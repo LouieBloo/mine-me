@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+
+/* Need vs Greed - Global Design Tokens */
+@theme {
+  --color-sol: #F59E0B; /* Amber 500 */
+  --color-lear: #10B981; /* Emerald 500 */
+  
+  --color-bg-dark: #0f172a; /* Slate 900 */
+  --color-panel: #1e293b; /* Slate 800 */
+  
+  --font-primary: 'Inter', system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-bg-dark);
+  color: white;
+  font-family: var(--font-primary);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}

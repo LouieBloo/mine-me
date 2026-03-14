@@ -35,7 +35,7 @@ A cooldown-based action that slightly increases either **Combat Score** or **Def
 Players can travel freely between different cities to access unique dungeons and professional resources. Traveling costs **1 month of Age**.
 
 ### 5.4 Trade
-Trading is conducted strictly through a global highly-regulated Marketplace or directly to NPCs. No 1-1 direct player trading. Players can choose to sell to NPCs for immediate Sol or list on the marketplace where prices are fixed by developers to control the economy.
+Trading is conducted strictly through a global highly-regulated Marketplace or directly to NPCs. No 1-1 direct player trading. Players can choose to sell items to NPCs for **more Sol** than they can get through selling to a player. This creates the "Greed" incentive: a player can take the higher NPC payout for themselves, or accept a lower price on the Marketplace to help another player gear up for the World Boss. Marketplace prices are fixed by developers to control the economy.
 
 ## 6. Combat System & Mechanics
 Combat uses simultaneous action phases between the player and the mob. 
@@ -53,7 +53,13 @@ Players are limited to **1 profession per character**, forcing player interdepen
 - **Herbalism:** Gather herbs using a Lopper (Herbs: Marifana, Bolstria, Aloe, Heroes Bane, Caffinica, Nostramica).
 - **Farming:** Grow crops using pots, soil, seeds, and water. Real-time fruiting cycles. (Crops: Corncobs, Prumpkins, Oonions, Taters, Chillums, Morpin).
 - **Lumberjack:** Chop and plant trees in city-specific forests. Forests have a global "health" meter; if depleted, the forest cannot grow until it regains health.
-- **Chemistry:** Use herbs and crops to craft potions.
+    - **List of Wood:**
+        - **Cedarbark:** Low rarity (1 Sol)
+        - **Oakbark:** Low rarity (1 Sol)
+        - **Ironbark:** Medium rarity (5 Sol)
+        - **Shadowwood:** Rare (10 Sol)
+        - **Whisperleaf:** Rare (12 Sol)
+        - **Elderwood:** Very rare (25 Sol)
 - **Blacksmithing:** Use minerals and wood to craft gear.
 
 ## 8. MMO & Social Aspects
@@ -76,7 +82,7 @@ A React-based internal tool to manage game configurations. Exports configuration
 - City data, Mob attributes, Item/Gear stats, Shopkeeper inventories, Experience curves, Profession and Dungeon definitions.
 
 ### 10.2 Client-Side Game
-Built using the latest version of **React**. Will incorporate a 2D canvas/WebGL framework for simple UI animations, character movement, and combat particle effects. Mobile-friendly but optimized for desktop browser experiences.
+Built using the latest version of **React**. We will use **PixiJS** (integrated via **@pixi/react**) as the 2D rendering engine for character movement, combat animations, and particle effects. This allows for a high-performance WebGL canvas to sit alongside a standard React/HTML UI. Mobile-friendly but optimized for desktop browser experiences.
 
 ### 10.3 Server-Side API
 High-performance backend written in **Node.js**.
@@ -84,15 +90,3 @@ High-performance backend written in **Node.js**.
 - **State Management:** Fast in-memory state for active boss fights handling hundreds of concurrent players. 
 - **Database:** **PostgreSQL** to handle heavy transactional data (trading, inventory, progression, currency).
 - **Security:** Strict server-side validation and rules-engine implementation to prevent cheating in combat, movement, and trading.
-
----
-
-# System Prompt For AI Agent Build
-
-You are an expert game developer who is tasked with taking the above PRD and creating the entire software stack to build the client-side, server-side, and tooling applications. You will use all modern day practices and build the game using the most up to date software packages and frameworks. You will always keep in mind performance at scale when writing the backend and front end projects. You will write tests for all relevant functions and pride yourself on an easily testable project.
-
-When implementing core logic such as classes, abilities, marketplaces, items, gear, potions, etc., you will use modern standards for class inheritance, object oriented principles, and functional programming when applicable. It should be easy to add and remove items, gears, etc. from the game as they have a great robust structure and easily inheritable properties and functions.
-
-When implementing the multiplayer and real time socket logic you will use your understanding of high performance and stable game development experience. The server side will be easily scaled and any socket connections will work regardless of servers scaling up and down to maintain load balancing. 
-
-You will need to make robust systems that can be easily expanded on, tested, and verified. Use this PRD as your absolute source of truth.

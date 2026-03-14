@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// ACCOUNT & PLAYER
+// ----------------------------------------------------------------------------
+model User {
+  id          String      @id @default(cuid())
+  phoneNumber String      @unique
+  familyName  String      @unique
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  characters  Character[]
+}
+
+model Character {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  
+  name           String
+  class          String    // 'Warrior', 'Mage', 'Rogue'
+  profession     String?   // 'Mining', 'Herbalism', etc.
+  
+  level          Int       @default(1)
+  combatScore    Int       @default(10)
+  defenseScore   Int       @default(10)
+  stamina        Int       @default(100)
+  maxStamina     Int       @default(100)
+  age            Int       @default(18) // Permadeath at 100
+  
+  sol            Int       @default(0)
+  lear           Int       @default(0)
+  
+  cityId         String
+  city           City      @relation(fields: [cityId], references: [id])
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  // Relationships
+  inventory      InventoryItem[] // 25 slots max
+}
+
+// ----------------------------------------------------------------------------
+// WORLD
+// ----------------------------------------------------------------------------
+model City {
+  id             String      @id @default(cuid())
+  name           String      @unique
+  description    String
+  characters     Character[]
+}
+
+// ----------------------------------------------------------------------------
+// ITEMS & INVENTORY
+// ----------------------------------------------------------------------------
+model InventoryItem {
+  id             String    @id @default(cuid())
+  characterId    String
+  character      Character @relation(fields: [characterId], references: [id])
+  
+  itemId         String
+  quantity       Int       @default(1)
+}
