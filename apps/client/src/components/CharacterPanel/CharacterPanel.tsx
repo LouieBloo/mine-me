@@ -1,4 +1,5 @@
 import type { PlayerState } from '@nvg/shared';
+import './CharacterPanel.css';
 
 interface Props {
   player: PlayerState | null;
@@ -74,13 +75,13 @@ export const CharacterPanel = ({ player }: Props) => {
             <div className="flex justify-between items-center">
               <span className="text-slate-300">Age</span>
               <span className="font-mono text-sm font-bold text-red-400">
-                {player.attributes.age} / 100 yrs
+                {Math.floor(player.attributes.ageInDays / 365)} / 100 yrs
               </span>
             </div>
             <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-red-500/50"
-                style={{ width: `${(player.attributes.age / 100) * 100}%` }}
+                style={{ width: `${((player.attributes.ageInDays / 365) / 100) * 100}%` }}
               />
             </div>
           </div>

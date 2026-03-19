@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 
 import { authRouter } from './routes/auth';
+import { adminRouter } from './routes/admin';
+import { charactersRouter } from './routes/characters';
 import { handleSocketConnection } from './sockets/handlers';
 
 dotenv.config();
@@ -25,6 +27,8 @@ app.use(express.json());
 
 // API Routes
 app.use('/auth', authRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/characters', charactersRouter);
 
 app.get('/health', (req: express.Request, res: express.Response) => {
   res.json({ status: 'NVG Server is running healthy.' });

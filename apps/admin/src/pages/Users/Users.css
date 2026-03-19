@@ -1,0 +1,5 @@
+/* Users specific styles if needed, currently inheriting tailwind classes in component */
+.users-container {
+  display: flex;
+  flex-direction: column;
+}

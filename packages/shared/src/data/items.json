@@ -1,0 +1,19 @@
+[
+  {
+    "id": "iron_ore",
+    "name": "Iron Ore",
+    "description": "Common mineral.",
+    "type": "Material",
+    "priceSol": 10,
+    "rarity": "Low"
+  },
+  {
+    "id": "iron_dagger",
+    "name": "Iron Dagger",
+    "description": "A simple sharp blade.",
+    "type": "Weapon",
+    "priceSol": 50,
+    "rarity": "Low",
+    "properties": { "damage": 5 }
+  }
+]

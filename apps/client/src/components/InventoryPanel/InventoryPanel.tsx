@@ -1,4 +1,5 @@
 import type { PlayerInventory } from '@nvg/shared';
+import './InventoryPanel.css';
 
 interface Props {
   inventory: PlayerInventory | null;

@@ -7,7 +7,7 @@ export interface PlayerAttributes {
   defenseScore: number;
   stamina: number;
   maxStamina: number;
-  age: number; // in years
+  ageInDays: number; // minimum unit of time
 }
 
 export interface PlayerInventory {

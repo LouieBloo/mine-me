@@ -1,38 +1,42 @@
-import { CharacterPanel } from '../components/CharacterPanel';
-import { InventoryPanel } from '../components/InventoryPanel';
-import { PixiCanvas } from '../components/game/PixiCanvas';
+import { CharacterPanel } from '../../components/CharacterPanel/CharacterPanel';
+import { InventoryPanel } from '../../components/InventoryPanel/InventoryPanel';
+import { Navigate } from 'react-router-dom';
 import type { PlayerState } from '@nvg/shared';
+import { useGame } from '../../contexts/GameContext';
+import { useAuth } from '../../hooks/useAuth';
+import './HomeView.css';
 
-// Temporary mock state to demonstrate the UI until WebSockets are wired up
-const MOCK_PLAYER: PlayerState = {
-  id: 'phone_hash_123',
-  familyName: 'Stark',
-  characterName: 'Arya',
-  characterClass: 'Rogue',
-  profession: 'Herbalism',
-  sol: 1450,
-  lear: 3,
-  attributes: {
-    level: 14,
-    combatScore: 120,
-    defenseScore: 45,
-    stamina: 85,
-    maxStamina: 100,
-    age: 24
-  },
-  inventory: {
-    slots: 25,
-    items: [
-      { id: '1', name: 'Aloe', description: 'Heals', type: 'Material', priceSol: 3, rarity: 'Medium' },
-      { id: '2', name: 'Iron Dagger', description: 'Sharp', type: 'Weapon', priceSol: 50 },
-      { id: '3', name: 'Iron Dagger', description: 'Sharp', type: 'Weapon', priceSol: 50 },
-    ]
-  },
-  gear: {}
-};
+export const HomeView = () => {
+  const { activeCharacter } = useGame();
+  const { user } = useAuth();
 
-export const CityView = () => {
-  const player = MOCK_PLAYER;
+  if (!activeCharacter) {
+    return <Navigate to="/characters" replace />;
+  }
+
+  // Map the backend character to the PlayerState the UI expects
+  const player: PlayerState = {
+    id: activeCharacter.id,
+    familyName: user?.familyName || 'Unknown',
+    characterName: activeCharacter.name,
+    characterClass: activeCharacter.class as any,
+    profession: activeCharacter.profession as any,
+    sol: activeCharacter.sol,
+    lear: activeCharacter.lear,
+    attributes: {
+      level: activeCharacter.level,
+      combatScore: activeCharacter.combatScore,
+      defenseScore: activeCharacter.defenseScore,
+      stamina: activeCharacter.stamina,
+      maxStamina: activeCharacter.maxStamina,
+      ageInDays: activeCharacter.ageInDays
+    },
+    inventory: {
+      slots: 25,
+      items: [] // Invertory will be fetched separately later
+    },
+    gear: {}
+  };
 
   return (
     <div className="flex h-full w-full bg-slate-900 overflow-hidden">
@@ -60,9 +64,11 @@ export const CityView = () => {
           </div>
         </div>
 
-        {/* The Actual WebGL Canvas */}
-        <div className="flex-1 w-full h-full">
-          <PixiCanvas />
+        {/* The Actual WebGL Canvas (Disabled for now) */}
+        <div className="flex-1 w-full h-full bg-slate-800 flex items-center justify-center">
+          <div className="text-slate-500 font-bold uppercase tracking-widest text-xl">
+            2D Engine Disabled
+          </div>
         </div>
       </div>
 

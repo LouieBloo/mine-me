@@ -1,0 +1,21 @@
+/* Scoped styles for Auth view */
+.bg-panel {
+    background-color: var(--color-panel);
+}
+
+.text-sol {
+    color: var(--color-sol);
+}
+
+.focus\:ring-sol:focus {
+    --tw-ring-color: var(--color-sol);
+}
+
+.bg-sol {
+    background-color: var(--color-sol);
+}
+
+/* Add any specific animations or glow effects here */
+.animate-glow {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+}

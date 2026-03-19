@@ -85,7 +85,7 @@ A React-based internal tool to manage game configurations. Exports configuration
 Built using the latest version of **React**. We will use **PixiJS** (integrated via **@pixi/react**) as the 2D rendering engine for character movement, combat animations, and particle effects. This allows for a high-performance WebGL canvas to sit alongside a standard React/HTML UI. Mobile-friendly but optimized for desktop browser experiences.
 
 ### 10.3 Server-Side API
-High-performance backend written in **Node.js**.
+High-performance backend written in **Node.js (v24)**.
 - **Real-time Comms:** WebRTC or WebSockets for real-time boss fight synchronization.
 - **State Management:** Fast in-memory state for active boss fights handling hundreds of concurrent players. 
 - **Database:** **PostgreSQL** to handle heavy transactional data (trading, inventory, progression, currency).

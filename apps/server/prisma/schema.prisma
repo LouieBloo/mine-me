@@ -27,13 +27,14 @@ model Character {
   name           String
   class          String    // 'Warrior', 'Mage', 'Rogue'
   profession     String?   // 'Mining', 'Herbalism', etc.
+  status         CharacterStatus @default(ACTIVE)
   
   level          Int       @default(1)
   combatScore    Int       @default(10)
   defenseScore   Int       @default(10)
   stamina        Int       @default(100)
   maxStamina     Int       @default(100)
-  age            Int       @default(18) // Permadeath at 100
+  ageInDays      Int       @default(6570) // ~18 years in days (18 * 365)
   
   sol            Int       @default(0)
   lear           Int       @default(0)
@@ -45,22 +46,48 @@ model Character {
   updatedAt      DateTime  @updatedAt
   
   // Relationships
-  inventory      InventoryItem[] // 25 slots max
+  inventory      InventoryItem[]
+}
+
+enum CharacterStatus {
+  ACTIVE
+  DEAD
 }
 
 // ----------------------------------------------------------------------------
 // WORLD
 // ----------------------------------------------------------------------------
 model City {
-  id             String      @id @default(cuid())
+  id             String      @id // Fixed ID like 'city_start'
   name           String      @unique
   description    String
   characters     Character[]
+  dungeons       Dungeon[]
+}
+
+model Dungeon {
+  id             String      @id // Fixed ID like 'dungeon_forest_1'
+  name           String
+  description    String
+  cityId         String
+  city           City        @relation(fields: [cityId], references: [id])
+  minLevel       Int         @default(1)
+  encounters     Json        // Array of Mob IDs or encounter configs
 }
 
 // ----------------------------------------------------------------------------
 // ITEMS & INVENTORY
 // ----------------------------------------------------------------------------
+model Item {
+  id             String      @id // Fixed ID like 'iron_ore'
+  name           String
+  description    String
+  type           String      // 'Material', 'Potion', 'Gear', 'Weapon'
+  priceSol       Int
+  rarity         String      @default("Low")
+  properties     Json?       // Damage, Defense, etc.
+}
+
 model InventoryItem {
   id             String    @id @default(cuid())
   characterId    String
@@ -68,4 +95,17 @@ model InventoryItem {
   
   itemId         String
   quantity       Int       @default(1)
+}
+
+// ----------------------------------------------------------------------------
+// MOBS
+// ----------------------------------------------------------------------------
+model Mob {
+  id             String      @id // Fixed ID like 'mob_slime'
+  name           String
+  level          Int
+  health         Int
+  attack         Int
+  defense        Int
+  drops          Json        // Array of { itemId, chance, quantity }
 }

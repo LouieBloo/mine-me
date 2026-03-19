@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { MainMenu } from '../src/views/MainMenu';
-import { CityView } from '../src/views/CityView';
+import { MainMenu } from '../src/views/MainMenu/MainMenu';
+import { HomeView } from '../src/views/HomeView/HomeView';
+import { GameProvider } from '../src/contexts/GameContext';
+import { AuthProvider } from '../src/contexts/AuthContext';
 
-vi.mock('../src/components/game/PixiCanvas', () => ({
-  PixiCanvas: () => <div data-testid="mock-pixi-canvas" />
-}));
+// PixiCanvas mock removed as it is not used for now
 
 describe('Client UI Components', () => {
   it('should render the Main Menu with the game title', () => {
@@ -20,10 +20,29 @@ describe('Client UI Components', () => {
     expect(screen.getByText(/Play Game/i)).toBeDefined();
   });
 
-  it('should render the City View with character stats', () => {
+  it('should render the HomeView wrapped with GameProvider', () => {
+    localStorage.setItem('nvg_active_character', JSON.stringify({
+      id: '1', 
+      name: 'Arya', 
+      class: 'Rogue', 
+      level: 14, 
+      status: 'ACTIVE',
+      sol: 100,
+      lear: 5,
+      stamina: 100,
+      maxStamina: 100,
+      combatScore: 50,
+      defenseScore: 20,
+      ageInDays: 7000,
+      createdAt: new Date().toISOString()
+    }));
     render(
       <MemoryRouter>
-        <CityView />
+        <AuthProvider>
+          <GameProvider>
+            <HomeView />
+          </GameProvider>
+        </AuthProvider>
       </MemoryRouter>
     );
 

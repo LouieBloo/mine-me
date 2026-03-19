@@ -6,7 +6,7 @@ A browser-based, simplified MMORPG focused on the "Need vs. Greed" principle. Pl
 This project uses a modern **Turborepo** monorepo structure.
 - **Client App:** React, PixiJS (via `@pixi/react`), Tailwind CSS, Vite
 - **Admin App:** React, Tailwind CSS, Vite
-- **Server:** Node.js (v20+), Express.js, Socket.io, Prisma, PostgreSQL
+- **Server:** Node.js (v24), Express.js, Socket.io, Prisma, PostgreSQL
 - **Shared:** A dedicated TypeScript package for shared game logic and interfaces.
 - **Testing:** Vitest across all workspaces.
 
@@ -15,14 +15,37 @@ This project uses a modern **Turborepo** monorepo structure.
 ## 🚀 Getting Started
 
 ### Prerequisites
-1. **Node.js:** Ensure you are running **Node v20+** (Use `nvm use 20`).
+1. **Node.js:** Ensure you are running **Node v24+** (Use `nvm use 24`).
 2. **PostgreSQL:** A local or remote PostgreSQL database.
 
-### 1. Installation
-Run the following from the root of the project to install dependencies across all workspaces:
+### 🐳 Setting up PostgreSQL with Docker
+For local development, you can quickly spin up a database using Docker:
+
 ```bash
-npm install
+docker run -d \
+  --name nvg-postgres \
+  -e POSTGRES_USER=luke \
+  -e POSTGRES_PASSWORD=bigpoppa69 \
+  -e POSTGRES_DB=nvg_db \
+  -p 5432:5432 \
+  -v nvg_postgres_data_v4:/var/lib/postgresql \
+  postgres:latest
 ```
+
+> [!NOTE]
+> We use `/var/lib/postgresql` as the mount point to avoid directory permission and structure issues with Postgres 18+ images.
+
+### 1. Installation & Environment Setup
+Run the following from the root of the project to set up your environment (installs dependencies and initializes the database):
+```bash
+npm run setup
+```
+This script will ensure you are on the correct Node version, install all workspace dependencies, and set up the Prisma database schema.
+
+Alternatively, you can run the steps manually:
+1. Ensure you are on Node v24 (`nvm use`).
+2. Run `npm install`.
+3. Set up the database (see below).
 
 ### 2. Environment Variables
 Create a `.env` file inside `apps/server` with the following variables:

@@ -1,0 +1,7 @@
+.signup-form {
+    min-height: 200px;
+}
+
+.text-error {
+    color: #ef4444; /* red-500 */
+}

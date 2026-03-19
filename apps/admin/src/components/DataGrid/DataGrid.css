@@ -1,0 +1,39 @@
+/* AG Grid Styles - Using v33+ Theming API */
+
+/* AG Grid Styles - Using v33+ Theming API */
+
+.nvg-admin-grid {
+    --ag-grid-size: 8px;
+    --ag-list-item-height: 48px;
+    --ag-header-height: 56px;
+    --ag-font-size: 14px;
+    --ag-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    --ag-background-color: #ffffff;
+    --ag-header-background-color: #f8fafc;
+    --ag-border-color: #f1f5f9;
+    --ag-row-hover-color: #f8fafc;
+    --ag-selected-row-color: #f1f5f9;
+    --ag-odd-row-background-color: #fafafa;
+    --ag-header-column-separator-display: block;
+    --ag-header-column-separator-color: #e2e8f0;
+    --ag-border-radius: 12px;
+}
+
+.ag-header-cell-label {
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.075em;
+    color: #475569;
+    font-size: 11px;
+}
+
+.ag-row {
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.ag-cell {
+    display: flex;
+    align-items: center;
+    color: #1e293b;
+    font-weight: 500;
+}

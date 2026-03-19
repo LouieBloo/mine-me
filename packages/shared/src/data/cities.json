@@ -1,0 +1,12 @@
+[
+  {
+    "id": "city_iron",
+    "name": "Ironcrest",
+    "description": "A rugged industrial city."
+  },
+  {
+    "id": "city_start",
+    "name": "Town of Beginnings",
+    "description": "A peaceful starter town. test 123test"
+  }
+]

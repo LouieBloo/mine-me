@@ -1,0 +1,13 @@
+[
+  {
+    "id": "mob_slime",
+    "name": "Slime",
+    "level": 1,
+    "health": 20,
+    "attack": 2,
+    "defense": 1,
+    "drops": [
+      { "itemId": "gel", "chance": 50, "quantity": [1, 2] }
+    ]
+  }
+]

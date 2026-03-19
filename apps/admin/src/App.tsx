@@ -1,10 +1,12 @@
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
-import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Cities from './pages/Cities';
-import Items from './pages/Items';
-import Mobs from './pages/Mobs';
-import Rates from './pages/Rates';
+import Layout from './components/Layout/Layout';
+import Dashboard from './pages/Dashboard/Dashboard';
+import Cities from './pages/Cities/Cities';
+import Items from './pages/Items/Items';
+import Mobs from './pages/Mobs/Mobs';
+import Rates from './pages/Rates/Rates';
+import Users from './pages/Users/Users';
+import { EntityDetail } from './pages/EntityDetail/EntityDetail';
 import './App.css';
 
 const router = createBrowserRouter([
@@ -31,6 +33,14 @@ const router = createBrowserRouter([
       {
         path: "rates",
         element: <Rates />
+      },
+      {
+        path: "users",
+        element: <Users />
+      },
+      {
+        path: ":entity/:id",
+        element: <EntityDetail />
       }
     ]
   }
