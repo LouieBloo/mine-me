@@ -2,15 +2,19 @@ import { useEffect, useState } from 'react';
 import { DataGrid } from '../../components/DataGrid/DataGrid';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
+import { useApi } from '../../hooks/useApi';
+import { useNavigate } from 'react-router-dom';
 import './Items.css';
 
 export default function Items() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
+  const { fetchWithAuth } = useApi();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/admin/items')
+    fetchWithAuth('/api/admin/items')
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch items');
         return res.json();
@@ -29,7 +33,10 @@ export default function Items() {
     { field: 'id', headerName: 'ID', minWidth: 150 },
     { field: 'name', headerName: 'Name' },
     { field: 'type', headerName: 'Type' },
-    { field: 'priceSol', headerName: 'Price (Sol)' },
+    { field: 'vendorBuyPrice', headerName: 'V. Buy' },
+    { field: 'vendorSellPrice', headerName: 'V. Sell' },
+    { field: 'userSellPrice', headerName: 'U. Sell' },
+    { field: 'userBuyPrice', headerName: 'U. Buy' },
     { field: 'rarity', headerName: 'Rarity' }
   ];
 
@@ -40,7 +47,9 @@ export default function Items() {
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">ITEMS</h2>
           <p className="text-slate-500 font-medium">Manage game items, gear, and materials.</p>
         </div>
-        <button className="cursor-pointer px-4 py-2 bg-slate-900 text-white font-bold rounded shadow hover:bg-slate-800 transition-all">
+        <button 
+          onClick={() => navigate('/items/new')}
+          className="cursor-pointer px-4 py-2 bg-slate-900 text-white font-bold rounded shadow hover:bg-slate-800 transition-all">
           + Add Item
         </button>
       </div>

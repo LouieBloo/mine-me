@@ -2,15 +2,19 @@ import { useEffect, useState } from 'react';
 import { DataGrid } from '../../components/DataGrid/DataGrid';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
+import { useApi } from '../../hooks/useApi';
+import { useNavigate } from 'react-router-dom';
 import './Cities.css';
 
 export default function Cities() {
   const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
+  const { fetchWithAuth } = useApi();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/admin/cities')
+    fetchWithAuth('/api/admin/cities')
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch cities');
         return res.json();
@@ -38,7 +42,9 @@ export default function Cities() {
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">CITIES</h2>
           <p className="text-slate-500 font-medium">Manage in-game locations and travel points.</p>
         </div>
-        <button className="cursor-pointer px-4 py-2 bg-slate-900 text-white font-bold rounded shadow hover:bg-slate-800 transition-all">
+        <button 
+          onClick={() => navigate('/cities/new')}
+          className="cursor-pointer px-4 py-2 bg-slate-900 text-white font-bold rounded shadow hover:bg-slate-800 transition-all">
           + Add City
         </button>
       </div>

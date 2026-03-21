@@ -4,23 +4,23 @@ import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
 import { useNavigate } from 'react-router-dom';
-import './Mobs.css';
+import './Inventory.css';
 
-export default function Mobs() {
-  const [mobs, setMobs] = useState([]);
+export default function Inventory() {
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
   const { fetchWithAuth } = useApi();
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchWithAuth('/api/admin/mobs')
+    fetchWithAuth('/api/admin/inventory-items')
       .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch mobs');
+        if (!res.ok) throw new Error('Failed to fetch inventory items');
         return res.json();
       })
       .then(data => {
-        setMobs(data);
+        setItems(data);
         setLoading(false);
       })
       .catch(err => {
@@ -31,29 +31,31 @@ export default function Mobs() {
 
   const columnDefs = [
     { field: 'id', headerName: 'ID', minWidth: 200 },
-    { field: 'name', headerName: 'Name' },
-    { field: 'level', headerName: 'Level' },
-    { field: 'health', headerName: 'Health' },
-    { field: 'attack', headerName: 'Atk' },
-    { field: 'defense', headerName: 'Def' }
+    { 
+      field: 'character.name', 
+      headerName: 'Character',
+      valueGetter: (params: any) => params.data.character?.name || 'N/A'
+    },
+    { field: 'itemId', headerName: 'Item ID' },
+    { field: 'quantity', headerName: 'Quantity' }
   ];
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">MOBS</h2>
-          <p className="text-slate-500 font-medium">Manage enemy NPCs and mob types.</p>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight text-center uppercase">INVENTORY</h2>
+          <p className="text-slate-500 font-medium">Manage and review player inventory items.</p>
         </div>
         <button 
-          onClick={() => navigate('/mobs/new')}
+          onClick={() => navigate('/inventory-items/new')}
           className="cursor-pointer px-4 py-2 bg-slate-900 text-white font-bold rounded shadow hover:bg-slate-800 transition-all">
-          + Add Mob
+          + Manually Add Item
         </button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
-        {loading ? <LoadingSpinner size={60} /> : <DataGrid rowData={mobs} columnDefs={columnDefs} entityName="mobs" />}
+        {loading ? <LoadingSpinner size={60} /> : <DataGrid rowData={items} columnDefs={columnDefs} entityName="inventory-items" />}
       </div>
     </div>
   );

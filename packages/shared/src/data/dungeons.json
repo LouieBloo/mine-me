@@ -5,8 +5,17 @@
     "description": "A dark smelly cave.",
     "cityId": "city_start",
     "minLevel": 1,
-    "encounters": [
-      { "mobId": "mob_slime", "count": 1 }
+    "levels": [
+      {
+        "id": "cmn0jtfnh0001f2xqz0qmmy5d",
+        "dungeonId": "dungeon_goblin_cave",
+        "name": "Level 1",
+        "orderIndex": 0,
+        "mobs": [
+          "mob_slime",
+          "mob_slime"
+        ]
+      }
     ]
   }
 ]

@@ -6,13 +6,28 @@ import Items from './pages/Items/Items';
 import Mobs from './pages/Mobs/Mobs';
 import Rates from './pages/Rates/Rates';
 import Users from './pages/Users/Users';
+import Login from './pages/Login/Login';
+import Inventory from './pages/Inventory/Inventory';
+import Dungeons from './pages/Dungeons/Dungeons';
+import DungeonDetail from './pages/Dungeons/DungeonDetail';
 import { EntityDetail } from './pages/EntityDetail/EntityDetail';
+import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
+import { AuthProvider } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 import './App.css';
 
 const router = createBrowserRouter([
   {
+    path: "/login",
+    element: <Login />
+  },
+  {
     path: "/",
-    element: <Layout />,
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -39,6 +54,18 @@ const router = createBrowserRouter([
         element: <Users />
       },
       {
+        path: "inventory-items",
+        element: <Inventory />
+      },
+      {
+        path: "dungeons",
+        element: <Dungeons />
+      },
+      {
+        path: "dungeons/:id",
+        element: <DungeonDetail />
+      },
+      {
         path: ":entity/:id",
         element: <EntityDetail />
       }
@@ -47,7 +74,13 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <ToastProvider>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </ToastProvider>
+  );
 }
 
 export default App;

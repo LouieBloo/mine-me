@@ -16,6 +16,7 @@ model User {
   familyName  String      @unique
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  isAdmin     Boolean     @default(false)
   characters  Character[]
 }
 
@@ -66,13 +67,22 @@ model City {
 }
 
 model Dungeon {
-  id             String      @id // Fixed ID like 'dungeon_forest_1'
+  id             String         @id // Fixed ID like 'dungeon_forest_1'
   name           String
   description    String
   cityId         String
-  city           City        @relation(fields: [cityId], references: [id])
-  minLevel       Int         @default(1)
-  encounters     Json        // Array of Mob IDs or encounter configs
+  city           City           @relation(fields: [cityId], references: [id])
+  minLevel       Int            @default(1)
+  levels         DungeonLevel[]
+}
+
+model DungeonLevel {
+  id        String   @id @default(cuid())
+  dungeonId String
+  dungeon   Dungeon  @relation(fields: [dungeonId], references: [id])
+  name      String
+  orderIndex Int     @default(0)
+  mobs      Json     // Array of mob IDs or encounter configs
 }
 
 // ----------------------------------------------------------------------------
@@ -83,9 +93,11 @@ model Item {
   name           String
   description    String
   type           String      // 'Material', 'Potion', 'Gear', 'Weapon'
-  priceSol       Int
+  vendorBuyPrice Int         @default(0)
+  vendorSellPrice Int        @default(0)
+  userSellPrice  Int         @default(0)
+  userBuyPrice   Int         @default(0)
   rarity         String      @default("Low")
-  properties     Json?       // Damage, Defense, etc.
 }
 
 model InventoryItem {

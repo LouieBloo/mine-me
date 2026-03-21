@@ -4,13 +4,13 @@ interface User {
   id: string;
   phoneNumber: string;
   familyName: string;
+  isAdmin: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
-  signup: (familyName: string, phoneNumber: string) => Promise<void>;
   signin: (phoneNumber: string) => Promise<void>;
   logout: () => void;
   error: string | null;
@@ -22,45 +22,17 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('nvg_token'));
+  const [token, setToken] = useState<string | null>(localStorage.getItem('nvg_admin_token'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('nvg_user');
+    const savedUser = localStorage.getItem('nvg_admin_user');
     if (savedUser && token) {
       setUser(JSON.parse(savedUser));
     }
     setLoading(false);
   }, [token]);
-
-  const signup = async (familyName: string, phoneNumber: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`${API_URL}/auth/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyName, phoneNumber }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Signup failed');
-      }
-
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem('nvg_token', data.token);
-      localStorage.setItem('nvg_user', JSON.stringify(data.user));
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const signin = async (phoneNumber: string) => {
     setLoading(true);
@@ -78,10 +50,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error(data.error || 'Signin failed');
       }
 
+      // Check if user is admin
+      if (!data.user.isAdmin) {
+        throw new Error('Access denied. Admin privileges required.');
+      }
+
       setToken(data.token);
       setUser(data.user);
-      localStorage.setItem('nvg_token', data.token);
-      localStorage.setItem('nvg_user', JSON.stringify(data.user));
+      localStorage.setItem('nvg_admin_token', data.token);
+      localStorage.setItem('nvg_admin_user', JSON.stringify(data.user));
     } catch (err: any) {
       setError(err.message);
       throw err;
@@ -93,12 +70,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem('nvg_token');
-    localStorage.removeItem('nvg_user');
+    localStorage.removeItem('nvg_admin_token');
+    localStorage.removeItem('nvg_admin_user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, signup, signin, logout, error }}>
+    <AuthContext.Provider value={{ user, token, loading, signin, logout, error }}>
       {children}
     </AuthContext.Provider>
   );

@@ -3,6 +3,12 @@ import request from 'supertest';
 import express from 'express';
 import { adminRouter } from '../src/routes/admin';
 
+// Mock the adminMiddleware to bypass auth during tests
+vi.mock('../src/middleware/auth', () => ({
+  adminMiddleware: (req: any, res: any, next: any) => next(),
+  authenticateToken: (req: any, res: any, next: any) => next(),
+}));
+
 const app = express();
 app.use(express.json());
 app.use('/admin', adminRouter);

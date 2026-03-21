@@ -31,7 +31,7 @@ export const CharacterSelection: React.FC = () => {
 
     const fetchCharacters = async () => {
         try {
-            const response = await fetch('http://localhost:4000/api/characters', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/characters`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();

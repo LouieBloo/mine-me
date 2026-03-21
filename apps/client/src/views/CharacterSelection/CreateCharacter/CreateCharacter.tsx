@@ -23,7 +23,7 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
         setError(null);
 
         try {
-            const response = await fetch('http://localhost:4000/api/characters', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/characters`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',

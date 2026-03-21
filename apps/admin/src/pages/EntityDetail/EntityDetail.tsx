@@ -2,18 +2,34 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
+import { useApi } from '../../hooks/useApi';
 import './EntityDetail.css';
 
 export const EntityDetail = () => {
   const { entity, id } = useParams();
+  const isNew = id === 'new';
   const navigate = useNavigate();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+
+  const getTemplate = (entityName: string | undefined) => {
+    switch (entityName) {
+      case 'mobs': return { id: '', name: '', level: 1, health: 10, attack: 1, defense: 1, drops: [] };
+      case 'items': return { id: '', name: '', description: '', type: 'Material', vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'Low' };
+      case 'cities': return { id: '', name: '', description: '' };
+      case 'users': return { phoneNumber: '', familyName: '', isAdmin: false };
+      case 'inventory-items': return { characterId: '', itemId: '', quantity: 1 };
+      default: return { id: '' };
+    }
+  };
+
+  const [data, setData] = useState<any>(isNew ? getTemplate(entity) : null);
+  const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+  const { fetchWithAuth } = useApi();
 
   useEffect(() => {
-    fetch(`http://localhost:4000/api/admin/${entity}/${id}`)
+    if (isNew) return;
+    fetchWithAuth(`/api/admin/${entity}/${id}`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch entity details');
         return res.json();
@@ -26,19 +42,24 @@ export const EntityDetail = () => {
         toast.error(err.message);
         setLoading(false);
       });
-  }, [entity, id]);
+  }, [entity, id, isNew]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch(`http://localhost:4000/api/admin/${entity}/${id}`, {
-        method: 'PUT',
+      const endpoint = isNew ? `/api/admin/${entity}` : `/api/admin/${entity}/${id}`;
+      const method = isNew ? 'POST' : 'PUT';
+      const res = await fetchWithAuth(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      if (!res.ok) throw new Error('Failed to save entity');
-      toast.success('Saved successfully!');
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || 'Failed to save entity');
+      }
+      toast.success(isNew ? 'Created successfully!' : 'Saved successfully!');
       navigate(`/${entity}`);
     } catch (err: any) {
       toast.error(err.message);
