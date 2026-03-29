@@ -14,7 +14,7 @@ export interface ResourceNode {
 }
 
 export interface ToolItem extends GameItem {
-  type: 'Material'; // Reusing type or adding 'Tool'? Let's check shared types.
+  type: 'MATERIAL';
   durability: number;
   maxDurability: number;
   professionType: Profession;

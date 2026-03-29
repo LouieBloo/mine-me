@@ -1,20 +1,16 @@
 [
   {
-    "id": "dungeon_goblin_cave",
-    "name": "Goblin Cave",
-    "description": "A dark smelly cave.",
-    "cityId": "city_start",
+    "id": "cmn207v6c0001u72gvuueipej",
+    "name": "Dungeon 1",
+    "description": "Testing",
+    "cityId": "cmn1zlln10002ihw4wqu4tnxb",
     "minLevel": 1,
     "levels": [
       {
-        "id": "cmn0jtfnh0001f2xqz0qmmy5d",
-        "dungeonId": "dungeon_goblin_cave",
-        "name": "Level 1",
-        "orderIndex": 0,
-        "mobs": [
-          "mob_slime",
-          "mob_slime"
-        ]
+        "id": "cmn20f8e90007u72gtwrkuo32",
+        "dungeonId": "cmn207v6c0001u72gvuueipej",
+        "name": "123123",
+        "orderIndex": 0
       }
     ]
   }

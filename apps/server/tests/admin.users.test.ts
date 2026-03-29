@@ -54,7 +54,7 @@ describe('Admin Users API Routes', () => {
   it('should update a user', async () => {
     const res = await request(app)
       .put('/admin/users/user_1')
-      .send({ familyName: 'Fam3' });
+      .send({ phoneNumber: '111', familyName: 'Fam3' });
     expect(res.status).toBe(200);
     expect(res.body.id).toBe('user_1');
     expect(res.body.familyName).toBe('Fam3');

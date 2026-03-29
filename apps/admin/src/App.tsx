@@ -11,6 +11,8 @@ import Inventory from './pages/Inventory/Inventory';
 import Dungeons from './pages/Dungeons/Dungeons';
 import DungeonDetail from './pages/Dungeons/DungeonDetail';
 import { EntityDetail } from './pages/EntityDetail/EntityDetail';
+import MobDetail from './pages/Mobs/MobDetail';
+import ItemDetail from './pages/Items/ItemDetail/ItemDetail';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -64,6 +66,14 @@ const router = createBrowserRouter([
       {
         path: "dungeons/:id",
         element: <DungeonDetail />
+      },
+      {
+        path: "mobs/:id",
+        element: <MobDetail />
+      },
+      {
+        path: "items/:id",
+        element: <ItemDetail />
       },
       {
         path: ":entity/:id",

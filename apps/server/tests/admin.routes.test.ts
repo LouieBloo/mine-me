@@ -44,12 +44,12 @@ vi.mock('../src/index', () => ({
 describe('Admin API Routes', () => {
 
   const endpoints = [
-    { path: '/admin/cities', data: { name: 'New City' } },
-    { path: '/admin/items', data: { name: 'New Item' } },
-    { path: '/admin/mobs', data: { name: 'New Mob' } },
-    { path: '/admin/dungeons', data: { name: 'New Dungeon' } },
+    { path: '/admin/cities', data: { name: 'New City', description: 'A city' } },
+    { path: '/admin/items', data: { name: 'New Item', description: 'An item', type: 'MATERIAL', subType: 'MINERAL', vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW' } },
+    { path: '/admin/mobs', data: { name: 'New Mob', level: 1, health: 10, attack: 1, defense: 1 } },
+    { path: '/admin/dungeons', data: { name: 'New Dungeon', description: 'A dungeon', cityId: 'city_1', minLevel: 1 } },
     { path: '/admin/dungeon-levels', data: { name: 'New Level' } },
-    { path: '/admin/inventory-items', data: { quantity: 1 } }
+    { path: '/admin/inventory-items', data: { characterId: 'char_1', itemId: 'item_1', quantity: 1 } }
   ];
 
   for (const { path, data } of endpoints) {
@@ -92,4 +92,31 @@ describe('Admin API Routes', () => {
       }
     });
   }
+
+  describe('DropTable Payload Mapping', () => {
+    it('maps dropTable for /admin/mobs POST', async () => {
+       const dropTable = { solMin: 10, solMax: 20, items: [{ itemId: 'item_1', chance: 50, minQuantity: 1, maxQuantity: 2 }] };
+       const res = await request(app).post('/admin/mobs').send({
+         name: 'DropTable Mob', level: 1, health: 10, attack: 1, defense: 1,
+         dropTable
+       });
+       expect(res.status).toBe(200);
+       expect(res.body.dropTable).toBeDefined();
+       expect(res.body.dropTable.create.solMin).toBe(10);
+       expect(res.body.dropTable.create.items.create[0].itemId).toBe('item_1');
+    });
+
+    it('maps completionDropTable and mobs for /admin/dungeon-levels POST', async () => {
+       const completionDropTable = { solMin: 100, solMax: 200, items: [] };
+       const mobs = [{ mobId: 'mob_x', dropTable: { solMin: 5, solMax: 10, items: [] } }];
+       const res = await request(app).post('/admin/dungeon-levels').send({
+         name: 'Boss Level', dungeonId: 'dungeon_1', orderIndex: 1,
+         completionDropTable, mobs
+       });
+       expect(res.status).toBe(200);
+       expect(res.body.completionDropTable.create.solMin).toBe(100);
+       expect(res.body.mobs.create[0].mobId).toBe('mob_x');
+       expect(res.body.mobs.create[0].dropTable.create.solMin).toBe(5);
+    });
+  });
 });

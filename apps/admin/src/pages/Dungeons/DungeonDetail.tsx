@@ -3,14 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
+import { EntityPicker } from '../../components/EntityPicker/EntityPicker';
+import { DropTableEditor } from '../../components/DropTableEditor/DropTableEditor';
 import './DungeonDetail.css';
 
 export default function DungeonDetail() {
   const { id } = useParams<{ id: string }>();
   const isNew = id === 'new';
   const navigate = useNavigate();
-  const [data, setData] = useState<any>(isNew ? { id: '', name: '', description: '', cityId: '', minLevel: 1, levels: [] } : null);
+  const [data, setData] = useState<any>(isNew ? { name: '', description: '', cityId: '', minLevel: 1, levels: [] } : null);
   const [allMobs, setAllMobs] = useState<any[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
@@ -55,7 +58,17 @@ export default function DungeonDetail() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dungeonData)
       });
-      if (!res.ok) throw new Error('Failed to save dungeon');
+      if (!res.ok) {
+        if (res.status === 400) {
+          const errData = await res.json();
+          const newErrors: any = {};
+          errData.errors?.forEach((e: any) => { newErrors[e.path] = e.msg; });
+          setErrors(newErrors);
+          throw new Error('Please fix the validation errors.');
+        }
+        throw new Error('Failed to save dungeon');
+      }
+      setErrors({});
       
       const savedDungeon = await res.json();
       toast.success('Dungeon saved successfully!');
@@ -84,14 +97,18 @@ export default function DungeonDetail() {
           dungeonId: data.id,
           name: level.name,
           orderIndex: level.orderIndex || index,
-          mobs: level.mobs || []
+          mobs: level.mobs || [],
+          completionDropTable: level.completionDropTable || null
         })
       });
       if (!res.ok) throw new Error('Failed to save level');
       const savedLevel = await res.json();
-      const newLevels = [...data.levels];
-      newLevels[index] = savedLevel;
-      setData({ ...data, levels: newLevels });
+      setData((prevData: any) => {
+        if (!prevData || !prevData.levels) return prevData;
+        const newLevels = [...prevData.levels];
+        newLevels[index] = savedLevel;
+        return { ...prevData, levels: newLevels };
+      });
       toast.success('Level saved!');
     } catch (err: any) {
       toast.error(err.message);
@@ -102,8 +119,11 @@ export default function DungeonDetail() {
 
   const handleDeleteLevel = async (level: any, index: number) => {
     if (!level.id) {
-       const newLevels = data.levels.filter((_: any, i: number) => i !== index);
-       setData({ ...data, levels: newLevels });
+       setData((prevData: any) => {
+         if (!prevData || !prevData.levels) return prevData;
+         const newLevels = prevData.levels.filter((_: any, i: number) => i !== index);
+         return { ...prevData, levels: newLevels };
+       });
        return;
     }
     
@@ -115,8 +135,11 @@ export default function DungeonDetail() {
         method: 'DELETE'
       });
       if (!res.ok) throw new Error('Failed to delete level');
-      const newLevels = data.levels.filter((l: any) => l.id !== level.id);
-      setData({ ...data, levels: newLevels });
+      setData((prevData: any) => {
+         if (!prevData || !prevData.levels) return prevData;
+         const newLevels = prevData.levels.filter((l: any) => l.id !== level.id);
+         return { ...prevData, levels: newLevels };
+      });
       toast.success('Level deleted');
     } catch (err: any) {
       toast.error(err.message);
@@ -151,6 +174,7 @@ export default function DungeonDetail() {
   
   const addLevel = () => {
     const newLevels = [...(data.levels || []), {
+      _tempId: Math.random().toString(36).substr(2, 9),
       name: `Level ${(data.levels?.length || 0) + 1}`,
       orderIndex: data.levels?.length || 0,
       mobs: []
@@ -182,17 +206,16 @@ export default function DungeonDetail() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-200">
         <form onSubmit={handleSave} className="p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-2">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">ID</label>
               <input
                 type="text"
-                value={data.id}
-                disabled={!isNew}
-                onChange={(e) => setData({ ...data, id: e.target.value })}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+                value={data.id || 'Auto-generated'}
+                disabled
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-500"
               />
             </div>
             <div className="space-y-2">
@@ -200,17 +223,25 @@ export default function DungeonDetail() {
               <input
                 type="text"
                 value={data.name}
-                onChange={(e) => setData({ ...data, name: e.target.value })}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+                onChange={(e) => {
+                   setData({ ...data, name: e.target.value });
+                   if (errors.name) setErrors({...errors, name: ''});
+                }}
+                className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.name ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
               />
+              {errors.name && <p className="text-red-500 text-xs font-bold mt-1 tracking-wide">{errors.name}</p>}
             </div>
             <div className="space-y-2">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">City ID</label>
-              <input
-                type="text"
+              <EntityPicker
+                entityType="cities"
                 value={data.cityId}
-                onChange={(e) => setData({ ...data, cityId: e.target.value })}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+                onChange={(id) => {
+                  setData({ ...data, cityId: id });
+                  if (errors.cityId) setErrors({...errors, cityId: ''});
+                }}
+                error={errors.cityId}
+                placeholder="Select a city..."
               />
             </div>
             <div className="space-y-2">
@@ -218,18 +249,35 @@ export default function DungeonDetail() {
               <input
                 type="number"
                 value={data.minLevel}
-                onChange={(e) => setData({ ...data, minLevel: Number(e.target.value) })}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+                onChange={(e) => {
+                  setData({ ...data, minLevel: Number(e.target.value) });
+                  if (errors.minLevel) setErrors({...errors, minLevel: ''});
+                }}
+                className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.minLevel ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
               />
+              {errors.minLevel && <p className="text-red-500 text-xs font-bold mt-1 tracking-wide">{errors.minLevel}</p>}
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Description</label>
               <textarea
                 value={data.description}
-                onChange={(e) => setData({ ...data, description: e.target.value })}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 h-24"
+                onChange={(e) => {
+                  setData({ ...data, description: e.target.value });
+                  if (errors.description) setErrors({...errors, description: ''});
+                }}
+                className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 h-24 transition-all ${errors.description ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
+              />
+              {errors.description && <p className="text-red-500 text-xs font-bold mt-1 tracking-wide">{errors.description}</p>}
+            </div>
+            <div className="space-y-2 md:col-span-2 pt-4 border-t border-slate-100">
+              <DropTableEditor
+                value={data.completionDropTable}
+                onChange={(completionDropTable) => setData({ ...data, completionDropTable })}
+                title="Dungeon Completion Drops"
+                description="Rewarded when a player successfully completes all levels of this dungeon."
               />
             </div>
+            
           </div>
           <div className="flex justify-end pt-4 border-t border-slate-100">
             <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">
@@ -250,7 +298,7 @@ export default function DungeonDetail() {
           
           <div className="space-y-4">
             {data.levels?.map((level: any, i: number) => (
-              <div key={level.id || `new-${i}`} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6">
+              <div key={level.id || level._tempId || `new-${i}`} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6">
                 
                 {/* Reorder controls */}
                 <div className="flex flex-col justify-center items-center bg-slate-50 rounded-lg p-2 gap-2 border border-slate-100">
@@ -264,9 +312,9 @@ export default function DungeonDetail() {
                 </div>
 
                 <div className="flex-grow space-y-4">
-                  <div className="flex flex-col md:flex-row gap-4 items-start">
-                    <div className="flex-grow w-full">
-                      <label className="text-xs font-bold text-slate-400 uppercase">Level Name</label>
+                  <div className="flex flex-col gap-6 items-start w-full">
+                    <div className="w-full">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Level Name</label>
                       <input 
                         type="text" 
                         value={level.name} 
@@ -275,42 +323,96 @@ export default function DungeonDetail() {
                           newLevels[i].name = e.target.value;
                           setData({ ...data, levels: newLevels });
                         }}
-                        className="w-full p-2 mt-1 border border-slate-200 rounded font-bold"
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:border-blue-400 transition-colors"
                       />
                     </div>
                     
-                    <div className="flex-grow w-full">
-                       <label className="text-xs font-bold text-slate-400 uppercase">Mobs in Level</label>
-                       {/* Simplified mob selection just using IDs by comma, or a multi-select. A text input of Json for now or simple select. Let's do a basic multi select experience */}
-                       <div className="mt-1 flex flex-wrap gap-2">
-                         {level.mobs?.map((mobId: string, mIndex: number) => (
-                           <span key={mIndex} className="bg-red-100 text-red-800 text-xs font-bold px-2 py-1 rounded-full flex items-center">
-                             {allMobs.find(m => m.id === mobId)?.name || mobId}
-                             <button onClick={() => {
+                    <div className="w-full">
+                       <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block border-b border-slate-100 pb-2">Mobs & Level Drops</label>
+                       
+                       <div className="mt-4 space-y-3">
+                         {level.mobs?.map((mob: any, mIndex: number) => {
+                           const mobId = typeof mob === 'string' ? mob : mob.mobId;
+                           const mobObj = typeof mob === 'string' ? { mobId } : mob;
+                           const mobDetails = allMobs.find(m => m.id === mobId);
+                           
+                           return (
+                             <div key={mIndex} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                               <div className="flex justify-between items-center">
+                                 <div className="font-bold text-slate-700 flex items-center space-x-2">
+                                   <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                                   <span>{mobDetails?.name || mobId}</span>
+                                 </div>
+                                 <div className="flex items-center space-x-2">
+                                    <button onClick={() => {
+                                       const newLevels = [...data.levels];
+                                       if (typeof newLevels[i].mobs[mIndex] === 'string') {
+                                         newLevels[i].mobs[mIndex] = { mobId: newLevels[i].mobs[mIndex] };
+                                       }
+                                       newLevels[i].mobs[mIndex]._expanded = !newLevels[i].mobs[mIndex]._expanded;
+                                       setData({...data, levels: newLevels});
+                                    }} className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                                      {mobObj._expanded ? 'Close Drops' : 'Edit Drops'}
+                                    </button>
+                                    <button onClick={() => {
+                                       const newLevels = [...data.levels];
+                                       newLevels[i].mobs = newLevels[i].mobs.filter((_: any, idx: number) => idx !== mIndex);
+                                       setData({...data, levels: newLevels});
+                                    }} className="text-xs font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">
+                                      Remove
+                                    </button>
+                                 </div>
+                               </div>
+                               
+                               {mobObj._expanded && (
+                                 <div className="mt-4 pt-4 border-t border-slate-200">
+                                    <DropTableEditor
+                                       value={mobObj.dropTable}
+                                       onChange={(dt) => {
+                                         const newLevels = [...data.levels];
+                                         newLevels[i].mobs[mIndex].dropTable = dt;
+                                         setData({...data, levels: newLevels});
+                                       }}
+                                       title="Extra Level Drops"
+                                       description="These drops are added onto the mob's base drops when killed in this level."
+                                    />
+                                 </div>
+                               )}
+                             </div>
+                           );
+                         })}
+                         
+                         <div className="w-64 pt-2">
+                           <EntityPicker
+                             entityType="mobs"
+                             value=""
+                             onChange={(id, item) => {
                                const newLevels = [...data.levels];
-                               newLevels[i].mobs = newLevels[i].mobs.filter((_: any, idx: number) => idx !== mIndex);
+                               newLevels[i].mobs = [...(newLevels[i].mobs || []), { mobId: id }];
                                setData({...data, levels: newLevels});
-                             }} className="ml-1 hover:text-red-900 border-l border-red-200 pl-1 ml-2">x</button>
-                           </span>
-                         ))}
-                         <select 
-                           className="bg-slate-50 border border-slate-200 rounded text-sm font-bold p-1"
-                           onChange={(e) => {
-                             if (!e.target.value) return;
-                             const newLevels = [...data.levels];
-                             newLevels[i].mobs = [...(newLevels[i].mobs || []), e.target.value];
-                             setData({...data, levels: newLevels});
-                             e.target.value = "";
-                           }}
-                           value=""
-                         >
-                           <option value="">+ Add Mob</option>
-                           {allMobs.map(m => (
-                             <option key={m.id} value={m.id}>{m.name} (Lv {m.level})</option>
-                           ))}
-                         </select>
+                               
+                               if (item && !allMobs.find(m => m.id === id)) {
+                                 setAllMobs([...allMobs, item]);
+                               }
+                             }}
+                             placeholder="+ Add Mob to Level"
+                           />
+                         </div>
                        </div>
                     </div>
+                  </div>
+                  
+                  <div className="mt-8 border-t border-slate-100 pt-6">
+                    <DropTableEditor
+                      value={level.completionDropTable}
+                      onChange={(dt) => {
+                         const newLevels = [...data.levels];
+                         newLevels[i].completionDropTable = dt;
+                         setData({...data, levels: newLevels});
+                      }}
+                      title="Level Completion Drops"
+                      description="Rewarded when a player successfully completes this specific level."
+                    />
                   </div>
                   
                   <div className="flex justify-end space-x-2 pt-2">

@@ -1,0 +1,42 @@
+@reference "../../index.css";
+
+.atlas-overview-card {
+  @apply bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden;
+}
+
+.atlas-preview-grid {
+  @apply grid grid-cols-1 lg:grid-cols-2 gap-8 p-8;
+}
+
+.atlas-image-container {
+  @apply relative aspect-video bg-slate-50 rounded-xl border-2 border-slate-100 overflow-auto flex items-center justify-center p-4;
+}
+
+.atlas-image-container img {
+  @apply max-w-none shadow-lg rounded;
+  image-rendering: pixelated;
+}
+
+.atlas-json-container {
+  @apply flex flex-col h-[400px];
+}
+
+.atlas-json-header {
+  @apply flex items-center justify-between mb-2;
+}
+
+.atlas-json-content {
+  @apply flex-1 bg-slate-900 rounded-xl p-4 font-mono text-xs text-blue-300 overflow-auto border border-slate-800 shadow-inner;
+}
+
+.upload-overlay {
+  @apply absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center transition-all opacity-0 pointer-events-none;
+}
+
+.upload-overlay.active {
+  @apply opacity-100 pointer-events-auto;
+}
+
+.drop-zone {
+  @apply w-full border-2 border-dashed border-slate-300 rounded-xl p-12 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 hover:border-blue-400 transition-all cursor-pointer;
+}

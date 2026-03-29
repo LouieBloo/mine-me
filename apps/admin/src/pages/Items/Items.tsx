@@ -33,6 +33,7 @@ export default function Items() {
     { field: 'id', headerName: 'ID', minWidth: 150 },
     { field: 'name', headerName: 'Name' },
     { field: 'type', headerName: 'Type' },
+    { field: 'subType', headerName: 'Sub Type' },
     { field: 'vendorBuyPrice', headerName: 'V. Buy' },
     { field: 'vendorSellPrice', headerName: 'V. Sell' },
     { field: 'userSellPrice', headerName: 'U. Sell' },

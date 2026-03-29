@@ -1,19 +1,28 @@
 [
   {
-    "id": "iron_ore",
-    "name": "Iron Ore",
-    "description": "Common mineral.",
-    "type": "Material",
-    "priceSol": 10,
-    "rarity": "Low"
+    "id": "cmnc9o3in00005z6u5nr4ttl3",
+    "name": "Basic Herb",
+    "description": "herb",
+    "type": "MATERIAL",
+    "subType": "HERB",
+    "vendorBuyPrice": 0,
+    "vendorSellPrice": 0,
+    "userSellPrice": 0,
+    "userBuyPrice": 0,
+    "rarity": "LOW",
+    "iconUrl": null
   },
   {
-    "id": "iron_dagger",
-    "name": "Iron Dagger",
-    "description": "A simple sharp blade.",
-    "type": "Weapon",
-    "priceSol": 50,
-    "rarity": "Low",
-    "properties": { "damage": 5 }
+    "id": "cmnc6ct730000k21bi04iybb4",
+    "name": "lumber",
+    "description": "lumber",
+    "type": "MATERIAL",
+    "subType": "LUMBER",
+    "vendorBuyPrice": 0,
+    "vendorSellPrice": 0,
+    "userSellPrice": 0,
+    "userBuyPrice": 0,
+    "rarity": "RARE",
+    "iconUrl": "/assets/icons/items/cmnc6ct730000k21bi04iybb4_icon.png"
   }
 ]

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
+import { EntityPicker } from '../../components/EntityPicker/EntityPicker';
 import './EntityDetail.css';
 
 export const EntityDetail = () => {
@@ -12,16 +13,17 @@ export const EntityDetail = () => {
 
   const getTemplate = (entityName: string | undefined) => {
     switch (entityName) {
-      case 'mobs': return { id: '', name: '', level: 1, health: 10, attack: 1, defense: 1, drops: [] };
-      case 'items': return { id: '', name: '', description: '', type: 'Material', vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'Low' };
-      case 'cities': return { id: '', name: '', description: '' };
+      case 'mobs': return { name: '', level: 1, health: 10, attack: 1, defense: 1, drops: [] };
+      case 'items': return { name: '', description: '', type: 'GEAR', subType: 'HEAD', vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW' };
+      case 'cities': return { name: '', description: '' };
       case 'users': return { phoneNumber: '', familyName: '', isAdmin: false };
       case 'inventory-items': return { characterId: '', itemId: '', quantity: 1 };
-      default: return { id: '' };
+      default: return {};
     }
   };
 
   const [data, setData] = useState<any>(isNew ? getTemplate(entity) : null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
@@ -56,9 +58,17 @@ export const EntityDetail = () => {
         body: JSON.stringify(data)
       });
       if (!res.ok) {
+        if (res.status === 400) {
+          const errData = await res.json();
+          const newErrors: any = {};
+          errData.errors?.forEach((e: any) => { newErrors[e.path] = e.msg; });
+          setErrors(newErrors);
+          throw new Error('Please fix the validation errors.');
+        }
         const errText = await res.text();
         throw new Error(errText || 'Failed to save entity');
       }
+      setErrors({});
       toast.success(isNew ? 'Created successfully!' : 'Saved successfully!');
       navigate(`/${entity}`);
     } catch (err: any) {
@@ -89,7 +99,7 @@ export const EntityDetail = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-200">
         <form onSubmit={handleSave} className="p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {Object.keys(data).map(key => {
@@ -101,25 +111,46 @@ export const EntityDetail = () => {
               return (
                 <div key={key} className="space-y-2">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest">{key}</label>
-                  {isJson ? (
+                  {key === 'cityId' ? (
+                     <EntityPicker entityType="cities" value={val} onChange={(id) => { setData({...data, [key]: id}); setErrors({...errors, [key]: ''}); }} error={errors[key]} />
+                  ) : key === 'characterId' ? (
+                     <EntityPicker entityType="characters" value={val} onChange={(id) => { setData({...data, [key]: id}); setErrors({...errors, [key]: ''}); }} error={errors[key]} />
+                  ) : key === 'itemId' && entity === 'inventory-items' ? (
+                     <EntityPicker entityType="items" value={val} onChange={(id) => { setData({...data, [key]: id}); setErrors({...errors, [key]: ''}); }} error={errors[key]} />
+                  ) : typeof val === 'boolean' ? (
+                     <input
+                       type="checkbox"
+                       checked={!!val}
+                       onChange={(e) => {
+                          setData({ ...data, [key]: e.target.checked });
+                          if (errors[key]) setErrors({...errors, [key]: ''});
+                       }}
+                       className="w-5 h-5 ml-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                     />
+                  ) : isJson ? (
                     <textarea
                       value={JSON.stringify(val, null, 2)}
                       onChange={(e) => {
                         try {
                            const parsed = JSON.parse(e.target.value);
                            setData({ ...data, [key]: parsed });
+                           if (errors[key]) setErrors({...errors, [key]: ''});
                         } catch (err) {}
                       }}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-32"
+                      className={`w-full p-3 bg-slate-50 border rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 transition-all h-32 ${errors[key] ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
                     />
                   ) : (
                     <input
                       type={typeof val === 'number' ? 'number' : 'text'}
                       value={val || ''}
-                      onChange={(e) => setData({ ...data, [key]: typeof val === 'number' ? Number(e.target.value) : e.target.value })}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      onChange={(e) => {
+                         setData({ ...data, [key]: typeof val === 'number' ? Number(e.target.value) : e.target.value });
+                         if (errors[key]) setErrors({...errors, [key]: ''});
+                      }}
+                      className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 transition-all ${errors[key] ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
                     />
                   )}
+                  {errors[key] && <p className="text-red-500 text-xs font-bold mt-1 tracking-wide">{errors[key]}</p>}
                 </div>
               );
             })}

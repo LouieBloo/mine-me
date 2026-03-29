@@ -16,12 +16,12 @@ export default function Layout() {
         <nav className="flex-grow flex flex-col p-4 gap-2">
           <NavLink to="/" className={navLinkClass}>Dashboard</NavLink>
           <NavLink to="/cities" className={navLinkClass}>Cities Editor</NavLink>
+          <NavLink to="/dungeons" className={navLinkClass}>Dungeons Editor</NavLink>
+          <NavLink to="/inventory-items" className={navLinkClass}>Inventory Editor</NavLink>
           <NavLink to="/items" className={navLinkClass}>Items Editor</NavLink>
           <NavLink to="/mobs" className={navLinkClass}>Mobs Editor</NavLink>
           <NavLink to="/rates" className={navLinkClass}>Rates Editor</NavLink>
           <NavLink to="/users" className={navLinkClass}>Users Editor</NavLink>
-          <NavLink to="/inventory-items" className={navLinkClass}>Inventory Editor</NavLink>
-          <NavLink to="/dungeons" className={navLinkClass}>Dungeons Editor</NavLink>
         </nav>
       </div>
       <div className="flex-grow flex flex-col">

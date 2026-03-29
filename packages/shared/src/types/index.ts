@@ -34,34 +34,94 @@ export interface PlayerState {
   }
 }
 
-export type ItemRarity = 'Low' | 'Medium' | 'Rare' | 'Very Rare';
+export type ItemRarity = 'LOW' | 'MEDIUM' | 'RARE' | 'VERY_RARE';
+
+export type ItemType = 'GEAR' | 'MATERIAL' | 'POTION';
+
+export type GearSubType = 'HEAD' | 'CHEST' | 'LEGGINGS' | 'BOOTS' | 'WEAPON';
+export type MaterialSubType = 'LUMBER' | 'MINERAL' | 'AGRICULTURE' | 'HERB';
+export type PotionSubType = 'HEALTH' | 'STAMINA';
+
+export type ItemSubType = GearSubType | MaterialSubType | PotionSubType;
+
+export const ITEM_TYPES: ItemType[] = ['GEAR', 'MATERIAL', 'POTION'];
+
+export const ITEM_SUBTYPES: Record<ItemType, string[]> = {
+  GEAR: ['HEAD', 'CHEST', 'LEGGINGS', 'BOOTS', 'WEAPON'],
+  MATERIAL: ['LUMBER', 'MINERAL', 'AGRICULTURE', 'HERB'],
+  POTION: ['HEALTH', 'STAMINA'],
+};
+
+export const ITEM_RARITIES: ItemRarity[] = ['LOW', 'MEDIUM', 'RARE', 'VERY_RARE'];
 
 export interface GameItem {
   id: string;
   name: string;
   description: string;
-  type: 'Material' | 'Potion' | 'Gear' | 'Weapon';
+  type: ItemType;
+  subType: ItemSubType;
   priceSol: number;
   rarity?: ItemRarity;
 }
 
 export interface PotionItem extends GameItem {
-  type: 'Potion';
+  type: 'POTION';
+  subType: PotionSubType;
   effectType: 'Health' | 'Stamina' | 'Attack' | 'Defense';
   duration: 'Instant' | 'Round' | 'Lasting';
-  power: number; // The percentage boost or raw heal amount
+  power: number;
 }
 
 export interface GearItem extends GameItem {
-  type: 'Gear';
-  slot: 'Head' | 'Chest' | 'Leggings' | 'Boots';
+  type: 'GEAR';
+  subType: GearSubType;
   defenseBonus: number;
 }
 
-export interface WeaponItem extends GameItem {
-  type: 'Weapon';
+export interface WeaponItem extends GearItem {
+  subType: 'WEAPON';
   damage: number;
 }
+
+export interface MobAtlas {
+  url: string;
+  atlasUrl: string;
+}
+
+export interface DropTableItem {
+  id?: string;
+  itemId: string;
+  chance: number; // 0 to 100
+  minQuantity: number;
+  maxQuantity: number;
+  item?: GameItem; // populated sometimes by backend
+}
+
+export interface DropTable {
+  id?: string;
+  solMin: number;
+  solMax: number;
+  items: DropTableItem[];
+}
+
+export interface DungeonLevelMob {
+  id?: string;
+  mobId: string;
+  mob?: Mob;
+  dropTable?: DropTable;
+}
+
+export interface Mob {
+  id: string;
+  name: string;
+  level: number;
+  health: number;
+  attack: number;
+  defense: number;
+  dropTable?: DropTable;
+  animations?: MobAtlas;
+}
+
 
 export * from './combat';
 export * from './professions';

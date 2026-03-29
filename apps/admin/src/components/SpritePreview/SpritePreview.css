@@ -1,0 +1,9 @@
+@reference "../../index.css";
+
+.sprite-preview-unified {
+  @apply relative w-full overflow-auto bg-slate-900 rounded-xl border border-slate-700 shadow-inner flex items-center justify-center min-h-[240px];
+}
+
+.sprite-preview-unified canvas {
+  image-rendering: pixelated;
+}

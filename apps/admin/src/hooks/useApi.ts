@@ -7,11 +7,14 @@ export const useApi = () => {
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
         const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
 
-        const headers = {
+        const headers: any = {
             ...options.headers,
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
         };
+
+        if (!(options.body instanceof FormData)) {
+            headers['Content-Type'] = 'application/json';
+        }
 
         const response = await fetch(fullUrl, {
             ...options,

@@ -1,13 +1,54 @@
 [
   {
-    "id": "mob_slime",
-    "name": "Slime",
+    "id": "cmn1zl1bk0001ihw48b0c492z",
+    "name": "Dawg",
     "level": 1,
-    "health": 20,
-    "attack": 2,
+    "health": 10,
+    "attack": 1,
+    "defense": 2,
+    "animations": {
+      "url": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_sprite.png",
+      "atlasUrl": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_atlas.json"
+    },
+    "dropTable": null
+  },
+  {
+    "id": "cmn1zb9op0000ihw4mgknuvlr",
+    "name": "Small Cat",
+    "level": 1,
+    "health": 10,
+    "attack": 1,
     "defense": 1,
-    "drops": [
-      { "itemId": "gel", "chance": 50, "quantity": [1, 2] }
-    ]
+    "animations": {
+      "url": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_sprite.png",
+      "atlasUrl": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_atlas.json"
+    },
+    "dropTable": {
+      "id": "cmnc7fsio0000gnbafymg0efo",
+      "solMin": 20,
+      "solMax": 50,
+      "mobId": "cmn1zb9op0000ihw4mgknuvlr",
+      "dungeonId": null,
+      "dungeonLevelId": null,
+      "dungeonLevelMobId": null,
+      "items": [
+        {
+          "id": "cmnc9of7600065z6uu9om90b5",
+          "dropTableId": "cmnc7fsio0000gnbafymg0efo",
+          "itemId": "cmnc6ct730000k21bi04iybb4",
+          "chance": 10,
+          "minQuantity": 1,
+          "maxQuantity": 1
+        },
+        {
+          "id": "cmnc9of7600075z6ubbutagaq",
+          "dropTableId": "cmnc7fsio0000gnbafymg0efo",
+          "itemId": "cmnc9o3in00005z6u5nr4ttl3",
+          "chance": 50,
+          "minQuantity": 1,
+          "maxQuantity": 1
+        }
+      ]
+    }
   }
 ]

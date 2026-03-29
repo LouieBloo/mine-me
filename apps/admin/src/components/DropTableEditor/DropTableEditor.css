@@ -1,0 +1,14 @@
+@reference "../../index.css";
+
+.drop-table-editor {
+  @apply space-y-4;
+}
+
+.drop-item-row {
+  @apply items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm relative transition-all;
+}
+
+.drop-item-row:hover {
+  @apply border-slate-300;
+}
+
