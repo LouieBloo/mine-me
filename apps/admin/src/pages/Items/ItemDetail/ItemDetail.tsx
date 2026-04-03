@@ -5,6 +5,7 @@ import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../../hooks/useApi';
 import type { ItemType } from '@nvg/shared/types';
 import ItemIconUpload from './ItemIconUpload';
+import ItemGearUpload from './ItemGearUpload';
 import './ItemDetail.css';
 
 interface ItemEnums {
@@ -20,7 +21,7 @@ export default function ItemDetail() {
 
   const [data, setData] = useState<any>(isNew ? {
     name: '', description: '', type: 'GEAR', subType: 'HEAD',
-    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW'
+    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', isStartingPiece: false
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -185,6 +186,20 @@ export default function ItemDetail() {
               </select>
               {errors.rarity && <p className="text-red-500 text-xs font-bold mt-1">{errors.rarity}</p>}
             </div>
+
+            {/* Starting Piece toggle */}
+            <div className="space-y-2 md:col-span-2 flex items-center pt-2">
+              <label className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">
+                <input
+                  type="checkbox"
+                  checked={data.isStartingPiece || false}
+                  onChange={(e) => { setData({ ...data, isStartingPiece: e.target.checked }); if (errors.isStartingPiece) setErrors({ ...errors, isStartingPiece: '' }); }}
+                  className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Is Starting Piece (Character Creator)
+              </label>
+              {errors.isStartingPiece && <p className="text-red-500 text-xs font-bold mt-1">{errors.isStartingPiece}</p>}
+            </div>
           </div>
 
           <h3 className="text-xl font-black text-slate-800 border-b border-slate-100 pb-2 pt-4">Pricing</h3>
@@ -218,6 +233,11 @@ export default function ItemDetail() {
             itemId={id!} 
             iconUrl={data.iconUrl} 
             onUploadSuccess={(updatedItem) => setData(updatedItem)} 
+          />
+          <ItemGearUpload
+            itemId={id!}
+            gearImageUrl={data.gearImageUrl}
+            onUploadSuccess={(updatedItem) => setData(updatedItem)}
           />
         </div>
       )}

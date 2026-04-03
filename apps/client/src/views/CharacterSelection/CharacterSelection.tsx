@@ -5,6 +5,8 @@ import { CreateCharacter } from './CreateCharacter/CreateCharacter';
 import { useAuth } from '../../hooks/useAuth';
 import './CharacterSelection.css';
 
+import { type GameItem } from '@nvg/shared';
+
 export interface Character {
     id: string;
     name: string;
@@ -20,6 +22,10 @@ export interface Character {
     lear: number;
     ageInDays: number;
     createdAt: string;
+    inventory?: {
+        item: GameItem;
+        quantity: number;
+    }[];
 }
 
 export const CharacterSelection: React.FC = () => {
@@ -59,9 +65,9 @@ export const CharacterSelection: React.FC = () => {
     };
 
     return (
-        <div className="character-selection-container flex h-screen bg-bg-dark overflow-hidden">
+        <div className="character-selection-container flex min-h-screen bg-bg-dark">
             {/* Left/Middle: Preview Area */}
-            <div className="flex-1 flex flex-col items-center justify-center relative p-8">
+            <div className={`flex-1 flex flex-col items-center relative p-8 ${showCreate ? 'justify-start pt-12 pb-24' : 'justify-center h-screen sticky top-0'}`}>
                 {showCreate ? (
                     <CreateCharacter 
                         onCreated={handleCharacterCreated} 
@@ -81,8 +87,8 @@ export const CharacterSelection: React.FC = () => {
                 )}
             </div>
 
-            {/* Right Side: Character List */}
-            <div className="w-80 bg-panel border-l border-white/5 flex flex-col h-full shadow-2xl z-10">
+            {/* Right Side: Character List (Sticky to viewport) */}
+            <div className="w-80 bg-panel border-l border-white/5 flex flex-col sticky top-0 h-screen shadow-2xl z-10">
                 <div className="p-6 border-b border-white/5">
                     <h2 className="text-xl font-bold text-white tracking-wide">Your Characters</h2>
                 </div>

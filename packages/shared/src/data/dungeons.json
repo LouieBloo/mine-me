@@ -3,13 +3,26 @@
     "id": "cmn207v6c0001u72gvuueipej",
     "name": "Dungeon 1",
     "description": "Testing",
-    "cityId": "cmn1zlln10002ihw4wqu4tnxb",
     "minLevel": 1,
     "levels": [
       {
         "id": "cmn20f8e90007u72gtwrkuo32",
         "dungeonId": "cmn207v6c0001u72gvuueipej",
         "name": "123123",
+        "orderIndex": 0
+      }
+    ]
+  },
+  {
+    "id": "cmni6ijft000060xswu2c6ueh",
+    "name": "Dungeon 2",
+    "description": "cool dungeon",
+    "minLevel": 2,
+    "levels": [
+      {
+        "id": "cmni6ios4000260xsykljvq9t",
+        "dungeonId": "cmni6ijft000060xswu2c6ueh",
+        "name": "Level 1",
         "orderIndex": 0
       }
     ]

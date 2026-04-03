@@ -5,7 +5,7 @@ import { syncJson, getPagination, buildDropTableCreate, buildDropTableUpsert } f
 // --- DUNGEONS ---
 export const getDungeons = async (req: Request, res: Response) => {
   const { skip, take, where } = getPagination(req, 'name');
-  const dungeons = await prisma.dungeon.findMany({ skip, take, where, include: { levels: true } });
+  const dungeons = await prisma.dungeon.findMany({ skip, take, where, include: { levels: true, cityDungeons: { include: { city: true } } } });
   res.json(dungeons);
 };
 
@@ -14,6 +14,7 @@ export const getDungeon = async (req: Request, res: Response) => {
     where: { id: req.params.id },
     include: { 
       completionDropTable: { include: { items: true } },
+      cityDungeons: { include: { city: true } },
       levels: { 
         orderBy: { orderIndex: 'asc' },
         include: {
@@ -27,7 +28,7 @@ export const getDungeon = async (req: Request, res: Response) => {
 };
 
 export const createDungeon = async (req: Request, res: Response) => {
-  const { completionDropTable, ...dungeonData } = req.body;
+  const { completionDropTable, cityDungeons, cityId, ...dungeonData } = req.body;
   const dungeon = await prisma.dungeon.create({ 
     data: {
       ...dungeonData,
@@ -40,7 +41,7 @@ export const createDungeon = async (req: Request, res: Response) => {
 };
 
 export const updateDungeon = async (req: Request, res: Response) => {
-  const { completionDropTable, ...dungeonData } = req.body;
+  const { completionDropTable, cityDungeons, cityId, ...dungeonData } = req.body;
   const dungeon = await prisma.dungeon.update({ 
     where: { id: req.params.id }, 
     data: {

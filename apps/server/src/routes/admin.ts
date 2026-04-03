@@ -19,6 +19,17 @@ adminRouter.get('/cities/:id', CityController.getCity);
 adminRouter.post('/cities', runValidation(AdminValidation.cityValidation), CityController.createCity);
 adminRouter.put('/cities/:id', runValidation(AdminValidation.cityValidation), CityController.updateCity);
 
+// CITY DUNGEONS
+adminRouter.get('/cities/:id/dungeons', CityController.getCityDungeons);
+adminRouter.post('/cities/:id/dungeons', CityController.addCityDungeon);
+adminRouter.put('/cities/:id/dungeons/reorder', CityController.reorderCityDungeons);
+adminRouter.delete('/cities/:id/dungeons/:cityDungeonId', CityController.removeCityDungeon);
+
+// CITY MATERIALS
+adminRouter.get('/cities/:id/materials', CityController.getCityMaterials);
+adminRouter.post('/cities/:id/materials', CityController.addCityMaterial);
+adminRouter.delete('/cities/:id/materials/:cityMaterialId', CityController.removeCityMaterial);
+
 // ITEMS
 adminRouter.get('/items', ItemController.getItems);
 adminRouter.get('/item-enums', ItemController.getItemEnums);
@@ -26,6 +37,7 @@ adminRouter.get('/items/:id', ItemController.getItem);
 adminRouter.post('/items', runValidation(AdminValidation.itemValidation), ItemController.createItem);
 adminRouter.put('/items/:id', runValidation(AdminValidation.itemValidation), ItemController.updateItem);
 adminRouter.post('/items/:id/icon', ItemController.itemIconUpload, ItemController.uploadItemIcon);
+adminRouter.post('/items/:id/gear-image', ItemController.itemGearImageUpload, ItemController.uploadItemGearImage);
 
 // MOBS
 adminRouter.get('/mobs', MobController.getMobs);

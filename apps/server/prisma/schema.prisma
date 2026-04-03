@@ -59,21 +59,42 @@ enum CharacterStatus {
 // WORLD
 // ----------------------------------------------------------------------------
 model City {
-  id             String      @id @default(cuid())
-  name           String      @unique
+  id             String          @id @default(cuid())
+  name           String          @unique
   description    String
   characters     Character[]
-  dungeons       Dungeon[]
+  cityDungeons   CityDungeon[]
+  cityMaterials  CityMaterial[]
+}
+
+model CityDungeon {
+  id         String  @id @default(cuid())
+  cityId     String
+  city       City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  dungeonId  String
+  dungeon    Dungeon @relation(fields: [dungeonId], references: [id], onDelete: Cascade)
+  orderIndex Int     @default(0)
+
+  @@unique([cityId, dungeonId])
+}
+
+model CityMaterial {
+  id     String @id @default(cuid())
+  cityId String
+  city   City   @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([cityId, itemId])
 }
 
 model Dungeon {
   id             String         @id @default(cuid())
   name           String
   description    String
-  cityId         String
-  city           City           @relation(fields: [cityId], references: [id])
   minLevel       Int            @default(1)
   levels         DungeonLevel[]
+  cityDungeons   CityDungeon[]
   
   completionDropTable DropTable? @relation("DungeonCompletionDrops")
 }
@@ -127,8 +148,12 @@ model Item {
   userBuyPrice   Int         @default(0)
   rarity         ItemRarity  @default(LOW)
   iconUrl        String?
+  gearImageUrl   String?
+  isStartingPiece Boolean    @default(false)
   
   dropTableItems DropTableItem[]
+  cityMaterials  CityMaterial[]
+  inventoryItems InventoryItem[]
 }
 
 // ----------------------------------------------------------------------------
@@ -171,6 +196,7 @@ model InventoryItem {
   character      Character @relation(fields: [characterId], references: [id])
   
   itemId         String
+  item           Item      @relation(fields: [itemId], references: [id])
   quantity       Int       @default(1)
 }
 

@@ -23,7 +23,8 @@ export const itemValidation = [
   body('vendorSellPrice').isInt({ min: 0 }).withMessage('Vendor Sell Price must be >= 0'),
   body('userBuyPrice').isInt({ min: 0 }).withMessage('User Buy Price must be >= 0'),
   body('userSellPrice').isInt({ min: 0 }).withMessage('User Sell Price must be >= 0'),
-  body('rarity').isIn(ITEM_RARITIES).withMessage(`Rarity must be one of: ${ITEM_RARITIES.join(', ')}`)
+  body('rarity').isIn(ITEM_RARITIES).withMessage(`Rarity must be one of: ${ITEM_RARITIES.join(', ')}`),
+  body('isStartingPiece').optional().isBoolean().withMessage('isStartingPiece must be a boolean')
 ];
 
 export const mobValidation = [
@@ -37,7 +38,6 @@ export const mobValidation = [
 export const dungeonValidation = [
   body('name').trim().notEmpty().withMessage('Dungeon Name is required'),
   body('description').trim().notEmpty().withMessage('Description is required'),
-  body('cityId').trim().notEmpty().withMessage('A valid City must be selected'),
   body('minLevel').isInt({ min: 1 }).withMessage('Min Level must be >= 1')
 ];
 

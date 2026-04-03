@@ -16,7 +16,12 @@ charactersRouter.get('/', authenticateToken, async (req: AuthRequest, res: Respo
       where: { userId },
       orderBy: { createdAt: 'desc' },
       include: {
-        city: true
+        city: true,
+        inventory: {
+          include: {
+            item: true
+          }
+        }
       }
     });
 
@@ -33,7 +38,7 @@ charactersRouter.get('/', authenticateToken, async (req: AuthRequest, res: Respo
 charactersRouter.post('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const userId = req.userId;
-    const { name, class: charClass } = req.body;
+    const { name, class: charClass, gearSelections } = req.body;
 
     if (!name || !charClass) {
       return res.status(400).json({ error: 'Name and class are required.' });
@@ -57,6 +62,18 @@ charactersRouter.post('/', authenticateToken, async (req: AuthRequest, res: Resp
         return res.status(500).json({ error: 'No starting city found in the database. Please run seed.' });
     }
 
+    const inventoryData = [];
+    if (gearSelections && typeof gearSelections === 'object') {
+       for (const slot in gearSelections) {
+         if (gearSelections[slot]) {
+           inventoryData.push({
+             itemId: gearSelections[slot],
+             quantity: 1
+           });
+         }
+       }
+    }
+
     const character = await prisma.character.create({
       data: {
         userId: userId!,
@@ -66,7 +83,10 @@ charactersRouter.post('/', authenticateToken, async (req: AuthRequest, res: Resp
         level: 1,
         stamina: 100,
         maxStamina: 100,
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        inventory: inventoryData.length > 0 ? {
+          create: inventoryData
+        } : undefined
       }
     });
 

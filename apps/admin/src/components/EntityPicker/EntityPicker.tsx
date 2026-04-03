@@ -8,9 +8,10 @@ interface EntityPickerProps {
     onChange: (id: string, item?: any) => void;
     error?: string;
     placeholder?: string;
+    queryParams?: Record<string, string>;
 }
 
-export const EntityPicker: React.FC<EntityPickerProps> = ({ entityType, value, onChange, error, placeholder }) => {
+export const EntityPicker: React.FC<EntityPickerProps> = ({ entityType, value, onChange, error, placeholder, queryParams }) => {
     const { fetchWithAuth } = useApi();
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -42,7 +43,8 @@ export const EntityPicker: React.FC<EntityPickerProps> = ({ entityType, value, o
         setLoading(true);
         const currentPage = isNewSearch ? 1 : page;
         try {
-            const res = await fetchWithAuth(`/api/admin/${entityType}?search=${encodeURIComponent(search)}&page=${currentPage}&limit=50`);
+            const extraParams = queryParams ? Object.entries(queryParams).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('') : '';
+            const res = await fetchWithAuth(`/api/admin/${entityType}?search=${encodeURIComponent(search)}&page=${currentPage}&limit=50${extraParams}`);
             const data = await res.json();
             if (isNewSearch) {
                 setItems(data);

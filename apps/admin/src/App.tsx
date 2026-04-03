@@ -2,6 +2,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Cities from './pages/Cities/Cities';
+import CityDetail from './pages/Cities/CityDetail';
 import Items from './pages/Items/Items';
 import Mobs from './pages/Mobs/Mobs';
 import Rates from './pages/Rates/Rates';
@@ -38,6 +39,10 @@ const router = createBrowserRouter([
       {
         path: "cities",
         element: <Cities />
+      },
+      {
+        path: "cities/:id",
+        element: <CityDetail />
       },
       {
         path: "items",

@@ -18,6 +18,18 @@ const storage = multer.diskStorage({
   }
 });
 
+const gearStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, '../../../../../packages/shared/assets/gear');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    // Save as {id}_gear.png
+    cb(null, `${req.params.id}_gear.png`);
+  }
+});
+
 // Since the frontend checks that it's a PNG, we can do a quick check here too just in case.
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   if (file.mimetype === 'image/png') {
@@ -30,8 +42,18 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
 const upload = multer({ storage: storage, fileFilter });
 export const itemIconUpload = upload.single('icon');
 
+const uploadGear = multer({ storage: gearStorage, fileFilter });
+export const itemGearImageUpload = uploadGear.single('gearImage');
+
 export const getItems = async (req: Request, res: Response) => {
   const { skip, take, where } = getPagination(req, 'name');
+  // Support filtering by type and subType via query params
+  if (req.query.type) {
+    where.type = req.query.type as string;
+  }
+  if (req.query.subType) {
+    where.subType = req.query.subType as string;
+  }
   const items = await prisma.item.findMany({ skip, take, where });
   res.json(items);
 };
@@ -93,5 +115,38 @@ export const uploadItemIcon = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error(error);
     res.status(500).json({ error: error.message || 'Failed to upload item icon' });
+  }
+};
+
+export const uploadItemGearImage = async (req: Request, res: Response) => {
+  try {
+    const itemId = req.params.id;
+    const file = req.file;
+
+    const item = await prisma.item.findUnique({ where: { id: itemId } });
+    if (!item) {
+       res.status(404).json({ error: 'Item not found' });
+       return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No gear image file provided' });
+      return;
+    }
+
+    const gearImageUrl = `/assets/gear/${file.filename}`;
+
+    const updatedItem = await prisma.item.update({
+      where: { id: itemId },
+      data: { gearImageUrl }
+    });
+
+    const allItems = await prisma.item.findMany();
+    await syncJson('items.json', allItems);
+
+    res.json(updatedItem);
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ error: error.message || 'Failed to upload item gear image' });
   }
 };

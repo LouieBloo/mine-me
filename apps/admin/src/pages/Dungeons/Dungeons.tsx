@@ -32,8 +32,11 @@ export default function Dungeons() {
   const columnDefs = [
     { field: 'id', headerName: 'ID', minWidth: 200 },
     { field: 'name', headerName: 'Name' },
-    { field: 'cityId', headerName: 'City ID' },
     { field: 'minLevel', headerName: 'Min Level' },
+    { 
+      headerName: 'Cities', 
+      valueGetter: (params: any) => params.data.cityDungeons?.length || 0 
+    },
     { 
       headerName: 'Levels Configured', 
       valueGetter: (params: any) => params.data.levels?.length || 0 

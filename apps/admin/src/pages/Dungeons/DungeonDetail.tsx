@@ -11,7 +11,7 @@ export default function DungeonDetail() {
   const { id } = useParams<{ id: string }>();
   const isNew = id === 'new';
   const navigate = useNavigate();
-  const [data, setData] = useState<any>(isNew ? { name: '', description: '', cityId: '', minLevel: 1, levels: [] } : null);
+  const [data, setData] = useState<any>(isNew ? { name: '', description: '', minLevel: 1, levels: [] } : null);
   const [allMobs, setAllMobs] = useState<any[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(!isNew);
@@ -230,19 +230,6 @@ export default function DungeonDetail() {
                 className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.name ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
               />
               {errors.name && <p className="text-red-500 text-xs font-bold mt-1 tracking-wide">{errors.name}</p>}
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">City ID</label>
-              <EntityPicker
-                entityType="cities"
-                value={data.cityId}
-                onChange={(id) => {
-                  setData({ ...data, cityId: id });
-                  if (errors.cityId) setErrors({...errors, cityId: ''});
-                }}
-                error={errors.cityId}
-                placeholder="Select a city..."
-              />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Min Level</label>

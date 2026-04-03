@@ -17,7 +17,7 @@ Players begin their journey in a city. The core loop consists of choosing action
 - **Defense Score:** Modifier for damage taken (boosted by leveling, gear, and training).
 - **Stamina:** Required for all non-combat actions. Fully restored by resting, or partially restored via potions.
 - **Age:** Characters age whenever they rest or die in combat. Reaching 100 years of age results in **permadeath** for that character.
-- **Gear Slots:** Head Piece, Chest Piece, Leggings, Boots, and Weapon.
+- **Gear Slots:** Head Piece, Shoulders, Chest Piece, Gauntlets, Leggings, Boots, and Weapon.
 - **Inventory:** Limited to 25 slots by default. Expandable using Sol.
 
 ## 4. Currencies

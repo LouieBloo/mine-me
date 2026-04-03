@@ -8,6 +8,18 @@ import { CharacterSelection } from '../src/views/CharacterSelection/CharacterSel
 // Mock fetch
 global.fetch = vi.fn();
 
+vi.mock('@pixi/react', () => ({
+    Application: ({ children }: any) => <div data-testid="pixi-app">{children}</div>,
+}));
+
+vi.mock('pixi.js', async (importOriginal) => {
+    const actual = await importOriginal() as any;
+    return {
+        ...actual,
+        Assets: { load: vi.fn().mockResolvedValue({}) },
+    }
+});
+
 const mockCharacters = [
     { id: '1', name: 'Althea', class: 'Mage', level: 5, status: 'ACTIVE', sol: 10, lear: 0, stamina: 100, maxStamina: 100, combatScore: 20, defenseScore: 10, ageInDays: 6000, createdAt: new Date().toISOString() },
     { id: '2', name: 'Boric', class: 'Warrior', level: 2, status: 'ACTIVE', sol: 5, lear: 0, stamina: 100, maxStamina: 100, combatScore: 15, defenseScore: 15, ageInDays: 6500, createdAt: new Date(Date.now() - 10000).toISOString() },

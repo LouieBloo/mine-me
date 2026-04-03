@@ -27,7 +27,9 @@ export interface PlayerState {
   inventory: PlayerInventory;
   gear: {
     head?: GearItem;
+    shoulders?: GearItem;
     chest?: GearItem;
+    gauntlets?: GearItem;
     leggings?: GearItem;
     boots?: GearItem;
     weapon?: WeaponItem;
@@ -38,7 +40,7 @@ export type ItemRarity = 'LOW' | 'MEDIUM' | 'RARE' | 'VERY_RARE';
 
 export type ItemType = 'GEAR' | 'MATERIAL' | 'POTION';
 
-export type GearSubType = 'HEAD' | 'CHEST' | 'LEGGINGS' | 'BOOTS' | 'WEAPON';
+export type GearSubType = 'HEAD' | 'SHOULDERS' | 'CHEST' | 'GAUNTLETS' | 'LEGGINGS' | 'BOOTS' | 'WEAPON';
 export type MaterialSubType = 'LUMBER' | 'MINERAL' | 'AGRICULTURE' | 'HERB';
 export type PotionSubType = 'HEALTH' | 'STAMINA';
 
@@ -47,7 +49,7 @@ export type ItemSubType = GearSubType | MaterialSubType | PotionSubType;
 export const ITEM_TYPES: ItemType[] = ['GEAR', 'MATERIAL', 'POTION'];
 
 export const ITEM_SUBTYPES: Record<ItemType, string[]> = {
-  GEAR: ['HEAD', 'CHEST', 'LEGGINGS', 'BOOTS', 'WEAPON'],
+  GEAR: ['HEAD', 'SHOULDERS', 'CHEST', 'GAUNTLETS', 'LEGGINGS', 'BOOTS', 'WEAPON'],
   MATERIAL: ['LUMBER', 'MINERAL', 'AGRICULTURE', 'HERB'],
   POTION: ['HEALTH', 'STAMINA'],
 };
@@ -62,6 +64,9 @@ export interface GameItem {
   subType: ItemSubType;
   priceSol: number;
   rarity?: ItemRarity;
+  iconUrl?: string | null;
+  gearImageUrl?: string | null;
+  isStartingPiece?: boolean;
 }
 
 export interface PotionItem extends GameItem {
@@ -109,6 +114,25 @@ export interface DungeonLevelMob {
   mobId: string;
   mob?: Mob;
   dropTable?: DropTable;
+}
+
+export interface CityDungeon {
+  id: string;
+  cityId: string;
+  dungeonId: string;
+  dungeon?: {
+    id: string;
+    name: string;
+    description: string;
+    minLevel: number;
+  };
+}
+
+export interface CityMaterial {
+  id: string;
+  cityId: string;
+  itemId: string;
+  item?: GameItem;
 }
 
 export interface Mob {
