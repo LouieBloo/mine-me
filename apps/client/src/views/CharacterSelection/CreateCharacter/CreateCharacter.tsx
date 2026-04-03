@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../../hooks/useAuth';
+import { useApi } from '../../../hooks/useApi';
 import { Application } from '@pixi/react';
 import { Assets, Texture } from 'pixi.js';
 
@@ -62,7 +62,7 @@ const ContinuousButton = ({ onClick, children, className }: { onClick: () => voi
 };
 
 export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
-    const { token } = useAuth();
+    const { fetchWithAuth } = useApi();
     const [name, setName] = useState('');
     const [charClass, setCharClass] = useState('Warrior');
     const [loading, setLoading] = useState(false);
@@ -82,7 +82,7 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
     const calculatedScale = Math.min(400 / 518, 500 / 698) * 0.75;
 
     React.useEffect(() => {
-        fetch(`${import.meta.env.VITE_API_URL}/api/public/items?isStartingPiece=true`)
+        fetchWithAuth('/api/public/items?isStartingPiece=true')
             .then(res => res.json())
             .then((data: GameItem[]) => {
                 setStartingGear(data);
@@ -98,12 +98,8 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
         setError(null);
 
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/characters`, {
+            const response = await fetchWithAuth('/api/characters', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
                 body: JSON.stringify({ name, class: charClass, gearSelections: selectedGear }),
             });
 

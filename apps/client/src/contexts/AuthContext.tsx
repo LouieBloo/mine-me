@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, type ReactNode } from 'react';
+import { getTokenTimeRemaining, isTokenExpired } from '@nvg/shared';
 
 interface User {
   id: string;
@@ -29,9 +30,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const savedUser = localStorage.getItem('nvg_user');
     if (savedUser && token) {
-      setUser(JSON.parse(savedUser));
+      // Check if already expired on mount/load
+      if (isTokenExpired(token)) {
+        console.warn('Session expired on load');
+        logout();
+      } else {
+        setUser(JSON.parse(savedUser));
+      }
     }
     setLoading(false);
+  }, [token]);
+
+  // Handle auto-logout when token expires
+  useEffect(() => {
+    if (!token) return;
+
+    const timeRemainingSeconds = getTokenTimeRemaining(token);
+    if (timeRemainingSeconds <= 0) {
+      logout();
+      return;
+    }
+
+    // Set a timeout for the remaining life of the token
+    const timer = setTimeout(() => {
+        console.info('Auto-logging out due to token expiration');
+        logout();
+        window.location.href = '/auth'; // Force clear app state
+    }, timeRemainingSeconds * 1000);
+
+    return () => clearTimeout(timer);
   }, [token]);
 
   const signup = async (familyName: string, phoneNumber: string) => {

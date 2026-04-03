@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useApi } from '../../../hooks/useApi';
 import { type Character } from '../CharacterSelection';
 import { useGame } from '../../../contexts/GameContext';
 import { Application } from '@pixi/react';
@@ -29,11 +30,14 @@ const GearLayer = ({ url, offset }: { url: string, offset?: { x: number, y: numb
 
 interface Props {
     character: Character | null;
+    onRetired: (retiredChar: Character) => void;
 }
 
-export const CharacterPreview: React.FC<Props> = ({ character }) => {
+export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
     const navigate = useNavigate();
+    const { fetchWithAuth } = useApi();
     const { setActiveCharacter } = useGame();
+    const [retiring, setRetiring] = useState(false);
     
     const baseBodyUrl = `${import.meta.env.VITE_API_URL}/assets/gear/base-body.png`;
 
@@ -56,6 +60,32 @@ export const CharacterPreview: React.FC<Props> = ({ character }) => {
         if (character) {
             setActiveCharacter(character);
             navigate('/home');
+        }
+    };
+
+    const handleRetire = async () => {
+        if (!character) return;
+        
+        const confirm = window.confirm(`Are you sure you want to retire ${character.name}? This cannot be undone, and they will no longer be playable.`);
+        if (!confirm) return;
+
+        setRetiring(true);
+        try {
+            const response = await fetchWithAuth(`/api/characters/${character.id}/retire`, {
+                method: 'PATCH',
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to retire character');
+            }
+
+            const updatedChar = await response.json();
+            onRetired(updatedChar);
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setRetiring(false);
         }
     };
 
@@ -107,19 +137,31 @@ export const CharacterPreview: React.FC<Props> = ({ character }) => {
                 </div>
                 <div className="bg-white/5 p-4 rounded-xl border border-white/5 text-center">
                     <span className="block text-slate-500 text-[10px] uppercase font-bold mb-1">Status</span>
-                    <span className={`${character.status === 'DEAD' ? 'text-red-500' : 'text-emerald-500'} font-bold uppercase text-xs tracking-widest`}>
+                    <span className={`${character.status === 'DEAD' ? 'text-red-500' : character.status === 'RETIRED' ? 'text-amber-500' : 'text-emerald-500'} font-bold uppercase text-xs tracking-widest`}>
                         {character.status}
                     </span>
                 </div>
             </div>
 
-            <button 
-                onClick={handlePlay}
-                disabled={character.status === 'DEAD'}
-                className={`mt-12 w-full max-w-xs py-4 ${character.status === 'DEAD' ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-sol to-amber-600 text-slate-900 font-black hover:scale-105 cursor-pointer'} uppercase tracking-widest rounded-xl transition-all shadow-2xl shadow-sol/20`}
-            >
-                {character.status === 'DEAD' ? 'Character Interred' : 'Enter World'}
-            </button>
+            <div className="flex flex-col w-full max-w-xs gap-3 mt-12">
+                <button 
+                    onClick={handlePlay}
+                    disabled={character.status !== 'ACTIVE'}
+                    className={`w-full py-4 ${character.status !== 'ACTIVE' ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-sol to-amber-600 text-slate-900 font-black hover:scale-105 cursor-pointer'} uppercase tracking-widest rounded-xl transition-all shadow-2xl shadow-sol/20`}
+                >
+                    {character.status === 'DEAD' ? 'Character Interred' : character.status === 'RETIRED' ? 'Character Retired' : 'Enter World'}
+                </button>
+
+                {character.status === 'ACTIVE' && (
+                    <button
+                        onClick={handleRetire}
+                        disabled={retiring}
+                        className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 font-bold uppercase tracking-widest rounded-xl transition-all text-xs cursor-pointer"
+                    >
+                        {retiring ? 'Retiring...' : 'Retire Character'}
+                    </button>
+                )}
+            </div>
         </div>
     );
 };

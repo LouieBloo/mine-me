@@ -28,7 +28,7 @@ const mockCharacters = [
 describe('CharacterSelection View', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        localStorage.setItem('nvg_token', 'fake_token');
+        localStorage.setItem('nvg_token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJpYXQiOjE1MTYyMzkwMjIsImV4cCI6MjUzNDA2NTAwMH0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
         (global.fetch as any).mockResolvedValue({
             ok: true,
             json: async () => mockCharacters,

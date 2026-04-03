@@ -3,6 +3,7 @@ import { CharacterList } from './CharacterList/CharacterList';
 import { CharacterPreview } from './CharacterPreview/CharacterPreview';
 import { CreateCharacter } from './CreateCharacter/CreateCharacter';
 import { useAuth } from '../../hooks/useAuth';
+import { useApi } from '../../hooks/useApi';
 import './CharacterSelection.css';
 
 import { type GameItem } from '@nvg/shared';
@@ -12,7 +13,7 @@ export interface Character {
     name: string;
     class: string;
     level: number;
-    status: 'ACTIVE' | 'DEAD';
+    status: 'ACTIVE' | 'DEAD' | 'RETIRED';
     profession?: string;
     stamina: number;
     maxStamina: number;
@@ -30,6 +31,7 @@ export interface Character {
 
 export const CharacterSelection: React.FC = () => {
     const { token } = useAuth();
+    const { fetchWithAuth } = useApi();
     const [characters, setCharacters] = useState<Character[]>([]);
     const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
     const [showCreate, setShowCreate] = useState(false);
@@ -37,9 +39,7 @@ export const CharacterSelection: React.FC = () => {
 
     const fetchCharacters = async () => {
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/characters`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await fetchWithAuth('/api/characters');
             const data = await response.json();
             setCharacters(data);
             if (data.length > 0 && !selectedCharacter) {
@@ -64,6 +64,11 @@ export const CharacterSelection: React.FC = () => {
         setShowCreate(false);
     };
 
+    const handleCharacterRetired = (retiredChar: Character) => {
+        setCharacters(prev => prev.map(c => c.id === retiredChar.id ? retiredChar : c));
+        setSelectedCharacter(retiredChar);
+    };
+
     return (
         <div className="character-selection-container flex min-h-screen bg-bg-dark">
             {/* Left/Middle: Preview Area */}
@@ -74,7 +79,10 @@ export const CharacterSelection: React.FC = () => {
                         onCancel={() => setShowCreate(false)} 
                     />
                 ) : (
-                    <CharacterPreview character={selectedCharacter} />
+                    <CharacterPreview 
+                        character={selectedCharacter} 
+                        onRetired={handleCharacterRetired}
+                    />
                 )}
                 
                 {!showCreate && (

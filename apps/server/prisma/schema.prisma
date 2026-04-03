@@ -53,6 +53,7 @@ model Character {
 enum CharacterStatus {
   ACTIVE
   DEAD
+  RETIRED
 }
 
 // ----------------------------------------------------------------------------

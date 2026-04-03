@@ -95,3 +95,39 @@ charactersRouter.post('/', authenticateToken, async (req: AuthRequest, res: Resp
     return res.status(500).json({ error: err.message });
   }
 });
+
+// ----------------------------------------------------------------------------
+// PATCH /api/characters/:id/retire
+// Retires a character (sets status to RETIRED)
+// ----------------------------------------------------------------------------
+charactersRouter.patch('/:id/retire', authenticateToken, async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const userId = req.userId;
+    const { id } = req.params;
+
+    const character = await prisma.character.findUnique({
+      where: { id }
+    });
+
+    if (!character) {
+      return res.status(404).json({ error: 'Character not found.' });
+    }
+
+    if (character.userId !== userId) {
+      return res.status(403).json({ error: 'You do not have permission to retire this character.' });
+    }
+
+    if (character.status !== 'ACTIVE') {
+      return res.status(400).json({ error: 'Only active characters can be retired.' });
+    }
+
+    const updatedCharacter = await prisma.character.update({
+      where: { id },
+      data: { status: 'RETIRED' }
+    });
+
+    return res.json(updatedCharacter);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});

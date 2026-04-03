@@ -9,6 +9,8 @@ import { CharacterSelection } from './views/CharacterSelection/CharacterSelectio
 import { HomeView } from './views/HomeView/HomeView';
 import { UserProfile } from './views/UserProfile/UserProfile';
 
+import { InGameLayout } from './components/InGameLayout/InGameLayout';
+
 function App() {
   return (
     <AuthProvider>
@@ -19,8 +21,13 @@ function App() {
             <Route path="/" element={<ProtectedRoute />}>
               <Route path="characters" element={<CharacterSelection />} />
               <Route element={<AppLayout />}>
-                <Route index element={<MainMenu />} />
-                <Route path="home" element={<HomeView />} />
+                {/* Views WITH sidebars (in-game) */}
+                <Route element={<InGameLayout />}>
+                  <Route index element={<MainMenu />} />
+                  <Route path="home" element={<HomeView />} />
+                </Route>
+                
+                {/* Views WITHOUT sidebars (standard UI) */}
                 <Route path="profile" element={<UserProfile />} />
               </Route>
             </Route>

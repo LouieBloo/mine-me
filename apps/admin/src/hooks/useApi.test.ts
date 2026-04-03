@@ -4,8 +4,17 @@ import { useApi } from './useApi';
 
 // Mock useAuth
 vi.mock('./useAuth', () => ({
-  useAuth: vi.fn(() => ({ token: 'mock-token' }))
+  useAuth: vi.fn(() => ({ 
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJpYXQiOjE1MTYyMzkwMjIsImV4cCI6MjUzNDA2NTAwMH0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+    logout: vi.fn()
+  }))
 }));
+
+// Mock window.location
+Object.defineProperty(window, 'location', {
+  value: { href: '' },
+  writable: true
+});
 
 // Mock global fetch
 globalThis.fetch = vi.fn();
@@ -28,7 +37,7 @@ describe('useApi Hook', () => {
     const calledOptions = (globalThis.fetch as any).mock.calls[0][1];
     
     expect(calledUrl).toContain('/test-endpoint');
-    expect(calledOptions.headers).toHaveProperty('Authorization', 'Bearer mock-token');
+    expect(calledOptions.headers).toHaveProperty('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJpYXQiOjE1MTYyMzkwMjIsImV4cCI6MjUzNDA2NTAwMH0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
     expect(calledOptions.headers).toHaveProperty('Content-Type', 'application/json');
   });
 });
