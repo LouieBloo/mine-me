@@ -4,6 +4,7 @@ import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
 import { EntityPicker } from '../../components/EntityPicker/EntityPicker';
+import CityBackgroundUpload from './CityBackgroundUpload/CityBackgroundUpload';
 import { ITEM_SUBTYPES } from '@nvg/shared';
 import './CityDetail.css';
 
@@ -28,7 +29,7 @@ export default function CityDetail() {
   const isNew = id === 'new';
   const navigate = useNavigate();
 
-  const [data, setData] = useState<any>(isNew ? { name: '', description: '' } : null);
+  const [data, setData] = useState<any>(isNew ? { name: '', description: '', backgroundImageUrl: null } : null);
   const [cityDungeons, setCityDungeons] = useState<CityDungeonEntry[]>([]);
   const [cityMaterials, setCityMaterials] = useState<CityMaterialEntry[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -45,7 +46,7 @@ export default function CityDetail() {
           return res.json();
         })
         .then(json => {
-          setData({ name: json.name, description: json.description, id: json.id });
+          setData({ name: json.name, description: json.description, id: json.id, backgroundImageUrl: json.backgroundImageUrl });
           setCityDungeons(json.cityDungeons || []);
           setCityMaterials(json.cityMaterials || []);
           setLoading(false);
@@ -305,6 +306,15 @@ export default function CityDetail() {
           </div>
         </form>
       </div>
+
+      {/* Background Image Upload - only show after city exists */}
+      {!isNew && (
+        <CityBackgroundUpload 
+          cityId={id!} 
+          backgroundImageUrl={data.backgroundImageUrl} 
+          onUploadSuccess={(updatedCity) => setData(updatedCity)} 
+        />
+      )}
 
       {/* Dungeons Section - only show after city exists */}
       {!isNew && (

@@ -1,0 +1,7 @@
+.city-background-upload {
+  transition: all 0.3s ease;
+}
+
+.city-background-upload img {
+  image-rendering: auto; /* Backgrounds should be smooth, unlike icons */
+}

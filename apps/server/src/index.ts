@@ -10,7 +10,9 @@ import { authRouter } from './routes/auth';
 import { adminRouter } from './routes/admin';
 import { charactersRouter } from './routes/characters';
 import { publicRouter } from './routes/public';
+import { gameRouter } from './routes/game';
 import { handleSocketConnection } from './sockets/handlers';
+import { socketAuthMiddleware } from './sockets/socket.middleware';
 
 dotenv.config();
 
@@ -34,12 +36,14 @@ app.use('/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/characters', charactersRouter);
 app.use('/api/public', publicRouter);
+app.use('/api/game', gameRouter);
 
 app.get('/health', (req: express.Request, res: express.Response) => {
   res.json({ status: 'NVG Server is running healthy.' });
 });
 
 // Real-Time Socket Connections
+io.use(socketAuthMiddleware);
 io.on('connection', (socket: any) => {
   handleSocketConnection(io, socket);
 });

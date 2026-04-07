@@ -18,6 +18,7 @@ adminRouter.get('/cities', CityController.getCities);
 adminRouter.get('/cities/:id', CityController.getCity);
 adminRouter.post('/cities', runValidation(AdminValidation.cityValidation), CityController.createCity);
 adminRouter.put('/cities/:id', runValidation(AdminValidation.cityValidation), CityController.updateCity);
+adminRouter.post('/cities/:id/background', CityController.cityBackgroundUpload, CityController.uploadCityBackground);
 
 // CITY DUNGEONS
 adminRouter.get('/cities/:id/dungeons', CityController.getCityDungeons);

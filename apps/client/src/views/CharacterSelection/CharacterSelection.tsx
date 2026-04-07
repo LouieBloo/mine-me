@@ -6,7 +6,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { useApi } from '../../hooks/useApi';
 import './CharacterSelection.css';
 
-import { type GameItem } from '@nvg/shared';
+import { type GameItem, type GameCity } from '@nvg/shared';
+import { useSocket } from '../../contexts/SocketContext';
+import { useGame } from '../../contexts/GameContext';
+import { useNavigate } from 'react-router-dom';
 
 export interface Character {
     id: string;
@@ -22,20 +25,26 @@ export interface Character {
     sol: number;
     lear: number;
     ageInDays: number;
+    cityId: string;
     createdAt: string;
     inventory?: {
         item: GameItem;
         quantity: number;
     }[];
+    city?: GameCity;
 }
 
 export const CharacterSelection: React.FC = () => {
     const { token } = useAuth();
     const { fetchWithAuth } = useApi();
+    const { setActiveCharacter } = useGame();
+    const { selectCharacter } = useSocket();
+    const navigate = useNavigate();
     const [characters, setCharacters] = useState<Character[]>([]);
     const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
     const [showCreate, setShowCreate] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [entering, setEntering] = useState(false);
 
     const fetchCharacters = async () => {
         try {
@@ -69,6 +78,23 @@ export const CharacterSelection: React.FC = () => {
         setSelectedCharacter(retiredChar);
     };
 
+    const handleEnterGame = async () => {
+        if (!selectedCharacter || selectedCharacter.status !== 'ACTIVE') return;
+        setEntering(true);
+        try {
+            // 1. Join character-scoped socket room
+            await selectCharacter(selectedCharacter.id);
+            // 2. Set active character in game context
+            setActiveCharacter(selectedCharacter);
+            // 3. Navigate to game
+            navigate('/home');
+        } catch (err: any) {
+            console.error('[CharacterSelection] Failed to enter game:', err.message);
+        } finally {
+            setEntering(false);
+        }
+    };
+
     return (
         <div className="character-selection-container flex min-h-screen bg-bg-dark">
             {/* Left/Middle: Preview Area */}
@@ -85,10 +111,19 @@ export const CharacterSelection: React.FC = () => {
                     />
                 )}
                 
+                {!showCreate && selectedCharacter?.status === 'ACTIVE' && (
+                    <button 
+                        onClick={handleEnterGame}
+                        disabled={entering}
+                        className="mt-12 px-8 py-3 bg-sol text-slate-900 font-bold rounded-full hover:bg-amber-400 transition-all shadow-lg shadow-sol/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {entering ? 'Entering...' : 'Enter Game'}
+                    </button>
+                )}
                 {!showCreate && (
                     <button 
                         onClick={() => setShowCreate(true)}
-                        className="mt-12 px-8 py-3 bg-sol text-slate-900 font-bold rounded-full hover:bg-amber-400 transition-all shadow-lg shadow-sol/20 cursor-pointer"
+                        className="mt-4 px-6 py-2 bg-slate-700 text-slate-300 font-bold rounded-full hover:bg-slate-600 transition-all text-sm cursor-pointer"
                     >
                         Create New Character
                     </button>

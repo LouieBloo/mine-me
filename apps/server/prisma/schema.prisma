@@ -66,6 +66,10 @@ model City {
   characters     Character[]
   cityDungeons   CityDungeon[]
   cityMaterials  CityMaterial[]
+  backgroundImageUrl String?
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model CityDungeon {
@@ -77,6 +81,9 @@ model CityDungeon {
   orderIndex Int     @default(0)
 
   @@unique([cityId, dungeonId])
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model CityMaterial {
@@ -87,6 +94,9 @@ model CityMaterial {
   item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@unique([cityId, itemId])
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model Dungeon {
@@ -98,6 +108,9 @@ model Dungeon {
   cityDungeons   CityDungeon[]
   
   completionDropTable DropTable? @relation("DungeonCompletionDrops")
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model DungeonLevel {
@@ -109,6 +122,9 @@ model DungeonLevel {
   mobs      DungeonLevelMob[]
   
   completionDropTable DropTable? @relation("DungeonLevelCompletionDrops")
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model DungeonLevelMob {
@@ -119,6 +135,9 @@ model DungeonLevelMob {
   mob             Mob          @relation(fields: [mobId], references: [id])
   
   dropTable       DropTable?   @relation("DungeonLevelMobDrops")
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 // ----------------------------------------------------------------------------
@@ -155,6 +174,9 @@ model Item {
   dropTableItems DropTableItem[]
   cityMaterials  CityMaterial[]
   inventoryItems InventoryItem[]
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 // ----------------------------------------------------------------------------
@@ -177,6 +199,9 @@ model DropTable {
   
   dungeonLevelMobId     String? @unique
   dungeonLevelMob       DungeonLevelMob? @relation("DungeonLevelMobDrops", fields: [dungeonLevelMobId], references: [id], onDelete: Cascade)
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model DropTableItem {
@@ -189,6 +214,9 @@ model DropTableItem {
   chance        Float     // 0 to 100
   minQuantity   Int       @default(1)
   maxQuantity   Int       @default(1)
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model InventoryItem {
@@ -199,6 +227,9 @@ model InventoryItem {
   itemId         String
   item           Item      @relation(fields: [itemId], references: [id])
   quantity       Int       @default(1)
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 // ----------------------------------------------------------------------------
@@ -217,4 +248,7 @@ model Mob {
   animations     Json?       // e.g., { idle: { url: '...', frameWidth: 64, frameHeight: 64 } }
   
   dungeonLevelMobs DungeonLevelMob[]
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }

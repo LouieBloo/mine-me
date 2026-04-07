@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../src/contexts/AuthContext';
@@ -9,7 +10,8 @@ import { CharacterSelection } from '../src/views/CharacterSelection/CharacterSel
 global.fetch = vi.fn();
 
 vi.mock('@pixi/react', () => ({
-    Application: ({ children }: any) => <div data-testid="pixi-app">{children}</div>,
+    Application: ({ children }: any) => React.createElement('div', { 'data-testid': 'pixi-app' }, children),
+    extend: vi.fn(),
 }));
 
 vi.mock('pixi.js', async (importOriginal) => {
@@ -17,8 +19,31 @@ vi.mock('pixi.js', async (importOriginal) => {
     return {
         ...actual,
         Assets: { load: vi.fn().mockResolvedValue({}) },
+        Application: class {},
     }
 });
+
+vi.mock('socket.io-client', () => ({
+    io: vi.fn(() => ({
+        on: vi.fn(),
+        once: vi.fn(),
+        off: vi.fn(),
+        emit: vi.fn(),
+        connected: false,
+        disconnect: vi.fn(),
+    })),
+}));
+
+vi.mock('../src/contexts/SocketContext', () => ({
+    SocketProvider: ({ children }: any) => React.createElement('div', null, children),
+    useSocket: () => ({
+        isConnected: false,
+        selectCharacter: vi.fn().mockResolvedValue(undefined),
+        joinCity: vi.fn().mockResolvedValue(undefined),
+        leaveCity: vi.fn().mockResolvedValue(undefined),
+        onEvent: vi.fn(() => () => {}),
+    }),
+}));
 
 const mockCharacters = [
     { id: '1', name: 'Althea', class: 'Mage', level: 5, status: 'ACTIVE', sol: 10, lear: 0, stamina: 100, maxStamina: 100, combatScore: 20, defenseScore: 10, ageInDays: 6000, createdAt: new Date().toISOString() },

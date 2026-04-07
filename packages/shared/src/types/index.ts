@@ -133,6 +133,21 @@ export interface CityMaterial {
   cityId: string;
   itemId: string;
   item?: GameItem;
+  
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface GameCity {
+  id: string;
+  name: string;
+  description: string;
+  backgroundImageUrl?: string | null;
+  cityDungeons?: CityDungeon[];
+  cityMaterials?: CityMaterial[];
+  
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Mob {

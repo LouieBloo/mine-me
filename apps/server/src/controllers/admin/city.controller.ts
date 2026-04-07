@@ -1,6 +1,32 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../index';
 import { syncJson, getPagination } from '../../services/admin.service';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, '../../../../../packages/shared/assets/cities/backgrounds');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, `${req.params.id}_background${ext}`);
+  }
+});
+
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  if (file.mimetype === 'image/png' || file.mimetype === 'image/jpeg') {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PNG or JPG images are allowed'));
+  }
+};
+
+const upload = multer({ storage: storage, fileFilter });
+export const cityBackgroundUpload = upload.single('background');
 
 export const getCities = async (req: Request, res: Response) => {
   const { skip, take, where } = getPagination(req, 'name');
@@ -137,4 +163,52 @@ export const removeCityMaterial = async (req: Request, res: Response) => {
   });
   syncJson('cities.json', allCities);
   res.json({ success: true });
+};
+
+export const uploadCityBackground = async (req: Request, res: Response) => {
+  try {
+    const cityId = req.params.id;
+    const file = req.file;
+
+    const city = await prisma.city.findUnique({ where: { id: cityId } });
+    if (!city) {
+      res.status(404).json({ error: 'City not found' });
+      return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No background file provided' });
+      return;
+    }
+
+    const backgroundImageUrl = `/assets/cities/backgrounds/${file.filename}`;
+
+    const updatedCity = await prisma.city.update({
+      where: { id: cityId },
+      data: { backgroundImageUrl },
+      include: {
+        cityDungeons: { 
+          orderBy: { orderIndex: 'asc' },
+          include: { dungeon: true } 
+        },
+        cityMaterials: { include: { item: true } }
+      }
+    });
+
+    const allCities = await prisma.city.findMany({
+      include: {
+        cityDungeons: { 
+          orderBy: { orderIndex: 'asc' },
+          include: { dungeon: true } 
+        },
+        cityMaterials: { include: { item: true } }
+      }
+    });
+    await syncJson('cities.json', allCities);
+
+    res.json(updatedCity);
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ error: error.message || 'Failed to upload city background' });
+  }
 };

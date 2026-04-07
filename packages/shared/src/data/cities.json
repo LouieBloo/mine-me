@@ -1,77 +1,11 @@
 [
   {
-    "id": "cmn1zlln10002ihw4wqu4tnxb",
-    "name": "Brackus",
-    "description": "City of Asss",
-    "cityDungeons": [
-      {
-        "id": "cmni6iuqe000660xsiy3884d6",
-        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
-        "dungeonId": "cmni6ijft000060xswu2c6ueh",
-        "orderIndex": 0,
-        "dungeon": {
-          "id": "cmni6ijft000060xswu2c6ueh",
-          "name": "Dungeon 2",
-          "description": "cool dungeon",
-          "minLevel": 2
-        }
-      },
-      {
-        "id": "cmni60dlo000143aeu0t6vcu3",
-        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
-        "dungeonId": "cmn207v6c0001u72gvuueipej",
-        "orderIndex": 1,
-        "dungeon": {
-          "id": "cmn207v6c0001u72gvuueipej",
-          "name": "Dungeon 1",
-          "description": "Testing",
-          "minLevel": 1
-        }
-      }
-    ],
-    "cityMaterials": [
-      {
-        "id": "cmni66o2z0001kkpxgkyfq3uu",
-        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
-        "itemId": "cmnc6ct730000k21bi04iybb4",
-        "item": {
-          "id": "cmnc6ct730000k21bi04iybb4",
-          "name": "lumber",
-          "description": "lumber",
-          "type": "MATERIAL",
-          "subType": "LUMBER",
-          "vendorBuyPrice": 0,
-          "vendorSellPrice": 0,
-          "userSellPrice": 0,
-          "userBuyPrice": 0,
-          "rarity": "RARE",
-          "iconUrl": "/assets/icons/items/cmnc6ct730000k21bi04iybb4_icon.png"
-        }
-      },
-      {
-        "id": "cmni66uxe0003kkpxt1k8u9fg",
-        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
-        "itemId": "cmnc9o3in00005z6u5nr4ttl3",
-        "item": {
-          "id": "cmnc9o3in00005z6u5nr4ttl3",
-          "name": "Basic Herb",
-          "description": "herb",
-          "type": "MATERIAL",
-          "subType": "HERB",
-          "vendorBuyPrice": 0,
-          "vendorSellPrice": 0,
-          "userSellPrice": 0,
-          "userBuyPrice": 0,
-          "rarity": "LOW",
-          "iconUrl": null
-        }
-      }
-    ]
-  },
-  {
     "id": "cmn2087uu0002u72gu8lggdsw",
     "name": "Iron Forge",
     "description": "test",
+    "backgroundImageUrl": null,
+    "createdAt": "2026-04-06T21:51:48.676Z",
+    "updatedAt": "2026-04-06T21:51:48.676Z",
     "cityDungeons": [],
     "cityMaterials": []
   },
@@ -79,6 +13,19 @@
     "id": "cmn208bs90003u72gkkkkb62d",
     "name": "Whatever City",
     "description": "2",
+    "backgroundImageUrl": null,
+    "createdAt": "2026-04-06T21:51:48.679Z",
+    "updatedAt": "2026-04-06T21:51:48.679Z",
+    "cityDungeons": [],
+    "cityMaterials": []
+  },
+  {
+    "id": "cmn1zlln10002ihw4wqu4tnxb",
+    "name": "Brackus",
+    "description": "City of Asss",
+    "backgroundImageUrl": "/assets/cities/backgrounds/cmn1zlln10002ihw4wqu4tnxb_background.png",
+    "createdAt": "2026-04-06T21:51:48.671Z",
+    "updatedAt": "2026-04-06T21:57:24.575Z",
     "cityDungeons": [],
     "cityMaterials": []
   }

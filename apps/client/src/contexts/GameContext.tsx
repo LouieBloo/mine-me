@@ -1,22 +1,28 @@
 import React, { createContext, useState, useContext, type ReactNode } from 'react';
 import type { Character } from '../views/CharacterSelection/CharacterSelection';
+import type { GameCity } from '@nvg/shared';
 
 interface GameContextType {
     activeCharacter: Character | null;
     setActiveCharacter: (character: Character | null) => void;
+    activeCity: GameCity | null;
+    setActiveCity: (city: GameCity | null) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    // For a more robust app, we'd persist this in localStorage or re-fetch on mount based on an ID
-    const [activeCharacter, setActiveCharacter] = useState<Character | null>(() => {
+    const [activeCharacter, setActiveCharacterState] = useState<Character | null>(() => {
         const saved = localStorage.getItem('nvg_active_character');
         return saved ? JSON.parse(saved) : null;
     });
 
-    const handleSetActiveCharacter = (char: Character | null) => {
-        setActiveCharacter(char);
+    const [activeCity, setActiveCity] = useState<GameCity | null>(null);
+
+    const setActiveCharacter = (char: Character | null) => {
+        setActiveCharacterState(char);
+        // Changing character clears city state
+        setActiveCity(null);
         if (char) {
             localStorage.setItem('nvg_active_character', JSON.stringify(char));
         } else {
@@ -25,7 +31,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     return (
-        <GameContext.Provider value={{ activeCharacter, setActiveCharacter: handleSetActiveCharacter }}>
+        <GameContext.Provider value={{ activeCharacter, setActiveCharacter, activeCity, setActiveCity }}>
             {children}
         </GameContext.Provider>
     );

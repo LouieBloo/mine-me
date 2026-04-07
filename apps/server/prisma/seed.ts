@@ -10,46 +10,50 @@ async function main() {
   // Path to shared data
   const dataPath = path.join(__dirname, '../../../packages/shared/src/data');
 
-  // Seed Cities
-  const cities = JSON.parse(fs.readFileSync(path.join(dataPath, 'cities.json'), 'utf-8'));
-  for (const city of cities) {
-    await prisma.city.upsert({
-      where: { id: city.id },
-      update: city,
-      create: city,
-    });
-  }
-  console.log('Cities seeded.');
-
   // Seed Items
   const items = JSON.parse(fs.readFileSync(path.join(dataPath, 'items.json'), 'utf-8'));
-  for (const item of items) {
+  for (const itemData of items) {
+     const { dropTableItems, cityMaterials, inventoryItems, ...itemRoot } = itemData;
     await prisma.item.upsert({
-      where: { id: item.id },
-      update: item,
-      create: item,
+      where: { id: itemRoot.id },
+      update: itemRoot,
+      create: itemRoot,
     });
   }
   console.log('Items seeded.');
 
+  // Seed Cities
+  const cities = JSON.parse(fs.readFileSync(path.join(dataPath, 'cities.json'), 'utf-8'));
+  for (const cityData of cities) {
+    const { cityDungeons, cityMaterials, characters, ...cityRoot } = cityData;
+    await prisma.city.upsert({
+      where: { id: cityRoot.id },
+      update: cityRoot,
+      create: cityRoot,
+    });
+  }
+  console.log('Cities seeded.');
+
   // Seed Mobs
   const mobs = JSON.parse(fs.readFileSync(path.join(dataPath, 'mobs.json'), 'utf-8'));
-  for (const mob of mobs) {
+  for (const mobData of mobs) {
+    const { dropTable, dungeonLevelMobs, ...mobRoot } = mobData;
     await prisma.mob.upsert({
-      where: { id: mob.id },
-      update: mob,
-      create: mob,
+      where: { id: mobRoot.id },
+      update: mobRoot,
+      create: mobRoot,
     });
   }
   console.log('Mobs seeded.');
 
   // Seed Dungeons
   const dungeons = JSON.parse(fs.readFileSync(path.join(dataPath, 'dungeons.json'), 'utf-8'));
-  for (const dungeon of dungeons) {
+  for (const dungeonData of dungeons) {
+    const { levels, cityDungeons, completionDropTable, ...dungeonRoot } = dungeonData;
     await prisma.dungeon.upsert({
-      where: { id: dungeon.id },
-      update: dungeon,
-      create: dungeon,
+      where: { id: dungeonRoot.id },
+      update: dungeonRoot,
+      create: dungeonRoot,
     });
   }
   console.log('Dungeons seeded.');
