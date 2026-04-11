@@ -34,7 +34,7 @@ export class TradingEngine {
     // 1. Check if selling items player actually has
     if (session.type === 'NPC_Buy' || session.type === 'Marketplace_Sell') {
       for (const tradeItem of session.items) {
-        const inventoryItem = player.inventory.items.find(i => i.id === tradeItem.itemId);
+        const inventoryItem = player.inventory.items.find(e => e.item.id === tradeItem.itemId);
         // Simplified check: inventory might have multiple stacks etc, for now just presence
         if (!inventoryItem) {
           return { success: false, message: `Missing item: ${tradeItem.itemId}` };

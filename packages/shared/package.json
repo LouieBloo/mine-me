@@ -8,7 +8,9 @@
     "dev": "tsc -w",
     "test": "vitest run"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  },
   "devDependencies": {
     "typescript": "^5.0.0",
     "vitest": "^1.0.0"

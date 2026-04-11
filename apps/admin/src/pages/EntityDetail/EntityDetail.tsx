@@ -17,6 +17,7 @@ export const EntityDetail = () => {
       case 'items': return { name: '', description: '', type: 'GEAR', subType: 'HEAD', vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW' };
       case 'cities': return { name: '', description: '' };
       case 'users': return { phoneNumber: '', familyName: '', isAdmin: false };
+      case 'characters': return { name: '', class: 'Warrior', level: 1, combatScore: 10, defenseScore: 10, stamina: 100, maxStamina: 100, maxInventorySlots: 25, ageInDays: 6570, sol: 0, lear: 0 };
       case 'inventory-items': return { characterId: '', itemId: '', quantity: 1 };
       default: return {};
     }

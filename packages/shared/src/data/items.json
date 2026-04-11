@@ -12,7 +12,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": null,
-    "isStartingPiece": false
+    "isStartingPiece": false,
+    "createdAt": "2026-04-06T21:51:48.593Z",
+    "updatedAt": "2026-04-06T21:51:48.593Z"
   },
   {
     "id": "cmnc6ct730000k21bi04iybb4",
@@ -27,22 +29,9 @@
     "rarity": "RARE",
     "iconUrl": "/assets/icons/items/cmnc6ct730000k21bi04iybb4_icon.png",
     "gearImageUrl": null,
-    "isStartingPiece": false
-  },
-  {
-    "id": "cmni8l0zu0000xe1auwhar051",
-    "name": "Basic Helmet",
-    "description": "basic",
-    "type": "GEAR",
-    "subType": "HEAD",
-    "vendorBuyPrice": 0,
-    "vendorSellPrice": 0,
-    "userSellPrice": 0,
-    "userBuyPrice": 0,
-    "rarity": "LOW",
-    "iconUrl": null,
-    "gearImageUrl": "/assets/gear/cmni8l0zu0000xe1auwhar051_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": false,
+    "createdAt": "2026-04-06T21:51:48.602Z",
+    "updatedAt": "2026-04-06T21:51:48.602Z"
   },
   {
     "id": "cmni8mse50001xe1a7ur35nrx",
@@ -57,7 +46,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8mse50001xe1a7ur35nrx_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.612Z",
+    "updatedAt": "2026-04-06T21:51:48.612Z"
   },
   {
     "id": "cmni8n4qz0002xe1acuv9mytw",
@@ -72,7 +63,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8n4qz0002xe1acuv9mytw_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.619Z",
+    "updatedAt": "2026-04-06T21:51:48.619Z"
   },
   {
     "id": "cmni8nkf00003xe1az1084gpc",
@@ -87,7 +80,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8nkf00003xe1az1084gpc_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.624Z",
+    "updatedAt": "2026-04-06T21:51:48.624Z"
   },
   {
     "id": "cmni8ohjt0005xe1alsscf6xp",
@@ -102,7 +97,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8ohjt0005xe1alsscf6xp_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.630Z",
+    "updatedAt": "2026-04-06T21:51:48.630Z"
   },
   {
     "id": "cmni8osk00006xe1aza26401u",
@@ -117,7 +114,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8osk00006xe1aza26401u_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.634Z",
+    "updatedAt": "2026-04-06T21:51:48.634Z"
   },
   {
     "id": "cmni8nzs20004xe1aokqxuysf",
@@ -132,7 +131,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8nzs20004xe1aokqxuysf_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.639Z",
+    "updatedAt": "2026-04-06T21:51:48.639Z"
   },
   {
     "id": "cmnjdru4y00008656sklfwyd2",
@@ -147,7 +148,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnjdru4y00008656sklfwyd2_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.643Z",
+    "updatedAt": "2026-04-06T21:51:48.643Z"
   },
   {
     "id": "cmnje0otv00018656nzoywcl7",
@@ -162,7 +165,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje0otv00018656nzoywcl7_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.647Z",
+    "updatedAt": "2026-04-06T21:51:48.647Z"
   },
   {
     "id": "cmnje132100028656bdkw1t9p",
@@ -177,7 +182,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje132100028656bdkw1t9p_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.651Z",
+    "updatedAt": "2026-04-06T21:51:48.651Z"
   },
   {
     "id": "cmnje1gyv000386569nj6a2tn",
@@ -192,7 +199,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje1gyv000386569nj6a2tn_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.656Z",
+    "updatedAt": "2026-04-06T21:51:48.656Z"
   },
   {
     "id": "cmnje20qh00048656s78jsmge",
@@ -207,7 +216,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje20qh00048656s78jsmge_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.660Z",
+    "updatedAt": "2026-04-06T21:51:48.660Z"
   },
   {
     "id": "cmnje30rf00058656o0xukduf",
@@ -222,7 +233,9 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje30rf00058656o0xukduf_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.664Z",
+    "updatedAt": "2026-04-06T21:51:48.664Z"
   },
   {
     "id": "cmnje3cld00068656i26o6j0k",
@@ -237,6 +250,25 @@
     "rarity": "LOW",
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje3cld00068656i26o6j0k_gear.png",
-    "isStartingPiece": true
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.668Z",
+    "updatedAt": "2026-04-06T21:51:48.668Z"
+  },
+  {
+    "id": "cmni8l0zu0000xe1auwhar051",
+    "name": "Basic Helmet",
+    "description": "basic",
+    "type": "GEAR",
+    "subType": "HEAD",
+    "vendorBuyPrice": 0,
+    "vendorSellPrice": 0,
+    "userSellPrice": 0,
+    "userBuyPrice": 0,
+    "rarity": "LOW",
+    "iconUrl": "/assets/icons/items/cmni8l0zu0000xe1auwhar051_icon.png",
+    "gearImageUrl": "/assets/gear/cmni8l0zu0000xe1auwhar051_gear.png",
+    "isStartingPiece": true,
+    "createdAt": "2026-04-06T21:51:48.607Z",
+    "updatedAt": "2026-04-11T02:30:46.526Z"
   }
 ]

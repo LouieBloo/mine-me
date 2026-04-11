@@ -1,0 +1,42 @@
+.city-picker-select {
+  appearance: none;
+  background-color: rgba(15, 23, 42, 0.6); /* slate-900 with opacity */
+  border: 1px solid rgba(51, 65, 85, 0.8); /* slate-700 */
+  color: #f8fafc; /* slate-50 */
+  padding: 0.5rem 1rem;
+  padding-right: 2.5rem;
+  border-radius: 0.5rem; /* rounded-lg */
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 700; /* font-bold */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease-in-out;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  backdrop-filter: blur(4px);
+}
+
+.city-picker-select:hover:not(.disabled) {
+  background-color: rgba(30, 41, 59, 0.8); /* slate-800 */
+  border-color: rgba(148, 163, 184, 0.5); /* slate-400 */
+}
+
+.city-picker-select:focus {
+  border-color: #3b82f6; /* blue-500 */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.city-picker-select.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.city-picker-select option {
+  background-color: #0f172a; /* slate-900 */
+  color: #f8fafc;
+  font-weight: 600;
+}

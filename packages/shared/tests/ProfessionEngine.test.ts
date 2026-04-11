@@ -11,13 +11,14 @@ describe('ProfessionEngine', () => {
     profession: 'Mining',
     sol: 0,
     lear: 0,
+    cityId: 'city_1',
     attributes: {
       level: 1,
       combatScore: 5,
       defenseScore: 5,
       stamina: 100,
       maxStamina: 100,
-      age: 20
+      ageInDays: 7300
     },
     inventory: { slots: 25, items: [] },
     gear: {}
@@ -38,7 +39,8 @@ describe('ProfessionEngine', () => {
     id: 'tool_1',
     name: 'Basic Pickaxe',
     description: 'A rusty pickaxe',
-    type: 'Material',
+    type: 'MATERIAL',
+    subType: 'MINERAL',
     priceSol: 5,
     durability: 10,
     maxDurability: 10,
@@ -90,7 +92,7 @@ describe('ProfessionEngine', () => {
     const smith = { 
       ...mockPlayer, 
       profession: 'Blacksmithing',
-      inventory: { items: [{ id: 'iron_ore' }] } // Simple mock
+      inventory: { slots: 25, items: [{ item: { id: 'iron_ore' }, quantity: 2 }] }
     } as any;
 
     const result = ProfessionEngine.craft(smith, mockRecipe);

@@ -133,7 +133,7 @@ export class ProfessionEngine {
 
     // 4. Validate Ingredients
     for (const ingredient of recipe.ingredients) {
-      const playerItem = player.inventory.items.find(i => i.id === ingredient.itemId);
+      const playerItem = player.inventory.items.find(e => e.item.id === ingredient.itemId);
       // In a real implementation, we'd check total quantity across slots
       // For now, simple check
       if (!playerItem) {

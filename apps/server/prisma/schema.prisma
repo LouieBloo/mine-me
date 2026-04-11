@@ -35,6 +35,7 @@ model Character {
   defenseScore   Int       @default(10)
   stamina        Int       @default(100)
   maxStamina     Int       @default(100)
+  maxInventorySlots Int    @default(25)
   ageInDays      Int       @default(6570) // ~18 years in days (18 * 365)
   
   sol            Int       @default(0)

@@ -26,17 +26,18 @@ describe('CombatEngine', () => {
     characterClass: 'Warrior',
     sol: 0,
     lear: 0,
+    cityId: 'city_1',
     attributes: {
       level: 1,
       combatScore: 10,
       defenseScore: 5,
       stamina: 100,
       maxStamina: 100,
-      age: 20
+      ageInDays: 7300
     },
     inventory: { slots: 25, items: [] },
     gear: {
-      weapon: { id: 'w1', name: 'Sword', type: 'Weapon', damage: 20, priceSol: 10, description: 'Basic sword' }
+      weapon: { id: 'w1', name: 'Sword', description: 'Basic sword', type: 'GEAR', subType: 'WEAPON', damage: 20, defenseBonus: 0, priceSol: 10 }
     }
   };
 

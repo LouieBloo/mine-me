@@ -6,6 +6,26 @@ export const gameRouter = Router();
 gameRouter.use(authenticateToken);
 
 // ----------------------------------------------------------------------------
+// GET /api/game/cities
+// Returns a list of all available cities for the UI dropdown.
+// ----------------------------------------------------------------------------
+gameRouter.get('/cities', async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const cities = await prisma.city.findMany({
+      select: {
+        id: true,
+        name: true,
+        description: true
+      },
+      orderBy: { name: 'asc' }
+    });
+    return res.json(cities);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ----------------------------------------------------------------------------
 // GET /api/game/city/:cityId
 // Returns core city data for the HomeView.
 // Security: Verifies the requesting user has an ACTIVE character in that city.

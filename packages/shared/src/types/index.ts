@@ -10,21 +10,28 @@ export interface PlayerAttributes {
   ageInDays: number; // minimum unit of time
 }
 
+export interface InventoryEntry {
+  item: GameItem;
+  quantity: number;
+}
+
 export interface PlayerInventory {
   slots: number;
-  items: GameItem[];
+  items: InventoryEntry[];
 }
 
 export interface PlayerState {
-  id: string; // phone number based identifier hash
+  id: string; // character id
   familyName: string;
   characterName: string;
   characterClass: CharacterClass;
   profession?: Profession;
   sol: number;
   lear: number;
+  cityId: string;
   attributes: PlayerAttributes;
   inventory: PlayerInventory;
+  city?: GameCity; // populated by socket push
   gear: {
     head?: GearItem;
     shoulders?: GearItem;

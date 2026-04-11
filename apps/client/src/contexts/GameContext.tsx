@@ -1,28 +1,63 @@
 import React, { createContext, useState, useContext, type ReactNode } from 'react';
 import type { Character } from '../views/CharacterSelection/CharacterSelection';
-import type { GameCity } from '@nvg/shared';
+import type { GameCity, PlayerState } from '@nvg/shared';
 
 interface GameContextType {
     activeCharacter: Character | null;
     setActiveCharacter: (character: Character | null) => void;
     activeCity: GameCity | null;
     setActiveCity: (city: GameCity | null) => void;
+    /** Authoritative character state pushed from the server via the socket. */
+    playerState: PlayerState | null;
+    setPlayerState: (state: PlayerState | null) => void;
+    /** Call on logout to clear all game state. */
+    clearGameState: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
+// Helper to safely parse JSON from localStorage
+function readLocalStorage<T>(key: string): T | null {
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+        return null;
+    }
+}
+
 export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [activeCharacter, setActiveCharacterState] = useState<Character | null>(() => {
-        const saved = localStorage.getItem('nvg_active_character');
-        return saved ? JSON.parse(saved) : null;
+    const [activeCharacter, setActiveCharacterState] = useState<Character | null>(() =>
+        readLocalStorage<Character>('nvg_active_character')
+    );
+
+    // Restore city from persisted playerState so we never flash "Loading..."
+    const [playerState, setPlayerStateRaw] = useState<PlayerState | null>(() =>
+        readLocalStorage<PlayerState>('nvg_player_state')
+    );
+
+    const [activeCity, setActiveCity] = useState<GameCity | null>(() => {
+        const ps = readLocalStorage<PlayerState>('nvg_player_state');
+        return ps?.city ?? null;
     });
 
-    const [activeCity, setActiveCity] = useState<GameCity | null>(null);
+    // Wrap setPlayerState so we also persist it
+    const setPlayerState = (state: PlayerState | null) => {
+        setPlayerStateRaw(state);
+        if (state) {
+            localStorage.setItem('nvg_player_state', JSON.stringify(state));
+            // Also keep activeCity in sync from the authoritative state
+            if (state.city) setActiveCity(state.city);
+        } else {
+            localStorage.removeItem('nvg_player_state');
+        }
+    };
 
+    // setActiveCharacter ONLY updates the active character + localStorage.
+    // It must NOT wipe playerState — city switching would hit this path and
+    // that must not discard the inventory or any other socket-pushed state.
     const setActiveCharacter = (char: Character | null) => {
         setActiveCharacterState(char);
-        // Changing character clears city state
-        setActiveCity(null);
         if (char) {
             localStorage.setItem('nvg_active_character', JSON.stringify(char));
         } else {
@@ -30,8 +65,25 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    // Call this on full logout to wipe everything
+    const clearGameState = () => {
+        setActiveCharacterState(null);
+        setPlayerStateRaw(null);
+        setActiveCity(null);
+        localStorage.removeItem('nvg_active_character');
+        localStorage.removeItem('nvg_player_state');
+    };
+
     return (
-        <GameContext.Provider value={{ activeCharacter, setActiveCharacter, activeCity, setActiveCity }}>
+        <GameContext.Provider value={{
+            activeCharacter,
+            setActiveCharacter,
+            activeCity,
+            setActiveCity,
+            playerState,
+            setPlayerState,
+            clearGameState,
+        }}>
             {children}
         </GameContext.Provider>
     );

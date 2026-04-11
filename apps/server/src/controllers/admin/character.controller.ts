@@ -12,3 +12,35 @@ export const getCharacter = async (req: Request, res: Response) => {
   const item = await prisma.character.findUnique({ where: { id: req.params.id } });
   res.json(item);
 };
+
+export const updateCharacter = async (req: Request, res: Response) => {
+  const { 
+    name, class: characterClass, profession, status, 
+    level, combatScore, defenseScore, stamina, maxStamina, 
+    maxInventorySlots, ageInDays, sol, lear 
+  } = req.body;
+
+  try {
+    const updated = await prisma.character.update({
+      where: { id: req.params.id },
+      data: {
+        name,
+        class: characterClass,
+        profession,
+        status,
+        level,
+        combatScore,
+        defenseScore,
+        stamina,
+        maxStamina,
+        maxInventorySlots,
+        ageInDays,
+        sol,
+        lear,
+      }
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update character' });
+  }
+};

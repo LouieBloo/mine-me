@@ -1,46 +1,55 @@
 import type { PlayerInventory } from '@nvg/shared';
+import { ItemListIcon } from '../ItemListIcon/ItemListIcon';
 import './InventoryPanel.css';
 
 interface Props {
   inventory: PlayerInventory | null;
 }
 
+// ---------------------------------------------------------------------------
+// InventoryPanel
+// ---------------------------------------------------------------------------
 export const InventoryPanel = ({ inventory }: Props) => {
   if (!inventory) return null;
 
-  // Fill empty slots up to the player's max slots definition
-  const slots = Array.from({ length: inventory.slots }, (_, i) => inventory.items[i] || null);
+  const totalItems = inventory.items.reduce((sum, e) => sum + e.quantity, 0);
 
   return (
     <div className="flex flex-col h-full bg-slate-800 border-l border-slate-700 w-80 shadow-2xl">
-       <div className="p-6 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
-        <h2 className="text-lg font-black tracking-widest text-slate-300 uppercase">Backpack</h2>
-        <span className="text-xs font-bold text-slate-500">{inventory.items.length} / {inventory.slots}</span>
+      {/* Header */}
+      <div className="p-6 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center shrink-0">
+        <h2 className="text-lg font-black tracking-widest text-slate-300 uppercase">
+          Backpack
+        </h2>
+        <span className="text-xs font-bold text-slate-500">
+          {totalItems} / {inventory.slots}
+        </span>
       </div>
 
-      <div className="p-4 overflow-y-auto">
-        <div className="grid grid-cols-4 gap-2">
-          {slots.map((item, idx) => (
-            <div 
-              key={idx} 
-              className={`
-                aspect-square rounded-lg border-2 flex items-center justify-center transition-all cursor-pointer shadow-inner
-                ${item 
-                  ? 'bg-slate-700 border-slate-600 hover:border-yellow-500 hover:bg-slate-600 hover:-translate-y-1 hover:shadow-lg' 
-                  : 'bg-slate-900/50 border-slate-800 border-dashed'}
-              `}
-              title={item?.name}
-            >
-              {item && (
-                <div className="text-xs font-bold text-slate-300 truncate w-full text-center px-1">
-                  {item.name.substring(0, 3)}
-                </div>
-              )}
-            </div>
-          ))}
+      {/* Grid item list */}
+      <div className="flex-1 overflow-y-auto p-4 content-start">
+        <div className="grid grid-cols-3 gap-3">
+          {Array.from({ length: inventory.slots }).map((_, idx) => {
+            const entry = inventory.items[idx];
+
+            if (entry) {
+              return <ItemListIcon key={`${entry.item.id}-${idx}`} entry={entry} />;
+            }
+
+            // Empty slot
+            return (
+              <div
+                key={`empty-${idx}`}
+                className="w-full aspect-square bg-slate-900/50 border border-slate-700/50 rounded-lg shadow-inner"
+              />
+            );
+          })}
         </div>
-        
-        <button className="w-full mt-6 py-3 font-bold text-yellow-600 transition-all border border-yellow-600/30 rounded hover:bg-yellow-600/10 active:scale-95 text-sm uppercase tracking-widest">
+      </div>
+
+      {/* Footer */}
+      <div className="p-3 border-t border-slate-700 shrink-0">
+        <button className="w-full py-2.5 font-bold text-yellow-600 transition-all border border-yellow-600/30 rounded hover:bg-yellow-600/10 active:scale-95 text-sm uppercase tracking-widest cursor-pointer">
           Expand Slots
         </button>
       </div>

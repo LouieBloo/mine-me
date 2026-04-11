@@ -1,0 +1,43 @@
+/* HoverTooltip trigger — needs to be inline so it doesn't break flex/grid layouts */
+.hover-tooltip-trigger {
+  display: contents;
+}
+
+/* The floating tooltip itself */
+.hover-tooltip {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+
+  /* Glass panel aesthetic matching the game's slate theme */
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.95),
+    rgba(30, 41, 59, 0.95)
+  );
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 0.5rem;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 1px rgba(148, 163, 184, 0.15);
+  backdrop-filter: blur(12px);
+
+  /* Sizing */
+  max-width: 280px;
+  min-width: 160px;
+  padding: 0.75rem 1rem;
+
+  /* Entry animation */
+  animation: tooltip-fade-in 120ms ease-out;
+}
+
+@keyframes tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -1,10 +1,15 @@
 import { io, Socket } from 'socket.io-client';
+import type { PlayerState, GameCity } from '@nvg/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 // SocketService events emitted by the server that the client can listen for
 export type SocketEventMap = {
-  // City events
+  // Character state — emitted after select_character succeeds
+  character_state: PlayerState;
+  // City data — emitted after join_city succeeds (replaces HTTP /api/game/city/:id)
+  city_data: GameCity;
+  // City presence events
   player_entered_city: { characterId: string; name: string; level: number; combatScore: number };
   player_left_city: { characterId: string };
   // Connection
@@ -40,11 +45,21 @@ class SocketService {
    */
   connect(token: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Already fully connected — nothing to do.
       if (this.socket?.connected) {
         resolve();
         return;
       }
 
+      // Socket instance exists but is still connecting (e.g. Strict Mode second mount).
+      // Attach to the in-flight attempt instead of creating a second socket.
+      if (this.socket) {
+        this.socket.once('connect', () => resolve());
+        this.socket.once('connect_error', reject);
+        return;
+      }
+
+      // Fresh connect.
       this.socket = io(API_URL, {
         auth: { token: `Bearer ${token}` },
         transports: ['websocket'],

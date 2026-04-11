@@ -7,7 +7,8 @@ describe('TradingEngine', () => {
     id: 'iron_ore',
     name: 'Iron Ore',
     description: 'Raw iron',
-    type: 'Material',
+    type: 'MATERIAL',
+    subType: 'MINERAL',
     priceSol: 10
   };
 
@@ -18,8 +19,9 @@ describe('TradingEngine', () => {
     characterClass: 'Mage',
     sol: 100,
     lear: 0,
-    attributes: { level: 1, combatScore: 0, defenseScore: 0, stamina: 100, maxStamina: 100, age: 20 },
-    inventory: { slots: 25, items: [{ ...mockItem }] },
+    cityId: 'city_1',
+    attributes: { level: 1, combatScore: 0, defenseScore: 0, stamina: 100, maxStamina: 100, ageInDays: 7300 },
+    inventory: { slots: 25, items: [{ item: { ...mockItem }, quantity: 1 }] },
     gear: {}
   };
 

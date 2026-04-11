@@ -73,7 +73,7 @@ export class CombatEngine {
   }
 
   private static applyPlayerPotion(state: CombatState, player: PlayerState, itemId?: string) {
-    const potion = player.inventory.items.find(i => i.id === itemId && i.type === 'POTION');
+    const potion = player.inventory.items.find(e => e.item.id === itemId && e.item.type === 'POTION');
     if (!potion) return;
 
     // Logic for different potion types would go here
