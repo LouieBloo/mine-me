@@ -1,1 +1,30 @@
-/* Empty CSS file to satisfy component folder structure rules */
+.item-name-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  container-type: size;
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--color-panel), transparent 50%), transparent);
+}
+
+.item-name-text {
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #475569; /* slate-600 */
+  text-align: center;
+  line-height: 1;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  /* Fluid font size based on container size */
+  font-size: clamp(8px, 15cqw, 20px);
+  /* Smooth transitions */
+  transition: all 0.2s ease-in-out;
+}
+
+/* Hover effects when inside the ItemListIcon group */
+:global(.group):hover .item-name-text {
+  color: #94a3b8; /* slate-400 */
+  transform: scale(1.05);
+}

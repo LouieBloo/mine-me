@@ -4,7 +4,8 @@ import { Assets, Texture, Sprite, Application as PixiApplication } from 'pixi.js
 import { useGame } from '../../contexts/GameContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { useApi } from '../../hooks/useApi';
-import { CityPicker } from '../../components/CityPicker/CityPicker';
+import { WorldMapModal } from '../../components/WorldMapModal/WorldMapModal';
+import { ConfirmationModal } from '../../components/ConfirmationModal/ConfirmationModal';
 import type { GameCity } from '@nvg/shared';
 import './HomeView.css';
 
@@ -70,6 +71,10 @@ export const HomeView = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [switchingCity, setSwitchingCity] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [showTravelConfirm, setShowTravelConfirm] = useState(false);
+  const [pendingCityId, setPendingCityId] = useState<string | null>(null);
+  const [cities, setCities] = useState<GameCity[]>([]);
   const [pixiApp, setPixiApp] = useState<PixiApplication | null>(null);
   const cityIdRef = useRef<string | null>(null);
   const joinedCityIdRef = useRef<string | null>(null);
@@ -95,6 +100,20 @@ export const HomeView = () => {
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, []);
+
+  // Fetch all cities on mount for the map
+  useEffect(() => {
+    let active = true;
+    fetchWithAuth('/api/game/cities')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (active && data) {
+          setCities(data);
+        }
+      })
+      .catch(err => console.error('[HomeView] Failed to fetch cities:', err));
+    return () => { active = false; };
+  }, [fetchWithAuth]);
 
   // city_data arrives after join_city — update activeCity.
   // We keep this handler because the server always emits it, and it may carry
@@ -137,11 +156,14 @@ export const HomeView = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCharacter?.cityId, activeCharacter?.id]);
 
-  const handleCityChange = async (newCityId: string) => {
+  const handleCityChange = (newCityId: string) => {
     if (!activeCharacter) return;
+    setPendingCityId(newCityId);
+    setShowTravelConfirm(true);
+  };
 
-    const confirmTravel = window.confirm("Are you sure you want to travel to this city?");
-    if (!confirmTravel) return;
+  const handleConfirmTravel = async () => {
+    if (!activeCharacter || !pendingCityId) return;
 
     setSwitchingCity(true);
     try {
@@ -150,12 +172,15 @@ export const HomeView = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ cityId: newCityId })
+        body: JSON.stringify({ cityId: pendingCityId })
       });
       if (!res.ok) throw new Error('Failed to switch city');
 
       const updatedCharacter = await res.json();
       setActiveCharacter(updatedCharacter);
+      setShowMapModal(false);
+      setShowTravelConfirm(false);
+      setPendingCityId(null);
     } catch (err) {
       console.error('[HomeView] Failed to travel:', err);
     } finally {
@@ -177,14 +202,29 @@ export const HomeView = () => {
           ) : cityName}
         </h1>
 
-        <div className="pointer-events-auto">
-          <CityPicker
-            currentCityId={activeCharacter.cityId}
-            onCityChange={handleCityChange}
+        <div className="pointer-events-auto flex items-center space-x-4">
+          <button
             disabled={cityLoading || switchingCity}
-          />
+            onClick={() => setShowMapModal(true)}
+            className="flex items-center space-x-2 px-6 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-black uppercase tracking-widest rounded shadow-xl transition-all active:scale-95 border border-amber-400"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+            <span>Open Map</span>
+          </button>
         </div>
       </div>
+
+      {showMapModal && (
+        <WorldMapModal 
+          cities={cities}
+          currentCityId={activeCharacter.cityId}
+          onCityTravel={handleCityChange}
+          onClose={() => setShowMapModal(false)}
+          loading={switchingCity}
+        />
+      )}
 
       {/* PixiJS Canvas */}
       <div ref={containerRef} className="flex-1 w-full h-full bg-slate-950 relative overflow-hidden">
@@ -208,6 +248,19 @@ export const HomeView = () => {
 
       {/* Bottom vignette */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-950/60 to-transparent pointer-events-none z-10" />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showTravelConfirm}
+        onClose={() => setShowTravelConfirm(false)}
+        onConfirm={handleConfirmTravel}
+        isLoading={switchingCity}
+        title="Travel Confirmation"
+        message={`Are you sure you want to travel to ${cities.find(c => c.id === pendingCityId)?.name || 'this city'}?`}
+        confirmLabel="Fast Travel"
+        cancelLabel="Stay Here"
+        variant="primary"
+      />
     </div>
   );
 };

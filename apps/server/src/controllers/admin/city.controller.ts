@@ -17,6 +17,18 @@ const storage = multer.diskStorage({
   }
 });
 
+const mapIconStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, '../../../../../packages/shared/assets/cities/icons');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, `${req.params.id}_mapicon${ext}`);
+  }
+});
+
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   if (file.mimetype === 'image/png' || file.mimetype === 'image/jpeg') {
     cb(null, true);
@@ -25,8 +37,19 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
   }
 };
 
+const iconFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  if (file.mimetype === 'image/png') {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PNG images are allowed for icons'));
+  }
+};
+
 const upload = multer({ storage: storage, fileFilter });
+const mapIconUpload = multer({ storage: mapIconStorage, fileFilter: iconFileFilter });
+
 export const cityBackgroundUpload = upload.single('background');
+export const cityMapIconUpload = mapIconUpload.single('icon');
 
 export const getCities = async (req: Request, res: Response) => {
   const { skip, take, where } = getPagination(req, 'name');
@@ -210,5 +233,53 @@ export const uploadCityBackground = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error(error);
     res.status(500).json({ error: error.message || 'Failed to upload city background' });
+  }
+};
+
+export const uploadCityMapIcon = async (req: Request, res: Response) => {
+  try {
+    const cityId = req.params.id;
+    const file = req.file;
+
+    const city = await prisma.city.findUnique({ where: { id: cityId } });
+    if (!city) {
+      res.status(404).json({ error: 'City not found' });
+      return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No icon file provided' });
+      return;
+    }
+
+    const mapIconUrl = `/assets/cities/icons/${file.filename}`;
+
+    const updatedCity = await prisma.city.update({
+      where: { id: cityId },
+      data: { mapIconUrl },
+      include: {
+        cityDungeons: { 
+          orderBy: { orderIndex: 'asc' },
+          include: { dungeon: true } 
+        },
+        cityMaterials: { include: { item: true } }
+      }
+    });
+
+    const allCities = await prisma.city.findMany({
+      include: {
+        cityDungeons: { 
+          orderBy: { orderIndex: 'asc' },
+          include: { dungeon: true } 
+        },
+        cityMaterials: { include: { item: true } }
+      }
+    });
+    await syncJson('cities.json', allCities);
+
+    res.json(updatedCity);
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ error: error.message || 'Failed to upload map icon' });
   }
 };

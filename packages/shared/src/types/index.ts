@@ -150,6 +150,7 @@ export interface GameCity {
   name: string;
   description: string;
   backgroundImageUrl?: string | null;
+  mapIconUrl?: string | null;
   cityDungeons?: CityDungeon[];
   cityMaterials?: CityMaterial[];
   

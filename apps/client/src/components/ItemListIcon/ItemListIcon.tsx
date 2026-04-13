@@ -26,9 +26,11 @@ export const ItemListIcon = ({ entry }: ItemListIconProps) => {
             className="w-full h-full object-cover scale-90 group-hover:scale-100 transition-transform"
           />
         ) : (
-          <span className="text-xl font-black text-slate-600">
-            {item.name.charAt(0)}
-          </span>
+          <div className="item-name-placeholder">
+            <span className="item-name-text">
+              {item.name}
+            </span>
+          </div>
         )}
 
         {/* Quantity badge - absolute positioned in bottom right */}

@@ -5,6 +5,7 @@ import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
 import { EntityPicker } from '../../components/EntityPicker/EntityPicker';
 import CityBackgroundUpload from './CityBackgroundUpload/CityBackgroundUpload';
+import CityMapIconUpload from './CityMapIconUpload/CityMapIconUpload';
 import { ITEM_SUBTYPES } from '@nvg/shared';
 import './CityDetail.css';
 
@@ -46,7 +47,7 @@ export default function CityDetail() {
           return res.json();
         })
         .then(json => {
-          setData({ name: json.name, description: json.description, id: json.id, backgroundImageUrl: json.backgroundImageUrl });
+          setData({ name: json.name, description: json.description, id: json.id, backgroundImageUrl: json.backgroundImageUrl, mapIconUrl: json.mapIconUrl });
           setCityDungeons(json.cityDungeons || []);
           setCityMaterials(json.cityMaterials || []);
           setLoading(false);
@@ -309,11 +310,18 @@ export default function CityDetail() {
 
       {/* Background Image Upload - only show after city exists */}
       {!isNew && (
-        <CityBackgroundUpload 
-          cityId={id!} 
-          backgroundImageUrl={data.backgroundImageUrl} 
-          onUploadSuccess={(updatedCity) => setData(updatedCity)} 
-        />
+        <>
+          <CityBackgroundUpload 
+            cityId={id!} 
+            backgroundImageUrl={data.backgroundImageUrl} 
+            onUploadSuccess={(updatedCity) => setData(updatedCity)} 
+          />
+          <CityMapIconUpload 
+            cityId={id!} 
+            mapIconUrl={data.mapIconUrl} 
+            onUploadSuccess={(updatedCity) => setData(updatedCity)} 
+          />
+        </>
       )}
 
       {/* Dungeons Section - only show after city exists */}

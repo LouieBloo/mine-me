@@ -1,32 +1,26 @@
 [
   {
-    "id": "cmn2087uu0002u72gu8lggdsw",
-    "name": "Iron Forge",
-    "description": "test",
-    "backgroundImageUrl": null,
-    "createdAt": "2026-04-06T21:51:48.676Z",
-    "updatedAt": "2026-04-06T21:51:48.676Z",
-    "cityDungeons": [],
-    "cityMaterials": []
-  },
-  {
     "id": "cmn1zlln10002ihw4wqu4tnxb",
     "name": "Brackus",
     "description": "City of Asss",
     "backgroundImageUrl": "/assets/cities/backgrounds/cmn1zlln10002ihw4wqu4tnxb_background.png",
     "createdAt": "2026-04-06T21:51:48.671Z",
-    "updatedAt": "2026-04-10T01:08:23.125Z",
-    "cityDungeons": [],
-    "cityMaterials": []
+    "updatedAt": "2026-04-10T01:08:23.125Z"
+  },
+  {
+    "id": "cmn2087uu0002u72gu8lggdsw",
+    "name": "Gorlon",
+    "description": "test",
+    "backgroundImageUrl": "/assets/cities/backgrounds/cmn2087uu0002u72gu8lggdsw_background.png",
+    "createdAt": "2026-04-06T21:51:48.676Z",
+    "updatedAt": "2026-04-13T01:34:59.110Z"
   },
   {
     "id": "cmn208bs90003u72gkkkkb62d",
-    "name": "Island Cit y",
+    "name": "Isle of Mim",
     "description": "2",
     "backgroundImageUrl": "/assets/cities/backgrounds/cmn208bs90003u72gkkkkb62d_background.png",
     "createdAt": "2026-04-06T21:51:48.679Z",
-    "updatedAt": "2026-04-10T01:08:37.778Z",
-    "cityDungeons": [],
-    "cityMaterials": []
+    "updatedAt": "2026-04-13T01:41:28.496Z"
   }
 ]

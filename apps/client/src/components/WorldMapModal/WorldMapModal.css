@@ -1,0 +1,8 @@
+.map-button-city {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.map-button-city:hover {
+  transform: scale(1.1);
+  z-index: 50;
+}

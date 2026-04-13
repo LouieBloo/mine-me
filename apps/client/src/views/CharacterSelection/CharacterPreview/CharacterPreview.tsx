@@ -7,6 +7,7 @@ import { Application } from '@pixi/react';
 import { Assets, Texture } from 'pixi.js';
 import { type GearSubType, GEAR_OFFSETS } from '@nvg/shared';
 import './CharacterPreview.css';
+import { ConfirmationModal } from '../../../components/ConfirmationModal/ConfirmationModal';
 
 const useTexture = (url: string | null | undefined) => {
     const [texture, setTexture] = useState<Texture | null>(null);
@@ -38,6 +39,8 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
     const { fetchWithAuth } = useApi();
     const { setActiveCharacter } = useGame();
     const [retiring, setRetiring] = useState(false);
+    const [showRetireConfirm, setShowRetireConfirm] = useState(false);
+    const [alertInfo, setAlertInfo] = useState({ isOpen: false, title: '', message: '' });
     
     const baseBodyUrl = `${import.meta.env.VITE_API_URL}/assets/gear/base-body.png`;
 
@@ -66,9 +69,6 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
     const handleRetire = async () => {
         if (!character) return;
         
-        const confirm = window.confirm(`Are you sure you want to retire ${character.name}? This cannot be undone, and they will no longer be playable.`);
-        if (!confirm) return;
-
         setRetiring(true);
         try {
             const response = await fetchWithAuth(`/api/characters/${character.id}/retire`, {
@@ -83,9 +83,14 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
             const updatedChar = await response.json();
             onRetired(updatedChar);
         } catch (err: any) {
-            alert(err.message);
+            setAlertInfo({
+                isOpen: true,
+                title: 'Retirement Failed',
+                message: err.message
+            });
         } finally {
             setRetiring(false);
+            setShowRetireConfirm(false);
         }
     };
 
@@ -154,7 +159,7 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
 
                 {character.status === 'ACTIVE' && (
                     <button
-                        onClick={handleRetire}
+                        onClick={() => setShowRetireConfirm(true)}
                         disabled={retiring}
                         className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 font-bold uppercase tracking-widest rounded-xl transition-all text-xs cursor-pointer"
                     >
@@ -162,6 +167,31 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
                     </button>
                 )}
             </div>
+
+            {/* Retirement Confirmation */}
+            <ConfirmationModal
+                isOpen={showRetireConfirm}
+                onClose={() => setShowRetireConfirm(false)}
+                onConfirm={handleRetire}
+                isLoading={retiring}
+                title="Retire Character"
+                message={`Are you sure you want to retire ${character.name}? This cannot be undone, and they will no longer be playable.`}
+                confirmLabel="Retire Forever"
+                cancelLabel="Keep Character"
+                variant="danger"
+            />
+
+            {/* Error Alert */}
+            <ConfirmationModal
+                isOpen={alertInfo.isOpen}
+                onClose={() => setAlertInfo({ ...alertInfo, isOpen: false })}
+                onConfirm={() => setAlertInfo({ ...alertInfo, isOpen: false })}
+                title={alertInfo.title}
+                message={alertInfo.message}
+                confirmLabel="Understood"
+                showCancel={false}
+                variant="warning"
+            />
         </div>
     );
 };
