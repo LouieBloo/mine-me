@@ -2,13 +2,15 @@ import React, { createContext, useContext, useEffect, useState, useCallback, typ
 import { socketService, type SocketEventMap } from '../services/socketService';
 import { useAuth } from '../hooks/useAuth';
 import { useGame } from './GameContext';
-import type { PlayerState } from '@nvg/shared';
+import type { PlayerState, CharacterStatUpdate, GameEventPayload, GameEventResult } from '@nvg/shared';
 
 interface SocketContextType {
   isConnected: boolean;
   selectCharacter: (characterId: string) => Promise<void>;
   joinCity: (cityId: string, characterId: string) => Promise<void>;
   leaveCity: (cityId: string) => Promise<void>;
+  /** Send a typed game event to the server. Returns the result. */
+  sendGameEvent: (payload: GameEventPayload) => Promise<GameEventResult>;
   /** Register a listener for a socket event. Returns a cleanup function. */
   onEvent: <K extends keyof SocketEventMap>(event: K, handler: (data: SocketEventMap[K]) => void) => () => void;
 }
@@ -17,7 +19,7 @@ const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
 export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { token } = useAuth();
-  const { setPlayerState, clearGameState, activeCharacter } = useGame();
+  const { setPlayerState, applyStatUpdate, clearGameState, activeCharacter } = useGame();
   const [isConnected, setIsConnected] = useState(false);
 
   // Connect / disconnect based on auth token presence
@@ -66,6 +68,19 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
   }, [setPlayerState]);
 
+  // Listen for partial stat updates pushed by the server.
+  // These are lightweight deltas that get merged into the existing playerState.
+  useEffect(() => {
+    const handleStatUpdate = (updates: CharacterStatUpdate) => {
+      console.log('[SocketContext] character_stat_update received:', updates);
+      applyStatUpdate(updates);
+    };
+    socketService.on('character_stat_update', handleStatUpdate);
+    return () => {
+      socketService.off('character_stat_update', handleStatUpdate);
+    };
+  }, [applyStatUpdate]);
+
   // Auto-select character on connect or when activeCharacter changes.
   // This ensures that right after a page reload, the client fetches the latest player state (including inventory) mapping over the socket.
   useEffect(() => {
@@ -95,8 +110,12 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return () => socketService.off(event, handler);
   }, []);
 
+  const sendGameEvent = useCallback((payload: GameEventPayload) => {
+    return socketService.sendGameEvent(payload);
+  }, []);
+
   return (
-    <SocketContext.Provider value={{ isConnected, selectCharacter, joinCity, leaveCity, onEvent }}>
+    <SocketContext.Provider value={{ isConnected, selectCharacter, joinCity, leaveCity, sendGameEvent, onEvent }}>
       {children}
     </SocketContext.Provider>
   );

@@ -6,6 +6,11 @@ export const cityValidation = [
   body('description').trim().notEmpty().withMessage('Description is required')
 ];
 
+export const cityCoordinatesValidation = [
+  body('worldPositionX').isInt({ min: 0, max: 100 }).withMessage('World Position X must be between 0 and 100'),
+  body('worldPositionY').isInt({ min: 0, max: 100 }).withMessage('World Position Y must be between 0 and 100')
+];
+
 export const itemValidation = [
   body('name').trim().notEmpty().withMessage('Item Name is required'),
   body('description').trim().notEmpty().withMessage('Description is required'),

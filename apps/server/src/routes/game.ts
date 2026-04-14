@@ -15,7 +15,10 @@ gameRouter.get('/cities', async (req: AuthRequest, res: Response): Promise<any> 
       select: {
         id: true,
         name: true,
-        description: true
+        description: true,
+        worldPositionX: true,
+        worldPositionY: true,
+        mapIconUrl: true
       },
       orderBy: { name: 'asc' }
     });

@@ -13,6 +13,7 @@ import { publicRouter } from './routes/public';
 import { gameRouter } from './routes/game';
 import { handleSocketConnection } from './sockets/handlers';
 import { socketAuthMiddleware } from './sockets/socket.middleware';
+import { setIO } from './services/characterBroadcast';
 
 dotenv.config();
 
@@ -25,6 +26,9 @@ const io = new Server(httpServer, {
   }
 });
 export const prisma = new PrismaClient();
+
+// Initialize the broadcast service so any route/controller can push socket events
+setIO(io);
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));

@@ -85,6 +85,51 @@ export const updateCity = async (req: Request, res: Response) => {
   res.json(city);
 };
 
+export const updateCityCoordinates = async (req: Request, res: Response) => {
+  const { worldPositionX, worldPositionY } = req.body;
+  const city = await prisma.city.update({
+    where: { id: req.params.id },
+    data: { worldPositionX, worldPositionY },
+    include: {
+      cityDungeons: { 
+        orderBy: { orderIndex: 'asc' },
+        include: { dungeon: true } 
+      },
+      cityMaterials: { include: { item: true } }
+    }
+  });
+
+  const allCities = await prisma.city.findMany({
+    include: {
+      cityDungeons: { 
+        orderBy: { orderIndex: 'asc' },
+        include: { dungeon: true } 
+      },
+      cityMaterials: { include: { item: true } }
+    }
+  });
+  await syncJson('cities.json', allCities);
+  
+  res.json(city);
+};
+
+export const updateCityObjects = async (req: Request, res: Response) => {
+  const { objectCoordinates } = req.body;
+  const city = await prisma.city.update({
+    where: { id: req.params.id },
+    data: { objectCoordinates: objectCoordinates ?? [] },
+    include: {
+      cityDungeons: { 
+        orderBy: { orderIndex: 'asc' },
+        include: { dungeon: true } 
+      },
+      cityMaterials: { include: { item: true } }
+    }
+  });
+
+  res.json(city);
+};
+
 // --- City Dungeons ---
 
 export const getCityDungeons = async (req: Request, res: Response) => {

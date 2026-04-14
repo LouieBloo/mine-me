@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, type ReactNode } from 'react';
 import type { Character } from '../views/CharacterSelection/CharacterSelection';
-import type { GameCity, PlayerState } from '@nvg/shared';
+import type { GameCity, PlayerState, CharacterStatUpdate } from '@nvg/shared';
 
 interface GameContextType {
     activeCharacter: Character | null;
@@ -10,6 +10,8 @@ interface GameContextType {
     /** Authoritative character state pushed from the server via the socket. */
     playerState: PlayerState | null;
     setPlayerState: (state: PlayerState | null) => void;
+    /** Merge a partial stat update into the existing playerState. */
+    applyStatUpdate: (updates: CharacterStatUpdate) => void;
     /** Call on logout to clear all game state. */
     clearGameState: () => void;
 }
@@ -53,6 +55,30 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    // Merge a partial stat update into the existing playerState.
+    // Fields in CharacterStatUpdate map to either top-level (sol, lear, cityId)
+    // or nested attributes (level, combatScore, stamina, ageInDays, etc.).
+    const applyStatUpdate = (updates: CharacterStatUpdate) => {
+        setPlayerStateRaw(prev => {
+            if (!prev) return prev;
+
+            const { sol, lear, cityId, ...attrUpdates } = updates;
+            const next: PlayerState = {
+                ...prev,
+                ...(sol !== undefined && { sol }),
+                ...(lear !== undefined && { lear }),
+                ...(cityId !== undefined && { cityId }),
+                attributes: {
+                    ...prev.attributes,
+                    ...attrUpdates,
+                },
+            };
+
+            localStorage.setItem('nvg_player_state', JSON.stringify(next));
+            return next;
+        });
+    };
+
     // setActiveCharacter ONLY updates the active character + localStorage.
     // It must NOT wipe playerState — city switching would hit this path and
     // that must not discard the inventory or any other socket-pushed state.
@@ -82,6 +108,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setActiveCity,
             playerState,
             setPlayerState,
+            applyStatUpdate,
             clearGameState,
         }}>
             {children}

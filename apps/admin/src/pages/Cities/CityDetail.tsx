@@ -6,7 +6,7 @@ import { useApi } from '../../hooks/useApi';
 import { EntityPicker } from '../../components/EntityPicker/EntityPicker';
 import CityBackgroundUpload from './CityBackgroundUpload/CityBackgroundUpload';
 import CityMapIconUpload from './CityMapIconUpload/CityMapIconUpload';
-import { ITEM_SUBTYPES } from '@nvg/shared';
+import { ITEM_SUBTYPES, type CityObject, type CityObjectType, CITY_OBJECT_TYPES } from '@nvg/shared';
 import './CityDetail.css';
 
 const MATERIAL_SUBTYPES = ITEM_SUBTYPES.MATERIAL;
@@ -30,9 +30,10 @@ export default function CityDetail() {
   const isNew = id === 'new';
   const navigate = useNavigate();
 
-  const [data, setData] = useState<any>(isNew ? { name: '', description: '', backgroundImageUrl: null } : null);
+  const [data, setData] = useState<any>(isNew ? { name: '', description: '', backgroundImageUrl: null, worldPositionX: 50, worldPositionY: 50, objectCoordinates: [] } : null);
   const [cityDungeons, setCityDungeons] = useState<CityDungeonEntry[]>([]);
   const [cityMaterials, setCityMaterials] = useState<CityMaterialEntry[]>([]);
+  const [selectedObjectType, setSelectedObjectType] = useState<CityObjectType>('DUNGEON');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -47,7 +48,16 @@ export default function CityDetail() {
           return res.json();
         })
         .then(json => {
-          setData({ name: json.name, description: json.description, id: json.id, backgroundImageUrl: json.backgroundImageUrl, mapIconUrl: json.mapIconUrl });
+          setData({ 
+            name: json.name, 
+            description: json.description, 
+            id: json.id, 
+            backgroundImageUrl: json.backgroundImageUrl, 
+            mapIconUrl: json.mapIconUrl, 
+            worldPositionX: json.worldPositionX ?? 50, 
+            worldPositionY: json.worldPositionY ?? 50,
+            objectCoordinates: json.objectCoordinates || []
+          });
           setCityDungeons(json.cityDungeons || []);
           setCityMaterials(json.cityMaterials || []);
           setLoading(false);
@@ -212,6 +222,76 @@ export default function CityDetail() {
     return cityMaterials.filter(cm => cm.item?.subType === subType);
   };
 
+  const handleGridClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isNew) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
+    const y = Math.max(0, Math.min(100, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
+
+    const newObject: CityObject = {
+      type: selectedObjectType,
+      x,
+      y,
+      label: selectedObjectType.charAt(0) + selectedObjectType.slice(1).toLowerCase()
+    };
+
+    const updatedCoordinates = [...(data.objectCoordinates || []), newObject];
+    
+    setSaving(true);
+    try {
+      const res = await fetchWithAuth(`/api/admin/cities/${id}/objects`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ objectCoordinates: updatedCoordinates })
+      });
+
+      if (!res.ok) throw new Error('Failed to update city objects');
+      
+      const updatedCity = await res.json();
+      setData({ ...data, objectCoordinates: updatedCity.objectCoordinates });
+      toast.success(`${newObject.label} placed!`);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveObject = async (index: number) => {
+    const updatedCoordinates = [...(data.objectCoordinates || [])];
+    updatedCoordinates.splice(index, 1);
+
+    setSaving(true);
+    try {
+      const res = await fetchWithAuth(`/api/admin/cities/${id}/objects`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ objectCoordinates: updatedCoordinates })
+      });
+
+      if (!res.ok) throw new Error('Failed to update city objects');
+      
+      const updatedCity = await res.json();
+      setData({ ...data, objectCoordinates: updatedCity.objectCoordinates });
+      toast.success('Object removed');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getObjectIcon = (type: CityObjectType) => {
+    switch (type) {
+      case 'DUNGEON': return '🏰';
+      case 'MINE': return '⛏️';
+      case 'FARM': return '🌾';
+      case 'MARKET': return '⚖️';
+      default: return '📍';
+    }
+  };
+
   const getSubTypeIcon = (subType: string): string => {
     switch (subType) {
       case 'LUMBER': return '🪵';
@@ -311,16 +391,96 @@ export default function CityDetail() {
       {/* Background Image Upload - only show after city exists */}
       {!isNew && (
         <>
-          <CityBackgroundUpload 
-            cityId={id!} 
-            backgroundImageUrl={data.backgroundImageUrl} 
-            onUploadSuccess={(updatedCity) => setData(updatedCity)} 
+          <CityBackgroundUpload
+            cityId={id!}
+            backgroundImageUrl={data.backgroundImageUrl}
+            onUploadSuccess={(updatedCity) => setData(updatedCity)}
           />
-          <CityMapIconUpload 
-            cityId={id!} 
-            mapIconUrl={data.mapIconUrl} 
-            onUploadSuccess={(updatedCity) => setData(updatedCity)} 
+          <CityMapIconUpload
+            cityId={id!}
+            mapIconUrl={data.mapIconUrl}
+            onUploadSuccess={(updatedCity) => setData(updatedCity)}
           />
+
+          {/* City Layout Editor */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-2xl font-black text-slate-800">CITY LAYOUT</h3>
+              <p className="text-slate-500 text-sm font-medium">Place interactive objects on the city map (16:9 grid).</p>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex h-[500px]">
+              {/* Layout Sidebar */}
+              <div className="w-64 border-r border-slate-100 flex flex-col bg-slate-50">
+                <div className="p-4 border-b border-slate-200">
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Select Object</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                  {CITY_OBJECT_TYPES.map(type => (
+                    <button
+                      key={type}
+                      onClick={() => setSelectedObjectType(type)}
+                      className={`w-full text-left p-3 rounded-xl flex items-center space-x-3 transition-all ${
+                        selectedObjectType === type 
+                          ? 'bg-blue-600 text-white shadow-lg scale-[1.02]' 
+                          : 'hover:bg-white text-slate-600'
+                      }`}
+                    >
+                      <span className="text-xl">{getObjectIcon(type)}</span>
+                      <span className="font-bold uppercase tracking-wide text-sm">{type}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Layout Grid */}
+              <div className="flex-1 bg-slate-900 relative overflow-hidden group p-4 flex items-center justify-center">
+                <div 
+                  className="relative w-full aspect-video bg-slate-800 border-2 border-slate-700 rounded shadow-2xl cursor-crosshair overflow-hidden"
+                  style={{ 
+                    backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)', 
+                    backgroundSize: '6.25% 11.11%' // 16x9 grid lines
+                  }}
+                  onClick={handleGridClick}
+                >
+                  {/* City Background Preview if exists */}
+                  {data.backgroundImageUrl && (
+                    <img 
+                      src={`${import.meta.env.VITE_API_URL}${data.backgroundImageUrl}`} 
+                      alt="Preview" 
+                      className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none"
+                    />
+                  )}
+
+                  {/* Placed Objects */}
+                  {(data.objectCoordinates || []).map((obj: CityObject, index: number) => (
+                    <div
+                      key={index}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 group/item"
+                      style={{ left: `${obj.x}%`, top: `${obj.y}%` }}
+                    >
+                      <div className="relative flex flex-col items-center">
+                        <div className="w-8 h-8 bg-blue-500 border-2 border-white rounded-lg shadow-lg flex items-center justify-center text-lg z-10 transition-transform hover:scale-125">
+                          {getObjectIcon(obj.type)}
+                        </div>
+                        <div className="mt-1 bg-slate-900/90 text-[10px] font-black text-white px-1.5 py-0.5 rounded shadow whitespace-nowrap uppercase tracking-tighter">
+                          {obj.label}
+                        </div>
+                        
+                        {/* Remove button appears on hover */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRemoveObject(index); }}
+                          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover/item:opacity-100 transition-opacity z-20 shadow-lg hover:bg-red-600"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </>
       )}
 
@@ -367,7 +527,7 @@ export default function CityDetail() {
                           </svg>
                         </button>
                       </div>
-                      
+
                       <div>
                         <div className="font-bold text-slate-800 flex items-center space-x-2">
                           <span className="text-lg">🏰</span>

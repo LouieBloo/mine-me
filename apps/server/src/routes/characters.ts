@@ -59,19 +59,19 @@ charactersRouter.post('/', authenticateToken, async (req: AuthRequest, res: Resp
     // Default to a starting city (ensure one exists in your DB or seed)
     const startingCity = await prisma.city.findFirst();
     if (!startingCity) {
-        return res.status(500).json({ error: 'No starting city found in the database. Please run seed.' });
+      return res.status(500).json({ error: 'No starting city found in the database. Please run seed.' });
     }
 
     const inventoryData = [];
     if (gearSelections && typeof gearSelections === 'object') {
-       for (const slot in gearSelections) {
-         if (gearSelections[slot]) {
-           inventoryData.push({
-             itemId: gearSelections[slot],
-             quantity: 1
-           });
-         }
-       }
+      for (const slot in gearSelections) {
+        if (gearSelections[slot]) {
+          inventoryData.push({
+            itemId: gearSelections[slot],
+            quantity: 1
+          });
+        }
+      }
     }
 
     const character = await prisma.character.create({
@@ -132,48 +132,3 @@ charactersRouter.patch('/:id/retire', authenticateToken, async (req: AuthRequest
   }
 });
 
-// ----------------------------------------------------------------------------
-// PATCH /api/characters/:id/city
-// Updates the character's current city
-// ----------------------------------------------------------------------------
-charactersRouter.patch('/:id/city', authenticateToken, async (req: AuthRequest, res: Response): Promise<any> => {
-  try {
-    const userId = req.userId;
-    const { id } = req.params;
-    const { cityId } = req.body;
-
-    if (!cityId) {
-      return res.status(400).json({ error: 'cityId is required.' });
-    }
-
-    const character = await prisma.character.findUnique({
-      where: { id }
-    });
-
-    if (!character) {
-      return res.status(404).json({ error: 'Character not found.' });
-    }
-
-    if (character.userId !== userId) {
-      return res.status(403).json({ error: 'You do not have permission to modify this character.' });
-    }
-
-    if (character.status !== 'ACTIVE') {
-      return res.status(400).json({ error: 'Only active characters can travel.' });
-    }
-
-    const cityExists = await prisma.city.findUnique({ where: { id: cityId } });
-    if (!cityExists) {
-      return res.status(404).json({ error: 'Target city not found.' });
-    }
-
-    const updatedCharacter = await prisma.character.update({
-      where: { id },
-      data: { cityId }
-    });
-
-    return res.json(updatedCharacter);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});

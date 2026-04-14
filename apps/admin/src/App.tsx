@@ -14,6 +14,7 @@ import DungeonDetail from './pages/Dungeons/DungeonDetail';
 import { EntityDetail } from './pages/EntityDetail/EntityDetail';
 import MobDetail from './pages/Mobs/MobDetail';
 import ItemDetail from './pages/Items/ItemDetail/ItemDetail';
+import MapEditor from './pages/MapEditor/MapEditor';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -79,6 +80,10 @@ const router = createBrowserRouter([
       {
         path: "items/:id",
         element: <ItemDetail />
+      },
+      {
+        path: "map-editor",
+        element: <MapEditor />
       },
       {
         path: ":entity/:id",

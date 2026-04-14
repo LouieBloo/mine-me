@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { PlayerState, GameCity } from '@nvg/shared';
+import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult } from '@nvg/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -7,6 +7,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 export type SocketEventMap = {
   // Character state — emitted after select_character succeeds
   character_state: PlayerState;
+  // Partial stat update — emitted whenever the server mutates character fields
+  character_stat_update: CharacterStatUpdate;
   // City data — emitted after join_city succeeds (replaces HTTP /api/game/city/:id)
   city_data: GameCity;
   // City presence events
@@ -144,6 +146,24 @@ class SocketService {
         } else {
           console.log(`[Socket] City room left: city:${cityId}`);
           resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Send a typed game event to the server.
+   * Uses the discriminated union pattern — the server dispatches based on payload.type.
+   */
+  sendGameEvent(payload: GameEventPayload): Promise<GameEventResult> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) return reject(new Error('Not connected'));
+
+      this.socket.emit('game_event', payload, (result: GameEventResult) => {
+        if (result?.success) {
+          resolve(result);
+        } else {
+          reject(new Error(result?.error || 'Game event failed'));
         }
       });
     });

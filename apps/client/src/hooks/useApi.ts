@@ -1,10 +1,11 @@
 import { useAuth } from './useAuth';
 import { isTokenExpired } from '@nvg/shared';
+import { useCallback } from 'react';
 
 export const useApi = () => {
     const { token, logout } = useAuth();
 
-    const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
         // 1. Pre-check: Is the token already expired?
         if (token && isTokenExpired(token)) {
             console.warn('Token expired before request. Logging out.');
@@ -43,7 +44,7 @@ export const useApi = () => {
             console.error('Network or fetch error:', error);
             throw error;
         }
-    };
+    }, [token, logout]);
 
     return { fetchWithAuth };
 };

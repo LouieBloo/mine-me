@@ -6,7 +6,7 @@ import { useSocket } from '../../contexts/SocketContext';
 import { useApi } from '../../hooks/useApi';
 import { WorldMapModal } from '../../components/WorldMapModal/WorldMapModal';
 import { ConfirmationModal } from '../../components/ConfirmationModal/ConfirmationModal';
-import type { GameCity } from '@nvg/shared';
+import { type GameCity, calculateTravelDays } from '@nvg/shared';
 import './HomeView.css';
 
 // ----------------------------------------------------------------------------
@@ -66,7 +66,7 @@ const CityBackground = ({
 // ----------------------------------------------------------------------------
 export const HomeView = () => {
   const { activeCharacter, setActiveCharacter, activeCity, setActiveCity, playerState } = useGame();
-  const { joinCity, leaveCity, onEvent } = useSocket();
+  const { joinCity, leaveCity, sendGameEvent, onEvent } = useSocket();
   const { fetchWithAuth } = useApi();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -167,22 +167,15 @@ export const HomeView = () => {
 
     setSwitchingCity(true);
     try {
-      const res = await fetchWithAuth(`/api/characters/${activeCharacter.id}/city`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ cityId: pendingCityId })
-      });
-      if (!res.ok) throw new Error('Failed to switch city');
+      const result = await sendGameEvent({ type: 'change_city', cityId: pendingCityId });
 
-      const updatedCharacter = await res.json();
-      setActiveCharacter(updatedCharacter);
+      // Update local activeCharacter with the new cityId
+      setActiveCharacter({ ...activeCharacter, cityId: pendingCityId, ageInDays: result.data?.ageInDays ?? activeCharacter.ageInDays });
       setShowMapModal(false);
       setShowTravelConfirm(false);
       setPendingCityId(null);
-    } catch (err) {
-      console.error('[HomeView] Failed to travel:', err);
+    } catch (err: any) {
+      console.error('[HomeView] Failed to travel:', err.message);
     } finally {
       setSwitchingCity(false);
     }
@@ -244,23 +237,63 @@ export const HomeView = () => {
             />
           </Application>
         )}
+
+        {/* City Objects Overlay (HTML buttons) */}
+        {!cityLoading && city?.objectCoordinates && city.objectCoordinates.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none">
+            {city.objectCoordinates.map((obj, index) => {
+              const getIcon = (type: string) => {
+                switch (type) {
+                  case 'DUNGEON': return '🏰';
+                  case 'MINE': return '⛏️';
+                  case 'FARM': return '🌾';
+                  case 'MARKET': return '⚖️';
+                  default: return '📍';
+                }
+              };
+
+              return (
+                <button
+                  key={index}
+                  className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group transition-all hover:scale-110 active:scale-95"
+                  style={{ left: `${obj.x}%`, top: `${obj.y}%` }}
+                  onClick={() => console.log(`[HomeView] Clicked ${obj.type}: ${obj.label}`)}
+                >
+                  <div className="w-12 h-12 bg-slate-900/80 backdrop-blur-md border-2 border-amber-500/50 rounded-xl shadow-[0_0_20px_rgba(245,158,11,0.2)] flex items-center justify-center text-2xl group-hover:border-amber-400 group-hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] transition-all">
+                    {getIcon(obj.type)}
+                  </div>
+                  <div className="mt-2 px-3 py-1 bg-slate-950/80 backdrop-blur-sm border border-slate-800 rounded text-xs font-black text-white uppercase tracking-[0.1em] shadow-xl group-hover:border-slate-700 transition-all">
+                    {obj.label}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Bottom vignette */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-950/60 to-transparent pointer-events-none z-10" />
 
       {/* Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showTravelConfirm}
-        onClose={() => setShowTravelConfirm(false)}
-        onConfirm={handleConfirmTravel}
-        isLoading={switchingCity}
-        title="Travel Confirmation"
-        message={`Are you sure you want to travel to ${cities.find(c => c.id === pendingCityId)?.name || 'this city'}?`}
-        confirmLabel="Fast Travel"
-        cancelLabel="Stay Here"
-        variant="primary"
-      />
+      {(() => {
+        const targetCity = cities.find(c => c.id === pendingCityId);
+        const days = targetCity && activeCity ? calculateTravelDays(activeCity, targetCity) : 0;
+        
+        return (
+          <ConfirmationModal
+            isOpen={showTravelConfirm}
+            onClose={() => setShowTravelConfirm(false)}
+            onConfirm={handleConfirmTravel}
+            isLoading={switchingCity}
+            title="Travel Confirmation"
+            message={`Are you sure you want to travel to ${targetCity?.name || 'this city'}? The journey will take ${days} days.`}
+            confirmLabel="Fast Travel"
+            cancelLabel="Stay Here"
+            variant="primary"
+          />
+        );
+      })()}
     </div>
   );
 };

@@ -18,8 +18,10 @@ adminRouter.get('/cities', CityController.getCities);
 adminRouter.get('/cities/:id', CityController.getCity);
 adminRouter.post('/cities', runValidation(AdminValidation.cityValidation), CityController.createCity);
 adminRouter.put('/cities/:id', runValidation(AdminValidation.cityValidation), CityController.updateCity);
+adminRouter.patch('/cities/:id/coordinates', runValidation(AdminValidation.cityCoordinatesValidation), CityController.updateCityCoordinates);
 adminRouter.post('/cities/:id/background', CityController.cityBackgroundUpload, CityController.uploadCityBackground);
 adminRouter.post('/cities/:id/map-icon', CityController.cityMapIconUpload, CityController.uploadCityMapIcon);
+adminRouter.patch('/cities/:id/objects', CityController.updateCityObjects);
 
 // CITY DUNGEONS
 adminRouter.get('/cities/:id/dungeons', CityController.getCityDungeons);

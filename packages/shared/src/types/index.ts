@@ -43,6 +43,23 @@ export interface PlayerState {
   }
 }
 
+/**
+ * Partial update payload for character stats pushed via WebSocket.
+ * Only the fields that changed are included.
+ * Used by: server `broadcastStatUpdate()` → client `applyStatUpdate()`
+ */
+export interface CharacterStatUpdate {
+  sol?: number;
+  lear?: number;
+  cityId?: string;
+  level?: number;
+  combatScore?: number;
+  defenseScore?: number;
+  stamina?: number;
+  maxStamina?: number;
+  ageInDays?: number;
+}
+
 export type ItemRarity = 'LOW' | 'MEDIUM' | 'RARE' | 'VERY_RARE';
 
 export type ItemType = 'GEAR' | 'MATERIAL' | 'POTION';
@@ -140,20 +157,34 @@ export interface CityMaterial {
   cityId: string;
   itemId: string;
   item?: GameItem;
-  
+
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+export type CityObjectType = 'DUNGEON' | 'MINE' | 'FARM' | 'MARKET';
+
+export const CITY_OBJECT_TYPES: CityObjectType[] = ['DUNGEON', 'MINE', 'FARM', 'MARKET'];
+
+export interface CityObject {
+  type: CityObjectType;
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+  label: string;
 }
 
 export interface GameCity {
   id: string;
   name: string;
   description: string;
+  worldPositionX?: number;
+  worldPositionY?: number;
   backgroundImageUrl?: string | null;
   mapIconUrl?: string | null;
+  objectCoordinates?: CityObject[] | null;
   cityDungeons?: CityDungeon[];
   cityMaterials?: CityMaterial[];
-  
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -173,3 +204,4 @@ export interface Mob {
 export * from './combat';
 export * from './professions';
 export * from './trade';
+export * from './gameEvents';

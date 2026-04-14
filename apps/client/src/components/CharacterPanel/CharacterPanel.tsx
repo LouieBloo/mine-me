@@ -74,14 +74,29 @@ export const CharacterPanel = ({ player }: Props) => {
           <div className="space-y-2 p-2">
             <div className="flex justify-between items-center">
               <span className="text-slate-300">Age</span>
-              <span className="font-mono text-sm font-bold text-red-400">
-                {Math.floor(player.attributes.ageInDays / 365)} / 100 yrs
-              </span>
+              <div className="flex flex-col items-end">
+                {(() => {
+                  const years = Math.floor(player.attributes.ageInDays / 365);
+                  const isOld = years >= 80;
+                  const colorClass = isOld ? 'text-red-400' : 'text-emerald-400';
+                  const subColorClass = isOld ? 'text-red-500/60' : 'text-emerald-500/60';
+                  return (
+                    <>
+                      <span className={`font-mono text-sm font-bold ${colorClass}`}>
+                        {years} yrs
+                      </span>
+                      <span className={`font-mono text-xs font-bold ${subColorClass} uppercase tracking-tighter`}>
+                        {Math.floor((player.attributes.ageInDays % 365) / 30)} mos {player.attributes.ageInDays % 30} days
+                      </span>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
             <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-red-500/50"
-                style={{ width: `${((player.attributes.ageInDays / 365) / 100) * 100}%` }}
+                className={`h-full transition-colors duration-500 ${Math.floor(player.attributes.ageInDays / 365) >= 80 ? 'bg-red-500/50' : 'bg-emerald-500/50'}`}
+                style={{ width: `${Math.min(100, ((player.attributes.ageInDays / 365) / 100) * 100)}%` }}
               />
             </div>
           </div>

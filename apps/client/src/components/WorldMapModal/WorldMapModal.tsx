@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Application } from '@pixi/react';
 import { Assets, Texture } from 'pixi.js';
-import type { GameCity } from '@nvg/shared';
+import { type GameCity, calculateTravelDays } from '@nvg/shared';
 import { Modal } from '../Modal/Modal';
 import './WorldMapModal.css';
 
@@ -23,16 +23,121 @@ const MapBackground = ({
   texture: Texture;
 }) => {
   const scale = Math.max(width / texture.width, height / texture.height);
-  
+
   return (
     // @ts-ignore
-    <sprite 
-      texture={texture} 
-      anchor={0.5} 
-      x={width / 2} 
-      y={height / 2} 
-      scale={scale} 
+    <sprite
+      texture={texture}
+      anchor={0.5}
+      x={width / 2}
+      y={height / 2}
+      scale={scale}
     />
+  );
+};
+
+const TravelNetwork = ({
+  cities,
+  currentCityId,
+  width,
+  height,
+}: {
+  cities: GameCity[];
+  currentCityId?: string;
+  width: number;
+  height: number;
+}) => {
+  const currentCity = cities.find((c) => c.id === currentCityId);
+
+  return (
+    <>
+      {/* 1. Subtle global network lines — faint background mesh */}
+      {/* @ts-ignore */}
+      <graphics
+        draw={(g: any) => {
+          g.clear();
+          // In Pixi v8 the correct pattern is: set style, then draw paths, then .stroke()
+          g.setStrokeStyle({ width: 2, color: 0x475569, alpha: 0.12 });
+          g.beginPath();
+          for (let i = 0; i < cities.length; i++) {
+            for (let j = i + 1; j < cities.length; j++) {
+              const c1 = cities[i];
+              const c2 = cities[j];
+              const x1 = ((c1.worldPositionX ?? 50) / 100) * width;
+              const y1 = ((c1.worldPositionY ?? 50) / 100) * height;
+              const x2 = ((c2.worldPositionX ?? 50) / 100) * width;
+              const y2 = ((c2.worldPositionY ?? 50) / 100) * height;
+              g.moveTo(x1, y1);
+              g.lineTo(x2, y2);
+            }
+          }
+          g.stroke();
+        }}
+      />
+
+      {/* 2. Highlighted connections from current city + labels */}
+      {currentCity && (
+        <>
+          {/* @ts-ignore */}
+          <graphics
+            draw={(g: any) => {
+              g.clear();
+              g.setStrokeStyle({ width: 4, color: 0xd97706, alpha: 0.5 });
+
+              const x1 = ((currentCity.worldPositionX ?? 50) / 100) * width;
+              const y1 = ((currentCity.worldPositionY ?? 50) / 100) * height;
+
+              g.beginPath();
+              cities.forEach((target) => {
+                if (target.id === currentCityId) return;
+                const x2 = ((target.worldPositionX ?? 50) / 100) * width;
+                const y2 = ((target.worldPositionY ?? 50) / 100) * height;
+                g.moveTo(x1, y1);
+                g.lineTo(x2, y2);
+              });
+              g.stroke();
+            }}
+          />
+
+          {cities.map((target) => {
+            if (target.id === currentCityId) return null;
+
+            const days = calculateTravelDays(currentCity, target);
+            const x1 = ((currentCity.worldPositionX ?? 50) / 100) * width;
+            const y1 = ((currentCity.worldPositionY ?? 50) / 100) * height;
+            const x2 = ((target.worldPositionX ?? 50) / 100) * width;
+            const y2 = ((target.worldPositionY ?? 50) / 100) * height;
+
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+
+            const textStyle = {
+              align: 'center',
+              fontFamily: '"JetBrains Mono", monospace',
+              fontSize: 30,
+              fontWeight: 'bold',
+              fill: '#fcd34d',
+              stroke: { color: '#000000', width: 6 },
+              letterSpacing: 1,
+            };
+
+            return (
+              /* @ts-ignore */
+              <text
+                key={`label-${target.id}`}
+                {...({
+                  text: `${days} days`,
+                  x: midX,
+                  y: midY,
+                  anchor: 0.5,
+                  style: textStyle,
+                } as any)}
+              />
+            );
+          })}
+        </>
+      )}
+    </>
   );
 };
 
@@ -70,26 +175,14 @@ export const WorldMapModal: React.FC<WorldMapModalProps> = ({ cities, currentCit
     };
   }, []);
 
-  const getCityPositionStyles = (index: number) => {
-    const positions = [
-      { left: '25%', top: '50%' },
-      { left: '50%', top: '50%' },
-      { left: '75%', top: '50%' },
-    ];
-    
-    if (index < positions.length) {
-      return {
-        ...positions[index],
-        transform: 'translate(-50%, -50%)'
-      };
-    }
-    
-    const angle = (index * 137.5) * (Math.PI / 180);
-    const radius = 20 + (index * 5);
+  const getCityPositionStyles = (c: GameCity) => {
+    const x = c.worldPositionX ?? 50;
+    const y = c.worldPositionY ?? 50;
     return {
-      left: `calc(50% + ${Math.cos(angle) * radius}%)`,
-      top: `calc(50% + ${Math.sin(angle) * radius}%)`,
-      transform: 'translate(-50%, -50%)'
+      left: `${x}%`,
+      top: `${y}%`,
+      transform: 'translate(-50%, -50%)',
+      zIndex: c.id === currentCityId ? 50 : 10
     };
   };
 
@@ -100,21 +193,21 @@ export const WorldMapModal: React.FC<WorldMapModalProps> = ({ cities, currentCit
   };
 
   return (
-    <Modal 
-      isOpen={true} 
-      onClose={onClose} 
-      title="World Map" 
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="World Map"
       maxWidthClass="w-full max-w-6xl h-[80vh] min-h-[500px]"
       noPadding={true}
       hideHeader={true}
     >
       <div className="relative w-full h-full min-h-0 overflow-hidden bg-slate-950 rounded-b-2xl flex flex-col">
         {/* Pixi Canvas Layer */}
-        <div 
-          ref={containerRef} 
+        <div
+          ref={containerRef}
           className="relative w-full h-full flex-1 bg-slate-900 pointer-events-none"
         >
-           {dimensions.width > 0 && dimensions.height > 0 && mapTexture ? (
+          {dimensions.width > 0 && dimensions.height > 0 && mapTexture ? (
             <Application
               width={dimensions.width}
               height={dimensions.height}
@@ -125,6 +218,12 @@ export const WorldMapModal: React.FC<WorldMapModalProps> = ({ cities, currentCit
                 width={dimensions.width}
                 height={dimensions.height}
                 texture={mapTexture}
+              />
+              <TravelNetwork
+                cities={cities}
+                currentCityId={currentCityId}
+                width={dimensions.width}
+                height={dimensions.height}
               />
             </Application>
           ) : (
@@ -138,27 +237,26 @@ export const WorldMapModal: React.FC<WorldMapModalProps> = ({ cities, currentCit
 
         {/* HTML Cities Layer */}
         <div className="absolute inset-0 z-10 pointer-events-none">
-          {cities.map((c, idx) => {
+          {cities.map((c) => {
             const isCurrent = c.id === currentCityId;
             return (
-              <div 
-                key={c.id} 
+              <div
+                key={c.id}
                 className="absolute pointer-events-auto flex flex-col items-center group map-button-city"
-                style={getCityPositionStyles(idx)}
+                style={getCityPositionStyles(c)}
               >
                 <button
                   disabled={loading || isCurrent}
                   onClick={() => onCityTravel(c.id)}
-                  className={`relative w-16 h-16 rounded-xl border-2 flex items-center justify-center overflow-hidden shadow-[0_4px_15px_rgba(0,0,0,0.5)] transition-all ${
-                    isCurrent 
-                      ? 'border-emerald-400 ring-4 ring-emerald-500/30 cursor-default scale-110' 
+                  className={`relative w-16 h-16 rounded-xl border-2 flex items-center justify-center overflow-hidden shadow-[0_4px_15px_rgba(0,0,0,0.5)] transition-all ${isCurrent
+                      ? 'border-emerald-400 ring-4 ring-emerald-500/30 cursor-default scale-110'
                       : 'border-slate-400 hover:border-amber-400 hover:scale-110 active:scale-95 cursor-pointer bg-slate-800'
-                  }`}
+                    }`}
                   title={isCurrent ? `You are currently in ${c.name}` : `Travel to ${c.name}`}
                 >
-                  <img 
-                    src={mapIconFullUrl(c.mapIconUrl)} 
-                    alt={c.name} 
+                  <img
+                    src={mapIconFullUrl(c.mapIconUrl)}
+                    alt={c.name}
                     className="w-full h-full object-cover select-none"
                     draggable={false}
                   />
@@ -169,9 +267,8 @@ export const WorldMapModal: React.FC<WorldMapModalProps> = ({ cities, currentCit
                   )}
                 </button>
                 <div className="mt-2 text-center pointer-events-none">
-                  <span className={`px-3 py-1 rounded font-black tracking-widest text-xs uppercase shadow-black shadow transition-colors ${
-                    isCurrent ? 'bg-emerald-600 text-white' : 'bg-slate-900/90 text-slate-200 group-hover:bg-amber-600 group-hover:text-white'
-                  }`}>
+                  <span className={`px-3 py-1 rounded font-black tracking-widest text-xs uppercase shadow-black shadow transition-colors ${isCurrent ? 'bg-emerald-600 text-white' : 'bg-slate-900/90 text-slate-200 group-hover:bg-amber-600 group-hover:text-white'
+                    }`}>
                     {c.name}
                   </span>
                 </div>

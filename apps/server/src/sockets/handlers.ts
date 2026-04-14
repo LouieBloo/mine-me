@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
-import type { PlayerState, GameCity } from '@nvg/shared';
+import { dispatchGameEvent } from './gameEvents';
+import type { PlayerState, GameCity, GameEventPayload } from '@nvg/shared';
 
 // Extend socket.data type for type safety
 declare module 'socket.io' {
@@ -55,11 +56,15 @@ const handleJoinCity = async (io: Server, socket: Socket, cityId: string, charac
         name: true,
         description: true,
         backgroundImageUrl: true,
+        objectCoordinates: true,
       }
     });
 
     if (city) {
-      const cityData: GameCity = city;
+      const cityData: GameCity = {
+        ...city,
+        objectCoordinates: city.objectCoordinates as any
+      };
       socket.emit('city_data', cityData);
     }
 
@@ -128,6 +133,9 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
               name: true,
               description: true,
               backgroundImageUrl: true,
+              worldPositionX: true,
+              worldPositionY: true,
+              objectCoordinates: true,
             }
           },
           inventory: {
@@ -211,6 +219,9 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
               name: character.city.name,
               description: character.city.description,
               backgroundImageUrl: character.city.backgroundImageUrl,
+              worldPositionX: character.city.worldPositionX,
+              worldPositionY: character.city.worldPositionY,
+              objectCoordinates: character.city.objectCoordinates as any,
             }
           : undefined,
         gear: {}, // TODO: derive equipped gear from inventory items
@@ -234,6 +245,13 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
 
   socket.on('leave_city', (cityId: string, callback?: Function) => {
     handleLeaveCity(io, socket, cityId, callback);
+  });
+
+  // --------------------------------------------------------------------------
+  // GAME EVENTS — Typed game actions dispatched through a single channel
+  // --------------------------------------------------------------------------
+  socket.on('game_event', (payload: GameEventPayload, callback?: Function) => {
+    dispatchGameEvent(io, socket, payload, callback as any);
   });
 
   // --------------------------------------------------------------------------

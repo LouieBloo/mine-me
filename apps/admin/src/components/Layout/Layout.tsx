@@ -16,6 +16,7 @@ export default function Layout() {
         <nav className="flex-grow flex flex-col p-4 gap-2">
           <NavLink to="/" className={navLinkClass}>Dashboard</NavLink>
           <NavLink to="/cities" className={navLinkClass}>Cities Editor</NavLink>
+          <NavLink to="/map-editor" className={navLinkClass}>Map Editor</NavLink>
           <NavLink to="/dungeons" className={navLinkClass}>Dungeons Editor</NavLink>
           <NavLink to="/inventory-items" className={navLinkClass}>Inventory Editor</NavLink>
           <NavLink to="/items" className={navLinkClass}>Items Editor</NavLink>

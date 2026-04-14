@@ -4,23 +4,38 @@
     "name": "Brackus",
     "description": "City of Asss",
     "backgroundImageUrl": "/assets/cities/backgrounds/cmn1zlln10002ihw4wqu4tnxb_background.png",
+    "mapIconUrl": null,
+    "worldPositionX": 47,
+    "worldPositionY": 19,
     "createdAt": "2026-04-06T21:51:48.671Z",
-    "updatedAt": "2026-04-10T01:08:23.125Z"
+    "updatedAt": "2026-04-13T23:36:15.323Z",
+    "cityDungeons": [],
+    "cityMaterials": []
   },
   {
     "id": "cmn2087uu0002u72gu8lggdsw",
     "name": "Gorlon",
     "description": "test",
     "backgroundImageUrl": "/assets/cities/backgrounds/cmn2087uu0002u72gu8lggdsw_background.png",
+    "mapIconUrl": null,
+    "worldPositionX": 15,
+    "worldPositionY": 59,
     "createdAt": "2026-04-06T21:51:48.676Z",
-    "updatedAt": "2026-04-13T01:34:59.110Z"
+    "updatedAt": "2026-04-13T23:36:20.743Z",
+    "cityDungeons": [],
+    "cityMaterials": []
   },
   {
     "id": "cmn208bs90003u72gkkkkb62d",
     "name": "Isle of Mim",
     "description": "2",
     "backgroundImageUrl": "/assets/cities/backgrounds/cmn208bs90003u72gkkkkb62d_background.png",
+    "mapIconUrl": null,
+    "worldPositionX": 47,
+    "worldPositionY": 46,
     "createdAt": "2026-04-06T21:51:48.679Z",
-    "updatedAt": "2026-04-13T01:41:28.496Z"
+    "updatedAt": "2026-04-14T00:31:05.443Z",
+    "cityDungeons": [],
+    "cityMaterials": []
   }
 ]
