@@ -1,94 +1,143 @@
 import type { 
   CombatAction, 
-  CombatState, 
-  MobState, 
-  PlayerState
+  BattleState, 
+  MobBattleState, 
+  PlayerState,
+  CombatActionType
 } from '../types';
-import { calculateDamage, calculateTotalGearDefense } from './combat';
 
 export class CombatEngine {
   /**
-   * Processes a single turn of combat where both player and mob take actions simultaneously.
+   * Processes a single turn of combat.
+   * Resolves player and mob actions simultaneously.
    */
   static processTurn(
-    state: CombatState,
+    state: BattleState,
     player: PlayerState,
-    playerAction: CombatAction,
-    mobAction: CombatAction
-  ): CombatState {
-    const newState = { ...state, turn: state.turn + 1 };
+    playerActions: CombatAction[],
+    mobActions: CombatAction[]
+  ): BattleState {
+    // Deep clone the state to avoid mutating the input
+    const newState: BattleState = JSON.parse(JSON.stringify(state));
+    newState.round += 1;
+    newState.turnLogs = [];
 
-    // 1. Handle Potions (Free actions or priority)
-    // For now, let's assume potions are applied before damage calculation
-    if (playerAction.type === 'Potion') {
-      this.applyPlayerPotion(newState, player, playerAction.itemId);
-    }
-    if (mobAction.type === 'Potion') {
-      // Mobs might use potions too? Not explicitly in PRD but good to have
+    const addLog = (message: string, type: 'damage' | 'defense' | 'info' | 'system', actorName?: string, targetName?: string) => {
+      newState.turnLogs!.push({
+        id: Math.random().toString(36).substring(7),
+        message,
+        type,
+        actorName,
+        targetName
+      });
+    };
+
+    addLog(`--- Round ${newState.round} ---`, 'system');
+
+    // Map actions by actor ID for easy lookup
+    const playerActionMap = new Map<string, CombatAction>(playerActions.map(a => [a.targetId, a]));
+    const mobActionMap = new Map<string, CombatAction>(mobActions.map(a => [a.actorId, a]));
+
+    // 1. Calculate Damage Dealt by Player
+    // For each mob, the player may have submitted an action against it.
+    for (const mob of newState.mobs) {
+      if (mob.health <= 0) continue;
+
+      const playerAction = playerActionMap.get(mob.id);
+      if (playerAction && playerAction.type === 'Attack') {
+        let damageToMob = player.attributes.combatScore || 5; // Base damage
+
+        // If mob is defending, reduce damage by 80%
+        const mobAction = mobActionMap.get(mob.id);
+        if (mobAction && mobAction.type === 'Defend') {
+          const originalDamage = damageToMob;
+          damageToMob = Math.floor(damageToMob * 0.2);
+          addLog(`${mob.name} guarded against your attack! Damage reduced from ${originalDamage} to ${damageToMob}.`, 'defense', mob.name, player.characterName);
+        }
+
+        mob.health = Math.max(0, mob.health - damageToMob);
+        addLog(`You dealt ${damageToMob} damage to ${mob.name}.`, 'damage', player.characterName, mob.name);
+      } else if (playerAction && playerAction.type === 'Defend') {
+        addLog(`You prepared to defend against ${mob.name}.`, 'info', player.characterName, mob.name);
+      }
     }
 
-    // 2. Calculate Damage Dealt by Player
-    if (playerAction.type === 'Attack' || playerAction.type === 'Ability') {
-      const weaponDamage = player.gear.weapon?.damage || 5; // Base punch damage if no weapon
-      const baseArmor = newState.mob.baseArmorScore;
-      // Using player's combat score or attributes could scale damage, but PRD formula is simple:
-      // (Weapon Damage - Armor Score) * (1 - (Defense Score / 100)) * (1 - (Potion Score / 100))
+    // 2. Calculate Damage Dealt by Mobs
+    let totalDamageToPlayer = 0;
+    const playerDefending = playerActions.some(a => a.type === 'Defend'); // If player defended ANY mob, do they get defense against all?
+    // PRD: "If there are multiple mobs, the player chooses an action to take on EACH mob."
+    // If player attacks Mob A and defends Mob B, do they get 80% reduction from Mob B? Yes.
+    
+    for (const mob of newState.mobs) {
+      if (mob.health <= 0) continue; // Dead mobs don't deal damage
+
+      const mobAction = mobActionMap.get(mob.id);
+      if (mobAction && mobAction.type === 'Attack') {
+        let damageToPlayer = mob.attack;
+
+        // Check if player defended against THIS mob
+        const playerActionAgainstMob = playerActionMap.get(mob.id);
+        if (playerActionAgainstMob && playerActionAgainstMob.type === 'Defend') {
+          const originalDamage = damageToPlayer;
+          damageToPlayer = Math.floor(damageToPlayer * 0.2);
+          addLog(`You blocked ${mob.name}'s attack! Damage reduced from ${originalDamage} to ${damageToPlayer}.`, 'defense', player.characterName, mob.name);
+        }
+
+        totalDamageToPlayer += damageToPlayer;
+        addLog(`${mob.name} attacked you for ${damageToPlayer} damage!`, 'damage', mob.name, player.characterName);
+      } else if (mobAction && mobAction.type === 'Defend') {
+        // Only log if they didn't get hit, because if they got hit, we already logged the block
+        const playerActionAgainstMob = playerActionMap.get(mob.id);
+        if (!playerActionAgainstMob || playerActionAgainstMob.type !== 'Attack') {
+          addLog(`${mob.name} stands defensively.`, 'info', mob.name);
+        }
+      }
+    }
+
+    newState.playerHealth = Math.max(0, newState.playerHealth - totalDamageToPlayer);
+
+    // 3. Update Status
+    const allMobsDead = newState.mobs.every(m => m.health <= 0);
+    if (newState.playerHealth <= 0) {
+      newState.status = 'DEFEAT';
+    } else if (allMobsDead) {
+      newState.status = 'VICTORY';
+    }
+
+    // 4. Update naive AI tracking & generate next actions
+    for (const mob of newState.mobs) {
+      if (mob.health <= 0) continue;
       
-      const damageToMob = calculateDamage(
-        weaponDamage + (newState.playerAttackModifier || 0),
-        baseArmor,
-        newState.mobDefenseModifier || 0,
-        0 // Mob potion defense logic
-      );
-      
-      newState.mob.health = Math.max(0, newState.mob.health - damageToMob);
+      const lastAction = mobActionMap.get(mob.id);
+      if (lastAction) {
+        if (lastAction.type === 'Attack') {
+          mob.consecutiveAttacks += 1;
+          mob.consecutiveDefends = 0;
+        } else if (lastAction.type === 'Defend') {
+          mob.consecutiveDefends += 1;
+          mob.consecutiveAttacks = 0;
+        }
+      }
+
+      // Generate next action
+      mob.intendedAction = this.generateMobAction(mob, newState.rngSeed, newState.round);
     }
-
-    // 3. Calculate Damage Dealt by Mob
-    if (mobAction.type === 'Attack') {
-      const mobWeaponDamage = newState.mob.baseDamage;
-      const playerDefenseScore = player.attributes.defenseScore + calculateTotalGearDefense(player);
-      
-      const damageToPlayer = calculateDamage(
-        mobWeaponDamage + (newState.mobAttackModifier || 0),
-        0, // Player doesn't have "Armor Score" in formula, just Defense Score
-        playerDefenseScore,
-        newState.playerDefenseModifier || 0
-      );
-
-      newState.playerHealth = Math.max(0, newState.playerHealth - damageToPlayer);
-    }
-
-    // 4. Update Status
-    if (newState.mob.health <= 0) {
-      newState.status = 'Victory';
-    } else if (newState.playerHealth <= 0) {
-      newState.status = 'Defeat';
-    }
-
-    // 5. Telegraph next mob action
-    newState.mob.intendedAction = this.telegraphNextAction(newState.mob);
 
     return newState;
   }
 
-  private static applyPlayerPotion(state: CombatState, player: PlayerState, itemId?: string) {
-    const potion = player.inventory.items.find(e => e.item.id === itemId && e.item.type === 'POTION');
-    if (!potion) return;
+  static generateMobAction(mob: MobBattleState, seed: string, round: number): CombatActionType {
+    // Naive AI guard
+    if (mob.consecutiveAttacks >= 3) return 'Defend';
+    if (mob.consecutiveDefends >= 3) return 'Attack';
 
-    // Logic for different potion types would go here
-    // For now, simple implementation
-  }
+    // Simple pseudo-random using seed and round
+    const hash = Array.from(seed + round + mob.id).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const rand = hash % 100; // 0 to 99
 
-  private static telegraphNextAction(mob: MobState): any {
-    const probs = mob.actionTelegraphProbabilities;
-    const rand = Math.random() * 100;
-    let cumulative = 0;
-    
-    for (const [action, prob] of Object.entries(probs)) {
-      cumulative += prob;
-      if (rand <= cumulative) return action;
+    if (rand < mob.attackPercentage) {
+      return 'Attack';
     }
-    return 'Attack';
+    return 'Defend';
   }
 }

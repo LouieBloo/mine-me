@@ -27,10 +27,36 @@ export interface ChangeCityPayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
+// Event: start_combat
+// Initializes a battle against mobs in a specific dungeon level
+// ----------------------------------------------------------------------------
+export interface StartCombatPayload extends GameEventBase {
+  type: 'start_combat';
+  cityId: string;
+}
+
+// ----------------------------------------------------------------------------
+// Event: combat_action
+// Submits player combat actions for a round
+// ----------------------------------------------------------------------------
+export interface CombatActionPayload extends GameEventBase {
+  type: 'combat_action';
+  actions: { targetId: string, action: 'Attack' | 'Defend' }[];
+}
+
+// ----------------------------------------------------------------------------
+// Event: leave_combat
+// Flees or leaves a completed battle
+// ----------------------------------------------------------------------------
+export interface LeaveCombatPayload extends GameEventBase {
+  type: 'leave_combat';
+}
+
+// ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
 // ----------------------------------------------------------------------------
-export type GameEventPayload = ChangeCityPayload;
+export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload;
 
 // Utility type: extract the type string literals from the union
 export type GameEventType = GameEventPayload['type'];

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Application } from '@pixi/react';
 import { Assets, Texture, Sprite, Application as PixiApplication } from 'pixi.js';
 import { useGame } from '../../contexts/GameContext';
@@ -68,6 +69,7 @@ export const HomeView = () => {
   const { activeCharacter, setActiveCharacter, activeCity, setActiveCity, playerState } = useGame();
   const { joinCity, leaveCity, sendGameEvent, onEvent } = useSocket();
   const { fetchWithAuth } = useApi();
+  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [switchingCity, setSwitchingCity] = useState(false);
@@ -259,7 +261,22 @@ export const HomeView = () => {
                   key={index}
                   className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group transition-all hover:scale-110 active:scale-95"
                   style={{ left: `${obj.x}%`, top: `${obj.y}%` }}
-                  onClick={() => console.log(`[HomeView] Clicked ${obj.type}: ${obj.label}`)}
+                  onClick={async () => {
+                    if (obj.type === 'DUNGEON') {
+                      try {
+                        const result = await sendGameEvent({ type: 'start_combat', cityId: activeCharacter.cityId });
+                        if (result.success) {
+                          navigate('/combat');
+                        } else {
+                          console.error('[HomeView] Failed to start combat:', result.error);
+                        }
+                      } catch (err: any) {
+                        console.error('[HomeView] Error starting combat:', err.message);
+                      }
+                    } else {
+                      console.log(`[HomeView] Clicked ${obj.type}: ${obj.label}`);
+                    }
+                  }}
                 >
                   <div className="w-12 h-12 bg-slate-900/80 backdrop-blur-md border-2 border-amber-500/50 rounded-xl shadow-[0_0_20px_rgba(245,158,11,0.2)] flex items-center justify-center text-2xl group-hover:border-amber-400 group-hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] transition-all">
                     {getIcon(obj.type)}

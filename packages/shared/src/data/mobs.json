@@ -6,6 +6,8 @@
     "health": 10,
     "attack": 1,
     "defense": 2,
+    "attackPercentage": 50,
+    "defendPercentage": 50,
     "animations": {
       "url": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_sprite.png",
       "atlasUrl": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_atlas.json"
@@ -18,9 +20,11 @@
     "id": "cmn1zb9op0000ihw4mgknuvlr",
     "name": "Mario",
     "level": 1,
-    "health": 10,
+    "health": 30,
     "attack": 2,
     "defense": 1,
+    "attackPercentage": 80,
+    "defendPercentage": 20,
     "animations": {
       "url": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_sprite.png",
       "atlasUrl": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_atlas.json"
@@ -36,7 +40,7 @@
       "dungeonLevelId": null,
       "dungeonLevelMobId": null,
       "createdAt": "2026-04-16T23:57:04.167Z",
-      "updatedAt": "2026-04-16T23:57:09.442Z",
+      "updatedAt": "2026-04-17T22:36:11.721Z",
       "items": []
     }
   }

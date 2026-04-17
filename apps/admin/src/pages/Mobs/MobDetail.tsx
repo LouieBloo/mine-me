@@ -15,7 +15,7 @@ export default function MobDetail() {
   const { id } = useParams<{ id: string }>();
   const isNew = id === 'new';
   const navigate = useNavigate();
-  const [data, setData] = useState<any>(isNew ? { name: '', level: 1, health: 10, attack: 1, defense: 1, dropTable: null, animations: {} } : null);
+  const [data, setData] = useState<any>(isNew ? { name: '', level: 1, health: 10, attack: 1, defense: 1, attackPercentage: 50, defendPercentage: 50, dropTable: null, animations: {} } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -147,6 +147,14 @@ export default function MobDetail() {
             <div className="space-y-2">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Defense</label>
               <input type="number" value={data.defense} onChange={(e) => { setData({ ...data, defense: Number(e.target.value) }); if (errors.defense) setErrors({...errors, defense: ''}); }} className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.defense ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Attack %</label>
+              <input type="number" value={data.attackPercentage ?? 50} onChange={(e) => { setData({ ...data, attackPercentage: Number(e.target.value) }); }} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Defend %</label>
+              <input type="number" value={data.defendPercentage ?? 50} onChange={(e) => { setData({ ...data, defendPercentage: Number(e.target.value) }); }} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800" />
             </div>
           </div>
           

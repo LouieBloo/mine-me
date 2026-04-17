@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { broadcastStatUpdate } from '../services/characterBroadcast';
+import { handleStartCombat, handleCombatAction, handleLeaveCombat } from './combatEvents';
 import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, calculateTravelDays } from '@nvg/shared';
 
 // ============================================================================
@@ -131,6 +132,9 @@ const handleChangeCity: GameEventHandler<ChangeCityPayload> = async (io, socket,
 // ----------------------------------------------------------------------------
 const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   change_city: handleChangeCity,
+  start_combat: handleStartCombat,
+  combat_action: handleCombatAction,
+  leave_combat: handleLeaveCombat,
 };
 
 // ----------------------------------------------------------------------------

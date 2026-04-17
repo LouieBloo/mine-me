@@ -158,7 +158,8 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
                 }
               }
             }
-          }
+          },
+          battle: true
         }
       });
 
@@ -191,6 +192,8 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
           level: character.level,
           combatScore: character.combatScore,
           defenseScore: character.defenseScore,
+          health: character.health,
+          maxHealth: character.maxHealth,
           stamina: character.stamina,
           maxStamina: character.maxStamina,
           ageInDays: character.ageInDays,
@@ -228,6 +231,24 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
       };
 
       socket.emit('character_state', playerState);
+
+      // If there's an active battle, join the battle room and emit state
+      if (character.battle && character.battle.status === 'IN_PROGRESS') {
+        socket.join(`battle:${characterId}`);
+        const battleState = {
+          id: character.battle.id,
+          characterId: character.battle.characterId,
+          dungeonLevelId: character.battle.dungeonLevelId,
+          playerHealth: character.stamina, // MVP
+          playerMaxHealth: character.maxStamina,
+          mobs: character.battle.mobsState as any,
+          round: character.battle.round,
+          turn: character.battle.turn as any,
+          status: character.battle.status as any,
+          rngSeed: character.battle.rngSeed
+        };
+        socket.emit('battle_state', battleState);
+      }
 
       if (callback) callback({ success: true });
     } catch (err: any) {

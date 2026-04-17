@@ -9,7 +9,7 @@ export const CharacterPanel = ({ player }: Props) => {
   if (!player) return <div className="p-4 text-slate-500 animate-pulse">Loading Character...</div>;
 
   return (
-    <div className="flex flex-col h-full bg-slate-800 border-r border-slate-700 w-80 shadow-2xl overflow-y-auto">
+    <div className="flex flex-col h-full bg-slate-800 w-full overflow-y-auto overflow-x-hidden">
       <div className="p-6 border-b border-slate-700 bg-slate-800/50">
         <h2 className="text-2xl font-black text-white capitalize drop-shadow-md">
           {player.characterName} <span className="text-slate-400 font-normal">({player.familyName})</span>

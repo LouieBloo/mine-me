@@ -5,6 +5,8 @@ export interface PlayerAttributes {
   level: number;
   combatScore: number;
   defenseScore: number;
+  health: number;
+  maxHealth: number;
   stamina: number;
   maxStamina: number;
   ageInDays: number; // minimum unit of time
@@ -55,6 +57,8 @@ export interface CharacterStatUpdate {
   level?: number;
   combatScore?: number;
   defenseScore?: number;
+  health?: number;
+  maxHealth?: number;
   stamina?: number;
   maxStamina?: number;
   ageInDays?: number;

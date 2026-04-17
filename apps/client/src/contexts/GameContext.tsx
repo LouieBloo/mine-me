@@ -10,6 +10,9 @@ interface GameContextType {
     /** Authoritative character state pushed from the server via the socket. */
     playerState: PlayerState | null;
     setPlayerState: (state: PlayerState | null) => void;
+    /** Current active battle state. */
+    battleState: any | null; // using any temporarily or import BattleState
+    setBattleState: (state: any | null) => void;
     /** Merge a partial stat update into the existing playerState. */
     applyStatUpdate: (updates: CharacterStatUpdate) => void;
     /** Call on logout to clear all game state. */
@@ -42,6 +45,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const ps = readLocalStorage<PlayerState>('nvg_player_state');
         return ps?.city ?? null;
     });
+
+    const [battleState, setBattleState] = useState<any | null>(null);
 
     // Wrap setPlayerState so we also persist it
     const setPlayerState = (state: PlayerState | null) => {
@@ -108,6 +113,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setActiveCity,
             playerState,
             setPlayerState,
+            battleState,
+            setBattleState,
             applyStatUpdate,
             clearGameState,
         }}>

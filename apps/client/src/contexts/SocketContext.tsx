@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, typ
 import { socketService, type SocketEventMap } from '../services/socketService';
 import { useAuth } from '../hooks/useAuth';
 import { useGame } from './GameContext';
+import { notificationService } from '../services/notificationService';
 import type { PlayerState, CharacterStatUpdate, GameEventPayload, GameEventResult } from '@nvg/shared';
 
 interface SocketContextType {
@@ -19,7 +20,7 @@ const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
 export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { token } = useAuth();
-  const { setPlayerState, applyStatUpdate, clearGameState, activeCharacter } = useGame();
+  const { setPlayerState, applyStatUpdate, setBattleState, clearGameState, activeCharacter } = useGame();
   const [isConnected, setIsConnected] = useState(false);
 
   // Connect / disconnect based on auth token presence
@@ -80,6 +81,40 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       socketService.off('character_stat_update', handleStatUpdate);
     };
   }, [applyStatUpdate]);
+
+  // Listen for combat state pushed by the server.
+  useEffect(() => {
+    const handleBattleState = (state: any) => {
+      console.log('[SocketContext] battle_state received:', state);
+      setBattleState(state);
+    };
+    socketService.on('battle_state', handleBattleState);
+    return () => {
+      socketService.off('battle_state', handleBattleState);
+    };
+  }, [setBattleState]);
+
+  // Listen for combat loot and trigger notifications
+  useEffect(() => {
+    const handleCombatLoot = (loot: { sol: number; items: any[] }) => {
+      console.log('[SocketContext] combat_loot received:', loot);
+      
+      if (loot.sol > 0) {
+        notificationService.gold(loot.sol, 'SOL');
+      }
+
+      for (const item of loot.items) {
+        if (item.itemDetails) {
+          notificationService.item(item.itemDetails, item.quantity);
+        }
+      }
+    };
+    
+    socketService.on('combat_loot', handleCombatLoot);
+    return () => {
+      socketService.off('combat_loot', handleCombatLoot);
+    };
+  }, []);
 
   // Auto-select character on connect or when activeCharacter changes.
   // This ensures that right after a page reload, the client fetches the latest player state (including inventory) mapping over the socket.
