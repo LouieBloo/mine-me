@@ -71,3 +71,27 @@ gameRouter.get('/city/:cityId', async (req: AuthRequest, res: Response): Promise
     return res.status(500).json({ error: err.message });
   }
 });
+
+// ----------------------------------------------------------------------------
+// GET /api/game/mobs
+// Returns all mobs with their animation data for rendering (no drop tables).
+// ----------------------------------------------------------------------------
+gameRouter.get('/mobs', async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const mobs = await prisma.mob.findMany({
+      select: {
+        id: true,
+        name: true,
+        level: true,
+        health: true,
+        attack: true,
+        defense: true,
+        animations: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    return res.json(mobs);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});

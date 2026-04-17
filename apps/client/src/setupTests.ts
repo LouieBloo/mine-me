@@ -11,11 +11,17 @@ if (typeof global.btoa === 'undefined') {
 }
 
 // Stub ResizeObserver (not available in jsdom)
-(global as any).ResizeObserver = class ResizeObserver {
+const MockResizeObserver = class ResizeObserver {
     observe() {}
     unobserve() {}
     disconnect() {}
 };
+
+(global as any).ResizeObserver = MockResizeObserver;
+(globalThis as any).ResizeObserver = MockResizeObserver;
+if (typeof window !== 'undefined') {
+    (window as any).ResizeObserver = MockResizeObserver;
+}
 
 // Mock import.meta.env
 vi.stubGlobal('import.meta', {

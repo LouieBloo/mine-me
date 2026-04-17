@@ -10,45 +10,34 @@
       "url": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_sprite.png",
       "atlasUrl": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_atlas.json"
     },
+    "createdAt": "2026-04-06T21:51:48.684Z",
+    "updatedAt": "2026-04-06T21:51:48.684Z",
     "dropTable": null
   },
   {
     "id": "cmn1zb9op0000ihw4mgknuvlr",
-    "name": "Small Cat",
+    "name": "Mario",
     "level": 1,
     "health": 10,
-    "attack": 1,
+    "attack": 2,
     "defense": 1,
     "animations": {
       "url": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_sprite.png",
       "atlasUrl": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_atlas.json"
     },
+    "createdAt": "2026-04-06T21:51:48.689Z",
+    "updatedAt": "2026-04-06T21:51:48.689Z",
     "dropTable": {
-      "id": "cmnc7fsio0000gnbafymg0efo",
-      "solMin": 20,
-      "solMax": 50,
+      "id": "cmo252azr0000ygtku562fr3f",
+      "solMin": 5,
+      "solMax": 10,
       "mobId": "cmn1zb9op0000ihw4mgknuvlr",
       "dungeonId": null,
       "dungeonLevelId": null,
       "dungeonLevelMobId": null,
-      "items": [
-        {
-          "id": "cmnc9of7600065z6uu9om90b5",
-          "dropTableId": "cmnc7fsio0000gnbafymg0efo",
-          "itemId": "cmnc6ct730000k21bi04iybb4",
-          "chance": 10,
-          "minQuantity": 1,
-          "maxQuantity": 1
-        },
-        {
-          "id": "cmnc9of7600075z6ubbutagaq",
-          "dropTableId": "cmnc7fsio0000gnbafymg0efo",
-          "itemId": "cmnc9o3in00005z6u5nr4ttl3",
-          "chance": 50,
-          "minQuantity": 1,
-          "maxQuantity": 1
-        }
-      ]
+      "createdAt": "2026-04-16T23:57:04.167Z",
+      "updatedAt": "2026-04-16T23:57:09.442Z",
+      "items": []
     }
   }
 ]

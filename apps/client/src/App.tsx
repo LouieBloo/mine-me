@@ -9,8 +9,11 @@ import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
 import { CharacterSelection } from './views/CharacterSelection/CharacterSelection';
 import { HomeView } from './views/HomeView/HomeView';
 import { UserProfile } from './views/UserProfile/UserProfile';
+import { TestMobView } from './views/TestMobView/TestMobView';
 
 import { InGameLayout } from './components/InGameLayout/InGameLayout';
+
+import { Toaster } from 'sonner';
 
 function App() {
   return (
@@ -18,6 +21,7 @@ function App() {
       <GameProvider>
         <SocketProvider>
           <BrowserRouter>
+            <Toaster position="bottom-center" visibleToasts={9} expand={true} richColors closeButton />
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/" element={<ProtectedRoute />}>
@@ -31,6 +35,7 @@ function App() {
                   
                   {/* Views WITHOUT sidebars (standard UI) */}
                   <Route path="profile" element={<UserProfile />} />
+                  <Route path="test-mob" element={<TestMobView />} />
                 </Route>
               </Route>
             </Routes>

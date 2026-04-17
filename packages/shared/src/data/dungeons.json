@@ -1,29 +1,36 @@
 [
   {
-    "id": "cmn207v6c0001u72gvuueipej",
-    "name": "Dungeon 1",
-    "description": "Testing",
-    "minLevel": 1,
-    "levels": [
-      {
-        "id": "cmn20f8e90007u72gtwrkuo32",
-        "dungeonId": "cmn207v6c0001u72gvuueipej",
-        "name": "123123",
-        "orderIndex": 0
-      }
-    ]
-  },
-  {
     "id": "cmni6ijft000060xswu2c6ueh",
     "name": "Dungeon 2",
     "description": "cool dungeon",
     "minLevel": 2,
+    "createdAt": "2026-04-06T21:51:48.697Z",
+    "updatedAt": "2026-04-06T21:51:48.697Z",
+    "levels": []
+  },
+  {
+    "id": "cmn207v6c0001u72gvuueipej",
+    "name": "Dungeon 1",
+    "description": "Testing",
+    "minLevel": 1,
+    "createdAt": "2026-04-06T21:51:48.693Z",
+    "updatedAt": "2026-04-06T21:51:48.693Z",
     "levels": [
       {
-        "id": "cmni6ios4000260xsykljvq9t",
-        "dungeonId": "cmni6ijft000060xswu2c6ueh",
+        "id": "cmo252vl50003ygtkbhv5wyl1",
+        "dungeonId": "cmn207v6c0001u72gvuueipej",
         "name": "Level 1",
-        "orderIndex": 0
+        "orderIndex": 0,
+        "createdAt": "2026-04-16T23:57:30.857Z",
+        "updatedAt": "2026-04-16T23:57:30.857Z"
+      },
+      {
+        "id": "cmo2534z20008ygtkfcbp1l76",
+        "dungeonId": "cmn207v6c0001u72gvuueipej",
+        "name": "Level 2",
+        "orderIndex": 1,
+        "createdAt": "2026-04-16T23:57:43.023Z",
+        "updatedAt": "2026-04-16T23:57:43.023Z"
       }
     ]
   }

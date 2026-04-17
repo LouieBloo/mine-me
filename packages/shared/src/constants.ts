@@ -67,3 +67,19 @@ export const SUBTYPE_LABEL: Record<string, string> = {
   HEALTH: 'Health',
   STAMINA: 'Stamina',
 };
+
+/**
+ * Whitelisted mob animation keys used across client, admin, and server.
+ * These match the capitalized keys found in the sprite atlas JSON files.
+ */
+export const MOB_ANIMATION_KEYS = [
+  'Idle',
+  'Attacking',
+  'Defending',
+  'TakingDamage',
+  'Taunt',
+  'Walking',
+  'Death',
+] as const;
+
+export type MobAnimationKey = (typeof MOB_ANIMATION_KEYS)[number];

@@ -1,0 +1,23 @@
+/* Scoped styles for the Notification component */
+.notification-container {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  position: relative;
+  z-index: 9999;
+}
+
+/* Ensure the toast doesn't have default sonner styles that clash */
+.notification-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.notification-icon-wrapper img {
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.5));
+}

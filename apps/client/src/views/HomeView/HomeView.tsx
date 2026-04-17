@@ -196,6 +196,8 @@ export const HomeView = () => {
         </h1>
 
         <div className="pointer-events-auto flex items-center space-x-4">
+
+
           <button
             disabled={cityLoading || switchingCity}
             onClick={() => setShowMapModal(true)}
