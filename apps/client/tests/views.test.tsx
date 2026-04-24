@@ -14,9 +14,9 @@ vi.mock('pixi.js', () => ({
   Texture: {
     EMPTY: {},
   },
-  Sprite: class {},
-  Container: class {},
-  Application: class {},
+  Sprite: class { },
+  Container: class { },
+  Application: class { },
 }));
 
 vi.mock('socket.io-client', () => ({
@@ -37,7 +37,7 @@ vi.mock('../src/contexts/SocketContext', () => ({
     selectCharacter: vi.fn().mockResolvedValue(undefined),
     joinCity: vi.fn().mockResolvedValue(undefined),
     leaveCity: vi.fn().mockResolvedValue(undefined),
-    onEvent: vi.fn(() => () => {}),
+    onEvent: vi.fn(() => () => { }),
   }),
 }));
 
@@ -48,34 +48,37 @@ import { HomeView } from '../src/views/HomeView/HomeView';
 import { InGameLayout } from '../src/components/InGameLayout/InGameLayout';
 import { GameProvider } from '../src/contexts/GameContext';
 import { AuthProvider } from '../src/contexts/AuthContext';
+import { ChatProvider } from '../src/contexts/ChatContext';
 
 // Stub ResizeObserver — not available in jsdom
 (global as any).ResizeObserver = class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  observe() { }
+  unobserve() { }
+  disconnect() { }
 };
 
 describe('Client UI Components', () => {
   it('should render the Main Menu with the game title', () => {
-    // Note: MainMenu now has sidebars too because it's under InGameLayout in the App
-    // But in this unit test we render it standalone, which is fine if we only care about Title
     render(
       <MemoryRouter>
-        <MainMenu />
+        <AuthProvider>
+          <GameProvider>
+            <MainMenu />
+          </GameProvider>
+        </AuthProvider>
       </MemoryRouter>
     );
-    
+
     expect(screen.getByText(/NEED VS. GREED/i)).toBeDefined();
     expect(screen.getByText(/Play Game/i)).toBeDefined();
   });
 
   it('should render the HomeView through the InGameLayout', () => {
     localStorage.setItem('nvg_active_character', JSON.stringify({
-      id: '1', 
-      name: 'Arya', 
-      class: 'Rogue', 
-      level: 14, 
+      id: '1',
+      name: 'Arya',
+      class: 'Rogue',
+      level: 14,
       status: 'ACTIVE',
       sol: 100,
       lear: 5,
@@ -92,16 +95,18 @@ describe('Client UI Components', () => {
         description: 'Dwarven city'
       }
     }));
-    
+
     render(
       <MemoryRouter initialEntries={['/home']}>
         <AuthProvider>
           <GameProvider>
-            <Routes>
-              <Route element={<InGameLayout />}>
-                <Route path="/home" element={<HomeView />} />
-              </Route>
-            </Routes>
+            <ChatProvider>
+              <Routes>
+                <Route element={<InGameLayout />}>
+                  <Route path="/home" element={<HomeView />} />
+                </Route>
+              </Routes>
+            </ChatProvider>
           </GameProvider>
         </AuthProvider>
       </MemoryRouter>

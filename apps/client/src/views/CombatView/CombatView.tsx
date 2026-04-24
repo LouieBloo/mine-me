@@ -133,7 +133,7 @@ export const CombatView: React.FC = () => {
 
       {/* Header Info */}
       <div className="absolute top-0 left-0 right-0 p-6 flex justify-between z-10 pointer-events-none">
-        <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 backdrop-blur-md">
+        <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 backdrop-blur-md pointer-events-auto">
           <h2 className="text-xl font-black text-amber-500 uppercase">{activeCharacter.name}</h2>
           <div className="mt-2 w-48 h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
             <div
@@ -144,8 +144,16 @@ export const CombatView: React.FC = () => {
           <p className="text-xs text-slate-400 font-bold mt-1 text-right">{battleState.playerHealth} / {battleState.playerMaxHealth} HP</p>
         </div>
 
-        <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 backdrop-blur-md flex flex-col items-end">
+        <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 backdrop-blur-md flex flex-col items-end gap-2 pointer-events-auto">
           <h2 className="text-xl font-black text-slate-300 uppercase">Round {battleState.round}</h2>
+          {!combatOver && (
+            <button 
+              onClick={handleLeaveCombat}
+              className="px-4 py-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 text-[10px] font-black uppercase tracking-widest border border-red-900/50 rounded-lg transition-all active:scale-95 cursor-pointer shadow-lg"
+            >
+              Flee Combat
+            </button>
+          )}
         </div>
       </div>
 
@@ -224,40 +232,45 @@ export const CombatView: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
-            <h3 className="text-slate-400 font-black uppercase tracking-widest mb-4 text-center">Select Actions</h3>
-            <div className="flex-1 overflow-y-auto min-h-[120px] space-y-3 mb-4 custom-scrollbar">
-              {aliveMobs.map((mob: MobBattleState) => (
-                <div key={mob.id} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex items-center justify-between">
-                  <div className="font-bold text-slate-200">{mob.name}</div>
-                  <div className="flex space-x-2">
-                    <button
-                      disabled={submitting}
-                      onClick={() => handleActionSelect(mob.id, 'Attack')}
-                      className={`px-6 py-2 rounded font-black uppercase tracking-widest transition-all ${pendingActions[mob.id] === 'Attack' ? 'bg-red-600 text-white border border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:bg-slate-800'}`}
-                    >
-                      Attack
-                    </button>
-                    <button
-                      disabled={submitting}
-                      onClick={() => handleActionSelect(mob.id, 'Defend')}
-                      className={`px-6 py-2 rounded font-black uppercase tracking-widest transition-all ${pendingActions[mob.id] === 'Defend' ? 'bg-blue-600 text-white border border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.5)]' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:bg-slate-800'}`}
-                    >
-                      Defend
-                    </button>
+          <div className="flex-1 flex max-w-5xl mx-auto w-full gap-6">
+            <div className="flex-1 flex flex-col">
+              <h3 className="text-slate-400 font-black uppercase tracking-widest mb-4">Select Actions</h3>
+              <div className="flex-1 overflow-y-auto min-h-[120px] space-y-3 custom-scrollbar pr-2">
+                {aliveMobs.map((mob: MobBattleState) => (
+                  <div key={mob.id} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex items-center justify-between">
+                    <div className="font-bold text-slate-200">{mob.name}</div>
+                    <div className="flex space-x-2">
+                      <button
+                        disabled={submitting}
+                        onClick={() => handleActionSelect(mob.id, 'Attack')}
+                        className={`px-6 py-2 rounded font-black uppercase tracking-widest transition-all cursor-pointer ${pendingActions[mob.id] === 'Attack' ? 'bg-red-600 text-white border border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:bg-slate-800'}`}
+                      >
+                        Attack
+                      </button>
+                      <button
+                        disabled={submitting}
+                        onClick={() => handleActionSelect(mob.id, 'Defend')}
+                        className={`px-6 py-2 rounded font-black uppercase tracking-widest transition-all cursor-pointer ${pendingActions[mob.id] === 'Defend' ? 'bg-blue-600 text-white border border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.5)]' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:bg-slate-800'}`}
+                      >
+                        Defend
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
-            <div className="flex justify-center">
+            <div className="w-48 flex flex-col justify-end">
               <button
                 disabled={submitting || !allActionsSelected}
                 onClick={handleSubmitTurn}
-                className="px-12 py-4 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:hover:bg-amber-600 text-white font-black uppercase tracking-widest rounded-xl shadow-[0_0_20px_rgba(217,119,6,0.3)] transition-all active:scale-95 border border-amber-400"
+                className="w-full py-8 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:hover:bg-amber-600 text-white font-black uppercase tracking-widest rounded-xl shadow-[0_0_20px_rgba(217,119,6,0.3)] transition-all active:scale-95 border border-amber-400 cursor-pointer h-fit mb-1"
               >
-                {submitting ? 'Resolving...' : 'Submit Turn'}
+                {submitting ? '...' : 'Submit Turn'}
               </button>
+              <p className="text-[10px] text-slate-500 font-bold text-center uppercase tracking-tighter mt-2">
+                {!allActionsSelected ? 'Select all targets' : 'Ready to strike'}
+              </p>
             </div>
           </div>
         )}

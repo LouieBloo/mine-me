@@ -128,8 +128,8 @@ export const handleStartCombat = async (
     id: battle.id,
     characterId: battle.characterId,
     dungeonLevelId: battle.dungeonLevelId,
-    playerHealth: character.stamina, // MVP mapping
-    playerMaxHealth: character.maxStamina,
+    playerHealth: character.health,
+    playerMaxHealth: character.maxHealth,
     mobs: battle.mobsState as unknown as MobBattleState[],
     round: battle.round,
     turn: battle.turn as any,
@@ -314,13 +314,9 @@ export const handleLeaveCombat = async (
   });
 
   if (battle) {
-    // Mark as fled or keep as is, depending on rules
-    if (battle.status === 'IN_PROGRESS') {
-      await prisma.battle.update({
-        where: { id: battle.id },
-        data: { status: 'DEFEAT' } // Fleeing counts as defeat for now
-      });
-    }
+    await prisma.battle.delete({
+      where: { id: battle.id }
+    });
   }
 
   socket.leave(`battle:${characterId}`);

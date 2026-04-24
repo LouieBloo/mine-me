@@ -27,12 +27,15 @@ function App() {
               <Toaster position="top-center" visibleToasts={9} expand={true} richColors closeButton />
               <Routes>
                 <Route path="/auth" element={<Auth />} />
-                <Route path="/" element={<ProtectedRoute />}>
+                
+                {/* Public Landing Page - No sidebars */}
+                <Route index element={<MainMenu />} />
+
+                <Route element={<ProtectedRoute />}>
                   <Route path="characters" element={<CharacterSelection />} />
                   <Route element={<AppLayout />}>
                     {/* Views WITH sidebars (in-game) */}
                     <Route element={<InGameLayout />}>
-                      <Route index element={<MainMenu />} />
                       <Route path="home" element={<HomeView />} />
                       <Route path="combat" element={<CombatView />} />
                     </Route>
