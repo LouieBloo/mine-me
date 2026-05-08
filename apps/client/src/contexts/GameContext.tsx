@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, type ReactNode } from 'react';
 import type { Character } from '../views/CharacterSelection/CharacterSelection';
-import type { GameCity, PlayerState, CharacterStatUpdate } from '@nvg/shared';
+import type { GameCity, PlayerState, CharacterStatUpdate, CityDungeonInfo } from '@nvg/shared';
 
 interface GameContextType {
     activeCharacter: Character | null;
@@ -13,6 +13,9 @@ interface GameContextType {
     /** Current active battle state. */
     battleState: any | null; // using any temporarily or import BattleState
     setBattleState: (state: any | null) => void;
+    /** Dungeon info for the current city (dungeons + cleared levels). */
+    cityDungeonInfo: CityDungeonInfo | null;
+    setCityDungeonInfo: (info: CityDungeonInfo | null) => void;
     /** Merge a partial stat update into the existing playerState. */
     applyStatUpdate: (updates: CharacterStatUpdate) => void;
     /** Call on logout to clear all game state. */
@@ -47,6 +50,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     const [battleState, setBattleState] = useState<any | null>(null);
+    const [cityDungeonInfo, setCityDungeonInfo] = useState<CityDungeonInfo | null>(null);
 
     // Wrap setPlayerState so we also persist it
     const setPlayerState = (state: PlayerState | null) => {
@@ -101,6 +105,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setActiveCharacterState(null);
         setPlayerStateRaw(null);
         setActiveCity(null);
+        setCityDungeonInfo(null);
         localStorage.removeItem('nvg_active_character');
         localStorage.removeItem('nvg_player_state');
     };
@@ -115,6 +120,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setPlayerState,
             battleState,
             setBattleState,
+            cityDungeonInfo,
+            setCityDungeonInfo,
             applyStatUpdate,
             clearGameState,
         }}>

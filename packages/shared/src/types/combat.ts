@@ -35,6 +35,21 @@ export interface CombatLogMessage {
   targetName?: string;
 }
 
+/**
+ * Represents a single damage/heal event that occurred during a combat round.
+ * Used by the client to render floating damage indicators over entities.
+ */
+export interface DamageEvent {
+  /** The entity that received the effect — 'player' for the character, or a mob id */
+  targetId: string;
+  /** Positive = damage dealt, negative = healing received */
+  amount: number;
+  /** The visual category of the event */
+  type: 'damage' | 'heal' | 'blocked' | 'critical';
+  /** The entity that caused the effect */
+  sourceId?: string;
+}
+
 export interface BattleState {
   id: string;
   characterId: string;
@@ -47,4 +62,10 @@ export interface BattleState {
   playerMaxHealth: number;
   rngSeed: string; // Used to sync determinism if needed
   turnLogs?: CombatLogMessage[];
+  /** Structured damage/heal events for this round, used by floating damage indicators */
+  damageEvents?: DamageEvent[];
+  /** The next dungeon level id to advance to, or null/undefined if this is the last level */
+  nextDungeonLevelId?: string | null;
+  /** True when completing this level also completes the entire dungeon */
+  isDungeonComplete?: boolean;
 }

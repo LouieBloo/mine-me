@@ -33,6 +33,7 @@ export interface ChangeCityPayload extends GameEventBase {
 export interface StartCombatPayload extends GameEventBase {
   type: 'start_combat';
   cityId: string;
+  dungeonLevelId: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -53,10 +54,26 @@ export interface LeaveCombatPayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
+// Event: advance_dungeon_level
+// Advances to the next dungeon level after a VICTORY, starting a new battle.
+// ----------------------------------------------------------------------------
+export interface AdvanceDungeonLevelPayload extends GameEventBase {
+  type: 'advance_dungeon_level';
+}
+
+// ----------------------------------------------------------------------------
+// Event: rest
+// Character rests to recover health and stamina at the cost of 1 day of age.
+// ----------------------------------------------------------------------------
+export interface RestPayload extends GameEventBase {
+  type: 'rest';
+}
+
+// ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
 // ----------------------------------------------------------------------------
-export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload;
+export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload;
 
 // Utility type: extract the type string literals from the union
 export type GameEventType = GameEventPayload['type'];

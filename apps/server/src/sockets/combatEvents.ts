@@ -1,15 +1,17 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { CombatEngine } from '@nvg/shared/src/gameLogic/CombatEngine';
-import type { 
-  StartCombatPayload, 
-  CombatActionPayload, 
-  LeaveCombatPayload, 
-  GameEventResult, 
+import type {
+  StartCombatPayload,
+  CombatActionPayload,
+  LeaveCombatPayload,
+  AdvanceDungeonLevelPayload,
+  GameEventResult,
   BattleState,
   MobBattleState
 } from '@nvg/shared';
 import { LootService } from '../services/loot.service';
+import { BattleService } from '../services/battle.service';
 
 // Helper to push battle state
 const pushBattleState = (socket: Socket, state: BattleState) => {
@@ -26,7 +28,7 @@ export const handleStartCombat = async (
 
   if (!characterId) return { success: false, error: 'No character selected.' };
 
-  const { cityId } = payload;
+  const { cityId, dungeonLevelId } = payload;
 
   const character = await prisma.character.findUnique({
     where: { id: characterId },
@@ -40,29 +42,28 @@ export const handleStartCombat = async (
     return { success: false, error: 'Character is not in this city.' };
   }
 
-  // MVP: Find the first dungeon level in the given city
-  const cityDungeon = await prisma.cityDungeon.findFirst({
-    where: { cityId },
+  if (character.stamina < 100) {
+    return { success: false, error: 'Not enough stamina to enter the dungeon. Please rest.' };
+  }
+
+  // Fetch the specific dungeon level and verify it belongs to a dungeon in this city
+  const dungeonLevel = await prisma.dungeonLevel.findUnique({
+    where: { id: dungeonLevelId },
     include: {
       dungeon: {
         include: {
-          levels: {
-            orderBy: { orderIndex: 'asc' },
-            take: 1,
-            include: {
-              mobs: {
-                include: { mob: true }
-              }
-            }
-          }
+          cityDungeons: { where: { cityId }, take: 1 }
         }
+      },
+      mobs: {
+        include: { mob: true }
       }
     }
   });
 
-  const dungeonLevel = cityDungeon?.dungeon.levels[0];
-
-  if (!dungeonLevel) return { success: false, error: 'No dungeon found in this city.' };
+  if (!dungeonLevel || dungeonLevel.dungeon.cityDungeons.length === 0) {
+    return { success: false, error: 'Dungeon level not found in this city.' };
+  }
 
   // Check if battle already exists
   let battle = await prisma.battle.findUnique({
@@ -72,26 +73,7 @@ export const handleStartCombat = async (
   if (!battle || battle.status !== 'IN_PROGRESS') {
     // Create new battle
     const rngSeed = Math.random().toString(36).substring(7);
-    const mobsState: MobBattleState[] = dungeonLevel.mobs.map(m => ({
-      id: m.id, // using DungeonLevelMob ID as unique battle mob ID
-      mobId: m.mob.id,
-      name: m.mob.name,
-      level: m.mob.level,
-      health: m.mob.health,
-      maxHealth: m.mob.health,
-      attack: m.mob.attack,
-      defense: m.mob.defense,
-      attackPercentage: m.mob.attackPercentage,
-      defendPercentage: m.mob.defendPercentage,
-      animations: m.mob.animations,
-      consecutiveAttacks: 0,
-      consecutiveDefends: 0,
-    }));
-
-    // Initial intended actions
-    for (const m of mobsState) {
-      m.intendedAction = CombatEngine.generateMobAction(m, rngSeed, 1);
-    }
+    const mobsState = BattleService.generateInitialMobsState(dungeonLevel.mobs, rngSeed);
 
     if (battle) {
       battle = await prisma.battle.update({
@@ -124,18 +106,7 @@ export const handleStartCombat = async (
   const battleRoom = `battle:${characterId}`;
   socket.join(battleRoom);
 
-  const state: BattleState = {
-    id: battle.id,
-    characterId: battle.characterId,
-    dungeonLevelId: battle.dungeonLevelId,
-    playerHealth: character.health,
-    playerMaxHealth: character.maxHealth,
-    mobs: battle.mobsState as unknown as MobBattleState[],
-    round: battle.round,
-    turn: battle.turn as any,
-    status: battle.status as any,
-    rngSeed: battle.rngSeed
-  };
+  const state = BattleService.buildBattleState(battle, character);
 
   pushBattleState(socket, state);
 
@@ -163,18 +134,7 @@ export const handleCombatAction = async (
   });
   if (!character) return { success: false, error: 'Character not found.' };
 
-  const currentState: BattleState = {
-    id: battle.id,
-    characterId: battle.characterId,
-    dungeonLevelId: battle.dungeonLevelId,
-    playerHealth: character.health,
-    playerMaxHealth: character.maxHealth,
-    mobs: battle.mobsState as unknown as MobBattleState[],
-    round: battle.round,
-    turn: battle.turn as any,
-    status: battle.status as any,
-    rngSeed: battle.rngSeed
-  };
+  const currentState = BattleService.buildBattleState(battle, character);
 
   const playerState = {
     attributes: {
@@ -239,7 +199,7 @@ export const handleCombatAction = async (
     const prevMob = currentState.mobs.find(m => m.id === mob.id);
     const wasAlive = prevMob ? prevMob.health > 0 : false;
     const isDead = mob.health <= 0;
-    
+
     if (wasAlive && isDead) {
       // Fetch mob drop table
       const mobData = await prisma.mob.findUnique({
@@ -263,40 +223,112 @@ export const handleCombatAction = async (
     }
   }
 
-  // 2. If victory, handle dungeon level completion loot
+  // 2. If victory, handle dungeon level completion loot, dungeon completion, and progression
   if (newState.status === 'VICTORY') {
-    const dungeonLevel = await prisma.dungeonLevel.findUnique({
-      where: { id: battle.dungeonLevelId },
-      select: { completionDropTable: { select: { id: true } } }
-    });
-
-    if (dungeonLevel?.completionDropTable) {
-      const loot = await LootService.awardLootToCharacter(characterId, dungeonLevel.completionDropTable.id);
-      lootResults.sol += loot.sol;
-      // Merge items safely
-      for (const item of loot.items) {
-        const existing = lootResults.items.find(i => i.itemId === item.itemId);
-        if (existing) {
-          existing.quantity += item.quantity;
-        } else {
-          lootResults.items.push({ ...item });
-        }
-      }
+    await BattleService.processVictory(battle, characterId, lootResults, newState);
+    
+    // Broadcast updated stamina (decremented in processVictory)
+    const updatedCharacter = await prisma.character.findUnique({ where: { id: characterId }, select: { stamina: true } });
+    if (updatedCharacter) {
+      io.to(`user:${socket.data.userId}`).emit('character_stat_update', { stamina: updatedCharacter.stamina });
     }
   }
 
   // 3. Emit loot event to client and push character sync if we got anything
   if (lootResults.sol > 0 || lootResults.items.length > 0) {
     socket.emit('combat_loot', lootResults);
-    
-    // We also need to emit character_stat_update for Sol so the UI updates immediately
+
     const updatedCharacter = await prisma.character.findUnique({ where: { id: characterId }, select: { sol: true } });
     if (updatedCharacter) {
-       io.to(`user:${socket.data.userId}`).emit('character_stat_update', { sol: updatedCharacter.sol });
+      io.to(`user:${socket.data.userId}`).emit('character_stat_update', { sol: updatedCharacter.sol });
     }
   }
 
   pushBattleState(socket, newState);
+
+  return { success: true };
+};
+
+// ----------------------------------------------------------------------------
+// Handler: advance_dungeon_level
+// Called after a VICTORY to start a new battle on the next dungeon level.
+// ----------------------------------------------------------------------------
+export const handleAdvanceDungeonLevel = async (
+  io: Server,
+  socket: Socket,
+  payload: AdvanceDungeonLevelPayload
+): Promise<GameEventResult> => {
+  const characterId = socket.data.characterId;
+  if (!characterId) return { success: false, error: 'No character selected.' };
+
+  const battle = await prisma.battle.findUnique({ where: { characterId } });
+  if (!battle || battle.status !== 'VICTORY') {
+    return { success: false, error: 'No completed battle to advance from.' };
+  }
+
+  const character = await prisma.character.findUnique({ where: { id: characterId } });
+  if (!character) return { success: false, error: 'Character not found.' };
+
+  if (character.stamina < 100) {
+    return { success: false, error: 'Not enough stamina to continue. You must retreat and rest.' };
+  }
+
+  // Find the current dungeon level and next level
+  const currentLevel = await prisma.dungeonLevel.findUnique({
+    where: { id: battle.dungeonLevelId },
+    include: {
+      dungeon: {
+        include: {
+          levels: { orderBy: { orderIndex: 'asc' }, select: { id: true, orderIndex: true } }
+        }
+      }
+    }
+  });
+
+  if (!currentLevel) {
+    return { success: false, error: 'Current dungeon level not found.' };
+  }
+
+  const levels = currentLevel.dungeon.levels;
+  const currentIndex = levels.findIndex(l => l.id === currentLevel.id);
+  const nextLevel = currentIndex >= 0 && currentIndex < levels.length - 1
+    ? levels[currentIndex + 1]
+    : null;
+
+  if (!nextLevel) {
+    return { success: false, error: 'No next level available.' };
+  }
+
+  // Fetch the next dungeon level's mobs
+  const nextDungeonLevel = await prisma.dungeonLevel.findUnique({
+    where: { id: nextLevel.id },
+    include: { mobs: { include: { mob: true } } }
+  });
+
+  if (!nextDungeonLevel || nextDungeonLevel.mobs.length === 0) {
+    return { success: false, error: 'Next dungeon level has no mobs.' };
+  }
+
+  // Build new battle state
+  const rngSeed = Math.random().toString(36).substring(7);
+  const mobsState = BattleService.generateInitialMobsState(nextDungeonLevel.mobs, rngSeed);
+
+  // Update existing battle record for the next level
+  const updatedBattle = await prisma.battle.update({
+    where: { id: battle.id },
+    data: {
+      dungeonLevelId: nextLevel.id,
+      mobsState: mobsState as any,
+      round: 1,
+      turn: 'PLAYER',
+      rngSeed,
+      status: 'IN_PROGRESS',
+    }
+  });
+
+  const state = BattleService.buildBattleState(updatedBattle, character);
+
+  pushBattleState(socket, state);
 
   return { success: true };
 };
@@ -320,29 +352,10 @@ export const handleLeaveCombat = async (
   }
 
   socket.leave(`battle:${characterId}`);
-  
+
   // Clear client battle state
   socket.emit('battle_state', null);
 
   return { success: true };
 };
 
-/**
- * Resolves a drop table and returns the Sol and Items rewarded.
- */
-async function resolveDropTable(dt: any) {
-  const sol = Math.floor(Math.random() * (dt.solMax - dt.solMin + 1)) + dt.solMin;
-  const items: { itemId: string; quantity: number }[] = [];
-
-  for (const entry of dt.items) {
-    const roll = Math.random() * 100;
-    if (roll <= entry.chance) {
-      const quantity = Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1)) + entry.minQuantity;
-      if (quantity > 0) {
-        items.push({ itemId: entry.itemId, quantity });
-      }
-    }
-  }
-
-  return { sol, items };
-}

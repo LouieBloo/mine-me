@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, BattleState } from '@nvg/shared';
+import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, BattleState, CityDungeonInfo } from '@nvg/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -11,6 +11,8 @@ export type SocketEventMap = {
   character_stat_update: CharacterStatUpdate;
   // City data — emitted after join_city succeeds (replaces HTTP /api/game/city/:id)
   city_data: GameCity;
+  // Dungeon data — emitted after join_city with dungeon info + completion status
+  city_dungeons: CityDungeonInfo;
   // Combat data
   battle_state: BattleState | null;
   combat_loot: { sol: number; items: { itemId: string; quantity: number; itemDetails?: any }[] };
@@ -36,6 +38,7 @@ export type SocketEventMap = {
 class SocketService {
   private socket: Socket | null = null;
   private joinedCityId: string | null = null;
+  private listeners: { [event: string]: Function[] } = {};
 
   get isConnected(): boolean {
     return this.socket?.connected ?? false;
@@ -72,6 +75,13 @@ class SocketService {
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
       });
+
+      // Re-attach any listeners that were registered before the socket was (re)created
+      for (const [event, handlers] of Object.entries(this.listeners)) {
+        for (const handler of handlers) {
+          this.socket.on(event, handler as any);
+        }
+      }
 
       this.socket.once('connect', () => {
         console.log('[Socket] Connected:', this.socket?.id);
@@ -141,9 +151,11 @@ class SocketService {
         return resolve();
       }
 
+      // Clear immediately to prevent race conditions in React StrictMode
+      // (where a fast unmount/mount cycle might trigger leave -> join before the leave callback returns)
+      this.joinedCityId = null;
+
       this.socket.emit('leave_city', cityId, (res: { success?: boolean; error?: string }) => {
-        // Clear local state even if server returns error (assume it's gone)
-        this.joinedCityId = null;
         if (res?.error) {
           reject(new Error(res.error));
         } else {
@@ -176,6 +188,10 @@ class SocketService {
    * Register a listener for a server event.
    */
   on<K extends keyof SocketEventMap>(event: K, handler: (data: SocketEventMap[K]) => void): void {
+    if (!this.listeners[event as string]) {
+      this.listeners[event as string] = [];
+    }
+    this.listeners[event as string].push(handler);
     this.socket?.on(event as string, handler as any);
   }
 
@@ -183,6 +199,9 @@ class SocketService {
    * Unregister a listener.
    */
   off<K extends keyof SocketEventMap>(event: K, handler: (data: SocketEventMap[K]) => void): void {
+    if (this.listeners[event as string]) {
+      this.listeners[event as string] = this.listeners[event as string].filter(h => h !== handler);
+    }
     this.socket?.off(event as string, handler as any);
   }
 

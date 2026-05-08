@@ -4,9 +4,12 @@ import { Application } from '@pixi/react';
 import { Assets, Texture, Sprite, Application as PixiApplication } from 'pixi.js';
 import { useGame } from '../../contexts/GameContext';
 import { useSocket } from '../../contexts/SocketContext';
+import { useChat } from '../../contexts/ChatContext';
 import { useApi } from '../../hooks/useApi';
 import { WorldMapModal } from '../../components/WorldMapModal/WorldMapModal';
+import { DungeonModal } from '../../components/DungeonModal/DungeonModal';
 import { ConfirmationModal } from '../../components/ConfirmationModal/ConfirmationModal';
+import { notificationService } from '../../services/notificationService';
 import { type GameCity, calculateTravelDays } from '@nvg/shared';
 import './HomeView.css';
 
@@ -66,26 +69,32 @@ const CityBackground = ({
 // HomeView
 // ----------------------------------------------------------------------------
 export const HomeView = () => {
-  const { activeCharacter, setActiveCharacter, activeCity, setActiveCity, playerState } = useGame();
-  const { joinCity, leaveCity, sendGameEvent, onEvent } = useSocket();
+  const { activeCharacter, setActiveCharacter, activeCity, playerState, cityDungeonInfo, setCityDungeonInfo } = useGame();
+  const { sendGameEvent } = useSocket();
+  const { setActiveTab } = useChat();
   const { fetchWithAuth } = useApi();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [switchingCity, setSwitchingCity] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [showDungeonModal, setShowDungeonModal] = useState(false);
   const [showTravelConfirm, setShowTravelConfirm] = useState(false);
   const [pendingCityId, setPendingCityId] = useState<string | null>(null);
   const [cities, setCities] = useState<GameCity[]>([]);
+  const [enteringDungeon, setEnteringDungeon] = useState(false);
   const [pixiApp, setPixiApp] = useState<PixiApplication | null>(null);
-  const cityIdRef = useRef<string | null>(null);
-  const joinedCityIdRef = useRef<string | null>(null);
 
   // Derive city: prefer live activeCity (set by server events), fall back to
   // playerState.city (persisted across sessions), so we never show "Loading"
   // when we already have the data.
   const city: GameCity | null = activeCity ?? playerState?.city ?? null;
   const cityLoading = city === null;
+
+  // Auto-select City chat tab when entering HomeView
+  useEffect(() => {
+    setActiveTab('City');
+  }, [setActiveTab]);
 
   // Track container size for the Pixi canvas
   useEffect(() => {
@@ -117,46 +126,6 @@ export const HomeView = () => {
     return () => { active = false; };
   }, [fetchWithAuth]);
 
-  // city_data arrives after join_city — update activeCity.
-  // We keep this handler because the server always emits it, and it may carry
-  // fresher data than the cached playerState (e.g. after a city switch).
-  useEffect(() => {
-    const cleanup = onEvent('city_data', (incoming: GameCity) => {
-      console.log('[HomeView] city_data received:', incoming.name);
-      setActiveCity(incoming);
-    });
-    return cleanup;
-  }, [onEvent, setActiveCity]);
-
-  // Join city room on mount (or when cityId changes), leave on unmount.
-  useEffect(() => {
-    if (!activeCharacter?.cityId || !activeCharacter?.id) return;
-
-    const cityId = activeCharacter.cityId;
-
-    // Idempotency guard: prevent double-joining same city (Strict Mode remount).
-    if (joinedCityIdRef.current === cityId) return;
-
-    cityIdRef.current = cityId;
-    joinedCityIdRef.current = cityId;
-
-    // Join the websocket city room — the server will push city_data back.
-    // We don't reset cityLoading here because we may already have city data
-    // from playerState, so there's nothing to "load".
-    joinCity(cityId, activeCharacter.id)
-      .catch((err) => {
-        console.error('[HomeView] Failed to join city:', err.message);
-      });
-
-    return () => {
-      if (cityIdRef.current) {
-        leaveCity(cityIdRef.current).catch(() => {});
-        cityIdRef.current = null;
-        // Intentionally NOT resetting joinedCityIdRef here — see comment above.
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCharacter?.cityId, activeCharacter?.id]);
 
   const handleCityChange = (newCityId: string) => {
     if (!activeCharacter) return;
@@ -176,10 +145,50 @@ export const HomeView = () => {
       setShowMapModal(false);
       setShowTravelConfirm(false);
       setPendingCityId(null);
+      // Reset dungeon info since we changed cities
+      setCityDungeonInfo(null);
     } catch (err: any) {
       console.error('[HomeView] Failed to travel:', err.message);
     } finally {
       setSwitchingCity(false);
+    }
+  };
+
+  const handleSelectDungeon = async (dungeonLevelId: string) => {
+    if (!activeCharacter) return;
+
+    setEnteringDungeon(true);
+    try {
+      const result = await sendGameEvent({
+        type: 'start_combat',
+        cityId: activeCharacter.cityId,
+        dungeonLevelId,
+      });
+      if (result.success) {
+        setShowDungeonModal(false);
+        navigate('/combat');
+      } else {
+        console.error('[HomeView] Failed to start combat:', result.error);
+        notificationService.error('Cannot enter dungeon', result.error);
+      }
+    } catch (err: any) {
+      console.error('[HomeView] Error starting combat:', err.message);
+      notificationService.error('Error', err.message);
+    } finally {
+      setEnteringDungeon(false);
+    }
+  };
+
+  const handleRest = async () => {
+    try {
+      const result = await sendGameEvent({ type: 'rest' });
+      if (result.success) {
+        notificationService.success('Rested', 'Health and stamina restored. 1 day has passed.');
+      } else {
+        notificationService.error('Cannot rest', result.error);
+      }
+    } catch (err: any) {
+      notificationService.error('Error', err.message);
     }
   };
 
@@ -199,6 +208,16 @@ export const HomeView = () => {
 
         <div className="pointer-events-auto flex items-center space-x-4">
 
+          <button
+            disabled={cityLoading || switchingCity}
+            onClick={handleRest}
+            className="flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-black uppercase tracking-widest rounded shadow-xl transition-all active:scale-95 border border-blue-400"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+            <span>Rest</span>
+          </button>
 
           <button
             disabled={cityLoading || switchingCity}
@@ -220,6 +239,16 @@ export const HomeView = () => {
           onCityTravel={handleCityChange}
           onClose={() => setShowMapModal(false)}
           loading={switchingCity}
+        />
+      )}
+
+      {showDungeonModal && cityDungeonInfo && (
+        <DungeonModal
+          dungeonInfo={cityDungeonInfo}
+          onSelectDungeon={handleSelectDungeon}
+          onClose={() => setShowDungeonModal(false)}
+          loading={enteringDungeon}
+          characterLevel={playerState?.attributes.level ?? 1}
         />
       )}
 
@@ -261,18 +290,9 @@ export const HomeView = () => {
                   key={index}
                   className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group transition-all hover:scale-110 active:scale-95"
                   style={{ left: `${obj.x}%`, top: `${obj.y}%` }}
-                  onClick={async () => {
+                  onClick={() => {
                     if (obj.type === 'DUNGEON') {
-                      try {
-                        const result = await sendGameEvent({ type: 'start_combat', cityId: activeCharacter.cityId });
-                        if (result.success) {
-                          navigate('/combat');
-                        } else {
-                          console.error('[HomeView] Failed to start combat:', result.error);
-                        }
-                      } catch (err: any) {
-                        console.error('[HomeView] Error starting combat:', err.message);
-                      }
+                      setShowDungeonModal(true);
                     } else {
                       console.log(`[HomeView] Clicked ${obj.type}: ${obj.label}`);
                     }

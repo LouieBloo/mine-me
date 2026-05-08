@@ -1,6 +1,7 @@
 import type { 
   CombatAction, 
   BattleState, 
+  DamageEvent,
   MobBattleState, 
   PlayerState,
   CombatActionType
@@ -21,6 +22,7 @@ export class CombatEngine {
     const newState: BattleState = JSON.parse(JSON.stringify(state));
     newState.round += 1;
     newState.turnLogs = [];
+    newState.damageEvents = [];
 
     const addLog = (message: string, type: 'damage' | 'defense' | 'info' | 'system', actorName?: string, targetName?: string) => {
       newState.turnLogs!.push({
@@ -49,7 +51,8 @@ export class CombatEngine {
 
         // If mob is defending, reduce damage by 80%
         const mobAction = mobActionMap.get(mob.id);
-        if (mobAction && mobAction.type === 'Defend') {
+        const isBlocked = mobAction && mobAction.type === 'Defend';
+        if (isBlocked) {
           const originalDamage = damageToMob;
           damageToMob = Math.floor(damageToMob * 0.2);
           addLog(`${mob.name} guarded against your attack! Damage reduced from ${originalDamage} to ${damageToMob}.`, 'defense', mob.name, player.characterName);
@@ -57,6 +60,14 @@ export class CombatEngine {
 
         mob.health = Math.max(0, mob.health - damageToMob);
         addLog(`You dealt ${damageToMob} damage to ${mob.name}.`, 'damage', player.characterName, mob.name);
+
+        // Record damage event for floating indicators
+        newState.damageEvents!.push({
+          targetId: mob.id,
+          amount: damageToMob,
+          type: isBlocked ? 'blocked' : 'damage',
+          sourceId: 'player',
+        });
       } else if (playerAction && playerAction.type === 'Defend') {
         addLog(`You prepared to defend against ${mob.name}.`, 'info', player.characterName, mob.name);
       }
@@ -77,7 +88,8 @@ export class CombatEngine {
 
         // Check if player defended against THIS mob
         const playerActionAgainstMob = playerActionMap.get(mob.id);
-        if (playerActionAgainstMob && playerActionAgainstMob.type === 'Defend') {
+        const isPlayerBlocking = playerActionAgainstMob && playerActionAgainstMob.type === 'Defend';
+        if (isPlayerBlocking) {
           const originalDamage = damageToPlayer;
           damageToPlayer = Math.floor(damageToPlayer * 0.2);
           addLog(`You blocked ${mob.name}'s attack! Damage reduced from ${originalDamage} to ${damageToPlayer}.`, 'defense', player.characterName, mob.name);
@@ -85,6 +97,14 @@ export class CombatEngine {
 
         totalDamageToPlayer += damageToPlayer;
         addLog(`${mob.name} attacked you for ${damageToPlayer} damage!`, 'damage', mob.name, player.characterName);
+
+        // Record damage event for floating indicators on the player
+        newState.damageEvents!.push({
+          targetId: 'player',
+          amount: damageToPlayer,
+          type: isPlayerBlocking ? 'blocked' : 'damage',
+          sourceId: mob.id,
+        });
       } else if (mobAction && mobAction.type === 'Defend') {
         // Only log if they didn't get hit, because if they got hit, we already logged the block
         const playerActionAgainstMob = playerActionMap.get(mob.id);

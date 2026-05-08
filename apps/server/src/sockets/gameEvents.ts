@@ -1,8 +1,8 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { broadcastStatUpdate } from '../services/characterBroadcast';
-import { handleStartCombat, handleCombatAction, handleLeaveCombat } from './combatEvents';
-import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, calculateTravelDays } from '@nvg/shared';
+import { handleStartCombat, handleCombatAction, handleLeaveCombat, handleAdvanceDungeonLevel } from './combatEvents';
+import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays } from '@nvg/shared';
 
 // ============================================================================
 // Game Event Handler Registry
@@ -127,14 +127,58 @@ const handleChangeCity: GameEventHandler<ChangeCityPayload> = async (io, socket,
 };
 
 // ----------------------------------------------------------------------------
+// Handler: rest
+// Restores health and stamina to max, ages the character by 1 day.
+// ----------------------------------------------------------------------------
+const handleRest: GameEventHandler<RestPayload> = async (io, socket, payload) => {
+  const userId = socket.data.userId;
+  const characterId = socket.data.characterId;
+
+  if (!characterId) {
+    return { success: false, error: 'No character selected. Call select_character first.' };
+  }
+
+  const character = await prisma.character.findUnique({
+    where: { id: characterId },
+  });
+
+  if (!character || character.userId !== userId) {
+    return { success: false, error: 'Character not found or forbidden.' };
+  }
+
+  if (character.status !== 'ACTIVE') {
+    return { success: false, error: 'Only active characters can rest.' };
+  }
+
+  const updatedCharacter = await prisma.character.update({
+    where: { id: characterId },
+    data: {
+      health: character.maxHealth,
+      stamina: character.maxStamina,
+      ageInDays: { increment: 1 },
+    },
+  });
+
+  broadcastStatUpdate(characterId, {
+    health: updatedCharacter.health,
+    stamina: updatedCharacter.stamina,
+    ageInDays: updatedCharacter.ageInDays,
+  });
+
+  return { success: true };
+};
+
+// ----------------------------------------------------------------------------
 // Handler Registry — maps event type strings to their handler functions.
 // To add a new event, just add an entry here.
 // ----------------------------------------------------------------------------
-const gameEventHandlers: Record<string, GameEventHandler<any>> = {
+export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   change_city: handleChangeCity,
   start_combat: handleStartCombat,
   combat_action: handleCombatAction,
   leave_combat: handleLeaveCombat,
+  advance_dungeon_level: handleAdvanceDungeonLevel,
+  rest: handleRest,
 };
 
 // ----------------------------------------------------------------------------

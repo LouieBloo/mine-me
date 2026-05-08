@@ -52,6 +52,7 @@ model Character {
   // Relationships
   inventory      InventoryItem[]
   battle         Battle?
+  accomplishments Accomplishment[]
 }
 
 enum CharacterStatus {
@@ -284,4 +285,23 @@ model Battle {
   
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+}
+
+// ----------------------------------------------------------------------------
+// ACCOMPLISHMENTS
+// ----------------------------------------------------------------------------
+enum AccomplishmentType {
+  DUNGEON_LEVEL_CLEARED
+  DUNGEON_CLEARED
+}
+
+model Accomplishment {
+  id           String             @id @default(cuid())
+  characterId  String
+  character    Character          @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  type         AccomplishmentType
+  referenceId  String             // e.g. dungeonLevelId for DUNGEON_LEVEL_CLEARED
+  createdAt    DateTime           @default(now())
+
+  @@unique([characterId, type, referenceId])
 }

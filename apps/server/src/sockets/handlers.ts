@@ -76,6 +76,53 @@ const handleJoinCity = async (io: Server, socket: Socket, cityId: string, charac
       combatScore: character.combatScore,
     });
 
+    // Fetch dungeons for this city + character's dungeon accomplishments
+    const cityDungeons = await prisma.cityDungeon.findMany({
+      where: { cityId },
+      include: {
+        dungeon: {
+          include: {
+            levels: {
+              orderBy: { orderIndex: 'asc' },
+              select: { id: true, name: true, orderIndex: true }
+            }
+          }
+        }
+      },
+      orderBy: { orderIndex: 'asc' }
+    });
+
+    // Get all dungeon level IDs for this city's dungeons
+    const allLevelIds = cityDungeons.flatMap(cd => cd.dungeon.levels.map(l => l.id));
+
+    // Fetch accomplishments for those levels
+    const accomplishments = await prisma.accomplishment.findMany({
+      where: {
+        characterId,
+        type: 'DUNGEON_LEVEL_CLEARED',
+        referenceId: { in: allLevelIds }
+      },
+      select: { referenceId: true }
+    });
+
+    const clearedLevelIds = accomplishments.map(a => a.referenceId);
+
+    socket.emit('city_dungeons', {
+      dungeons: cityDungeons.map(cd => ({
+        id: cd.id,
+        cityId: cd.cityId,
+        dungeonId: cd.dungeonId,
+        dungeon: {
+          id: cd.dungeon.id,
+          name: cd.dungeon.name,
+          description: cd.dungeon.description,
+          minLevel: cd.dungeon.minLevel,
+          levels: cd.dungeon.levels,
+        }
+      })),
+      clearedLevelIds,
+    });
+
     if (callback) callback({ success: true });
   } catch (err: any) {
     console.error('[Socket] join_city error:', err);
@@ -218,14 +265,14 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
         },
         city: character.city
           ? {
-              id: character.city.id,
-              name: character.city.name,
-              description: character.city.description,
-              backgroundImageUrl: character.city.backgroundImageUrl,
-              worldPositionX: character.city.worldPositionX,
-              worldPositionY: character.city.worldPositionY,
-              objectCoordinates: character.city.objectCoordinates as any,
-            }
+            id: character.city.id,
+            name: character.city.name,
+            description: character.city.description,
+            backgroundImageUrl: character.city.backgroundImageUrl,
+            worldPositionX: character.city.worldPositionX,
+            worldPositionY: character.city.worldPositionY,
+            objectCoordinates: character.city.objectCoordinates as any,
+          }
           : undefined,
         gear: {}, // TODO: derive equipped gear from inventory items
       };

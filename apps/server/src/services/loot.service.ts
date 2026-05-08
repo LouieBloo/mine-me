@@ -78,4 +78,19 @@ export class LootService {
 
     return loot;
   }
+
+  /**
+   * Merges loot from a source into an accumulator, deduplicating items by itemId.
+   */
+  public static mergeLoot(acc: LootResult, loot: LootResult) {
+    acc.sol += loot.sol;
+    for (const item of loot.items) {
+      const existing = acc.items.find(i => i.itemId === item.itemId);
+      if (existing) {
+        existing.quantity += item.quantity;
+      } else {
+        acc.items.push({ ...item });
+      }
+    }
+  }
 }

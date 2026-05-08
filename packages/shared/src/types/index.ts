@@ -153,7 +153,36 @@ export interface CityDungeon {
     name: string;
     description: string;
     minLevel: number;
+    levels?: DungeonLevelInfo[];
   };
+}
+
+export interface DungeonLevelInfo {
+  id: string;
+  name: string;
+  orderIndex: number;
+}
+
+/**
+ * Payload sent via the `city_dungeons` socket event.
+ * Contains dungeon info for the current city + which dungeon levels
+ * the character has cleared (via accomplishments).
+ */
+export interface CityDungeonInfo {
+  dungeons: CityDungeon[];
+  /** Set of dungeon level IDs the character has cleared */
+  clearedLevelIds: string[];
+}
+
+// Accomplishments
+export type AccomplishmentType = 'DUNGEON_LEVEL_CLEARED' | 'DUNGEON_CLEARED';
+
+export interface Accomplishment {
+  id: string;
+  characterId: string;
+  type: AccomplishmentType;
+  referenceId: string;
+  createdAt: string;
 }
 
 export interface CityMaterial {
