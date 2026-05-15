@@ -76,7 +76,10 @@ export const CharacterPanel = ({ player }: Props) => {
               <span className="text-slate-300">Age</span>
               <div className="flex flex-col items-end">
                 {(() => {
-                  const years = Math.floor(player.attributes.ageInDays / 365);
+                  const totalDays = player.attributes.ageInDays;
+                  const years = Math.floor(totalDays / 360);
+                  const months = Math.floor((totalDays % 360) / 30);
+                  const days = totalDays % 30;
                   const isOld = years >= 80;
                   const colorClass = isOld ? 'text-red-400' : 'text-emerald-400';
                   const subColorClass = isOld ? 'text-red-500/60' : 'text-emerald-500/60';
@@ -86,7 +89,7 @@ export const CharacterPanel = ({ player }: Props) => {
                         {years} yrs
                       </span>
                       <span className={`font-mono text-xs font-bold ${subColorClass} uppercase tracking-tighter`}>
-                        {Math.floor((player.attributes.ageInDays % 365) / 30)} mos {player.attributes.ageInDays % 30} days
+                        {months} mos {days} days
                       </span>
                     </>
                   );
@@ -95,8 +98,8 @@ export const CharacterPanel = ({ player }: Props) => {
             </div>
             <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
               <div 
-                className={`h-full transition-colors duration-500 ${Math.floor(player.attributes.ageInDays / 365) >= 80 ? 'bg-red-500/50' : 'bg-emerald-500/50'}`}
-                style={{ width: `${Math.min(100, ((player.attributes.ageInDays / 365) / 100) * 100)}%` }}
+                className={`h-full transition-colors duration-500 ${Math.floor(player.attributes.ageInDays / 360) >= 80 ? 'bg-red-500/50' : 'bg-emerald-500/50'}`}
+                style={{ width: `${Math.min(100, ((player.attributes.ageInDays / 360) / 100) * 100)}%` }}
               />
             </div>
           </div>

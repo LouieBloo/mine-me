@@ -21,5 +21,5 @@ export function isPlayerInCity(characterCityId: string, targetCityId: string): b
  * Validates if a player has reached the maximum age constraint.
  */
 export function isPlayerDeadFromAge(player: PlayerState): boolean {
-  return player.attributes.ageInDays >= 36500;
+  return player.attributes.ageInDays >= 36000;
 }

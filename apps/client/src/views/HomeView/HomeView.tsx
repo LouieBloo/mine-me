@@ -233,7 +233,7 @@ export const HomeView = () => {
       </div>
 
       {showMapModal && (
-        <WorldMapModal 
+        <WorldMapModal
           cities={cities}
           currentCityId={activeCharacter.cityId}
           onCityTravel={handleCityChange}
@@ -281,6 +281,7 @@ export const HomeView = () => {
                   case 'MINE': return '⛏️';
                   case 'FARM': return '🌾';
                   case 'MARKET': return '⚖️';
+                  case 'TRAINING_GROUNDS': return '⚔️';
                   default: return '📍';
                 }
               };
@@ -293,6 +294,8 @@ export const HomeView = () => {
                   onClick={() => {
                     if (obj.type === 'DUNGEON') {
                       setShowDungeonModal(true);
+                    } else if (obj.type === 'TRAINING_GROUNDS') {
+                      navigate('/training');
                     } else {
                       console.log(`[HomeView] Clicked ${obj.type}: ${obj.label}`);
                     }
@@ -317,8 +320,8 @@ export const HomeView = () => {
       {/* Confirmation Modal */}
       {(() => {
         const targetCity = cities.find(c => c.id === pendingCityId);
-        const days = targetCity && activeCity ? calculateTravelDays(activeCity, targetCity) : 0;
-        
+        const travelDays = targetCity && city ? calculateTravelDays(city, targetCity) : 0;
+
         return (
           <ConfirmationModal
             isOpen={showTravelConfirm}
@@ -326,7 +329,7 @@ export const HomeView = () => {
             onConfirm={handleConfirmTravel}
             isLoading={switchingCity}
             title="Travel Confirmation"
-            message={`Are you sure you want to travel to ${targetCity?.name || 'this city'}? The journey will take ${days} days.`}
+            message={`Are you sure you want to travel to ${targetCity?.name || 'this city'}? The journey will take ${travelDays} days.`}
             confirmLabel="Fast Travel"
             cancelLabel="Stay Here"
             variant="primary"

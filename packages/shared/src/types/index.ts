@@ -195,9 +195,9 @@ export interface CityMaterial {
   updatedAt?: Date;
 }
 
-export type CityObjectType = 'DUNGEON' | 'MINE' | 'FARM' | 'MARKET';
+export type CityObjectType = 'DUNGEON' | 'MINE' | 'FARM' | 'MARKET' | 'TRAINING_GROUNDS';
 
-export const CITY_OBJECT_TYPES: CityObjectType[] = ['DUNGEON', 'MINE', 'FARM', 'MARKET'];
+export const CITY_OBJECT_TYPES: CityObjectType[] = ['DUNGEON', 'MINE', 'FARM', 'MARKET', 'TRAINING_GROUNDS'];
 
 export interface CityObject {
   type: CityObjectType;

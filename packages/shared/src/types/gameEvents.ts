@@ -70,10 +70,28 @@ export interface RestPayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
+// Event: training_action
+// Performs a training action (Attack or Defend) against the training dummy.
+// Costs 20 stamina. Increases combatScore or defenseScore by 1.
+// ----------------------------------------------------------------------------
+export interface TrainingActionPayload extends GameEventBase {
+  type: 'training_action';
+  action: 'Attack' | 'Defend';
+}
+
+// ----------------------------------------------------------------------------
+// Event: leave_training
+// Exits the training grounds and returns to the city.
+// ----------------------------------------------------------------------------
+export interface LeaveTrainingPayload extends GameEventBase {
+  type: 'leave_training';
+}
+
+// ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
 // ----------------------------------------------------------------------------
-export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload;
+export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload;
 
 // Utility type: extract the type string literals from the union
 export type GameEventType = GameEventPayload['type'];

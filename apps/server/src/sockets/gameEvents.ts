@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { broadcastStatUpdate } from '../services/characterBroadcast';
 import { handleStartCombat, handleCombatAction, handleLeaveCombat, handleAdvanceDungeonLevel } from './combatEvents';
+import { handleTrainingAction } from './trainingEvents';
 import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays } from '@nvg/shared';
 
 // ============================================================================
@@ -179,6 +180,7 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   leave_combat: handleLeaveCombat,
   advance_dungeon_level: handleAdvanceDungeonLevel,
   rest: handleRest,
+  training_action: handleTrainingAction,
 };
 
 // ----------------------------------------------------------------------------

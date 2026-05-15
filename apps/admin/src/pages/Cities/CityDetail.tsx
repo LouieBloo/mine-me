@@ -288,6 +288,7 @@ export default function CityDetail() {
       case 'MINE': return '⛏️';
       case 'FARM': return '🌾';
       case 'MARKET': return '⚖️';
+      case 'TRAINING_GROUNDS': return '⚔️';
       default: return '📍';
     }
   };

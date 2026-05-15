@@ -49,7 +49,6 @@ export const DataGrid = <T extends { id: string | number }>({ rowData, columnDef
         }}
         pagination={true}
         paginationPageSize={20}
-        domLayout="autoHeight"
       />
     </div>
   );

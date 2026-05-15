@@ -12,6 +12,7 @@ import { HomeView } from './views/HomeView/HomeView';
 import { UserProfile } from './views/UserProfile/UserProfile';
 import { TestMobView } from './views/TestMobView/TestMobView';
 import { CombatView } from './views/CombatView/CombatView';
+import { TrainingView } from './views/TrainingView/TrainingView';
 
 import { InGameLayout } from './components/InGameLayout/InGameLayout';
 
@@ -38,6 +39,7 @@ function App() {
                     <Route element={<InGameLayout />}>
                       <Route path="home" element={<HomeView />} />
                       <Route path="combat" element={<CombatView />} />
+                      <Route path="training" element={<TrainingView />} />
                     </Route>
                     
                     {/* Views WITHOUT sidebars (standard UI) */}
