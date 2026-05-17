@@ -18,7 +18,7 @@ export const DropTableEditor: React.FC<DropTableEditorProps> = ({
   description,
   errors = {}
 }) => {
-  const current = value || { solMin: 0, solMax: 0, items: [] };
+  const current = value || { solMin: 0, solMax: 0, experience: 0, items: [] };
 
   const handleChange = (updates: Partial<Omit<DropTable, 'id'>>) => {
     onChange({ ...current, ...updates });
@@ -62,7 +62,7 @@ export const DropTableEditor: React.FC<DropTableEditorProps> = ({
       </div>
 
       <div className="p-4 space-y-6">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">
               Sol (Min)
@@ -85,6 +85,18 @@ export const DropTableEditor: React.FC<DropTableEditorProps> = ({
               value={current.solMax}
               onChange={(e) => handleChange({ solMax: Number(e.target.value) })}
               className={`w-full p-2 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.solMax ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200 focus:border-blue-400'}`}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">
+              Experience
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={current.experience}
+              onChange={(e) => handleChange({ experience: Number(e.target.value) })}
+              className={`w-full p-2 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.experience ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200 focus:border-blue-400'}`}
             />
           </div>
         </div>

@@ -2,7 +2,6 @@ export type CharacterClass = 'Warrior' | 'Mage' | 'Rogue';
 export type Profession = 'Mining' | 'Herbalism' | 'Farming' | 'Lumberjack' | 'Chemistry' | 'Blacksmithing';
 
 export interface PlayerAttributes {
-  level: number;
   combatScore: number;
   defenseScore: number;
   health: number;
@@ -10,6 +9,7 @@ export interface PlayerAttributes {
   stamina: number;
   maxStamina: number;
   ageInDays: number; // minimum unit of time
+  experience: number;
 }
 
 export interface InventoryEntry {
@@ -54,7 +54,6 @@ export interface CharacterStatUpdate {
   sol?: number;
   lear?: number;
   cityId?: string;
-  level?: number;
   combatScore?: number;
   defenseScore?: number;
   health?: number;
@@ -62,6 +61,8 @@ export interface CharacterStatUpdate {
   stamina?: number;
   maxStamina?: number;
   ageInDays?: number;
+  experience?: number;
+  inventory?: PlayerInventory;
 }
 
 export type ItemRarity = 'LOW' | 'MEDIUM' | 'RARE' | 'VERY_RARE';
@@ -134,6 +135,7 @@ export interface DropTable {
   id?: string;
   solMin: number;
   solMax: number;
+  experience: number;
   items: DropTableItem[];
 }
 

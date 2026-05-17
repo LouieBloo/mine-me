@@ -17,20 +17,22 @@
     "updatedAt": "2026-04-06T21:51:48.693Z",
     "levels": [
       {
-        "id": "cmo252vl50003ygtkbhv5wyl1",
-        "dungeonId": "cmn207v6c0001u72gvuueipej",
-        "name": "Level 1",
-        "orderIndex": 0,
-        "createdAt": "2026-04-16T23:57:30.857Z",
-        "updatedAt": "2026-04-19T17:23:15.087Z"
-      },
-      {
         "id": "cmo2534z20008ygtkfcbp1l76",
         "dungeonId": "cmn207v6c0001u72gvuueipej",
         "name": "Level 2",
         "orderIndex": 1,
+        "staminaCost": 50,
         "createdAt": "2026-04-16T23:57:43.023Z",
-        "updatedAt": "2026-05-08T00:55:35.781Z"
+        "updatedAt": "2026-05-17T16:30:23.903Z"
+      },
+      {
+        "id": "cmo252vl50003ygtkbhv5wyl1",
+        "dungeonId": "cmn207v6c0001u72gvuueipej",
+        "name": "Level 1",
+        "orderIndex": 0,
+        "staminaCost": 50,
+        "createdAt": "2026-04-16T23:57:30.857Z",
+        "updatedAt": "2026-05-17T16:30:26.030Z"
       }
     ]
   }

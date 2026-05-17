@@ -35,13 +35,25 @@
       "id": "cmo252azr0000ygtku562fr3f",
       "solMin": 5,
       "solMax": 10,
+      "experience": 10,
       "mobId": "cmn1zb9op0000ihw4mgknuvlr",
       "dungeonId": null,
       "dungeonLevelId": null,
       "dungeonLevelMobId": null,
       "createdAt": "2026-04-16T23:57:04.167Z",
-      "updatedAt": "2026-04-17T22:36:11.721Z",
-      "items": []
+      "updatedAt": "2026-05-17T16:56:56.347Z",
+      "items": [
+        {
+          "id": "cmpa0pf6j0004y12ivnuvj5xn",
+          "dropTableId": "cmo252azr0000ygtku562fr3f",
+          "itemId": "cmp6aexa30004idpx29gsz12l",
+          "chance": 75,
+          "minQuantity": 1,
+          "maxQuantity": 1,
+          "createdAt": "2026-05-17T16:56:56.347Z",
+          "updatedAt": "2026-05-17T16:56:56.347Z"
+        }
+      ]
     }
   }
 ]

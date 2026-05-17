@@ -43,6 +43,12 @@ describe('combatEvents', () => {
       (prisma.character.findUnique as any).mockResolvedValue({
         id: 'char1', userId: 'user1', cityId: 'city1', stamina: 50
       });
+      (prisma.dungeonLevel.findUnique as any).mockResolvedValue({
+        id: 'level1',
+        staminaCost: 100,
+        dungeon: { cityDungeons: [{ cityId: 'city1' }] },
+        mobs: []
+      });
 
       const result = await handleStartCombat(io, socket, {
         type: 'start_combat', cityId: 'city1', dungeonLevelId: 'level1'
@@ -73,6 +79,20 @@ describe('combatEvents', () => {
       });
       (prisma.character.findUnique as any).mockResolvedValue({
         id: 'char1', stamina: 99
+      });
+      (prisma.dungeonLevel.findUnique as any).mockImplementation((args: any) => {
+        if (args.where.id === 'level1') {
+          return Promise.resolve({
+            id: 'level1',
+            dungeon: { levels: [{ id: 'level1' }, { id: 'level2' }] }
+          });
+        }
+        if (args.where.id === 'level2') {
+          return Promise.resolve({
+            id: 'level2', staminaCost: 100, mobs: [{}]
+          });
+        }
+        return Promise.resolve(null);
       });
 
       const result = await handleAdvanceDungeonLevel(io, socket, {

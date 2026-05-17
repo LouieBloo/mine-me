@@ -15,9 +15,9 @@ export type SocketEventMap = {
   city_dungeons: CityDungeonInfo;
   // Combat data
   battle_state: BattleState | null;
-  combat_loot: { sol: number; items: { itemId: string; quantity: number; itemDetails?: any }[] };
+  combat_loot: { sol: number; experience: number; items: { itemId: string; quantity: number; itemDetails?: any }[] };
   // City presence events
-  player_entered_city: { characterId: string; name: string; level: number; combatScore: number };
+  player_entered_city: { characterId: string; name: string; combatScore: number };
   player_left_city: { characterId: string };
   // Connection
   connect: undefined;

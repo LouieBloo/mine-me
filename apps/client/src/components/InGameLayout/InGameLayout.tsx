@@ -84,7 +84,6 @@ export const InGameLayout = () => {
         lear: activeCharacter.lear,
         cityId: activeCharacter.cityId,
         attributes: {
-            level: activeCharacter.level,
             combatScore: activeCharacter.combatScore,
             defenseScore: activeCharacter.defenseScore,
             health: (activeCharacter as any).health || 100,
@@ -92,6 +91,7 @@ export const InGameLayout = () => {
             stamina: activeCharacter.stamina,
             maxStamina: activeCharacter.maxStamina,
             ageInDays: activeCharacter.ageInDays,
+            experience: activeCharacter.experience || 0,
         },
         inventory: {
             slots: 25,

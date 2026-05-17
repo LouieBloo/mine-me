@@ -148,10 +148,10 @@ export class BattleService {
 
     // Decrement stamina for completing the dungeon level
     const character = await prisma.character.findUnique({ where: { id: characterId } });
-    if (character) {
+    if (character && dungeonLevel) {
       await prisma.character.update({
         where: { id: characterId },
-        data: { stamina: Math.max(0, character.stamina - 100) }
+        data: { stamina: Math.max(0, character.stamina - dungeonLevel.staminaCost) }
       });
     }
   }

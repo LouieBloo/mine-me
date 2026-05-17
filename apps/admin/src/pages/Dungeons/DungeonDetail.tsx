@@ -97,6 +97,7 @@ export default function DungeonDetail() {
           dungeonId: data.id,
           name: level.name,
           orderIndex: level.orderIndex || index,
+          staminaCost: level.staminaCost !== undefined ? Number(level.staminaCost) : 100,
           mobs: level.mobs || [],
           completionDropTable: level.completionDropTable || null
         })
@@ -177,6 +178,7 @@ export default function DungeonDetail() {
       _tempId: Math.random().toString(36).substr(2, 9),
       name: `Level ${(data.levels?.length || 0) + 1}`,
       orderIndex: data.levels?.length || 0,
+      staminaCost: 100,
       mobs: []
     }];
     setData({ ...data, levels: newLevels });
@@ -300,18 +302,33 @@ export default function DungeonDetail() {
 
                 <div className="flex-grow space-y-4">
                   <div className="flex flex-col gap-6 items-start w-full">
-                    <div className="w-full">
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Level Name</label>
-                      <input 
-                        type="text" 
-                        value={level.name} 
-                        onChange={(e) => {
-                          const newLevels = [...data.levels];
-                          newLevels[i].name = e.target.value;
-                          setData({ ...data, levels: newLevels });
-                        }}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:border-blue-400 transition-colors"
-                      />
+                    <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Level Name</label>
+                        <input 
+                          type="text" 
+                          value={level.name} 
+                          onChange={(e) => {
+                            const newLevels = [...data.levels];
+                            newLevels[i].name = e.target.value;
+                            setData({ ...data, levels: newLevels });
+                          }}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:border-blue-400 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Stamina Cost</label>
+                        <input 
+                          type="number" 
+                          value={level.staminaCost !== undefined ? level.staminaCost : 100} 
+                          onChange={(e) => {
+                            const newLevels = [...data.levels];
+                            newLevels[i].staminaCost = Number(e.target.value);
+                            setData({ ...data, levels: newLevels });
+                          }}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:border-blue-400 transition-colors"
+                        />
+                      </div>
                     </div>
                     
                     <div className="w-full">

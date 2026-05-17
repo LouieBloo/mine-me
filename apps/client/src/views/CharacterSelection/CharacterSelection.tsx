@@ -15,7 +15,6 @@ export interface Character {
     id: string;
     name: string;
     class: string;
-    level: number;
     status: 'ACTIVE' | 'DEAD' | 'RETIRED';
     profession?: string;
     stamina: number;
@@ -25,6 +24,7 @@ export interface Character {
     sol: number;
     lear: number;
     ageInDays: number;
+    experience: number;
     cityId: string;
     createdAt: string;
     inventory?: {

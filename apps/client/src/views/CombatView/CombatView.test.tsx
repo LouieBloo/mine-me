@@ -28,6 +28,10 @@ vi.mock('../../components/game/SpriteRenderer/SpriteRenderer', () => ({
   SpriteRenderer: () => <div data-testid="sprite-renderer" />,
 }));
 
+vi.mock('../../components/game/PixiStageContext/PixiStageContext', () => ({
+  PixiStageProvider: ({ children }: any) => <div data-testid="pixi-stage-provider">{children}</div>,
+}));
+
 vi.mock('../../components/game/combat/CombatAnimationSequencer', () => {
   class MockSequencer {
     playSequence = vi.fn();

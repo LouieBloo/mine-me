@@ -42,10 +42,6 @@ export const handleStartCombat = async (
     return { success: false, error: 'Character is not in this city.' };
   }
 
-  if (character.stamina < 100) {
-    return { success: false, error: 'Not enough stamina to enter the dungeon. Please rest.' };
-  }
-
   // Fetch the specific dungeon level and verify it belongs to a dungeon in this city
   const dungeonLevel = await prisma.dungeonLevel.findUnique({
     where: { id: dungeonLevelId },
@@ -63,6 +59,10 @@ export const handleStartCombat = async (
 
   if (!dungeonLevel || dungeonLevel.dungeon.cityDungeons.length === 0) {
     return { success: false, error: 'Dungeon level not found in this city.' };
+  }
+
+  if (character.stamina < dungeonLevel.staminaCost) {
+    return { success: false, error: 'Not enough stamina to enter the dungeon. Please rest.' };
   }
 
   // Check if battle already exists
@@ -145,7 +145,6 @@ export const handleCombatAction = async (
       stamina: character.stamina,
       maxStamina: character.maxStamina,
       ageInDays: character.ageInDays,
-      level: character.level,
     }
   } as any;
 
@@ -192,7 +191,7 @@ export const handleCombatAction = async (
   }
 
   // If victory or mobs died, handle loot
-  const lootResults: { sol: number; items: { itemId: string; quantity: number }[] } = { sol: 0, items: [] };
+  const lootResults: { sol: number; experience: number; items: { itemId: string; quantity: number }[] } = { sol: 0, experience: 0, items: [] };
 
   // 1. Check for newly dead mobs in this turn
   for (const mob of newState.mobs) {
@@ -209,16 +208,7 @@ export const handleCombatAction = async (
 
       if (mobData?.dropTable) {
         const loot = await LootService.awardLootToCharacter(characterId, mobData.dropTable.id);
-        lootResults.sol += loot.sol;
-        // Merge items safely
-        for (const item of loot.items) {
-          const existing = lootResults.items.find(i => i.itemId === item.itemId);
-          if (existing) {
-            existing.quantity += item.quantity;
-          } else {
-            lootResults.items.push({ ...item });
-          }
-        }
+        LootService.mergeLoot(lootResults, loot);
       }
     }
   }
@@ -235,12 +225,45 @@ export const handleCombatAction = async (
   }
 
   // 3. Emit loot event to client and push character sync if we got anything
-  if (lootResults.sol > 0 || lootResults.items.length > 0) {
+  if (lootResults.sol > 0 || lootResults.experience > 0 || lootResults.items.length > 0) {
     socket.emit('combat_loot', lootResults);
 
-    const updatedCharacter = await prisma.character.findUnique({ where: { id: characterId }, select: { sol: true } });
+    const updatedCharacter = await prisma.character.findUnique({
+      where: { id: characterId },
+      include: {
+        inventory: {
+          include: {
+            item: true
+          }
+        }
+      }
+    });
+    
     if (updatedCharacter) {
-      io.to(`user:${socket.data.userId}`).emit('character_stat_update', { sol: updatedCharacter.sol });
+      const inventory = {
+        slots: updatedCharacter.maxInventorySlots,
+        items: updatedCharacter.inventory.map(inv => ({
+          item: {
+            id: inv.item.id,
+            name: inv.item.name,
+            description: inv.item.description,
+            type: inv.item.type as any,
+            subType: inv.item.subType as any,
+            priceSol: inv.item.vendorSellPrice,
+            rarity: inv.item.rarity as any,
+            iconUrl: inv.item.iconUrl,
+            gearImageUrl: inv.item.gearImageUrl,
+            isStartingPiece: inv.item.isStartingPiece,
+          },
+          quantity: inv.quantity,
+        })),
+      };
+
+      io.to(`user:${socket.data.userId}`).emit('character_stat_update', {
+        sol: updatedCharacter.sol,
+        experience: updatedCharacter.experience,
+        inventory
+      });
     }
   }
 
@@ -268,10 +291,6 @@ export const handleAdvanceDungeonLevel = async (
 
   const character = await prisma.character.findUnique({ where: { id: characterId } });
   if (!character) return { success: false, error: 'Character not found.' };
-
-  if (character.stamina < 100) {
-    return { success: false, error: 'Not enough stamina to continue. You must retreat and rest.' };
-  }
 
   // Find the current dungeon level and next level
   const currentLevel = await prisma.dungeonLevel.findUnique({
@@ -307,6 +326,10 @@ export const handleAdvanceDungeonLevel = async (
 
   if (!nextDungeonLevel || nextDungeonLevel.mobs.length === 0) {
     return { success: false, error: 'Next dungeon level has no mobs.' };
+  }
+
+  if (character.stamina < nextDungeonLevel.staminaCost) {
+    return { success: false, error: 'Not enough stamina to continue. You must retreat and rest.' };
   }
 
   // Build new battle state

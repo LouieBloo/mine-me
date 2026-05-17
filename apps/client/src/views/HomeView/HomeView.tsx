@@ -10,7 +10,7 @@ import { WorldMapModal } from '../../components/WorldMapModal/WorldMapModal';
 import { DungeonModal } from '../../components/DungeonModal/DungeonModal';
 import { ConfirmationModal } from '../../components/ConfirmationModal/ConfirmationModal';
 import { notificationService } from '../../services/notificationService';
-import { type GameCity, calculateTravelDays } from '@nvg/shared';
+import { type GameCity, calculateTravelDays, calculateLevel } from '@nvg/shared';
 import './HomeView.css';
 
 // ----------------------------------------------------------------------------
@@ -248,7 +248,7 @@ export const HomeView = () => {
           onSelectDungeon={handleSelectDungeon}
           onClose={() => setShowDungeonModal(false)}
           loading={enteringDungeon}
-          characterLevel={playerState?.attributes.level ?? 1}
+          characterLevel={calculateLevel(playerState?.attributes.experience ?? 0)}
         />
       )}
 

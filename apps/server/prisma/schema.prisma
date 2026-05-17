@@ -30,7 +30,6 @@ model Character {
   profession     String?   // 'Mining', 'Herbalism', etc.
   status         CharacterStatus @default(ACTIVE)
   
-  level          Int       @default(1)
   combatScore    Int       @default(10)
   defenseScore   Int       @default(10)
   health         Int       @default(100)
@@ -39,6 +38,7 @@ model Character {
   maxStamina     Int       @default(100)
   maxInventorySlots Int    @default(25)
   ageInDays      Int       @default(6570) // ~18 years in days (18 * 365)
+  experience     Int       @default(0)
   
   sol            Int       @default(0)
   lear           Int       @default(0)
@@ -128,6 +128,7 @@ model DungeonLevel {
   dungeon   Dungeon  @relation(fields: [dungeonId], references: [id])
   name      String
   orderIndex Int     @default(0)
+  staminaCost Int    @default(100)
   mobs      DungeonLevelMob[]
   
   completionDropTable DropTable? @relation("DungeonLevelCompletionDrops")
@@ -196,6 +197,7 @@ model DropTable {
   id              String @id @default(cuid())
   solMin          Int    @default(0)
   solMax          Int    @default(0)
+  experience      Int    @default(0)
   items           DropTableItem[]
 
   mobId                 String? @unique

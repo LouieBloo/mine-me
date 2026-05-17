@@ -80,7 +80,7 @@ charactersRouter.post('/', authenticateToken, async (req: AuthRequest, res: Resp
         name,
         class: charClass,
         cityId: startingCity.id,
-        level: 1,
+
         stamina: 100,
         maxStamina: 100,
         status: 'ACTIVE',

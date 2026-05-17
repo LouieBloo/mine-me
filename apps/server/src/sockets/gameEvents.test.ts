@@ -24,20 +24,19 @@ vi.mock('../services/characterBroadcast', () => ({
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-const makeSocket = (userId = 'user1', characterId = 'char1') => ({
+const makeSocket = (userId = 'user1', characterId: string | null = 'char1') => ({
   data: { userId, characterId },
   leave: vi.fn(),
   join: vi.fn(),
   to: vi.fn().mockReturnValue({ emit: vi.fn() }),
   emit: vi.fn(),
-});
+} as any);
 
 const makeCharacter = (overrides = {}) => ({
   id: 'char1',
   userId: 'user1',
   name: 'Hero',
   status: 'ACTIVE',
-  level: 1,
   combatScore: 10,
   cityId: 'city-a',
   maxHealth: 100,

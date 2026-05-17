@@ -16,6 +16,7 @@ export const buildDropTableUpsert = (dropTable: any) => {
       create: {
         solMin: dropTable.solMin || 0,
         solMax: dropTable.solMax || 0,
+        experience: dropTable.experience || 0,
         items: {
           create: (dropTable.items || []).map((i: any) => ({
             itemId: i.itemId,
@@ -28,6 +29,7 @@ export const buildDropTableUpsert = (dropTable: any) => {
       update: {
         solMin: dropTable.solMin || 0,
         solMax: dropTable.solMax || 0,
+        experience: dropTable.experience || 0,
         items: {
           deleteMany: {},
           create: (dropTable.items || []).map((i: any) => ({
@@ -48,6 +50,7 @@ export const buildDropTableCreate = (dropTable: any) => {
     create: {
       solMin: dropTable.solMin || 0,
       solMax: dropTable.solMax || 0,
+      experience: dropTable.experience || 0,
       items: {
         create: (dropTable.items || []).map((i: any) => ({
           itemId: i.itemId,

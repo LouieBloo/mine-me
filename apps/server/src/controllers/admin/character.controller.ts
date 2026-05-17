@@ -16,7 +16,7 @@ export const getCharacter = async (req: Request, res: Response) => {
 export const updateCharacter = async (req: Request, res: Response) => {
   const { 
     name, class: characterClass, profession, status, 
-    level, combatScore, defenseScore, stamina, maxStamina, 
+    experience, combatScore, defenseScore, stamina, maxStamina, 
     maxInventorySlots, ageInDays, sol, lear 
   } = req.body;
 
@@ -28,7 +28,7 @@ export const updateCharacter = async (req: Request, res: Response) => {
         class: characterClass,
         profession,
         status,
-        level,
+        experience,
         combatScore,
         defenseScore,
         stamina,

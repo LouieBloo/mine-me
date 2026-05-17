@@ -92,7 +92,6 @@ const handleChangeCity: GameEventHandler<ChangeCityPayload> = async (io, socket,
   socket.to(newCityRoom).emit('player_entered_city', {
     characterId,
     name: character.name,
-    level: character.level,
     combatScore: character.combatScore,
   });
 

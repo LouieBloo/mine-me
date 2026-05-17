@@ -1,7 +1,7 @@
 import React from 'react';
 import './GameNotification.css';
 
-export type NotificationVariant = 'success' | 'error' | 'info' | 'item' | 'gold';
+export type NotificationVariant = 'success' | 'error' | 'info' | 'item' | 'gold' | 'xp';
 
 interface GameNotificationProps {
   title: string;
@@ -42,6 +42,8 @@ export const GameNotification: React.FC<GameNotificationProps> = ({
       }
       case 'gold':
         return 'border-sol/50 bg-sol/10 shadow-[0_0_10px_rgba(245,158,11,0.2)]';
+      case 'xp':
+        return 'border-cyan-400/50 bg-cyan-500/10 shadow-[0_0_10px_rgba(34,211,238,0.2)]';
       default:
         return 'border-slate-700/50 bg-slate-800/80';
     }
@@ -58,6 +60,8 @@ export const GameNotification: React.FC<GameNotificationProps> = ({
         return <span className="text-2xl" role="img" aria-label="error">❌</span>;
       case 'gold':
         return <span className="text-2xl" role="img" aria-label="gold">💰</span>;
+      case 'xp':
+        return <span className="text-2xl" role="img" aria-label="xp">⭐</span>;
       default:
         return <span className="text-2xl" role="img" aria-label="info">🔔</span>;
     }

@@ -22,7 +22,7 @@ const handleJoinCity = async (io: Server, socket: Socket, cityId: string, charac
     // Security: Verify character belongs to the authenticated user AND is in the requested city
     const character = await prisma.character.findUnique({
       where: { id: characterId },
-      select: { id: true, userId: true, cityId: true, name: true, combatScore: true, level: true }
+      select: { id: true, userId: true, cityId: true, name: true, combatScore: true }
     });
 
     if (!character) {
@@ -72,7 +72,6 @@ const handleJoinCity = async (io: Server, socket: Socket, cityId: string, charac
     socket.to(cityRoom).emit('player_entered_city', {
       characterId: character.id,
       name: character.name,
-      level: character.level,
       combatScore: character.combatScore,
     });
 
@@ -236,7 +235,6 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
         lear: character.lear,
         cityId: character.cityId,
         attributes: {
-          level: character.level,
           combatScore: character.combatScore,
           defenseScore: character.defenseScore,
           health: character.health,
@@ -244,6 +242,7 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
           stamina: character.stamina,
           maxStamina: character.maxStamina,
           ageInDays: character.ageInDays,
+          experience: character.experience,
         },
         inventory: {
           slots: character.maxInventorySlots,

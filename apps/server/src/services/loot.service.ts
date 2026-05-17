@@ -2,12 +2,13 @@ import { prisma } from '../index';
 
 export interface LootResult {
   sol: number;
+  experience: number;
   items: { itemId: string; quantity: number; itemDetails?: any }[];
 }
 
 export class LootService {
   /**
-   * Resolves a drop table and returns the Sol and Items rewarded.
+   * Resolves a drop table and returns the Sol, Experience, and Items rewarded.
    * This is a pure mathematical resolution, it does NOT persist to DB.
    */
   public static async resolveDropTable(dropTableId: string): Promise<LootResult> {
@@ -17,10 +18,11 @@ export class LootService {
     });
 
     if (!dt) {
-      return { sol: 0, items: [] };
+      return { sol: 0, experience: 0, items: [] };
     }
 
     const sol = Math.floor(Math.random() * (dt.solMax - dt.solMin + 1)) + dt.solMin;
+    const experience = dt.experience;
     const items: { itemId: string; quantity: number; itemDetails?: any }[] = [];
 
     for (const entry of dt.items) {
@@ -33,7 +35,7 @@ export class LootService {
       }
     }
 
-    return { sol, items };
+    return { sol, experience, items };
   }
 
   /**
@@ -42,15 +44,18 @@ export class LootService {
   public static async awardLootToCharacter(characterId: string, dropTableId: string): Promise<LootResult> {
     const loot = await this.resolveDropTable(dropTableId);
 
-    if (loot.sol === 0 && loot.items.length === 0) {
+    if (loot.sol === 0 && loot.experience === 0 && loot.items.length === 0) {
       return loot;
     }
 
-    // 1. Give Sol
-    if (loot.sol > 0) {
+    // 1. Give Sol and Experience
+    if (loot.sol > 0 || loot.experience > 0) {
       await prisma.character.update({
         where: { id: characterId },
-        data: { sol: { increment: loot.sol } }
+        data: {
+          ...(loot.sol > 0 && { sol: { increment: loot.sol } }),
+          ...(loot.experience > 0 && { experience: { increment: loot.experience } }),
+        }
       });
     }
 
@@ -84,6 +89,7 @@ export class LootService {
    */
   public static mergeLoot(acc: LootResult, loot: LootResult) {
     acc.sol += loot.sol;
+    acc.experience += loot.experience;
     for (const item of loot.items) {
       const existing = acc.items.find(i => i.itemId === item.itemId);
       if (existing) {

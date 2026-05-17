@@ -5,6 +5,7 @@ import type {
   GameItem,
   Recipe
 } from '../types';
+import { calculateLevel } from '../utils/experience';
 
 export interface GatheringResult {
   success: boolean;
@@ -112,7 +113,7 @@ export class ProfessionEngine {
     }
 
     // 2. Validate Level
-    if (player.attributes.level < recipe.requiredLevel) {
+    if (calculateLevel(player.attributes.experience) < recipe.requiredLevel) {
       return {
         success: false,
         experienceGained: 0,

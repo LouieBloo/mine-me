@@ -70,6 +70,15 @@ class NotificationService {
     const message = `You ${amount > 0 ? 'gained' : 'lost'} ${Math.abs(amount)} ${type.toLowerCase()}.`;
     this.show(title, message, 'gold');
   }
+
+  /**
+   * Show a notification for receiving experience.
+   */
+  xp(amount: number) {
+    const title = `+${amount} XP`;
+    const message = `You gained ${amount} experience.`;
+    this.show(title, message, 'xp');
+  }
 }
 
 export const notificationService = new NotificationService();

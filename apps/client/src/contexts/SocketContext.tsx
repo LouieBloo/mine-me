@@ -96,11 +96,15 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Listen for combat loot and trigger notifications
   useEffect(() => {
-    const handleCombatLoot = (loot: { sol: number; items: any[] }) => {
+    const handleCombatLoot = (loot: { sol: number; experience: number; items: any[] }) => {
       console.log('[SocketContext] combat_loot received:', loot);
       
       if (loot.sol > 0) {
         notificationService.gold(loot.sol, 'SOL');
+      }
+
+      if (loot.experience > 0) {
+        notificationService.xp(loot.experience);
       }
 
       for (const item of loot.items) {

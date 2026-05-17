@@ -30,7 +30,7 @@ describe('DropTableEditor Component', () => {
 
   it('calls onChange when Sol fields are modified', () => {
     const onChangeMock = vi.fn();
-    const initialValue = { solMin: 0, solMax: 0, items: [] };
+    const initialValue = { solMin: 0, solMax: 0, experience: 0, items: [] };
     render(<DropTableEditor value={initialValue} onChange={onChangeMock} />);
     
     const inputs = screen.getAllByRole('spinbutton');
@@ -41,13 +41,14 @@ describe('DropTableEditor Component', () => {
     expect(onChangeMock).toHaveBeenCalledWith({
       solMin: 50,
       solMax: 0,
+      experience: 0,
       items: []
     });
   });
 
   it('can add an item row and modify properties', () => {
     const onChangeMock = vi.fn();
-    const initialValue = { solMin: 0, solMax: 0, items: [] };
+    const initialValue = { solMin: 0, solMax: 0, experience: 0, items: [] };
     const { rerender } = render(<DropTableEditor value={initialValue} onChange={onChangeMock} />);
     
     const addButton = screen.getByText('+ Add Item');
@@ -56,6 +57,7 @@ describe('DropTableEditor Component', () => {
     expect(onChangeMock).toHaveBeenCalledWith({
       solMin: 0,
       solMax: 0,
+      experience: 0,
       items: [{ itemId: '', chance: 10, minQuantity: 1, maxQuantity: 1 }]
     });
 
@@ -63,6 +65,7 @@ describe('DropTableEditor Component', () => {
     rerender(<DropTableEditor value={{
       solMin: 0,
       solMax: 0,
+      experience: 0,
       items: [{ itemId: '', chance: 10, minQuantity: 1, maxQuantity: 1 }]
     }} onChange={onChangeMock} />);
     
@@ -72,6 +75,7 @@ describe('DropTableEditor Component', () => {
     expect(onChangeMock).toHaveBeenCalledWith({
       solMin: 0,
       solMax: 0,
+      experience: 0,
       items: [{ itemId: 'item_xyz', chance: 10, minQuantity: 1, maxQuantity: 1 }]
     });
   });

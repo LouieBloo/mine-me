@@ -1,5 +1,6 @@
 import React from 'react';
 import { type Character } from '../CharacterSelection';
+import { calculateLevel } from '@nvg/shared';
 import './CharacterList.css';
 
 interface Props {
@@ -47,7 +48,7 @@ export const CharacterList: React.FC<Props> = ({ characters, selectedId, onSelec
                     </span>
                     <div className="flex items-center space-x-2 mt-1">
                         <span className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">
-                            LVL {char.level}
+                            LVL {calculateLevel(char.experience)}
                         </span>
                         <span className="text-[10px] text-slate-600">•</span>
                         <span className="text-[10px] text-slate-500 italic">
