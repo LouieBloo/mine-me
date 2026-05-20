@@ -296,6 +296,8 @@ export const HomeView = () => {
                       setShowDungeonModal(true);
                     } else if (obj.type === 'TRAINING_GROUNDS') {
                       navigate('/training');
+                    } else if (obj.type === 'MINE') {
+                      navigate('/mine');
                     } else {
                       console.log(`[HomeView] Clicked ${obj.type}: ${obj.label}`);
                     }

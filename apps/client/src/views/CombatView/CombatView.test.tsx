@@ -23,10 +23,29 @@ vi.mock('react-router-dom', () => ({
   useNavigate: vi.fn(),
 }));
 
+const mockPlayAnimation = vi.fn((_key: string, options?: any) => {
+  if (options?.onComplete) {
+    options.onComplete();
+  }
+});
+const mockHasAnimation = vi.fn(() => true);
+
 // Mock SpriteRenderer and Sequencer
-vi.mock('../../components/game/SpriteRenderer/SpriteRenderer', () => ({
-  SpriteRenderer: () => <div data-testid="sprite-renderer" />,
-}));
+vi.mock('../../components/game/SpriteRenderer/SpriteRenderer', async () => {
+  const React = await import('react');
+  return {
+    SpriteRenderer: React.forwardRef((_props: any, ref: any) => {
+      React.useImperativeHandle(ref, () => ({
+        showFloatingText: vi.fn(),
+        getContainer: vi.fn(() => ({ x: 0, y: 0 })),
+        getOriginPosition: vi.fn(() => ({ x: 0, y: 0 })),
+        playAnimation: mockPlayAnimation,
+        hasAnimation: mockHasAnimation,
+      }));
+      return React.createElement('div', { 'data-testid': 'sprite-renderer' });
+    }),
+  };
+});
 
 vi.mock('../../components/game/PixiStageContext/PixiStageContext', () => ({
   PixiStageProvider: ({ children }: any) => <div data-testid="pixi-stage-provider">{children}</div>,
@@ -34,12 +53,26 @@ vi.mock('../../components/game/PixiStageContext/PixiStageContext', () => ({
 
 vi.mock('../../components/game/combat/CombatAnimationSequencer', () => {
   class MockSequencer {
-    playSequence = vi.fn();
-    cancel = vi.fn();
+    cancelled = false;
+    playSequence = vi.fn(async (steps: any[]) => {
+      this.cancelled = false;
+      for (const step of steps) {
+        if (this.cancelled) return;
+        if (step.type === 'effect') {
+          step.execute();
+        } else if (step.type === 'callback') {
+          await step.execute();
+        }
+      }
+    });
+    cancel = vi.fn(() => {
+      this.cancelled = true;
+    });
+    isCancelled = vi.fn(() => this.cancelled);
   }
   return {
     CombatAnimationSequencer: MockSequencer,
-    buildAttackSteps: vi.fn(),
+    buildAttackSteps: vi.fn(() => []),
   };
 });
 
@@ -170,5 +203,62 @@ describe('CombatView', () => {
 
     render(<CombatView />);
     expect(mockNavigate).toHaveBeenCalledWith('/home');
+  });
+
+  it('plays death animation and sets faded class when a mob dies', async () => {
+    const mockBattleState = {
+      id: 'battle_1',
+      status: 'IN_PROGRESS',
+      playerHealth: 100,
+      playerMaxHealth: 100,
+      mobs: [{
+        id: 'mob_1',
+        name: 'Goblin',
+        health: 50,
+        maxHealth: 50,
+        animations: { url: '/assets/goblin.png', atlasUrl: '/assets/goblin.json' }
+      }],
+      round: 1,
+      turn: 'PLAYER',
+      damageEvents: [] as any[],
+      turnLogs: [] as any[],
+    };
+
+    const mockGameContext = {
+      battleState: mockBattleState,
+      activeCharacter: { id: 'char_1' },
+      playerState: { inventory: { items: [] } },
+    };
+
+    (useGame as any).mockReturnValue(mockGameContext);
+
+    const { rerender } = render(<CombatView />);
+
+    // Update state to round 2 with a death event
+    mockBattleState.round = 2;
+    mockBattleState.mobs[0].health = 0;
+    mockBattleState.damageEvents = [
+      {
+        sourceId: 'player',
+        targetId: 'mob_1',
+        type: 'damage',
+        amount: 50,
+      },
+    ];
+    mockBattleState.turnLogs = [
+      { type: 'damage', content: 'Player deals 50 damage to Goblin.' }
+    ];
+
+    // Rerender with the new state
+    rerender(<CombatView />);
+
+    // Wait for playAnimation to be called with 'death'
+    await waitFor(() => {
+      expect(mockPlayAnimation).toHaveBeenCalledWith('death', expect.any(Object));
+    });
+
+    // Verify the mob's row has faded (has the opacity-0 class)
+    const mobRow = screen.getByText('Goblin').closest('.transition-all.duration-1000');
+    expect(mobRow?.className).toContain('opacity-0');
   });
 });

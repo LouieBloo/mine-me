@@ -88,10 +88,18 @@ export interface LeaveTrainingPayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
+// Event: mine
+// Mines in the current city. Costs 25 stamina.
+// ----------------------------------------------------------------------------
+export interface MinePayload extends GameEventBase {
+  type: 'mine';
+}
+
+// ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
 // ----------------------------------------------------------------------------
-export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload;
+export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload | MinePayload;
 
 // Utility type: extract the type string literals from the union
 export type GameEventType = GameEventPayload['type'];

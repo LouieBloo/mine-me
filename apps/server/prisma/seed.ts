@@ -31,8 +31,30 @@ async function main() {
       update: cityRoot,
       create: cityRoot,
     });
+
+    if (cityMaterials && cityMaterials.length > 0) {
+      for (const cm of cityMaterials) {
+        await prisma.cityMaterial.upsert({
+          where: {
+            cityId_itemId: {
+              cityId: cm.cityId,
+              itemId: cm.itemId
+            }
+          },
+          update: {
+            cityId: cm.cityId,
+            itemId: cm.itemId,
+          },
+          create: {
+            id: cm.id,
+            cityId: cm.cityId,
+            itemId: cm.itemId,
+          }
+        });
+      }
+    }
   }
-  console.log('Cities seeded.');
+  console.log('Cities and materials seeded.');
 
   // Seed Mobs
   const mobs = JSON.parse(fs.readFileSync(path.join(dataPath, 'mobs.json'), 'utf-8'));

@@ -13,6 +13,7 @@ import { UserProfile } from './views/UserProfile/UserProfile';
 import { TestMobView } from './views/TestMobView/TestMobView';
 import { CombatView } from './views/CombatView/CombatView';
 import { TrainingView } from './views/TrainingView/TrainingView';
+import { MineView } from './views/MineView/MineView';
 
 import { InGameLayout } from './components/InGameLayout/InGameLayout';
 
@@ -40,6 +41,7 @@ function App() {
                       <Route path="home" element={<HomeView />} />
                       <Route path="combat" element={<CombatView />} />
                       <Route path="training" element={<TrainingView />} />
+                      <Route path="mine" element={<MineView />} />
                     </Route>
                     
                     {/* Views WITHOUT sidebars (standard UI) */}

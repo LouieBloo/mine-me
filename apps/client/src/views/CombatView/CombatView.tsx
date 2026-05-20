@@ -81,6 +81,7 @@ export const CombatView: React.FC = () => {
   // Display health: rendered in health bars, updated incrementally during animation
   const [displayPlayerHealth, setDisplayPlayerHealth] = useState<number>(0);
   const [displayMobHealth, setDisplayMobHealth] = useState<Record<string, number>>({});
+  const [fadedMobs, setFadedMobs] = useState<Record<string, boolean>>({});
 
   // Track the last processed round to avoid re-triggering animations
   const lastProcessedRound = useRef<number>(0);
@@ -147,8 +148,15 @@ export const CombatView: React.FC = () => {
     if (lastProcessedRound.current === 0 && !animating) {
       setDisplayPlayerHealth(battleState.playerHealth);
       const mobHealth: Record<string, number> = {};
-      battleState.mobs.forEach((m: MobBattleState) => { mobHealth[m.id] = m.health; });
+      const initialFaded: Record<string, boolean> = {};
+      battleState.mobs.forEach((m: MobBattleState) => {
+        mobHealth[m.id] = m.health;
+        if (m.health <= 0) {
+          initialFaded[m.id] = true;
+        }
+      });
       setDisplayMobHealth(mobHealth);
+      setFadedMobs(initialFaded);
     }
   }, [battleState?.id]);
 
@@ -218,6 +226,14 @@ export const CombatView: React.FC = () => {
       if (systemLogs.length > 0) {
         steps.push({ type: 'effect', execute: () => addCombatLogs(systemLogs) });
       }
+
+      // Track running health of targets during the sequence to detect the killing blow
+      const runningHealth: Record<string, number> = {
+        player: displayPlayerHealth,
+        ...Object.fromEntries(
+          battleState.mobs.map((m: MobBattleState) => [m.id, displayMobHealth[m.id] ?? m.health])
+        ),
+      };
 
       // Build animation steps for each event group
       for (const { event, logs } of eventGroups) {
@@ -303,6 +319,43 @@ export const CombatView: React.FC = () => {
             steps.push({ type: 'wait', duration: 200 });
           }
         }
+
+        // Apply health change to running health tracker
+        const targetId = event.targetId;
+        const healthBefore = runningHealth[targetId];
+        runningHealth[targetId] = Math.max(0, runningHealth[targetId] - event.amount);
+        const healthAfter = runningHealth[targetId];
+
+        // If a mob dies from this event, schedule a death animation & fade-out step
+        if (targetId !== 'player' && healthBefore > 0 && healthAfter <= 0) {
+          steps.push({
+            type: 'callback',
+            execute: async () => {
+              const targetRef = mobSpriteRefs.current.get(targetId);
+              if (targetRef && typeof targetRef.hasAnimation === 'function' && targetRef.hasAnimation('death')) {
+                await new Promise<void>((resolve) => {
+                  const checkInterval = setInterval(() => {
+                    if (sequencerRef.current.isCancelled()) {
+                      clearInterval(checkInterval);
+                      resolve();
+                    }
+                  }, 100);
+
+                  targetRef.playAnimation('death', {
+                    loop: false,
+                    onComplete: () => {
+                      clearInterval(checkInterval);
+                      resolve();
+                    },
+                  });
+                });
+              }
+              if (!sequencerRef.current.isCancelled()) {
+                setFadedMobs((prev) => ({ ...prev, [targetId]: true }));
+              }
+            },
+          });
+        }
       }
 
       // Push any trailing logs (defend-only actions, etc.)
@@ -354,6 +407,7 @@ export const CombatView: React.FC = () => {
         lastProcessedRound.current = 0;
         mobSpriteRefs.current.clear();
         sequencerRef.current.cancel();
+        setFadedMobs({});
       } else {
         console.error('[CombatView] Failed to advance level:', result.error);
         notificationService.error('Cannot advance level', result.error);
@@ -460,13 +514,13 @@ export const CombatView: React.FC = () => {
             const spriteUrl = atlasConfig?.url ? (atlasConfig.url.startsWith('http') ? atlasConfig.url : `${import.meta.env.VITE_API_URL}${atlasConfig.url}`) : null;
             const atlasUrl = atlasConfig?.atlasUrl ? (atlasConfig.atlasUrl.startsWith('http') ? atlasConfig.atlasUrl : `${import.meta.env.VITE_API_URL}${atlasConfig.atlasUrl}`) : null;
             const mobDisplayHealth = displayMobHealth[mob.id] ?? mob.health;
-            const isDead = mobDisplayHealth <= 0;
+            const isFaded = !!fadedMobs[mob.id];
 
             return (
-              <div key={mob.id} className={`relative flex items-center gap-6 transition-all duration-1000 ${isDead ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100'}`}>
+              <div key={mob.id} className={`relative flex items-center gap-6 transition-all duration-1000 ${isFaded ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100'}`}>
                 <div
-                  className={`relative flex items-center justify-center cursor-pointer transition-all duration-300 ${pendingActions[mob.id] ? '' : 'hover:opacity-80'}`}
-                  onClick={() => !isInteractionDisabled && handleActionSelect(mob.id, pendingActions[mob.id] || 'Attack')}
+                  className={`relative flex items-center justify-center transition-all duration-300 ${isFaded ? 'pointer-events-none' : pendingActions[mob.id] ? '' : 'hover:opacity-80'}`}
+                  onClick={() => !isInteractionDisabled && !isFaded && handleActionSelect(mob.id, pendingActions[mob.id] || 'Attack')}
                 >
                   {/* Mob Health Bar */}
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-32 flex flex-col items-center z-20">
@@ -486,6 +540,7 @@ export const CombatView: React.FC = () => {
                       spriteUrl={spriteUrl}
                       atlasUrl={atlasUrl}
                       animationKey="idle"
+                      isFaded={isFaded}
                     />
                   ) : (
                     <div className="w-32 h-32 bg-slate-800 border-2 border-red-500/50 rounded flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,0.2)]">
@@ -498,16 +553,28 @@ export const CombatView: React.FC = () => {
                 {/* Action Buttons to the right */}
                 <div className="flex flex-col gap-3 pointer-events-auto z-20">
                   <button
-                    disabled={isInteractionDisabled}
+                    disabled={isInteractionDisabled || isFaded}
                     onClick={() => handleActionSelect(mob.id, 'Attack')}
-                    className={`px-6 py-2 rounded font-black uppercase tracking-widest text-xs transition-all cursor-pointer ${pendingActions[mob.id] === 'Attack' ? 'bg-red-600 text-white border border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'bg-slate-900/90 text-slate-400 border border-slate-700 hover:bg-slate-800 backdrop-blur-sm'}`}
+                    className={`px-6 py-2 rounded font-black uppercase tracking-widest text-xs transition-all ${
+                      isInteractionDisabled || isFaded
+                        ? 'bg-slate-900/40 text-slate-600 border border-slate-800 cursor-not-allowed'
+                        : pendingActions[mob.id] === 'Attack'
+                        ? 'bg-red-600 text-white border border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.5)] cursor-pointer'
+                        : 'bg-slate-900/90 text-slate-400 border border-slate-700 hover:bg-slate-800 backdrop-blur-sm cursor-pointer'
+                    }`}
                   >
                     Attack
                   </button>
                   <button
-                    disabled={isInteractionDisabled}
+                    disabled={isInteractionDisabled || isFaded}
                     onClick={() => handleActionSelect(mob.id, 'Defend')}
-                    className={`px-6 py-2 rounded font-black uppercase tracking-widest text-xs transition-all cursor-pointer ${pendingActions[mob.id] === 'Defend' ? 'bg-blue-600 text-white border border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.5)]' : 'bg-slate-900/90 text-slate-400 border border-slate-700 hover:bg-slate-800 backdrop-blur-sm'}`}
+                    className={`px-6 py-2 rounded font-black uppercase tracking-widest text-xs transition-all ${
+                      isInteractionDisabled || isFaded
+                        ? 'bg-slate-900/40 text-slate-600 border border-slate-800 cursor-not-allowed'
+                        : pendingActions[mob.id] === 'Defend'
+                        ? 'bg-blue-600 text-white border border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.5)] cursor-pointer'
+                        : 'bg-slate-900/90 text-slate-400 border border-slate-700 hover:bg-slate-800 backdrop-blur-sm cursor-pointer'
+                    }`}
                   >
                     Defend
                   </button>

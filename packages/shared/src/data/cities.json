@@ -1,19 +1,5 @@
 [
   {
-    "id": "cmn2087uu0002u72gu8lggdsw",
-    "name": "Gorlon",
-    "description": "test",
-    "backgroundImageUrl": "/assets/cities/backgrounds/cmn2087uu0002u72gu8lggdsw_background.png",
-    "mapIconUrl": null,
-    "worldPositionX": 15,
-    "worldPositionY": 59,
-    "objectCoordinates": null,
-    "createdAt": "2026-04-06T21:51:48.676Z",
-    "updatedAt": "2026-04-13T23:36:20.743Z",
-    "cityDungeons": [],
-    "cityMaterials": []
-  },
-  {
     "id": "cmn208bs90003u72gkkkkb62d",
     "name": "Isle of Mim",
     "description": "2",
@@ -59,10 +45,16 @@
         "y": 63,
         "type": "MARKET",
         "label": "Market"
+      },
+      {
+        "x": 15,
+        "y": 66,
+        "type": "TRAINING_GROUNDS",
+        "label": "Training_grounds"
       }
     ],
     "createdAt": "2026-04-06T21:51:48.671Z",
-    "updatedAt": "2026-04-14T00:55:27.064Z",
+    "updatedAt": "2026-05-15T02:36:15.584Z",
     "cityDungeons": [
       {
         "id": "cmo3gz72i00014c2cy33pkqu6",
@@ -81,6 +73,100 @@
         }
       }
     ],
+    "cityMaterials": [
+      {
+        "id": "cmpdjby3k0009mw0dxhm50cbp",
+        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
+        "itemId": "cmp6aexa30004idpx29gsz12l",
+        "createdAt": "2026-05-20T04:01:38.912Z",
+        "updatedAt": "2026-05-20T04:01:38.912Z",
+        "item": {
+          "id": "cmp6aexa30004idpx29gsz12l",
+          "name": "Copperium",
+          "description": "Cop",
+          "type": "MATERIAL",
+          "subType": "MINERAL",
+          "vendorBuyPrice": 1,
+          "vendorSellPrice": 5,
+          "userSellPrice": 0,
+          "userBuyPrice": 0,
+          "rarity": "LOW",
+          "iconUrl": null,
+          "gearImageUrl": null,
+          "isStartingPiece": false,
+          "createdAt": "2026-05-15T02:17:38.043Z",
+          "updatedAt": "2026-05-15T02:17:38.043Z"
+        }
+      },
+      {
+        "id": "cmpdjc0mf000bmw0dipueredu",
+        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
+        "itemId": "cmp6ammsn0006idpxgnpsnyk1",
+        "createdAt": "2026-05-20T04:01:42.183Z",
+        "updatedAt": "2026-05-20T04:01:42.183Z",
+        "item": {
+          "id": "cmp6ammsn0006idpxgnpsnyk1",
+          "name": "Silverium",
+          "description": "Silver",
+          "type": "MATERIAL",
+          "subType": "MINERAL",
+          "vendorBuyPrice": 3,
+          "vendorSellPrice": 3,
+          "userSellPrice": 3,
+          "userBuyPrice": 3,
+          "rarity": "MEDIUM",
+          "iconUrl": null,
+          "gearImageUrl": null,
+          "isStartingPiece": false,
+          "createdAt": "2026-05-15T02:23:37.703Z",
+          "updatedAt": "2026-05-15T02:23:37.703Z"
+        }
+      }
+    ]
+  },
+  {
+    "id": "cmn2087uu0002u72gu8lggdsw",
+    "name": "Gorlon",
+    "description": "test",
+    "backgroundImageUrl": "/assets/cities/backgrounds/cmn2087uu0002u72gu8lggdsw_background.png",
+    "mapIconUrl": null,
+    "worldPositionX": 15,
+    "worldPositionY": 59,
+    "objectCoordinates": [
+      {
+        "x": 88,
+        "y": 32,
+        "type": "MINE",
+        "label": "Mine"
+      },
+      {
+        "x": 16,
+        "y": 29,
+        "type": "DUNGEON",
+        "label": "Dungeon"
+      },
+      {
+        "x": 85,
+        "y": 81,
+        "type": "FARM",
+        "label": "Farm"
+      },
+      {
+        "x": 43,
+        "y": 66,
+        "type": "MARKET",
+        "label": "Market"
+      },
+      {
+        "x": 68,
+        "y": 56,
+        "type": "TRAINING_GROUNDS",
+        "label": "Training_grounds"
+      }
+    ],
+    "createdAt": "2026-04-06T21:51:48.676Z",
+    "updatedAt": "2026-05-17T16:43:00.068Z",
+    "cityDungeons": [],
     "cityMaterials": []
   }
 ]
