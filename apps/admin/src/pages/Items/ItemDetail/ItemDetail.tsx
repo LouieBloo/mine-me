@@ -21,7 +21,7 @@ export default function ItemDetail() {
 
   const [data, setData] = useState<any>(isNew ? {
     name: '', description: '', type: 'GEAR', subType: 'HEAD',
-    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', isStartingPiece: false
+    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', isStartingPiece: false, experience: 0
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -185,6 +185,18 @@ export default function ItemDetail() {
                 {enums?.rarities.map(r => <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase().replace(/_/g, ' ')}</option>)}
               </select>
               {errors.rarity && <p className="text-red-500 text-xs font-bold mt-1">{errors.rarity}</p>}
+            </div>
+
+            {/* Experience */}
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Experience</label>
+              <input
+                type="number"
+                value={data.experience ?? 0}
+                onChange={(e) => { setData({ ...data, experience: Number(e.target.value) }); if (errors.experience) setErrors({ ...errors, experience: '' }); }}
+                className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.experience ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
+              />
+              {errors.experience && <p className="text-red-500 text-xs font-bold mt-1">{errors.experience}</p>}
             </div>
 
             {/* Starting Piece toggle */}

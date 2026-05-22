@@ -28,6 +28,7 @@ export interface PlayerState {
   characterName: string;
   characterClass: CharacterClass;
   profession?: Profession;
+  status: 'ACTIVE' | 'DEAD' | 'RETIRED';
   sol: number;
   lear: number;
   cityId: string;
@@ -63,6 +64,7 @@ export interface CharacterStatUpdate {
   ageInDays?: number;
   experience?: number;
   inventory?: PlayerInventory;
+  status?: 'ACTIVE' | 'DEAD' | 'RETIRED';
 }
 
 export type ItemRarity = 'LOW' | 'MEDIUM' | 'RARE' | 'VERY_RARE';
@@ -96,6 +98,7 @@ export interface GameItem {
   iconUrl?: string | null;
   gearImageUrl?: string | null;
   isStartingPiece?: boolean;
+  experience?: number;
 }
 
 export interface PotionItem extends GameItem {

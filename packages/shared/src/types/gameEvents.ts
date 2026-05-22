@@ -67,6 +67,7 @@ export interface AdvanceDungeonLevelPayload extends GameEventBase {
 // ----------------------------------------------------------------------------
 export interface RestPayload extends GameEventBase {
   type: 'rest';
+  days?: number;
 }
 
 // ----------------------------------------------------------------------------

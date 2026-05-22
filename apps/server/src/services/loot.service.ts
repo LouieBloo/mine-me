@@ -1,4 +1,5 @@
 import { prisma } from '../index';
+import { InventoryService } from './inventory.service';
 
 export interface LootResult {
   sol: number;
@@ -61,24 +62,8 @@ export class LootService {
 
     // 2. Give Items
     for (const item of loot.items) {
-      const existing = await prisma.inventoryItem.findFirst({
-        where: { characterId, itemId: item.itemId }
-      });
-
-      if (existing) {
-        await prisma.inventoryItem.update({
-          where: { id: existing.id },
-          data: { quantity: { increment: item.quantity } }
-        });
-      } else {
-        await prisma.inventoryItem.create({
-          data: {
-            characterId,
-            itemId: item.itemId,
-            quantity: item.quantity
-          }
-        });
-      }
+      const result = await InventoryService.giveItemToCharacter(characterId, item.itemId, item.quantity);
+      loot.experience += result.experienceGranted;
     }
 
     return loot;

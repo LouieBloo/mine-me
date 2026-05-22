@@ -1,5 +1,50 @@
 [
   {
+    "id": "cmn2087uu0002u72gu8lggdsw",
+    "name": "Gorlon",
+    "description": "test",
+    "backgroundImageUrl": "/assets/cities/backgrounds/cmn2087uu0002u72gu8lggdsw_background.png",
+    "mapIconUrl": null,
+    "worldPositionX": 15,
+    "worldPositionY": 59,
+    "objectCoordinates": [
+      {
+        "x": 88,
+        "y": 32,
+        "type": "MINE",
+        "label": "Mine"
+      },
+      {
+        "x": 16,
+        "y": 29,
+        "type": "DUNGEON",
+        "label": "Dungeon"
+      },
+      {
+        "x": 85,
+        "y": 81,
+        "type": "FARM",
+        "label": "Farm"
+      },
+      {
+        "x": 43,
+        "y": 66,
+        "type": "MARKET",
+        "label": "Market"
+      },
+      {
+        "x": 68,
+        "y": 56,
+        "type": "TRAINING_GROUNDS",
+        "label": "Training_grounds"
+      }
+    ],
+    "createdAt": "2026-04-06T21:51:48.676Z",
+    "updatedAt": "2026-05-17T16:43:00.068Z",
+    "cityDungeons": [],
+    "cityMaterials": []
+  },
+  {
     "id": "cmn208bs90003u72gkkkkb62d",
     "name": "Isle of Mim",
     "description": "2",
@@ -71,6 +116,22 @@
           "createdAt": "2026-04-06T21:51:48.693Z",
           "updatedAt": "2026-04-06T21:51:48.693Z"
         }
+      },
+      {
+        "id": "cmpg7a1m4000a46yu3k3jnhrv",
+        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
+        "dungeonId": "cmpg79fy7000846yu2qjtvev6",
+        "orderIndex": 1,
+        "createdAt": "2026-05-22T00:47:33.293Z",
+        "updatedAt": "2026-05-22T00:47:33.293Z",
+        "dungeon": {
+          "id": "cmpg79fy7000846yu2qjtvev6",
+          "name": "Dungeon 3",
+          "description": "Dungeon 3",
+          "minLevel": 1,
+          "createdAt": "2026-05-22T00:47:05.216Z",
+          "updatedAt": "2026-05-22T00:47:05.216Z"
+        }
       }
     ],
     "cityMaterials": [
@@ -79,7 +140,7 @@
         "cityId": "cmn1zlln10002ihw4wqu4tnxb",
         "itemId": "cmp6aexa30004idpx29gsz12l",
         "createdAt": "2026-05-20T04:01:38.912Z",
-        "updatedAt": "2026-05-20T04:01:38.912Z",
+        "updatedAt": "2026-05-20T04:21:46.737Z",
         "item": {
           "id": "cmp6aexa30004idpx29gsz12l",
           "name": "Copperium",
@@ -94,6 +155,7 @@
           "iconUrl": null,
           "gearImageUrl": null,
           "isStartingPiece": false,
+          "experience": 10,
           "createdAt": "2026-05-15T02:17:38.043Z",
           "updatedAt": "2026-05-15T02:17:38.043Z"
         }
@@ -103,7 +165,7 @@
         "cityId": "cmn1zlln10002ihw4wqu4tnxb",
         "itemId": "cmp6ammsn0006idpxgnpsnyk1",
         "createdAt": "2026-05-20T04:01:42.183Z",
-        "updatedAt": "2026-05-20T04:01:42.183Z",
+        "updatedAt": "2026-05-20T04:21:46.742Z",
         "item": {
           "id": "cmp6ammsn0006idpxgnpsnyk1",
           "name": "Silverium",
@@ -118,55 +180,11 @@
           "iconUrl": null,
           "gearImageUrl": null,
           "isStartingPiece": false,
+          "experience": 30,
           "createdAt": "2026-05-15T02:23:37.703Z",
           "updatedAt": "2026-05-15T02:23:37.703Z"
         }
       }
     ]
-  },
-  {
-    "id": "cmn2087uu0002u72gu8lggdsw",
-    "name": "Gorlon",
-    "description": "test",
-    "backgroundImageUrl": "/assets/cities/backgrounds/cmn2087uu0002u72gu8lggdsw_background.png",
-    "mapIconUrl": null,
-    "worldPositionX": 15,
-    "worldPositionY": 59,
-    "objectCoordinates": [
-      {
-        "x": 88,
-        "y": 32,
-        "type": "MINE",
-        "label": "Mine"
-      },
-      {
-        "x": 16,
-        "y": 29,
-        "type": "DUNGEON",
-        "label": "Dungeon"
-      },
-      {
-        "x": 85,
-        "y": 81,
-        "type": "FARM",
-        "label": "Farm"
-      },
-      {
-        "x": 43,
-        "y": 66,
-        "type": "MARKET",
-        "label": "Market"
-      },
-      {
-        "x": 68,
-        "y": 56,
-        "type": "TRAINING_GROUNDS",
-        "label": "Training_grounds"
-      }
-    ],
-    "createdAt": "2026-04-06T21:51:48.676Z",
-    "updatedAt": "2026-05-17T16:43:00.068Z",
-    "cityDungeons": [],
-    "cityMaterials": []
   }
 ]

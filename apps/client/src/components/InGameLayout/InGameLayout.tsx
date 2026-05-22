@@ -80,6 +80,7 @@ export const InGameLayout = () => {
         characterName: activeCharacter.name,
         characterClass: activeCharacter.class as any,
         profession: (activeCharacter as any).profession || undefined,
+        status: (activeCharacter as any).status || 'ACTIVE',
         sol: activeCharacter.sol,
         lear: activeCharacter.lear,
         cityId: activeCharacter.cityId,

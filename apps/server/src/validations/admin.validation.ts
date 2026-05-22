@@ -29,7 +29,8 @@ export const itemValidation = [
   body('userBuyPrice').isInt({ min: 0 }).withMessage('User Buy Price must be >= 0'),
   body('userSellPrice').isInt({ min: 0 }).withMessage('User Sell Price must be >= 0'),
   body('rarity').isIn(ITEM_RARITIES).withMessage(`Rarity must be one of: ${ITEM_RARITIES.join(', ')}`),
-  body('isStartingPiece').optional().isBoolean().withMessage('isStartingPiece must be a boolean')
+  body('isStartingPiece').optional().isBoolean().withMessage('isStartingPiece must be a boolean'),
+  body('experience').optional().isInt({ min: 0 }).withMessage('Experience must be >= 0')
 ];
 
 export const mobValidation = [

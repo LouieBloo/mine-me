@@ -32,18 +32,24 @@ const makeSocket = (userId = 'user1', characterId: string | null = 'char1') => (
   emit: vi.fn(),
 } as any);
 
-const makeCharacter = (overrides = {}) => ({
-  id: 'char1',
-  userId: 'user1',
-  name: 'Hero',
-  status: 'ACTIVE',
-  combatScore: 10,
-  cityId: 'city-a',
-  maxHealth: 100,
-  maxStamina: 100,
-  ageInDays: 6570,
-  ...overrides,
-});
+const makeCharacter = (overrides: any = {}) => {
+  const maxHealth = overrides.maxHealth ?? 100;
+  const maxStamina = overrides.maxStamina ?? 100;
+  return {
+    id: 'char1',
+    userId: 'user1',
+    name: 'Hero',
+    status: 'ACTIVE',
+    combatScore: 10,
+    cityId: 'city-a',
+    health: maxHealth,
+    stamina: maxStamina,
+    maxHealth,
+    maxStamina,
+    ageInDays: 6570,
+    ...overrides,
+  };
+};
 
 const makeCity = (id: string, x: number, y: number, overrides = {}) => ({
   id,
@@ -310,8 +316,8 @@ describe('gameEvents — handleRest', () => {
   });
 
   it('restores health and stamina to max and ages by exactly 1 day', async () => {
-    (prisma.character.findUnique as any).mockResolvedValue(makeCharacter({ maxHealth: 200, maxStamina: 150 }));
-    (prisma.character.update as any).mockResolvedValue({ health: 200, stamina: 150, ageInDays: 6571 });
+    (prisma.character.findUnique as any).mockResolvedValue(makeCharacter({ health: 100, stamina: 50, maxHealth: 200, maxStamina: 150, ageInDays: 6570 }));
+    (prisma.character.update as any).mockResolvedValue({ health: 200, stamina: 75, ageInDays: 6571, status: 'ACTIVE' });
 
     await handleRest(io, socket, { type: 'rest' });
 
@@ -319,15 +325,39 @@ describe('gameEvents — handleRest', () => {
       where: { id: 'char1' },
       data: {
         health: 200,
-        stamina: 150,
-        ageInDays: { increment: 1 },
+        stamina: 75,
+        ageInDays: 6571,
       },
     });
   });
 
-  it('broadcasts updated health, stamina, and ageInDays', async () => {
-    (prisma.character.findUnique as any).mockResolvedValue(makeCharacter({ maxHealth: 200, maxStamina: 100 }));
-    (prisma.character.update as any).mockResolvedValue({ health: 200, stamina: 100, ageInDays: 5 });
+  it('restores health and stamina for custom days', async () => {
+    (prisma.character.findUnique as any).mockResolvedValue(makeCharacter({ health: 100, stamina: 50, maxHealth: 200, maxStamina: 150, ageInDays: 6570 }));
+    (prisma.character.update as any).mockResolvedValue({ health: 200, stamina: 125, ageInDays: 6573, status: 'ACTIVE' });
+
+    await handleRest(io, socket, { type: 'rest', days: 3 });
+
+    expect(prisma.character.update).toHaveBeenCalledWith({
+      where: { id: 'char1' },
+      data: {
+        health: 200,
+        stamina: 125,
+        ageInDays: 6573,
+      },
+    });
+  });
+
+  it('returns error if days is invalid', async () => {
+    const result1 = await handleRest(io, socket, { type: 'rest', days: -5 });
+    expect(result1).toEqual({ success: false, error: 'Invalid days parameter. Must be a positive integer.' });
+
+    const result2 = await handleRest(io, socket, { type: 'rest', days: 1.5 });
+    expect(result2).toEqual({ success: false, error: 'Invalid days parameter. Must be a positive integer.' });
+  });
+
+  it('broadcasts updated health, stamina, ageInDays, and status', async () => {
+    (prisma.character.findUnique as any).mockResolvedValue(makeCharacter({ maxHealth: 200, maxStamina: 100, ageInDays: 4 }));
+    (prisma.character.update as any).mockResolvedValue({ health: 200, stamina: 100, ageInDays: 5, status: 'ACTIVE' });
 
     await handleRest(io, socket, { type: 'rest' });
 
@@ -335,14 +365,33 @@ describe('gameEvents — handleRest', () => {
       health: 200,
       stamina: 100,
       ageInDays: 5,
+      status: 'ACTIVE',
     });
   });
 
-  it('returns success: true on valid rest', async () => {
+  it('returns success: true and died: false on valid rest', async () => {
     (prisma.character.findUnique as any).mockResolvedValue(makeCharacter());
-    (prisma.character.update as any).mockResolvedValue({ health: 100, stamina: 100, ageInDays: 6571 });
+    (prisma.character.update as any).mockResolvedValue({ health: 100, stamina: 100, ageInDays: 6571, status: 'ACTIVE' });
 
     const result = await handleRest(io, socket, { type: 'rest' });
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({ success: true, data: { died: false } });
+  });
+
+  it('kills character and sets status to DEAD if character ages to 36000 days or more', async () => {
+    (prisma.character.findUnique as any).mockResolvedValue(makeCharacter({ ageInDays: 35999 }));
+    (prisma.character.update as any).mockResolvedValue({ health: 0, stamina: 0, ageInDays: 36000, status: 'DEAD' });
+
+    const result = await handleRest(io, socket, { type: 'rest', days: 1 });
+
+    expect(prisma.character.update).toHaveBeenCalledWith({
+      where: { id: 'char1' },
+      data: {
+        status: 'DEAD',
+        health: 0,
+        stamina: 0,
+        ageInDays: 36000,
+      },
+    });
+    expect(result).toEqual({ success: true, data: { died: true } });
   });
 });

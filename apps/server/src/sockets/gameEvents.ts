@@ -4,7 +4,7 @@ import { broadcastStatUpdate } from '../services/characterBroadcast';
 import { handleStartCombat, handleCombatAction, handleLeaveCombat, handleAdvanceDungeonLevel } from './combatEvents';
 import { handleTrainingAction } from './trainingEvents';
 import { handleMine } from './miningEvents';
-import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays } from '@nvg/shared';
+import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays, getStaminaRecoveryPerDay } from '@nvg/shared';
 
 // ============================================================================
 // Game Event Handler Registry
@@ -139,6 +139,13 @@ const handleRest: GameEventHandler<RestPayload> = async (io, socket, payload) =>
     return { success: false, error: 'No character selected. Call select_character first.' };
   }
 
+  const { days } = payload;
+  const requestedDays = days ?? 1;
+
+  if (days !== undefined && (!Number.isInteger(days) || days <= 0)) {
+    return { success: false, error: 'Invalid days parameter. Must be a positive integer.' };
+  }
+
   const character = await prisma.character.findUnique({
     where: { id: characterId },
   });
@@ -151,22 +158,42 @@ const handleRest: GameEventHandler<RestPayload> = async (io, socket, payload) =>
     return { success: false, error: 'Only active characters can rest.' };
   }
 
+  const recoveryPerDay = getStaminaRecoveryPerDay(character as any);
+  const staminaRecovered = requestedDays * recoveryPerDay;
+  const newAge = character.ageInDays + requestedDays;
+  const isDead = newAge >= 36000;
+
+  const updateData: any = {
+    ageInDays: newAge,
+  };
+
+  if (isDead) {
+    updateData.status = 'DEAD';
+    updateData.health = 0;
+    updateData.stamina = 0;
+  } else {
+    updateData.health = character.maxHealth;
+    updateData.stamina = Math.min(character.maxStamina, character.stamina + staminaRecovered);
+  }
+
   const updatedCharacter = await prisma.character.update({
     where: { id: characterId },
-    data: {
-      health: character.maxHealth,
-      stamina: character.maxStamina,
-      ageInDays: { increment: 1 },
-    },
+    data: updateData,
   });
 
   broadcastStatUpdate(characterId, {
     health: updatedCharacter.health,
     stamina: updatedCharacter.stamina,
     ageInDays: updatedCharacter.ageInDays,
+    status: updatedCharacter.status as any,
   });
 
-  return { success: true };
+  return {
+    success: true,
+    data: {
+      died: isDead,
+    },
+  };
 };
 
 // ----------------------------------------------------------------------------

@@ -68,16 +68,21 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Fields in CharacterStatUpdate map to either top-level (sol, lear, cityId)
     // or nested attributes (level, combatScore, stamina, ageInDays, etc.).
     const applyStatUpdate = (updates: CharacterStatUpdate) => {
+        if (updates.status === 'DEAD') {
+            setActiveCharacterState(null);
+            localStorage.removeItem('nvg_active_character');
+        }
         setPlayerStateRaw(prev => {
             if (!prev) return prev;
 
-            const { sol, lear, cityId, inventory, ...attrUpdates } = updates as any;
+            const { sol, lear, cityId, inventory, status, ...attrUpdates } = updates as any;
             const next: PlayerState = {
                 ...prev,
                 ...(sol !== undefined && { sol }),
                 ...(lear !== undefined && { lear }),
                 ...(cityId !== undefined && { cityId }),
                 ...(inventory !== undefined && { inventory }),
+                ...(status !== undefined && { status }),
                 attributes: {
                     ...prev.attributes,
                     ...attrUpdates,

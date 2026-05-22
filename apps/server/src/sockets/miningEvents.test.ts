@@ -20,6 +20,13 @@ vi.mock('../index', () => ({
   },
 }));
 
+const mockGiveItemToCharacter = vi.fn();
+vi.mock('../services/inventory.service', () => ({
+  InventoryService: {
+    giveItemToCharacter: (...args: any[]) => mockGiveItemToCharacter(...args),
+  },
+}));
+
 vi.mock('../services/characterBroadcast', () => ({
   broadcastStatUpdate: vi.fn(),
 }));
@@ -120,7 +127,11 @@ describe('miningEvents', () => {
       stamina: 75,
     });
 
-    (prisma.inventoryItem.findFirst as any).mockResolvedValue(null);
+    mockGiveItemToCharacter.mockResolvedValue({
+      quantity: 1,
+      experienceGranted: 5,
+      itemDetails: { id: 'item1', name: 'Copperium' }
+    });
 
     // Force Math.random to return 0.1 so the roll <= LOW (50) chance succeeds
     const spyRandom = vi.spyOn(Math, 'random').mockReturnValue(0.1);
@@ -132,15 +143,10 @@ describe('miningEvents', () => {
     expect(result.data?.rewards).toHaveLength(1);
     expect(result.data?.rewards[0].name).toBe('Copperium');
 
-    expect(prisma.inventoryItem.create).toHaveBeenCalledWith({
-      data: {
-        characterId: 'char1',
-        itemId: 'item1',
-        quantity: 1,
-      },
-    });
+    expect(mockGiveItemToCharacter).toHaveBeenCalledWith('char1', 'item1', 1);
 
     expect(socket.emit).toHaveBeenCalledWith('combat_loot', expect.objectContaining({
+      experience: 5,
       items: expect.arrayContaining([
         expect.objectContaining({ itemId: 'item1', quantity: 1 }),
       ]),

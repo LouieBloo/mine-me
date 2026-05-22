@@ -35,5 +35,24 @@
         "updatedAt": "2026-05-17T16:30:26.030Z"
       }
     ]
+  },
+  {
+    "id": "cmpg79fy7000846yu2qjtvev6",
+    "name": "Dungeon 3",
+    "description": "Dungeon 3",
+    "minLevel": 1,
+    "createdAt": "2026-05-22T00:47:05.216Z",
+    "updatedAt": "2026-05-22T00:47:05.216Z",
+    "levels": [
+      {
+        "id": "cmpg7hqoj000e46yustwzokf0",
+        "dungeonId": "cmpg79fy7000846yu2qjtvev6",
+        "name": "Level 1",
+        "orderIndex": 0,
+        "staminaCost": 100,
+        "createdAt": "2026-05-22T00:53:32.372Z",
+        "updatedAt": "2026-05-22T00:53:32.372Z"
+      }
+    ]
   }
 ]

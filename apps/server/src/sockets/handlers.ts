@@ -201,6 +201,7 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
                   iconUrl: true,
                   gearImageUrl: true,
                   isStartingPiece: true,
+                  experience: true,
                 }
               }
             }
@@ -231,6 +232,7 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
         characterName: character.name,
         characterClass: character.class as any,
         profession: character.profession as any ?? undefined,
+        status: character.status as any,
         sol: character.sol,
         lear: character.lear,
         cityId: character.cityId,
@@ -258,6 +260,7 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
               iconUrl: inv.item.iconUrl,
               gearImageUrl: inv.item.gearImageUrl,
               isStartingPiece: inv.item.isStartingPiece,
+              experience: inv.item.experience,
             },
             quantity: inv.quantity,
           })),

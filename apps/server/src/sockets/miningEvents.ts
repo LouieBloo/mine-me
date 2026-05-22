@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { broadcastStatUpdate } from '../services/characterBroadcast';
 import type { GameEventResult } from '@nvg/shared';
+import { InventoryService } from '../services/inventory.service';
 
 const MINING_STAMINA_COST = 25;
 
@@ -75,6 +76,7 @@ export const handleMine = async (
           iconUrl: cm.item.iconUrl,
           gearImageUrl: cm.item.gearImageUrl,
           isStartingPiece: cm.item.isStartingPiece,
+          experience: cm.item.experience,
         },
       });
     }
@@ -88,26 +90,11 @@ export const handleMine = async (
     },
   });
 
+  let totalItemExperience = 0;
   // Save rewards to database
   for (const reward of rewards) {
-    const existing = await prisma.inventoryItem.findFirst({
-      where: { characterId, itemId: reward.itemId },
-    });
-
-    if (existing) {
-      await prisma.inventoryItem.update({
-        where: { id: existing.id },
-        data: { quantity: { increment: reward.quantity } },
-      });
-    } else {
-      await prisma.inventoryItem.create({
-        data: {
-          characterId,
-          itemId: reward.itemId,
-          quantity: reward.quantity,
-        },
-      });
-    }
+    const result = await InventoryService.giveItemToCharacter(characterId, reward.itemId, reward.quantity);
+    totalItemExperience += result.experienceGranted;
   }
 
   // Retrieve full updated character inventory to sync client state
@@ -140,6 +127,7 @@ export const handleMine = async (
         iconUrl: inv.item.iconUrl,
         gearImageUrl: inv.item.gearImageUrl,
         isStartingPiece: inv.item.isStartingPiece,
+        experience: inv.item.experience,
       },
       quantity: inv.quantity,
     })),
@@ -153,6 +141,7 @@ export const handleMine = async (
   // Push character stat update with updated inventory to this user
   io.to(`user:${userId}`).emit('character_stat_update', {
     stamina: updatedCharacter.stamina,
+    experience: characterWithInventory.experience,
     inventory: clientInventory,
   });
 
@@ -160,7 +149,7 @@ export const handleMine = async (
   if (rewards.length > 0) {
     socket.emit('combat_loot', {
       sol: 0,
-      experience: 0,
+      experience: totalItemExperience,
       items: rewards,
     });
   }

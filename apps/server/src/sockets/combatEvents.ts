@@ -254,6 +254,7 @@ export const handleCombatAction = async (
             iconUrl: inv.item.iconUrl,
             gearImageUrl: inv.item.gearImageUrl,
             isStartingPiece: inv.item.isStartingPiece,
+            experience: inv.item.experience,
           },
           quantity: inv.quantity,
         })),

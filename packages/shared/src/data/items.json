@@ -13,6 +13,7 @@
     "iconUrl": null,
     "gearImageUrl": null,
     "isStartingPiece": false,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.593Z",
     "updatedAt": "2026-04-06T21:51:48.593Z"
   },
@@ -30,6 +31,7 @@
     "iconUrl": "/assets/icons/items/cmnc6ct730000k21bi04iybb4_icon.png",
     "gearImageUrl": null,
     "isStartingPiece": false,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.602Z",
     "updatedAt": "2026-04-06T21:51:48.602Z"
   },
@@ -47,6 +49,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8mse50001xe1a7ur35nrx_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.612Z",
     "updatedAt": "2026-04-06T21:51:48.612Z"
   },
@@ -64,6 +67,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8n4qz0002xe1acuv9mytw_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.619Z",
     "updatedAt": "2026-04-06T21:51:48.619Z"
   },
@@ -81,6 +85,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8nkf00003xe1az1084gpc_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.624Z",
     "updatedAt": "2026-04-06T21:51:48.624Z"
   },
@@ -98,6 +103,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8ohjt0005xe1alsscf6xp_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.630Z",
     "updatedAt": "2026-04-06T21:51:48.630Z"
   },
@@ -115,6 +121,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8osk00006xe1aza26401u_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.634Z",
     "updatedAt": "2026-04-06T21:51:48.634Z"
   },
@@ -132,6 +139,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmni8nzs20004xe1aokqxuysf_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.639Z",
     "updatedAt": "2026-04-06T21:51:48.639Z"
   },
@@ -149,6 +157,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnjdru4y00008656sklfwyd2_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.643Z",
     "updatedAt": "2026-04-06T21:51:48.643Z"
   },
@@ -166,6 +175,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje0otv00018656nzoywcl7_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.647Z",
     "updatedAt": "2026-04-06T21:51:48.647Z"
   },
@@ -183,6 +193,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje132100028656bdkw1t9p_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.651Z",
     "updatedAt": "2026-04-06T21:51:48.651Z"
   },
@@ -200,6 +211,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje1gyv000386569nj6a2tn_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.656Z",
     "updatedAt": "2026-04-06T21:51:48.656Z"
   },
@@ -217,6 +229,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje20qh00048656s78jsmge_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.660Z",
     "updatedAt": "2026-04-06T21:51:48.660Z"
   },
@@ -234,6 +247,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje30rf00058656o0xukduf_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.664Z",
     "updatedAt": "2026-04-06T21:51:48.664Z"
   },
@@ -251,6 +265,7 @@
     "iconUrl": null,
     "gearImageUrl": "/assets/gear/cmnje3cld00068656i26o6j0k_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.668Z",
     "updatedAt": "2026-04-06T21:51:48.668Z"
   },
@@ -268,8 +283,27 @@
     "iconUrl": "/assets/icons/items/cmni8l0zu0000xe1auwhar051_icon.png",
     "gearImageUrl": "/assets/gear/cmni8l0zu0000xe1auwhar051_gear.png",
     "isStartingPiece": true,
+    "experience": 0,
     "createdAt": "2026-04-06T21:51:48.607Z",
     "updatedAt": "2026-04-11T02:30:46.526Z"
+  },
+  {
+    "id": "cmp6an6oz0007idpxifchh73j",
+    "name": "Solium",
+    "description": "Sol",
+    "type": "MATERIAL",
+    "subType": "MINERAL",
+    "vendorBuyPrice": 10,
+    "vendorSellPrice": 10,
+    "userSellPrice": 10,
+    "userBuyPrice": 10,
+    "rarity": "RARE",
+    "iconUrl": null,
+    "gearImageUrl": null,
+    "isStartingPiece": false,
+    "experience": 0,
+    "createdAt": "2026-05-15T02:24:03.491Z",
+    "updatedAt": "2026-05-15T02:24:03.491Z"
   },
   {
     "id": "cmp6aexa30004idpx29gsz12l",
@@ -285,6 +319,7 @@
     "iconUrl": null,
     "gearImageUrl": null,
     "isStartingPiece": false,
+    "experience": 10,
     "createdAt": "2026-05-15T02:17:38.043Z",
     "updatedAt": "2026-05-15T02:17:38.043Z"
   },
@@ -302,24 +337,8 @@
     "iconUrl": null,
     "gearImageUrl": null,
     "isStartingPiece": false,
+    "experience": 30,
     "createdAt": "2026-05-15T02:23:37.703Z",
     "updatedAt": "2026-05-15T02:23:37.703Z"
-  },
-  {
-    "id": "cmp6an6oz0007idpxifchh73j",
-    "name": "Solium",
-    "description": "Sol",
-    "type": "MATERIAL",
-    "subType": "MINERAL",
-    "vendorBuyPrice": 10,
-    "vendorSellPrice": 10,
-    "userSellPrice": 10,
-    "userBuyPrice": 10,
-    "rarity": "RARE",
-    "iconUrl": null,
-    "gearImageUrl": null,
-    "isStartingPiece": false,
-    "createdAt": "2026-05-15T02:24:03.491Z",
-    "updatedAt": "2026-05-15T02:24:03.491Z"
   }
 ]
