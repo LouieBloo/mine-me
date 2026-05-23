@@ -147,13 +147,13 @@ export class CombatEngine {
   }
 
   static generateMobAction(mob: MobBattleState, seed: string, round: number): CombatActionType {
-    // Naive AI guard
-    if (mob.consecutiveAttacks >= 3) return 'Defend';
-    if (mob.consecutiveDefends >= 3) return 'Attack';
-
-    // Simple pseudo-random using seed and round
-    const hash = Array.from(seed + round + mob.id).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const rand = hash % 100; // 0 to 99
+    const key = `${seed}_${round}_${mob.id}`;
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      hash = (hash << 5) - hash + key.charCodeAt(i);
+      hash |= 0; // Convert to 32-bit integer
+    }
+    const rand = Math.abs(hash) % 100;
 
     if (rand < mob.attackPercentage) {
       return 'Attack';

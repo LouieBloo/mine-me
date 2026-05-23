@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { dispatchGameEvent } from './gameEvents';
+import { BattleService } from '../services/battle.service';
 import type { PlayerState, GameCity, GameEventPayload } from '@nvg/shared';
 
 // Extend socket.data type for type safety
@@ -284,18 +285,7 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
       // If there's an active battle, join the battle room and emit state
       if (character.battle && character.battle.status === 'IN_PROGRESS') {
         socket.join(`battle:${characterId}`);
-        const battleState = {
-          id: character.battle.id,
-          characterId: character.battle.characterId,
-          dungeonLevelId: character.battle.dungeonLevelId,
-          playerHealth: character.stamina, // MVP
-          playerMaxHealth: character.maxStamina,
-          mobs: character.battle.mobsState as any,
-          round: character.battle.round,
-          turn: character.battle.turn as any,
-          status: character.battle.status as any,
-          rngSeed: character.battle.rngSeed
-        };
+        const battleState = BattleService.buildBattleState(character.battle, character);
         socket.emit('battle_state', battleState);
       }
 

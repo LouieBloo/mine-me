@@ -1,5 +1,6 @@
 import { prisma } from '../index';
 import { InventoryService } from './inventory.service';
+import { CharacterService } from './character.service';
 
 export interface LootResult {
   sol: number;
@@ -49,21 +50,27 @@ export class LootService {
       return loot;
     }
 
-    // 1. Give Sol and Experience
-    if (loot.sol > 0 || loot.experience > 0) {
+    // 1. Give Sol
+    if (loot.sol > 0) {
       await prisma.character.update({
         where: { id: characterId },
-        data: {
-          ...(loot.sol > 0 && { sol: { increment: loot.sol } }),
-          ...(loot.experience > 0 && { experience: { increment: loot.experience } }),
-        }
+        data: { sol: { increment: loot.sol } }
       });
     }
 
-    // 2. Give Items
+    // 2. Give Experience
+    if (loot.experience > 0) {
+      const result = await CharacterService.addExperience(characterId, loot.experience);
+      this.mergeLoot(loot, result.levelUpLoot);
+    }
+
+    // 3. Give Items
     for (const item of loot.items) {
       const result = await InventoryService.giveItemToCharacter(characterId, item.itemId, item.quantity);
       loot.experience += result.experienceGranted;
+      if (result.levelUpLoot) {
+        this.mergeLoot(loot, result.levelUpLoot);
+      }
     }
 
     return loot;

@@ -151,11 +151,16 @@ export const handleCombatAction = async (
   // Reconstruct mob actions from their intended actions
   const mobActions = currentState.mobs
     .filter(m => m.health > 0)
-    .map(m => ({
-      type: m.intendedAction!,
-      actorId: m.id,
-      targetId: characterId
-    }));
+    .map(m => {
+      if (!m.intendedAction) {
+        m.intendedAction = CombatEngine.generateMobAction(m, currentState.rngSeed, currentState.round);
+      }
+      return {
+        type: m.intendedAction,
+        actorId: m.id,
+        targetId: characterId
+      };
+    });
 
   const mappedPlayerActions = payload.actions.map(a => ({
     type: a.action,

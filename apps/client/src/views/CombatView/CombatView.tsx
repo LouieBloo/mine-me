@@ -523,7 +523,7 @@ export const CombatView: React.FC = () => {
                   onClick={() => !isInteractionDisabled && !isFaded && handleActionSelect(mob.id, pendingActions[mob.id] || 'Attack')}
                 >
                   {/* Mob Health Bar */}
-                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-32 flex flex-col items-center z-20">
+                  <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-36 flex flex-col items-center z-20">
                     <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap drop-shadow-md bg-slate-900/50 px-2 py-0.5 rounded">{mob.name}</span>
                     <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-600 mt-1 shadow-lg">
                       <div
@@ -531,6 +531,15 @@ export const CombatView: React.FC = () => {
                         style={{ width: `${Math.max(0, (mobDisplayHealth / mob.maxHealth) * 100)}%` }}
                       />
                     </div>
+                    {mob.intendedAction && (
+                      <span className={`text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded border flex items-center gap-1 shadow-md uppercase tracking-wider ${
+                        mob.intendedAction === 'Attack'
+                          ? 'bg-red-950/80 text-red-400 border-red-900/50'
+                          : 'bg-blue-950/80 text-blue-400 border-blue-900/50'
+                      }`}>
+                        {mob.intendedAction === 'Attack' ? '⚔️ Attacking' : '🛡️ Defending'}
+                      </span>
+                    )}
                   </div>
 
                   {spriteUrl && atlasUrl ? (

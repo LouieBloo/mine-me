@@ -5,7 +5,8 @@ import { type Character } from '../CharacterSelection';
 import { useGame } from '../../../contexts/GameContext';
 import { Application } from '@pixi/react';
 import { Assets, Texture } from 'pixi.js';
-import { type GearSubType, GEAR_OFFSETS, calculateLevel } from '@nvg/shared';
+import { type GearSubType, GEAR_OFFSETS } from '@nvg/shared';
+import { useCharacterLevel } from '../../../hooks/useLevels';
 import './CharacterPreview.css';
 import { ConfirmationModal } from '../../../components/ConfirmationModal/ConfirmationModal';
 
@@ -38,6 +39,7 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
     const navigate = useNavigate();
     const { fetchWithAuth } = useApi();
     const { setActiveCharacter } = useGame();
+    const level = useCharacterLevel(character?.experience ?? 0);
     const [retiring, setRetiring] = useState(false);
     const [showRetireConfirm, setShowRetireConfirm] = useState(false);
     const [alertInfo, setAlertInfo] = useState({ isOpen: false, title: '', message: '' });
@@ -117,7 +119,7 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
                     </Application>
                 </div>
                 <div className="absolute -bottom-2 -right-2 w-12 h-12 rounded-full bg-sol text-slate-900 flex items-center justify-center font-bold text-lg border-4 border-slate-900 shadow-lg">
-                    {calculateLevel(character.experience)}
+                    {level ?? '...'}
                 </div>
                 
                 {/* Status Badge */}

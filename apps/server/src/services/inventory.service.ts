@@ -1,16 +1,18 @@
 import { prisma } from '../index';
+import { CharacterService } from './character.service';
+import { LootResult } from './loot.service';
 
 export class InventoryService {
   /**
    * Awards an item to a character, persists it to the database,
    * and awards experience associated with the item to the character.
-   * Returns the quantity given and experience points granted.
+   * Returns the quantity given, experience points granted, and any level-up loot.
    */
   public static async giveItemToCharacter(
     characterId: string,
     itemId: string,
     quantity: number
-  ): Promise<{ quantity: number; experienceGranted: number; itemDetails: any }> {
+  ): Promise<{ quantity: number; experienceGranted: number; itemDetails: any; levelUpLoot?: LootResult }> {
     const item = await prisma.item.findUnique({
       where: { id: itemId }
     });
@@ -41,20 +43,19 @@ export class InventoryService {
       });
     }
 
+    let levelUpLoot: LootResult | undefined = undefined;
+
     // 2. Give Experience to Character
     if (experienceGranted > 0) {
-      await prisma.character.update({
-        where: { id: characterId },
-        data: {
-          experience: { increment: experienceGranted }
-        }
-      });
+      const result = await CharacterService.addExperience(characterId, experienceGranted);
+      levelUpLoot = result.levelUpLoot;
     }
 
     return {
       quantity,
       experienceGranted,
-      itemDetails: item
+      itemDetails: item,
+      levelUpLoot
     };
   }
 }

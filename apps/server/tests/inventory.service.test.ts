@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InventoryService } from '../src/services/inventory.service';
 import { prisma } from '../src/index';
+import { CharacterService } from '../src/services/character.service';
 
 vi.mock('../src/index', () => ({
   prisma: {
@@ -12,10 +13,16 @@ vi.mock('../src/index', () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
-    character: {
-      update: vi.fn(),
-    },
   },
+}));
+
+vi.mock('../src/services/character.service', () => ({
+  CharacterService: {
+    addExperience: vi.fn().mockResolvedValue({
+      experience: 100,
+      levelUpLoot: { sol: 0, experience: 0, items: [] }
+    })
+  }
 }));
 
 describe('InventoryService', () => {
@@ -51,17 +58,13 @@ describe('InventoryService', () => {
           quantity: 2,
         },
       });
-      expect(prisma.character.update).toHaveBeenCalledWith({
-        where: { id: 'char1' },
-        data: {
-          experience: { increment: 30 }, // 15 * 2
-        },
-      });
+      expect(CharacterService.addExperience).toHaveBeenCalledWith('char1', 30);
 
       expect(result).toEqual({
         quantity: 2,
         experienceGranted: 30,
         itemDetails: mockItem,
+        levelUpLoot: { sol: 0, experience: 0, items: [] }
       });
     });
 
@@ -85,12 +88,13 @@ describe('InventoryService', () => {
           quantity: { increment: 3 },
         },
       });
-      expect(prisma.character.update).not.toHaveBeenCalled();
+      expect(CharacterService.addExperience).not.toHaveBeenCalled();
 
       expect(result).toEqual({
         quantity: 3,
         experienceGranted: 0,
         itemDetails: mockItem,
+        levelUpLoot: undefined
       });
     });
   });

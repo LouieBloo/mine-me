@@ -239,6 +239,15 @@ export interface Mob {
 }
 
 
+export interface CharacterLevel {
+  id: string;
+  level: number;
+  xpRequired: number;
+  dropTable?: DropTable | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export * from './combat';
 export * from './professions';
 export * from './trade';

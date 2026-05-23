@@ -29,7 +29,7 @@ function App() {
               <Toaster position="top-center" visibleToasts={9} expand={true} richColors closeButton />
               <Routes>
                 <Route path="/auth" element={<Auth />} />
-                
+
                 {/* Public Landing Page - No sidebars */}
                 <Route index element={<MainMenu />} />
 
@@ -43,7 +43,7 @@ function App() {
                       <Route path="training" element={<TrainingView />} />
                       <Route path="mine" element={<MineView />} />
                     </Route>
-                    
+
                     {/* Views WITHOUT sidebars (standard UI) */}
                     <Route path="profile" element={<UserProfile />} />
                     <Route path="test-mob" element={<TestMobView />} />

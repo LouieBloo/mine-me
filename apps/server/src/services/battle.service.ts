@@ -35,13 +35,20 @@ export class BattleService {
    * Constructs the BattleState object to be sent to the client.
    */
   public static buildBattleState(battle: any, character: any): BattleState {
+    const mobs = (battle.mobsState as unknown as MobBattleState[]).map(m => {
+      if (!m.intendedAction) {
+        m.intendedAction = CombatEngine.generateMobAction(m, battle.rngSeed, battle.round);
+      }
+      return m;
+    });
+
     return {
       id: battle.id,
       characterId: battle.characterId,
       dungeonLevelId: battle.dungeonLevelId,
       playerHealth: character.health,
       playerMaxHealth: character.maxHealth,
-      mobs: battle.mobsState as unknown as MobBattleState[],
+      mobs,
       round: battle.round,
       turn: battle.turn as any,
       status: battle.status as any,

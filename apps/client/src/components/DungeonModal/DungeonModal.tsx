@@ -21,7 +21,6 @@ export const DungeonModal: React.FC<DungeonModalProps> = ({
   onSelectDungeon,
   onClose,
   loading = false,
-  characterLevel = 1,
 }) => {
   const { dungeons, clearedLevelIds } = dungeonInfo;
   const clearedSet = new Set(clearedLevelIds);
@@ -50,7 +49,6 @@ export const DungeonModal: React.FC<DungeonModalProps> = ({
             const totalLevels = levels.length;
             const clearedLevels = levels.filter(l => clearedSet.has(l.id)).length;
             const isComplete = totalLevels > 0 && clearedLevels === totalLevels;
-            const meetsLevel = characterLevel >= dungeon.minLevel;
 
             // Pick the first uncleared level, or the first level if all cleared (replay)
             const targetLevel = levels.find(l => !clearedSet.has(l.id)) ?? levels[0];
@@ -58,14 +56,12 @@ export const DungeonModal: React.FC<DungeonModalProps> = ({
             return (
               <button
                 key={cd.id}
-                disabled={loading || !meetsLevel || !targetLevel}
+                disabled={loading || !targetLevel}
                 onClick={() => targetLevel && onSelectDungeon(targetLevel.id)}
                 className={`relative flex flex-col items-center p-6 rounded-xl border-2 transition-all cursor-pointer group
                   ${isComplete
                     ? 'border-emerald-500/50 bg-emerald-950/20 hover:border-emerald-400 hover:bg-emerald-950/40'
-                    : meetsLevel
-                      ? 'border-slate-700 bg-slate-800/50 hover:border-amber-500 hover:bg-slate-800 hover:shadow-[0_0_20px_rgba(245,158,11,0.15)]'
-                      : 'border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed'
+                    : 'border-slate-700 bg-slate-800/50 hover:border-amber-500 hover:bg-slate-800 hover:shadow-[0_0_20px_rgba(245,158,11,0.15)]'
                   }
                   active:scale-95 disabled:active:scale-100
                 `}
@@ -88,10 +84,8 @@ export const DungeonModal: React.FC<DungeonModalProps> = ({
                 </h3>
 
                 {/* Level Requirement */}
-                <p className={`text-[10px] font-bold uppercase tracking-widest mb-2
-                  ${meetsLevel ? 'text-slate-500' : 'text-red-400'}
-                `}>
-                  {meetsLevel ? `Level ${dungeon.minLevel}+` : `Requires Level ${dungeon.minLevel}`}
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2 text-slate-500">
+                  Level {dungeon.minLevel}+
                 </p>
 
                 {/* Completion Progress */}

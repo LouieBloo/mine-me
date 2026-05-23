@@ -57,3 +57,8 @@ export const inventoryItemValidation = [
   body('itemId').trim().notEmpty().withMessage('Item ID is required'),
   body('quantity').isInt({ min: 1 }).withMessage('Quantity must be >= 1')
 ];
+
+export const characterLevelValidation = [
+  body('level').isInt({ min: 1 }).withMessage('Level must be >= 1'),
+  body('xpRequired').isInt({ min: 0 }).withMessage('XP Required must be >= 0')
+];

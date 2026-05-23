@@ -19,3 +19,14 @@ publicRouter.get('/items', async (req: Request, res: Response): Promise<any> => 
     return res.status(500).json({ error: err.message });
   }
 });
+
+publicRouter.get('/levels', async (req: Request, res: Response): Promise<any> => {
+  try {
+    const levels = await prisma.characterLevel.findMany({
+      orderBy: { level: 'asc' }
+    });
+    return res.json(levels);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});

@@ -46,17 +46,31 @@ vi.mock('../src/contexts/SocketContext', () => ({
 }));
 
 const mockCharacters = [
-    { id: '1', name: 'Althea', class: 'Mage', level: 5, status: 'ACTIVE', sol: 10, lear: 0, stamina: 100, maxStamina: 100, combatScore: 20, defenseScore: 10, ageInDays: 6000, createdAt: new Date().toISOString() },
-    { id: '2', name: 'Boric', class: 'Warrior', level: 2, status: 'ACTIVE', sol: 5, lear: 0, stamina: 100, maxStamina: 100, combatScore: 15, defenseScore: 15, ageInDays: 6500, createdAt: new Date(Date.now() - 10000).toISOString() },
+    { id: '1', name: 'Althea', class: 'Mage', level: 5, status: 'ACTIVE', sol: 10, lear: 0, stamina: 100, maxStamina: 100, combatScore: 20, defenseScore: 10, ageInDays: 6000, experience: 1000, createdAt: new Date().toISOString() },
+    { id: '2', name: 'Boric', class: 'Warrior', level: 2, status: 'ACTIVE', sol: 5, lear: 0, stamina: 100, maxStamina: 100, combatScore: 15, defenseScore: 15, ageInDays: 6500, experience: 150, createdAt: new Date(Date.now() - 10000).toISOString() },
 ];
 
 describe('CharacterSelection View', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         localStorage.setItem('nvg_token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJpYXQiOjE1MTYyMzkwMjIsImV4cCI6MjUzNDA2NTAwMH0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
-        (global.fetch as any).mockResolvedValue({
-            ok: true,
-            json: async () => mockCharacters,
+        (global.fetch as any).mockImplementation((url: string) => {
+            if (url.includes('/api/public/levels')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => [
+                        { id: 'l1', level: 1, xpRequired: 0 },
+                        { id: 'l2', level: 2, xpRequired: 100 },
+                        { id: 'l3', level: 3, xpRequired: 300 },
+                        { id: 'l4', level: 4, xpRequired: 600 },
+                        { id: 'l5', level: 5, xpRequired: 1000 },
+                    ],
+                });
+            }
+            return Promise.resolve({
+                ok: true,
+                json: async () => JSON.parse(JSON.stringify(mockCharacters)),
+            });
         });
     });
 

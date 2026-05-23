@@ -1,0 +1,65 @@
+[
+  {
+    "id": "cmphlbr0g0000wk65k5yq179a",
+    "level": 1,
+    "xpRequired": 100,
+    "createdAt": "2026-05-23T00:08:33.665Z",
+    "updatedAt": "2026-05-23T00:08:33.665Z",
+    "dropTable": {
+      "id": "cmphlbr0g0001wk65ikfjrcvb",
+      "solMin": 10,
+      "solMax": 0,
+      "experience": 0,
+      "mobId": null,
+      "dungeonId": null,
+      "dungeonLevelId": null,
+      "dungeonLevelMobId": null,
+      "characterLevelId": "cmphlbr0g0000wk65k5yq179a",
+      "createdAt": "2026-05-23T00:08:33.665Z",
+      "updatedAt": "2026-05-23T00:08:33.665Z",
+      "items": []
+    }
+  },
+  {
+    "id": "cmphlc5k20002wk65pzrsx56s",
+    "level": 2,
+    "xpRequired": 500,
+    "createdAt": "2026-05-23T00:08:52.515Z",
+    "updatedAt": "2026-05-23T00:08:52.515Z",
+    "dropTable": {
+      "id": "cmphlc5k20003wk65uypj52cd",
+      "solMin": 50,
+      "solMax": 0,
+      "experience": 0,
+      "mobId": null,
+      "dungeonId": null,
+      "dungeonLevelId": null,
+      "dungeonLevelMobId": null,
+      "characterLevelId": "cmphlc5k20002wk65pzrsx56s",
+      "createdAt": "2026-05-23T00:08:52.515Z",
+      "updatedAt": "2026-05-23T00:08:52.515Z",
+      "items": []
+    }
+  },
+  {
+    "id": "cmphleans0004wk650dbjbjl8",
+    "level": 3,
+    "xpRequired": 1250,
+    "createdAt": "2026-05-23T00:10:32.440Z",
+    "updatedAt": "2026-05-23T00:10:47.445Z",
+    "dropTable": {
+      "id": "cmphleans0005wk65rw2604j3",
+      "solMin": 100,
+      "solMax": 0,
+      "experience": 0,
+      "mobId": null,
+      "dungeonId": null,
+      "dungeonLevelId": null,
+      "dungeonLevelMobId": null,
+      "characterLevelId": "cmphleans0004wk650dbjbjl8",
+      "createdAt": "2026-05-23T00:10:32.440Z",
+      "updatedAt": "2026-05-23T00:10:47.445Z",
+      "items": []
+    }
+  }
+]

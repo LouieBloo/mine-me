@@ -13,7 +13,7 @@ async function main() {
   // Seed Items
   const items = JSON.parse(fs.readFileSync(path.join(dataPath, 'items.json'), 'utf-8'));
   for (const itemData of items) {
-     const { dropTableItems, cityMaterials, inventoryItems, ...itemRoot } = itemData;
+    const { dropTableItems, cityMaterials, inventoryItems, ...itemRoot } = itemData;
     await prisma.item.upsert({
       where: { id: itemRoot.id },
       update: itemRoot,

@@ -8,6 +8,7 @@ import * as DungeonController from '../controllers/admin/dungeon.controller';
 import * as UserController from '../controllers/admin/user.controller';
 import * as InventoryController from '../controllers/admin/inventory.controller';
 import * as CharacterController from '../controllers/admin/character.controller';
+import * as CharacterLevelController from '../controllers/admin/character-level.controller';
 import * as AdminValidation from '../validations/admin.validation';
 
 const adminRouter = express.Router();
@@ -79,5 +80,12 @@ adminRouter.delete('/inventory-items/:id', InventoryController.deleteInventoryIt
 adminRouter.get('/characters', CharacterController.getCharacters);
 adminRouter.get('/characters/:id', CharacterController.getCharacter);
 adminRouter.put('/characters/:id', CharacterController.updateCharacter);
+
+// CHARACTER LEVELS
+adminRouter.get('/levels', CharacterLevelController.getLevels);
+adminRouter.get('/levels/:id', CharacterLevelController.getLevel);
+adminRouter.post('/levels', runValidation(AdminValidation.characterLevelValidation), CharacterLevelController.createLevel);
+adminRouter.put('/levels/:id', runValidation(AdminValidation.characterLevelValidation), CharacterLevelController.updateLevel);
+adminRouter.delete('/levels/:id', CharacterLevelController.deleteLevel);
 
 export { adminRouter };

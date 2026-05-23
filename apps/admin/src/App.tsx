@@ -15,6 +15,7 @@ import { EntityDetail } from './pages/EntityDetail/EntityDetail';
 import MobDetail from './pages/Mobs/MobDetail';
 import ItemDetail from './pages/Items/ItemDetail/ItemDetail';
 import MapEditor from './pages/MapEditor/MapEditor';
+import CharacterLevel from './pages/CharacterLevel/CharacterLevel';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -60,6 +61,10 @@ const router = createBrowserRouter([
       {
         path: "users",
         element: <Users />
+      },
+      {
+        path: "character-levels",
+        element: <CharacterLevel />
       },
       {
         path: "inventory-items",

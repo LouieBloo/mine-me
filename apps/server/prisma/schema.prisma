@@ -213,6 +213,9 @@ model DropTable {
   dungeonLevelMobId     String? @unique
   dungeonLevelMob       DungeonLevelMob? @relation("DungeonLevelMobDrops", fields: [dungeonLevelMobId], references: [id], onDelete: Cascade)
   
+  characterLevelId      String? @unique
+  characterLevel        CharacterLevel? @relation("CharacterLevelDrops", fields: [characterLevelId], references: [id], onDelete: Cascade)
+  
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -307,4 +310,17 @@ model Accomplishment {
   createdAt    DateTime           @default(now())
 
   @@unique([characterId, type, referenceId])
+}
+
+model CharacterLevel {
+  id           String     @id @default(cuid())
+  level        Int        @unique
+  xpRequired   Int
+  
+  dropTable    DropTable? @relation("CharacterLevelDrops")
+  
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("character_levels")
 }

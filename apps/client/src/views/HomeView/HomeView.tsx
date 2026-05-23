@@ -10,7 +10,8 @@ import { WorldMapModal } from '../../components/WorldMapModal/WorldMapModal';
 import { DungeonModal } from '../../components/DungeonModal/DungeonModal';
 import { ConfirmationModal } from '../../components/ConfirmationModal/ConfirmationModal';
 import { notificationService } from '../../services/notificationService';
-import { type GameCity, calculateTravelDays, calculateLevel, getStaminaRecoveryPerDay, calculateRestDaysToFull } from '@nvg/shared';
+import { type GameCity, calculateTravelDays, getStaminaRecoveryPerDay, calculateRestDaysToFull } from '@nvg/shared';
+import { useCharacterLevel } from '../../hooks/useLevels';
 import './HomeView.css';
 
 // ----------------------------------------------------------------------------
@@ -73,6 +74,7 @@ export const HomeView = () => {
   const { sendGameEvent } = useSocket();
   const { setActiveTab } = useChat();
   const { fetchWithAuth } = useApi();
+  const characterLevel = useCharacterLevel(playerState?.attributes.experience ?? 0);
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -312,7 +314,7 @@ export const HomeView = () => {
           onSelectDungeon={handleSelectDungeon}
           onClose={() => setShowDungeonModal(false)}
           loading={enteringDungeon}
-          characterLevel={calculateLevel(playerState?.attributes.experience ?? 0)}
+          characterLevel={characterLevel ?? 1}
         />
       )}
 
