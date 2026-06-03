@@ -58,4 +58,69 @@ export class InventoryService {
       levelUpLoot
     };
   }
+
+  /**
+   * Translates a database Item to a shared GameItem.
+   */
+  public static mapItem(item: any) {
+    if (!item) return undefined;
+    return {
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      type: item.type as any,
+      subType: item.subType as any,
+      priceSol: item.vendorSellPrice,
+      rarity: item.rarity as any,
+      iconUrl: item.iconUrl,
+      gearImageUrl: item.gearImageUrl,
+      isStartingPiece: item.isStartingPiece,
+      experience: item.experience,
+      combatScore: item.combatScore,
+      defenseScore: item.defenseScore,
+    };
+  }
+
+  /**
+   * Translates a database InventoryItem to a shared InventoryEntry.
+   */
+  public static mapInventoryEntry(inv: any) {
+    if (!inv) return undefined;
+    return {
+      id: inv.id,
+      item: InventoryService.mapItem(inv.item) as any,
+      quantity: inv.quantity,
+      equipped: inv.equipped,
+    };
+  }
+
+  /**
+   * Translates character inventory to shared format.
+   */
+  public static mapCharacterInventory(character: { maxInventorySlots: number; inventory: any[] }) {
+    return {
+      slots: character.maxInventorySlots,
+      items: character.inventory.map(inv => InventoryService.mapInventoryEntry(inv) as any),
+    };
+  }
+
+  /**
+   * Translates character equipped inventory items to gear subtype mappings.
+   */
+  public static mapCharacterGear(inventory: any[]) {
+    const getEquippedItem = (subType: string) => {
+      const inv = inventory.find(i => i.equipped && i.item.type === 'GEAR' && i.item.subType === subType);
+      return inv ? InventoryService.mapItem(inv.item) : undefined;
+    };
+
+    return {
+      head: getEquippedItem('HEAD') as any,
+      shoulders: getEquippedItem('SHOULDERS') as any,
+      chest: getEquippedItem('CHEST') as any,
+      gauntlets: getEquippedItem('GAUNTLETS') as any,
+      leggings: getEquippedItem('LEGGINGS') as any,
+      boots: getEquippedItem('BOOTS') as any,
+      weapon: getEquippedItem('WEAPON') as any,
+    };
+  }
 }

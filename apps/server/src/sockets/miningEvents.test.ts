@@ -24,6 +24,50 @@ const mockGiveItemToCharacter = vi.fn();
 vi.mock('../services/inventory.service', () => ({
   InventoryService: {
     giveItemToCharacter: (...args: any[]) => mockGiveItemToCharacter(...args),
+    mapItem: (item: any) => {
+      if (!item) return undefined;
+      return {
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        type: item.type,
+        subType: item.subType,
+        priceSol: item.vendorSellPrice,
+        rarity: item.rarity,
+        iconUrl: item.iconUrl,
+        gearImageUrl: item.gearImageUrl,
+        isStartingPiece: item.isStartingPiece,
+        experience: item.experience,
+        combatScore: item.combatScore,
+        defenseScore: item.defenseScore,
+      };
+    },
+    mapCharacterInventory: (character: any) => {
+      if (!character) return undefined;
+      return {
+        slots: character.maxInventorySlots,
+        items: (character.inventory || []).map((inv: any) => ({
+          id: inv.id,
+          item: {
+            id: inv.item.id,
+            name: inv.item.name,
+            description: inv.item.description,
+            type: inv.item.type,
+            subType: inv.item.subType,
+            priceSol: inv.item.vendorSellPrice,
+            rarity: inv.item.rarity,
+            iconUrl: inv.item.iconUrl,
+            gearImageUrl: inv.item.gearImageUrl,
+            isStartingPiece: inv.item.isStartingPiece,
+            experience: inv.item.experience,
+            combatScore: inv.item.combatScore,
+            defenseScore: inv.item.defenseScore,
+          },
+          quantity: inv.quantity,
+          equipped: inv.equipped,
+        })),
+      };
+    },
   },
 }));
 

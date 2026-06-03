@@ -13,6 +13,7 @@ import type {
 } from '@nvg/shared';
 import { LootService } from '../services/loot.service';
 import { BattleService } from '../services/battle.service';
+import { InventoryService } from '../services/inventory.service';
 
 // Helper to push battle state
 const pushBattleState = (socket: Socket, state: BattleState) => {
@@ -261,29 +262,7 @@ export const handleCombatAction = async (
     });
     
     if (updatedCharacter) {
-      const inventory = {
-        slots: updatedCharacter.maxInventorySlots,
-        items: updatedCharacter.inventory.map(inv => ({
-          id: inv.id,
-          item: {
-            id: inv.item.id,
-            name: inv.item.name,
-            description: inv.item.description,
-            type: inv.item.type as any,
-            subType: inv.item.subType as any,
-            priceSol: inv.item.vendorSellPrice,
-            rarity: inv.item.rarity as any,
-            iconUrl: inv.item.iconUrl,
-            gearImageUrl: inv.item.gearImageUrl,
-            isStartingPiece: inv.item.isStartingPiece,
-            experience: inv.item.experience,
-            combatScore: inv.item.combatScore,
-            defenseScore: inv.item.defenseScore,
-          },
-          quantity: inv.quantity,
-          equipped: inv.equipped,
-        })),
-      };
+      const inventory = InventoryService.mapCharacterInventory(updatedCharacter);
 
       io.to(`user:${socket.data.userId}`).emit('character_stat_update', {
         sol: updatedCharacter.sol,

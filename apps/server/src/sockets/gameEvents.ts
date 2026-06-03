@@ -4,6 +4,7 @@ import { broadcastStatUpdate } from '../services/characterBroadcast';
 import { handleStartCombat, handleCombatAction, handleLeaveCombat, handleAdvanceDungeonLevel } from './combatEvents';
 import { handleTrainingAction } from './trainingEvents';
 import { handleMine } from './miningEvents';
+import { InventoryService } from '../services/inventory.service';
 import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays, getStaminaRecoveryPerDay } from '@nvg/shared';
 
 // ============================================================================
@@ -267,39 +268,8 @@ const handleEquipItem: GameEventHandler<any> = async (io, socket, payload) => {
     return { success: false, error: 'Character not found.' };
   }
 
-  const clientInventory = {
-    slots: character.maxInventorySlots,
-    items: character.inventory.map(inv => ({
-      id: inv.id,
-      item: {
-        id: inv.item.id,
-        name: inv.item.name,
-        description: inv.item.description,
-        type: inv.item.type as any,
-        subType: inv.item.subType as any,
-        priceSol: inv.item.vendorSellPrice,
-        rarity: inv.item.rarity as any,
-        iconUrl: inv.item.iconUrl,
-        gearImageUrl: inv.item.gearImageUrl,
-        isStartingPiece: inv.item.isStartingPiece,
-        experience: inv.item.experience,
-        combatScore: inv.item.combatScore,
-        defenseScore: inv.item.defenseScore,
-      },
-      quantity: inv.quantity,
-      equipped: inv.equipped,
-    })),
-  };
-
-  const clientGear = {
-    head: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'HEAD')?.item as any,
-    shoulders: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'SHOULDERS')?.item as any,
-    chest: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'CHEST')?.item as any,
-    gauntlets: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'GAUNTLETS')?.item as any,
-    leggings: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'LEGGINGS')?.item as any,
-    boots: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'BOOTS')?.item as any,
-    weapon: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'WEAPON')?.item as any,
-  };
+  const clientInventory = InventoryService.mapCharacterInventory(character);
+  const clientGear = InventoryService.mapCharacterGear(character.inventory);
 
   broadcastStatUpdate(characterId, {
     inventory: clientInventory,
@@ -353,39 +323,8 @@ const handleUnequipItem: GameEventHandler<any> = async (io, socket, payload) => 
     return { success: false, error: 'Character not found.' };
   }
 
-  const clientInventory = {
-    slots: character.maxInventorySlots,
-    items: character.inventory.map(inv => ({
-      id: inv.id,
-      item: {
-        id: inv.item.id,
-        name: inv.item.name,
-        description: inv.item.description,
-        type: inv.item.type as any,
-        subType: inv.item.subType as any,
-        priceSol: inv.item.vendorSellPrice,
-        rarity: inv.item.rarity as any,
-        iconUrl: inv.item.iconUrl,
-        gearImageUrl: inv.item.gearImageUrl,
-        isStartingPiece: inv.item.isStartingPiece,
-        experience: inv.item.experience,
-        combatScore: inv.item.combatScore,
-        defenseScore: inv.item.defenseScore,
-      },
-      quantity: inv.quantity,
-      equipped: inv.equipped,
-    })),
-  };
-
-  const clientGear = {
-    head: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'HEAD')?.item as any,
-    shoulders: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'SHOULDERS')?.item as any,
-    chest: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'CHEST')?.item as any,
-    gauntlets: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'GAUNTLETS')?.item as any,
-    leggings: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'LEGGINGS')?.item as any,
-    boots: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'BOOTS')?.item as any,
-    weapon: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'WEAPON')?.item as any,
-  };
+  const clientInventory = InventoryService.mapCharacterInventory(character);
+  const clientGear = InventoryService.mapCharacterGear(character.inventory);
 
   broadcastStatUpdate(characterId, {
     inventory: clientInventory,

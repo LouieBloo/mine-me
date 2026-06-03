@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { dispatchGameEvent } from './gameEvents';
 import { BattleService } from '../services/battle.service';
+import { InventoryService } from '../services/inventory.service';
 import type { PlayerState, GameCity, GameEventPayload } from '@nvg/shared';
 
 // Extend socket.data type for type safety
@@ -249,29 +250,7 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
           ageInDays: character.ageInDays,
           experience: character.experience,
         },
-        inventory: {
-          slots: character.maxInventorySlots,
-          items: character.inventory.map(inv => ({
-            id: inv.id,
-            item: {
-              id: inv.item.id,
-              name: inv.item.name,
-              description: inv.item.description,
-              type: inv.item.type as any,
-              subType: inv.item.subType as any,
-              priceSol: inv.item.vendorSellPrice,
-              rarity: inv.item.rarity as any,
-              iconUrl: inv.item.iconUrl,
-              gearImageUrl: inv.item.gearImageUrl,
-              isStartingPiece: inv.item.isStartingPiece,
-              experience: inv.item.experience,
-              combatScore: inv.item.combatScore,
-              defenseScore: inv.item.defenseScore,
-            },
-            quantity: inv.quantity,
-            equipped: inv.equipped,
-          })),
-        },
+        inventory: InventoryService.mapCharacterInventory(character),
         city: character.city
           ? {
             id: character.city.id,
@@ -283,15 +262,7 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
             objectCoordinates: character.city.objectCoordinates as any,
           }
           : undefined,
-        gear: {
-          head: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'HEAD')?.item as any,
-          shoulders: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'SHOULDERS')?.item as any,
-          chest: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'CHEST')?.item as any,
-          gauntlets: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'GAUNTLETS')?.item as any,
-          leggings: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'LEGGINGS')?.item as any,
-          boots: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'BOOTS')?.item as any,
-          weapon: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'WEAPON')?.item as any,
-        },
+        gear: InventoryService.mapCharacterGear(character.inventory) as any,
       };
 
       socket.emit('character_state', playerState);

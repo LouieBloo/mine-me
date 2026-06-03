@@ -65,19 +65,7 @@ export const handleMine = async (
       rewards.push({
         itemId: cm.itemId,
         quantity: 1,
-        itemDetails: {
-          id: cm.item.id,
-          name: cm.item.name,
-          description: cm.item.description,
-          type: cm.item.type,
-          subType: cm.item.subType,
-          priceSol: cm.item.vendorSellPrice,
-          rarity: cm.item.rarity,
-          iconUrl: cm.item.iconUrl,
-          gearImageUrl: cm.item.gearImageUrl,
-          isStartingPiece: cm.item.isStartingPiece,
-          experience: cm.item.experience,
-        },
+        itemDetails: InventoryService.mapItem(cm.item) as any,
       });
     }
   }
@@ -113,29 +101,7 @@ export const handleMine = async (
     return { success: false, error: 'Failed to retrieve updated inventory.' };
   }
 
-  const clientInventory = {
-    slots: characterWithInventory.maxInventorySlots,
-    items: characterWithInventory.inventory.map((inv) => ({
-      id: inv.id,
-      item: {
-        id: inv.item.id,
-        name: inv.item.name,
-        description: inv.item.description,
-        type: inv.item.type as any,
-        subType: inv.item.subType as any,
-        priceSol: inv.item.vendorSellPrice,
-        rarity: inv.item.rarity as any,
-        iconUrl: inv.item.iconUrl,
-        gearImageUrl: inv.item.gearImageUrl,
-        isStartingPiece: inv.item.isStartingPiece,
-        experience: inv.item.experience,
-        combatScore: inv.item.combatScore,
-        defenseScore: inv.item.defenseScore,
-      },
-      quantity: inv.quantity,
-      equipped: inv.equipped,
-    })),
-  };
+  const clientInventory = InventoryService.mapCharacterInventory(characterWithInventory);
 
   // Broadcast stat update
   broadcastStatUpdate(characterId, {
