@@ -116,6 +116,7 @@ export const handleMine = async (
   const clientInventory = {
     slots: characterWithInventory.maxInventorySlots,
     items: characterWithInventory.inventory.map((inv) => ({
+      id: inv.id,
       item: {
         id: inv.item.id,
         name: inv.item.name,
@@ -128,8 +129,11 @@ export const handleMine = async (
         gearImageUrl: inv.item.gearImageUrl,
         isStartingPiece: inv.item.isStartingPiece,
         experience: inv.item.experience,
+        combatScore: inv.item.combatScore,
+        defenseScore: inv.item.defenseScore,
       },
       quantity: inv.quantity,
+      equipped: inv.equipped,
     })),
   };
 

@@ -1,5 +1,6 @@
 export * from './types';
 export * from './gameLogic/combat';
+export * from './gameLogic/CharacterModEngine';
 export * from './constants';
 export * from './utils/jwt';
 export * from './utils/city';

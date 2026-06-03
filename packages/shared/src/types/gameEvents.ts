@@ -97,10 +97,28 @@ export interface MinePayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
+// Event: equip_item
+// Equips a gear item from inventory.
+// ----------------------------------------------------------------------------
+export interface EquipItemPayload extends GameEventBase {
+  type: 'equip_item';
+  inventoryItemId: string;
+}
+
+// ----------------------------------------------------------------------------
+// Event: unequip_item
+// Unequips a gear item.
+// ----------------------------------------------------------------------------
+export interface UnequipItemPayload extends GameEventBase {
+  type: 'unequip_item';
+  inventoryItemId: string;
+}
+
+// ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
 // ----------------------------------------------------------------------------
-export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload | MinePayload;
+export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload | MinePayload | EquipItemPayload | UnequipItemPayload;
 
 // Utility type: extract the type string literals from the union
 export type GameEventType = GameEventPayload['type'];

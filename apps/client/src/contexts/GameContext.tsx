@@ -75,7 +75,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setPlayerStateRaw(prev => {
             if (!prev) return prev;
 
-            const { sol, lear, cityId, inventory, status, ...attrUpdates } = updates as any;
+            const { sol, lear, cityId, inventory, status, gear, ...attrUpdates } = updates as any;
             const next: PlayerState = {
                 ...prev,
                 ...(sol !== undefined && { sol }),
@@ -83,6 +83,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ...(cityId !== undefined && { cityId }),
                 ...(inventory !== undefined && { inventory }),
                 ...(status !== undefined && { status }),
+                ...(gear !== undefined && { gear }),
                 attributes: {
                     ...prev.attributes,
                     ...attrUpdates,

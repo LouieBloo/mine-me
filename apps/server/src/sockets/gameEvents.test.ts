@@ -4,8 +4,8 @@ import { prisma } from '../index';
 import * as characterBroadcast from '../services/characterBroadcast';
 import { Server } from 'socket.io';
 
-vi.mock('../index', () => ({
-  prisma: {
+vi.mock('../index', () => {
+  const mockPrisma: any = {
     character: {
       findUnique: vi.fn(),
       update: vi.fn(),
@@ -13,8 +13,15 @@ vi.mock('../index', () => ({
     city: {
       findUnique: vi.fn(),
     },
-  },
-}));
+    inventoryItem: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+    $transaction: vi.fn((cb) => cb(mockPrisma)),
+  };
+  return { prisma: mockPrisma };
+});
 
 vi.mock('../services/characterBroadcast', () => ({
   broadcastStatUpdate: vi.fn(),
@@ -393,5 +400,100 @@ describe('gameEvents — handleRest', () => {
       },
     });
     expect(result).toEqual({ success: true, data: { died: true } });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleEquipItem & handleUnequipItem
+// ---------------------------------------------------------------------------
+describe('gameEvents — handleEquipItem & handleUnequipItem', () => {
+  const handleEquipItem = gameEventHandlers.equip_item;
+  const handleUnequipItem = gameEventHandlers.unequip_item;
+  let io: Server;
+  let socket: ReturnType<typeof makeSocket>;
+
+  beforeEach(() => {
+    io = {} as Server;
+    socket = makeSocket();
+    vi.clearAllMocks();
+  });
+
+  it('equips a gear item and unequips other items of the same subtype', async () => {
+    const targetItem = {
+      id: 'inv-target',
+      characterId: 'char1',
+      itemId: 'item-helmet',
+      equipped: false,
+      item: { id: 'item-helmet', type: 'GEAR', subType: 'HEAD' },
+    };
+
+    const currentlyEquipped = {
+      id: 'inv-old',
+      characterId: 'char1',
+      itemId: 'item-old-helmet',
+      equipped: true,
+      item: { id: 'item-old-helmet', type: 'GEAR', subType: 'HEAD' },
+    };
+
+    const updatedChar = {
+      id: 'char1',
+      maxInventorySlots: 25,
+      inventory: [
+        {
+          id: 'inv-target',
+          quantity: 1,
+          equipped: true,
+          item: { id: 'item-helmet', type: 'GEAR', subType: 'HEAD', combatScore: 0, defenseScore: 5 },
+        },
+      ],
+    };
+
+    (prisma.inventoryItem.findUnique as any).mockResolvedValue(targetItem);
+    (prisma.inventoryItem.findFirst as any).mockResolvedValue(currentlyEquipped);
+    (prisma.character.findUnique as any).mockResolvedValue(updatedChar);
+
+    const result = await handleEquipItem(io, socket, { type: 'equip_item', inventoryItemId: 'inv-target' });
+
+    expect(result).toEqual({ success: true });
+    expect(prisma.inventoryItem.update).toHaveBeenCalledWith({
+      where: { id: 'inv-target' },
+      data: { equipped: true },
+    });
+    expect(characterBroadcast.broadcastStatUpdate).toHaveBeenCalled();
+  });
+
+  it('unequips an equipped item', async () => {
+    const targetItem = {
+      id: 'inv-target',
+      characterId: 'char1',
+      itemId: 'item-helmet',
+      equipped: true,
+      item: { id: 'item-helmet', type: 'GEAR', subType: 'HEAD' },
+    };
+
+    const updatedChar = {
+      id: 'char1',
+      maxInventorySlots: 25,
+      inventory: [
+        {
+          id: 'inv-target',
+          quantity: 1,
+          equipped: false,
+          item: { id: 'item-helmet', type: 'GEAR', subType: 'HEAD', combatScore: 0, defenseScore: 5 },
+        },
+      ],
+    };
+
+    (prisma.inventoryItem.findUnique as any).mockResolvedValue(targetItem);
+    (prisma.character.findUnique as any).mockResolvedValue(updatedChar);
+
+    const result = await handleUnequipItem(io, socket, { type: 'unequip_item', inventoryItemId: 'inv-target' });
+
+    expect(result).toEqual({ success: true });
+    expect(prisma.inventoryItem.update).toHaveBeenCalledWith({
+      where: { id: 'inv-target' },
+      data: { equipped: false },
+    });
+    expect(characterBroadcast.broadcastStatUpdate).toHaveBeenCalled();
   });
 });

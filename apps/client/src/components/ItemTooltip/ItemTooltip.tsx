@@ -49,7 +49,28 @@ export const ItemTooltip = ({ entry }: ItemTooltipProps) => {
         {quantity > 1 && (
           <span className="text-xs text-slate-400">Qty: {quantity}</span>
         )}
+        {entry.equipped && (
+          <span className="text-xs font-bold text-emerald-400 border border-emerald-500/30 bg-emerald-950/40 px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(16,185,129,0.2)]">
+            Equipped
+          </span>
+        )}
       </div>
+
+      {/* Stats */}
+      {(item.combatScore || item.defenseScore) ? (
+        <div className="border-t border-slate-700/50 pt-2 space-y-1">
+          {item.combatScore ? (
+            <p className="text-xs text-red-400 font-bold flex items-center gap-1">
+              <span>⚔️</span> +{item.combatScore} Combat Score
+            </p>
+          ) : null}
+          {item.defenseScore ? (
+            <p className="text-xs text-blue-400 font-bold flex items-center gap-1">
+              <span>🛡️</span> +{item.defenseScore} Defense Score
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Description */}
       {item.description && (

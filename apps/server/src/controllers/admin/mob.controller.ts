@@ -120,7 +120,15 @@ export const uploadMobSpriteAtlas = async (req: Request, res: Response) => {
       data: { animations: updatedConfig }
     });
     
-    const allMobs = await prisma.mob.findMany();
+    const allMobs = await prisma.mob.findMany({
+      include: {
+        dropTable: {
+          include: {
+            items: true
+          }
+        }
+      }
+    });
     await syncJson('mobs.json', allMobs);
     
     res.json(updatedMob);

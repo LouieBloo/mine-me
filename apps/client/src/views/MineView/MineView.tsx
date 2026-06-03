@@ -64,7 +64,7 @@ export const MineView: React.FC = () => {
   const gearLayers: GearLayerDescriptor[] = useMemo(() => {
     if (!playerState?.inventory?.items) return [];
     return playerState.inventory.items
-      .filter(inv => inv.item.type === 'GEAR' && inv.item.gearImageUrl)
+      .filter(inv => inv.item.type === 'GEAR' && inv.item.gearImageUrl && inv.equipped)
       .map(inv => ({
         url: `${import.meta.env.VITE_API_URL}${inv.item.gearImageUrl}`,
         subType: inv.item.subType as GearSubType,

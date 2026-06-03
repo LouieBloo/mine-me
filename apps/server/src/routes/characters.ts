@@ -68,7 +68,8 @@ charactersRouter.post('/', authenticateToken, async (req: AuthRequest, res: Resp
         if (gearSelections[slot]) {
           inventoryData.push({
             itemId: gearSelections[slot],
-            quantity: 1
+            quantity: 1,
+            equipped: true
           });
         }
       }

@@ -203,6 +203,8 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
                   gearImageUrl: true,
                   isStartingPiece: true,
                   experience: true,
+                  combatScore: true,
+                  defenseScore: true,
                 }
               }
             }
@@ -250,6 +252,7 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
         inventory: {
           slots: character.maxInventorySlots,
           items: character.inventory.map(inv => ({
+            id: inv.id,
             item: {
               id: inv.item.id,
               name: inv.item.name,
@@ -262,8 +265,11 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
               gearImageUrl: inv.item.gearImageUrl,
               isStartingPiece: inv.item.isStartingPiece,
               experience: inv.item.experience,
+              combatScore: inv.item.combatScore,
+              defenseScore: inv.item.defenseScore,
             },
             quantity: inv.quantity,
+            equipped: inv.equipped,
           })),
         },
         city: character.city
@@ -277,7 +283,15 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
             objectCoordinates: character.city.objectCoordinates as any,
           }
           : undefined,
-        gear: {}, // TODO: derive equipped gear from inventory items
+        gear: {
+          head: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'HEAD')?.item as any,
+          shoulders: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'SHOULDERS')?.item as any,
+          chest: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'CHEST')?.item as any,
+          gauntlets: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'GAUNTLETS')?.item as any,
+          leggings: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'LEGGINGS')?.item as any,
+          boots: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'BOOTS')?.item as any,
+          weapon: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'WEAPON')?.item as any,
+        },
       };
 
       socket.emit('character_state', playerState);

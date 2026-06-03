@@ -21,7 +21,8 @@ export default function ItemDetail() {
 
   const [data, setData] = useState<any>(isNew ? {
     name: '', description: '', type: 'GEAR', subType: 'HEAD',
-    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', isStartingPiece: false, experience: 0
+    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', isStartingPiece: false, experience: 0,
+    combatScore: 0, defenseScore: 0
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -198,6 +199,33 @@ export default function ItemDetail() {
               />
               {errors.experience && <p className="text-red-500 text-xs font-bold mt-1">{errors.experience}</p>}
             </div>
+
+            {/* GEAR-only Combat and Defense scores */}
+            {data.type === 'GEAR' && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Combat Score Bonus</label>
+                  <input
+                    type="number"
+                    value={data.combatScore ?? 0}
+                    onChange={(e) => { setData({ ...data, combatScore: Number(e.target.value) }); if (errors.combatScore) setErrors({ ...errors, combatScore: '' }); }}
+                    className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.combatScore ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
+                  />
+                  {errors.combatScore && <p className="text-red-500 text-xs font-bold mt-1">{errors.combatScore}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Defense Score Bonus</label>
+                  <input
+                    type="number"
+                    value={data.defenseScore ?? 0}
+                    onChange={(e) => { setData({ ...data, defenseScore: Number(e.target.value) }); if (errors.defenseScore) setErrors({ ...errors, defenseScore: '' }); }}
+                    className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.defenseScore ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
+                  />
+                  {errors.defenseScore && <p className="text-red-500 text-xs font-bold mt-1">{errors.defenseScore}</p>}
+                </div>
+              </>
+            )}
 
             {/* Starting Piece toggle */}
             <div className="space-y-2 md:col-span-2 flex items-center pt-2">

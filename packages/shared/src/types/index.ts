@@ -13,8 +13,10 @@ export interface PlayerAttributes {
 }
 
 export interface InventoryEntry {
+  id: string;
   item: GameItem;
   quantity: number;
+  equipped?: boolean;
 }
 
 export interface PlayerInventory {
@@ -65,6 +67,7 @@ export interface CharacterStatUpdate {
   experience?: number;
   inventory?: PlayerInventory;
   status?: 'ACTIVE' | 'DEAD' | 'RETIRED';
+  gear?: PlayerState['gear'];
 }
 
 export type ItemRarity = 'LOW' | 'MEDIUM' | 'RARE' | 'VERY_RARE';
@@ -99,6 +102,8 @@ export interface GameItem {
   gearImageUrl?: string | null;
   isStartingPiece?: boolean;
   experience?: number;
+  combatScore?: number;
+  defenseScore?: number;
 }
 
 export interface PotionItem extends GameItem {

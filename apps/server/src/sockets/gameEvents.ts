@@ -197,6 +197,205 @@ const handleRest: GameEventHandler<RestPayload> = async (io, socket, payload) =>
 };
 
 // ----------------------------------------------------------------------------
+// Handler: equip_item
+// Equips a gear item, unequipping any currently equipped item of the same subtype.
+// ----------------------------------------------------------------------------
+const handleEquipItem: GameEventHandler<any> = async (io, socket, payload) => {
+  const userId = socket.data.userId;
+  const characterId = socket.data.characterId;
+
+  if (!characterId) {
+    return { success: false, error: 'No character selected.' };
+  }
+
+  const { inventoryItemId } = payload;
+  if (!inventoryItemId) {
+    return { success: false, error: 'inventoryItemId is required.' };
+  }
+
+  const inventoryItem = await prisma.inventoryItem.findUnique({
+    where: { id: inventoryItemId },
+    include: { item: true }
+  });
+
+  if (!inventoryItem || inventoryItem.characterId !== characterId) {
+    return { success: false, error: 'Item not found in character inventory.' };
+  }
+
+  if (inventoryItem.item.type !== 'GEAR') {
+    return { success: false, error: 'Only gear can be equipped.' };
+  }
+
+  const subType = inventoryItem.item.subType;
+
+  // Transaction to unequip other items in same slot and equip this one
+  await prisma.$transaction(async (tx) => {
+    // Find currently equipped item of same subtype
+    const currentlyEquipped = await tx.inventoryItem.findFirst({
+      where: {
+        characterId,
+        equipped: true,
+        item: { subType }
+      }
+    });
+
+    if (currentlyEquipped) {
+      await tx.inventoryItem.update({
+        where: { id: currentlyEquipped.id },
+        data: { equipped: false }
+      });
+    }
+
+    // Equip the new item
+    await tx.inventoryItem.update({
+      where: { id: inventoryItemId },
+      data: { equipped: true }
+    });
+  });
+
+  // Fetch updated character inventory
+  const character = await prisma.character.findUnique({
+    where: { id: characterId },
+    include: {
+      inventory: {
+        include: { item: true }
+      }
+    }
+  });
+
+  if (!character) {
+    return { success: false, error: 'Character not found.' };
+  }
+
+  const clientInventory = {
+    slots: character.maxInventorySlots,
+    items: character.inventory.map(inv => ({
+      id: inv.id,
+      item: {
+        id: inv.item.id,
+        name: inv.item.name,
+        description: inv.item.description,
+        type: inv.item.type as any,
+        subType: inv.item.subType as any,
+        priceSol: inv.item.vendorSellPrice,
+        rarity: inv.item.rarity as any,
+        iconUrl: inv.item.iconUrl,
+        gearImageUrl: inv.item.gearImageUrl,
+        isStartingPiece: inv.item.isStartingPiece,
+        experience: inv.item.experience,
+        combatScore: inv.item.combatScore,
+        defenseScore: inv.item.defenseScore,
+      },
+      quantity: inv.quantity,
+      equipped: inv.equipped,
+    })),
+  };
+
+  const clientGear = {
+    head: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'HEAD')?.item as any,
+    shoulders: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'SHOULDERS')?.item as any,
+    chest: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'CHEST')?.item as any,
+    gauntlets: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'GAUNTLETS')?.item as any,
+    leggings: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'LEGGINGS')?.item as any,
+    boots: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'BOOTS')?.item as any,
+    weapon: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'WEAPON')?.item as any,
+  };
+
+  broadcastStatUpdate(characterId, {
+    inventory: clientInventory,
+    gear: clientGear
+  });
+
+  return { success: true };
+};
+
+// ----------------------------------------------------------------------------
+// Handler: unequip_item
+// Unequips a currently equipped gear item.
+// ----------------------------------------------------------------------------
+const handleUnequipItem: GameEventHandler<any> = async (io, socket, payload) => {
+  const userId = socket.data.userId;
+  const characterId = socket.data.characterId;
+
+  if (!characterId) {
+    return { success: false, error: 'No character selected.' };
+  }
+
+  const { inventoryItemId } = payload;
+  if (!inventoryItemId) {
+    return { success: false, error: 'inventoryItemId is required.' };
+  }
+
+  const inventoryItem = await prisma.inventoryItem.findUnique({
+    where: { id: inventoryItemId }
+  });
+
+  if (!inventoryItem || inventoryItem.characterId !== characterId) {
+    return { success: false, error: 'Item not found in character inventory.' };
+  }
+
+  await prisma.inventoryItem.update({
+    where: { id: inventoryItemId },
+    data: { equipped: false }
+  });
+
+  // Fetch updated character inventory
+  const character = await prisma.character.findUnique({
+    where: { id: characterId },
+    include: {
+      inventory: {
+        include: { item: true }
+      }
+    }
+  });
+
+  if (!character) {
+    return { success: false, error: 'Character not found.' };
+  }
+
+  const clientInventory = {
+    slots: character.maxInventorySlots,
+    items: character.inventory.map(inv => ({
+      id: inv.id,
+      item: {
+        id: inv.item.id,
+        name: inv.item.name,
+        description: inv.item.description,
+        type: inv.item.type as any,
+        subType: inv.item.subType as any,
+        priceSol: inv.item.vendorSellPrice,
+        rarity: inv.item.rarity as any,
+        iconUrl: inv.item.iconUrl,
+        gearImageUrl: inv.item.gearImageUrl,
+        isStartingPiece: inv.item.isStartingPiece,
+        experience: inv.item.experience,
+        combatScore: inv.item.combatScore,
+        defenseScore: inv.item.defenseScore,
+      },
+      quantity: inv.quantity,
+      equipped: inv.equipped,
+    })),
+  };
+
+  const clientGear = {
+    head: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'HEAD')?.item as any,
+    shoulders: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'SHOULDERS')?.item as any,
+    chest: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'CHEST')?.item as any,
+    gauntlets: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'GAUNTLETS')?.item as any,
+    leggings: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'LEGGINGS')?.item as any,
+    boots: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'BOOTS')?.item as any,
+    weapon: character.inventory.find(inv => inv.equipped && inv.item.type === 'GEAR' && inv.item.subType === 'WEAPON')?.item as any,
+  };
+
+  broadcastStatUpdate(characterId, {
+    inventory: clientInventory,
+    gear: clientGear
+  });
+
+  return { success: true };
+};
+
+// ----------------------------------------------------------------------------
 // Handler Registry — maps event type strings to their handler functions.
 // To add a new event, just add an entry here.
 // ----------------------------------------------------------------------------
@@ -209,6 +408,8 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   rest: handleRest,
   training_action: handleTrainingAction,
   mine: handleMine,
+  equip_item: handleEquipItem,
+  unequip_item: handleUnequipItem,
 };
 
 // ----------------------------------------------------------------------------

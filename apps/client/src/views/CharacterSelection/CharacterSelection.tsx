@@ -28,8 +28,10 @@ export interface Character {
     cityId: string;
     createdAt: string;
     inventory?: {
+        id: string;
         item: GameItem;
         quantity: number;
+        equipped?: boolean;
     }[];
     city?: GameCity;
 }

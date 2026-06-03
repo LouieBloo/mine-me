@@ -73,14 +73,30 @@ export const getCity = async (req: Request, res: Response) => {
 
 export const createCity = async (req: Request, res: Response) => {
   const city = await prisma.city.create({ data: req.body });
-  const allCities = await prisma.city.findMany();
+  const allCities = await prisma.city.findMany({
+    include: {
+      cityDungeons: { 
+        orderBy: { orderIndex: 'asc' },
+        include: { dungeon: true } 
+      },
+      cityMaterials: { include: { item: true } }
+    }
+  });
   syncJson('cities.json', allCities);
   res.json(city);
 };
 
 export const updateCity = async (req: Request, res: Response) => {
   const city = await prisma.city.update({ where: { id: req.params.id }, data: req.body });
-  const allCities = await prisma.city.findMany();
+  const allCities = await prisma.city.findMany({
+    include: {
+      cityDungeons: { 
+        orderBy: { orderIndex: 'asc' },
+        include: { dungeon: true } 
+      },
+      cityMaterials: { include: { item: true } }
+    }
+  });
   syncJson('cities.json', allCities);
   res.json(city);
 };

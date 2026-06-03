@@ -97,11 +97,21 @@ export const InGameLayout = () => {
         inventory: {
             slots: 25,
             items: (activeCharacter.inventory ?? []).map(inv => ({
+                id: inv.id,
                 item: inv.item,
                 quantity: inv.quantity,
+                equipped: (inv as any).equipped ?? false,
             })),
         },
-        gear: {},
+        gear: {
+            head: (activeCharacter.inventory ?? []).find(inv => (inv as any).equipped && inv.item.type === 'GEAR' && inv.item.subType === 'HEAD')?.item as any,
+            shoulders: (activeCharacter.inventory ?? []).find(inv => (inv as any).equipped && inv.item.type === 'GEAR' && inv.item.subType === 'SHOULDERS')?.item as any,
+            chest: (activeCharacter.inventory ?? []).find(inv => (inv as any).equipped && inv.item.type === 'GEAR' && inv.item.subType === 'CHEST')?.item as any,
+            gauntlets: (activeCharacter.inventory ?? []).find(inv => (inv as any).equipped && inv.item.type === 'GEAR' && inv.item.subType === 'GAUNTLETS')?.item as any,
+            leggings: (activeCharacter.inventory ?? []).find(inv => (inv as any).equipped && inv.item.type === 'GEAR' && inv.item.subType === 'LEGGINGS')?.item as any,
+            boots: (activeCharacter.inventory ?? []).find(inv => (inv as any).equipped && inv.item.type === 'GEAR' && inv.item.subType === 'BOOTS')?.item as any,
+            weapon: (activeCharacter.inventory ?? []).find(inv => (inv as any).equipped && inv.item.type === 'GEAR' && inv.item.subType === 'WEAPON')?.item as any,
+        },
     };
 
     return (

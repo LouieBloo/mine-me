@@ -35,7 +35,18 @@ export const createDungeon = async (req: Request, res: Response) => {
       completionDropTable: buildDropTableCreate(completionDropTable)
     } 
   });
-  const allDungeons = await prisma.dungeon.findMany({ include: { levels: true } });
+  const allDungeons = await prisma.dungeon.findMany({
+    include: {
+      completionDropTable: { include: { items: true } },
+      levels: {
+        orderBy: { orderIndex: 'asc' },
+        include: {
+          completionDropTable: { include: { items: true } },
+          mobs: { include: { dropTable: { include: { items: true } } } }
+        }
+      }
+    }
+  });
   syncJson('dungeons.json', allDungeons);
   res.json(dungeon);
 };
@@ -49,7 +60,18 @@ export const updateDungeon = async (req: Request, res: Response) => {
       completionDropTable: buildDropTableUpsert(completionDropTable)
     } 
   });
-  const allDungeons = await prisma.dungeon.findMany({ include: { levels: true } });
+  const allDungeons = await prisma.dungeon.findMany({
+    include: {
+      completionDropTable: { include: { items: true } },
+      levels: {
+        orderBy: { orderIndex: 'asc' },
+        include: {
+          completionDropTable: { include: { items: true } },
+          mobs: { include: { dropTable: { include: { items: true } } } }
+        }
+      }
+    }
+  });
   syncJson('dungeons.json', allDungeons);
   res.json(dungeon);
 };
@@ -78,7 +100,18 @@ export const createDungeonLevel = async (req: Request, res: Response) => {
       mobs: { include: { dropTable: { include: { items: true } } } }
     }
   });
-  const allDungeons = await prisma.dungeon.findMany({ include: { levels: true } });
+  const allDungeons = await prisma.dungeon.findMany({
+    include: {
+      completionDropTable: { include: { items: true } },
+      levels: {
+        orderBy: { orderIndex: 'asc' },
+        include: {
+          completionDropTable: { include: { items: true } },
+          mobs: { include: { dropTable: { include: { items: true } } } }
+        }
+      }
+    }
+  });
   syncJson('dungeons.json', allDungeons);
   res.json(level);
 };
@@ -103,14 +136,36 @@ export const updateDungeonLevel = async (req: Request, res: Response) => {
       mobs: { include: { dropTable: { include: { items: true } } } }
     }
   });
-  const allDungeons = await prisma.dungeon.findMany({ include: { levels: true } });
+  const allDungeons = await prisma.dungeon.findMany({
+    include: {
+      completionDropTable: { include: { items: true } },
+      levels: {
+        orderBy: { orderIndex: 'asc' },
+        include: {
+          completionDropTable: { include: { items: true } },
+          mobs: { include: { dropTable: { include: { items: true } } } }
+        }
+      }
+    }
+  });
   syncJson('dungeons.json', allDungeons);
   res.json(level);
 };
 
 export const deleteDungeonLevel = async (req: Request, res: Response) => {
   await prisma.dungeonLevel.delete({ where: { id: req.params.id } });
-  const allDungeons = await prisma.dungeon.findMany({ include: { levels: true } });
+  const allDungeons = await prisma.dungeon.findMany({
+    include: {
+      completionDropTable: { include: { items: true } },
+      levels: {
+        orderBy: { orderIndex: 'asc' },
+        include: {
+          completionDropTable: { include: { items: true } },
+          mobs: { include: { dropTable: { include: { items: true } } } }
+        }
+      }
+    }
+  });
   syncJson('dungeons.json', allDungeons);
   res.json({ success: true });
 };

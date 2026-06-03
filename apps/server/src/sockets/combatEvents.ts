@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { CombatEngine } from '@nvg/shared/src/gameLogic/CombatEngine';
+import { CharacterModEngine } from '@nvg/shared';
 import type {
   StartCombatPayload,
   CombatActionPayload,
@@ -130,16 +131,31 @@ export const handleCombatAction = async (
   }
 
   const character = await prisma.character.findUnique({
-    where: { id: characterId }
+    where: { id: characterId },
+    include: {
+      inventory: {
+        include: {
+          item: true
+        }
+      }
+    }
   });
   if (!character) return { success: false, error: 'Character not found.' };
 
   const currentState = BattleService.buildBattleState(battle, character);
 
+  const mods = CharacterModEngine.getModifications(character.inventory.map(inv => ({
+    item: inv.item as any,
+    equipped: inv.equipped,
+  })));
+
+  const totalCombatScore = character.combatScore + mods.combatScore;
+  const totalDefenseScore = character.defenseScore + mods.defenseScore;
+
   const playerState = {
     attributes: {
-      combatScore: character.combatScore,
-      defenseScore: character.defenseScore,
+      combatScore: totalCombatScore,
+      defenseScore: totalDefenseScore,
       health: character.health,
       maxHealth: character.maxHealth,
       stamina: character.stamina,
@@ -248,6 +264,7 @@ export const handleCombatAction = async (
       const inventory = {
         slots: updatedCharacter.maxInventorySlots,
         items: updatedCharacter.inventory.map(inv => ({
+          id: inv.id,
           item: {
             id: inv.item.id,
             name: inv.item.name,
@@ -260,8 +277,11 @@ export const handleCombatAction = async (
             gearImageUrl: inv.item.gearImageUrl,
             isStartingPiece: inv.item.isStartingPiece,
             experience: inv.item.experience,
+            combatScore: inv.item.combatScore,
+            defenseScore: inv.item.defenseScore,
           },
           quantity: inv.quantity,
+          equipped: inv.equipped,
         })),
       };
 

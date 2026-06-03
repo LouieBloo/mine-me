@@ -14,6 +14,8 @@
     "gearImageUrl": null,
     "isStartingPiece": false,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.593Z",
     "updatedAt": "2026-04-06T21:51:48.593Z"
   },
@@ -32,6 +34,8 @@
     "gearImageUrl": null,
     "isStartingPiece": false,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.602Z",
     "updatedAt": "2026-04-06T21:51:48.602Z"
   },
@@ -50,6 +54,8 @@
     "gearImageUrl": "/assets/gear/cmni8mse50001xe1a7ur35nrx_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.612Z",
     "updatedAt": "2026-04-06T21:51:48.612Z"
   },
@@ -68,6 +74,8 @@
     "gearImageUrl": "/assets/gear/cmni8n4qz0002xe1acuv9mytw_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.619Z",
     "updatedAt": "2026-04-06T21:51:48.619Z"
   },
@@ -86,6 +94,8 @@
     "gearImageUrl": "/assets/gear/cmni8nkf00003xe1az1084gpc_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.624Z",
     "updatedAt": "2026-04-06T21:51:48.624Z"
   },
@@ -104,6 +114,8 @@
     "gearImageUrl": "/assets/gear/cmni8ohjt0005xe1alsscf6xp_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.630Z",
     "updatedAt": "2026-04-06T21:51:48.630Z"
   },
@@ -122,6 +134,8 @@
     "gearImageUrl": "/assets/gear/cmni8osk00006xe1aza26401u_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.634Z",
     "updatedAt": "2026-04-06T21:51:48.634Z"
   },
@@ -140,6 +154,8 @@
     "gearImageUrl": "/assets/gear/cmni8nzs20004xe1aokqxuysf_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.639Z",
     "updatedAt": "2026-04-06T21:51:48.639Z"
   },
@@ -158,6 +174,8 @@
     "gearImageUrl": "/assets/gear/cmnjdru4y00008656sklfwyd2_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.643Z",
     "updatedAt": "2026-04-06T21:51:48.643Z"
   },
@@ -176,6 +194,8 @@
     "gearImageUrl": "/assets/gear/cmnje0otv00018656nzoywcl7_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.647Z",
     "updatedAt": "2026-04-06T21:51:48.647Z"
   },
@@ -194,26 +214,10 @@
     "gearImageUrl": "/assets/gear/cmnje132100028656bdkw1t9p_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.651Z",
     "updatedAt": "2026-04-06T21:51:48.651Z"
-  },
-  {
-    "id": "cmnje1gyv000386569nj6a2tn",
-    "name": "Pink Sword",
-    "description": "Pink Sword",
-    "type": "GEAR",
-    "subType": "WEAPON",
-    "vendorBuyPrice": 0,
-    "vendorSellPrice": 0,
-    "userSellPrice": 0,
-    "userBuyPrice": 0,
-    "rarity": "LOW",
-    "iconUrl": null,
-    "gearImageUrl": "/assets/gear/cmnje1gyv000386569nj6a2tn_gear.png",
-    "isStartingPiece": true,
-    "experience": 0,
-    "createdAt": "2026-04-06T21:51:48.656Z",
-    "updatedAt": "2026-04-06T21:51:48.656Z"
   },
   {
     "id": "cmnje20qh00048656s78jsmge",
@@ -230,6 +234,8 @@
     "gearImageUrl": "/assets/gear/cmnje20qh00048656s78jsmge_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.660Z",
     "updatedAt": "2026-04-06T21:51:48.660Z"
   },
@@ -248,6 +254,8 @@
     "gearImageUrl": "/assets/gear/cmnje30rf00058656o0xukduf_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.664Z",
     "updatedAt": "2026-04-06T21:51:48.664Z"
   },
@@ -266,6 +274,8 @@
     "gearImageUrl": "/assets/gear/cmnje3cld00068656i26o6j0k_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.668Z",
     "updatedAt": "2026-04-06T21:51:48.668Z"
   },
@@ -284,6 +294,8 @@
     "gearImageUrl": "/assets/gear/cmni8l0zu0000xe1auwhar051_gear.png",
     "isStartingPiece": true,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.607Z",
     "updatedAt": "2026-04-11T02:30:46.526Z"
   },
@@ -302,6 +314,8 @@
     "gearImageUrl": null,
     "isStartingPiece": false,
     "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-05-15T02:24:03.491Z",
     "updatedAt": "2026-05-15T02:24:03.491Z"
   },
@@ -320,6 +334,8 @@
     "gearImageUrl": null,
     "isStartingPiece": false,
     "experience": 10,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-05-15T02:17:38.043Z",
     "updatedAt": "2026-05-15T02:17:38.043Z"
   },
@@ -338,7 +354,29 @@
     "gearImageUrl": null,
     "isStartingPiece": false,
     "experience": 30,
+    "combatScore": 0,
+    "defenseScore": 0,
     "createdAt": "2026-05-15T02:23:37.703Z",
     "updatedAt": "2026-05-15T02:23:37.703Z"
+  },
+  {
+    "id": "cmnje1gyv000386569nj6a2tn",
+    "name": "Pink Sword",
+    "description": "Pink Sword",
+    "type": "GEAR",
+    "subType": "WEAPON",
+    "vendorBuyPrice": 0,
+    "vendorSellPrice": 0,
+    "userSellPrice": 0,
+    "userBuyPrice": 0,
+    "rarity": "LOW",
+    "iconUrl": null,
+    "gearImageUrl": "/assets/gear/cmnje1gyv000386569nj6a2tn_gear.png",
+    "isStartingPiece": true,
+    "experience": 0,
+    "combatScore": 5,
+    "defenseScore": 0,
+    "createdAt": "2026-04-06T21:51:48.656Z",
+    "updatedAt": "2026-04-06T21:51:48.656Z"
   }
 ]

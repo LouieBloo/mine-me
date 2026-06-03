@@ -182,6 +182,8 @@ model Item {
   gearImageUrl   String?
   isStartingPiece Boolean    @default(false)
   experience     Int         @default(0)
+  combatScore    Int         @default(0)
+  defenseScore   Int         @default(0)
   
   dropTableItems DropTableItem[]
   cityMaterials  CityMaterial[]
@@ -243,6 +245,7 @@ model InventoryItem {
   itemId         String
   item           Item      @relation(fields: [itemId], references: [id])
   quantity       Int       @default(1)
+  equipped       Boolean   @default(false)
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt

@@ -1,3 +1,5 @@
+import { CharacterModEngine } from '@nvg/shared';
+import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 import type { PlayerState } from '@nvg/shared';
 import { useLevelProgress } from '../../hooks/useLevels';
 import './CharacterPanel.css';
@@ -8,6 +10,10 @@ interface Props {
 
 export const CharacterPanel = ({ player }: Props) => {
   const levelInfo = useLevelProgress(player?.attributes.experience ?? 0);
+
+  const mods = player ? CharacterModEngine.getModifications(player.inventory?.items ?? []) : { combatScore: 0, defenseScore: 0 };
+  const totalCombatScore = player ? player.attributes.combatScore + mods.combatScore : 0;
+  const totalDefenseScore = player ? player.attributes.defenseScore + mods.defenseScore : 0;
 
   if (!player) return <div className="p-4 text-slate-500 animate-pulse">Loading Character...</div>;
 
@@ -76,15 +82,61 @@ export const CharacterPanel = ({ player }: Props) => {
         <div className="space-y-4">
           <h3 className="text-sm font-bold tracking-widest text-slate-400 uppercase">Attributes</h3>
           
-          <div className="flex justify-between items-center p-2 rounded hover:bg-slate-700/30 transition-colors">
-            <span className="text-slate-300">Combat Score</span>
-            <span className="font-mono text-lg font-bold text-white">{player.attributes.combatScore}</span>
-          </div>
+          <HoverTooltip
+            content={
+              <div className="p-2 text-xs font-semibold text-slate-300 space-y-1">
+                <p className="font-bold text-white mb-1">Combat Score Calculation</p>
+                <div className="flex justify-between gap-8">
+                  <span>Base Score:</span>
+                  <span className="font-mono text-white">{player.attributes.combatScore}</span>
+                </div>
+                <div className="flex justify-between gap-8 text-red-400">
+                  <span>Item Bonus:</span>
+                  <span className="font-mono">+{mods.combatScore}</span>
+                </div>
+                <div className="border-t border-slate-700 pt-1 flex justify-between gap-8 font-bold text-white">
+                  <span>Total:</span>
+                  <span className="font-mono">{totalCombatScore}</span>
+                </div>
+                <p className="text-[10px] text-slate-500 italic mt-1 font-normal border-t border-slate-800/80 pt-1">
+                  {player.attributes.combatScore} base + {mods.combatScore} items
+                </p>
+              </div>
+            }
+          >
+            <div className="flex justify-between items-center p-2 rounded hover:bg-slate-700/30 transition-colors cursor-help">
+              <span className="text-slate-300">Combat Score</span>
+              <span className="font-mono text-lg font-bold text-white">{totalCombatScore}</span>
+            </div>
+          </HoverTooltip>
           
-          <div className="flex justify-between items-center p-2 rounded hover:bg-slate-700/30 transition-colors">
-            <span className="text-slate-300">Defense Score</span>
-            <span className="font-mono text-lg font-bold text-white">{player.attributes.defenseScore}</span>
-          </div>
+          <HoverTooltip
+            content={
+              <div className="p-2 text-xs font-semibold text-slate-300 space-y-1">
+                <p className="font-bold text-white mb-1">Defense Score Calculation</p>
+                <div className="flex justify-between gap-8">
+                  <span>Base Score:</span>
+                  <span className="font-mono text-white">{player.attributes.defenseScore}</span>
+                </div>
+                <div className="flex justify-between gap-8 text-blue-400">
+                  <span>Item Bonus:</span>
+                  <span className="font-mono">+{mods.defenseScore}</span>
+                </div>
+                <div className="border-t border-slate-700 pt-1 flex justify-between gap-8 font-bold text-white">
+                  <span>Total:</span>
+                  <span className="font-mono">{totalDefenseScore}</span>
+                </div>
+                <p className="text-[10px] text-slate-500 italic mt-1 font-normal border-t border-slate-800/80 pt-1">
+                  {player.attributes.defenseScore} base + {mods.defenseScore} items
+                </p>
+              </div>
+            }
+          >
+            <div className="flex justify-between items-center p-2 rounded hover:bg-slate-700/30 transition-colors cursor-help">
+              <span className="text-slate-300">Defense Score</span>
+              <span className="font-mono text-lg font-bold text-white">{totalDefenseScore}</span>
+            </div>
+          </HoverTooltip>
 
           <div className="space-y-2 p-2">
             <div className="flex justify-between items-center">
