@@ -91,7 +91,15 @@ export const handleMine = async (
     include: {
       inventory: {
         include: {
-          item: true,
+          item: {
+            include: {
+              itemEffects: {
+                include: {
+                  effect: true
+                }
+              }
+            }
+          },
         },
       },
     },

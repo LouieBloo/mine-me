@@ -9,6 +9,7 @@ import * as UserController from '../controllers/admin/user.controller';
 import * as InventoryController from '../controllers/admin/inventory.controller';
 import * as CharacterController from '../controllers/admin/character.controller';
 import * as CharacterLevelController from '../controllers/admin/character-level.controller';
+import * as EffectController from '../controllers/admin/effect.controller';
 import * as AdminValidation from '../validations/admin.validation';
 
 const adminRouter = express.Router();
@@ -87,5 +88,12 @@ adminRouter.get('/levels/:id', CharacterLevelController.getLevel);
 adminRouter.post('/levels', runValidation(AdminValidation.characterLevelValidation), CharacterLevelController.createLevel);
 adminRouter.put('/levels/:id', runValidation(AdminValidation.characterLevelValidation), CharacterLevelController.updateLevel);
 adminRouter.delete('/levels/:id', CharacterLevelController.deleteLevel);
+
+// EFFECTS
+adminRouter.get('/effects', EffectController.getEffects);
+adminRouter.get('/effects/:id', EffectController.getEffect);
+adminRouter.post('/effects', runValidation(AdminValidation.effectValidation), EffectController.createEffect);
+adminRouter.put('/effects/:id', runValidation(AdminValidation.effectValidation), EffectController.updateEffect);
+adminRouter.delete('/effects/:id', EffectController.deleteEffect);
 
 export { adminRouter };

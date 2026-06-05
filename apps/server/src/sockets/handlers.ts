@@ -206,6 +206,11 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
                   experience: true,
                   combatScore: true,
                   defenseScore: true,
+                  itemEffects: {
+                    include: {
+                      effect: true
+                    }
+                  }
                 }
               }
             }

@@ -62,15 +62,56 @@ async function main() {
 
   const dataPath = path.join(__dirname, '../../../packages/shared/src/data');
 
-  // 1. Seed Items
+  // 1. Seed Effects
+  const effectsPath = path.join(dataPath, 'effects.json');
+  if (fs.existsSync(effectsPath)) {
+    const effects = JSON.parse(fs.readFileSync(effectsPath, 'utf-8'));
+    for (const eff of effects) {
+      const { objectEffects, ...effRoot } = eff;
+      await prisma.effect.upsert({
+        where: { id: effRoot.id },
+        update: {
+          name: effRoot.name,
+          description: effRoot.description,
+          healthGain: effRoot.healthGain,
+          staminaGain: effRoot.staminaGain
+        },
+        create: {
+          id: effRoot.id,
+          name: effRoot.name,
+          description: effRoot.description,
+          healthGain: effRoot.healthGain,
+          staminaGain: effRoot.staminaGain
+        },
+      });
+    }
+    console.log('✅ Effects seeded.');
+  }
+
+  // 2. Seed Items
   const items = JSON.parse(fs.readFileSync(path.join(dataPath, 'items.json'), 'utf-8'));
   for (const itemData of items) {
-    const { dropTableItems, cityMaterials, inventoryItems, ...itemRoot } = itemData;
+    const { dropTableItems, cityMaterials, inventoryItems, itemEffects, ...itemRoot } = itemData;
     await prisma.item.upsert({
       where: { id: itemRoot.id },
       update: itemRoot,
       create: itemRoot,
     });
+
+    if (itemEffects && itemEffects.length > 0) {
+      await prisma.objectEffects.deleteMany({
+        where: { itemId: itemRoot.id }
+      });
+      for (const ie of itemEffects) {
+        await prisma.objectEffects.create({
+          data: {
+            itemId: itemRoot.id,
+            effectId: ie.effectId,
+            value: ie.value
+          }
+        });
+      }
+    }
   }
   console.log('✅ Items seeded.');
 

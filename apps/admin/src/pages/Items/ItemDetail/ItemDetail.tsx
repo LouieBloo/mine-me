@@ -22,25 +22,29 @@ export default function ItemDetail() {
   const [data, setData] = useState<any>(isNew ? {
     name: '', description: '', type: 'GEAR', subType: 'HEAD',
     vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', isStartingPiece: false, experience: 0,
-    combatScore: 0, defenseScore: 0
+    combatScore: 0, defenseScore: 0, itemEffects: []
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
+  const [effectsList, setEffectsList] = useState<any[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
   const { fetchWithAuth } = useApi();
 
-  // Fetch enums
+  // Fetch enums & effects
   useEffect(() => {
-    fetchWithAuth('/api/admin/item-enums')
-      .then(res => res.json())
-      .then(json => {
-        setEnums(json);
+    Promise.all([
+      fetchWithAuth('/api/admin/item-enums').then(res => res.json()),
+      fetchWithAuth('/api/admin/effects').then(res => res.json())
+    ])
+      .then(([enumsJson, effectsJson]) => {
+        setEnums(enumsJson);
+        setEffectsList(effectsJson);
         if (isNew) setLoading(false);
       })
       .catch(err => {
-        toast.error('Failed to load item enums: ' + err.message);
+        toast.error('Failed to load enums/effects: ' + err.message);
         if (isNew) setLoading(false);
       });
   }, []);
@@ -225,6 +229,102 @@ export default function ItemDetail() {
                   {errors.defenseScore && <p className="text-red-500 text-xs font-bold mt-1">{errors.defenseScore}</p>}
                 </div>
               </>
+            )}
+
+            {/* Consumable Effects Configurator */}
+            {data.type === 'CONSUMABLE' && (
+              <div className="space-y-4 md:col-span-2 bg-slate-50 p-6 rounded-xl border border-slate-200">
+                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Consumable Effects</h4>
+                
+                {/* Add effect form */}
+                <div className="flex gap-4 items-end flex-wrap">
+                  <div className="flex-grow min-w-[200px] space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Effect</label>
+                    <select
+                      id="effect-select"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-lg font-bold text-slate-800 cursor-pointer"
+                    >
+                      <option value="">-- Choose an Effect --</option>
+                      {effectsList.map(eff => (
+                        <option key={eff.id} value={eff.id}>
+                          {eff.name} ({eff.healthGain ? 'Health' : ''}{eff.healthGain && eff.staminaGain ? ' & ' : ''}{eff.staminaGain ? 'Stamina' : ''})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="w-24 space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Value</label>
+                    <input
+                      type="number"
+                      id="effect-value-input"
+                      defaultValue="10"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-lg font-bold text-slate-800"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const selectEl = document.getElementById('effect-select') as HTMLSelectElement;
+                      const valueEl = document.getElementById('effect-value-input') as HTMLInputElement;
+                      if (!selectEl || !valueEl || !selectEl.value) return;
+                      
+                      const effectId = selectEl.value;
+                      const val = Number(valueEl.value);
+                      
+                      const selectedEffect = effectsList.find(e => e.id === effectId);
+                      if (!selectedEffect) return;
+
+                      // Check if already exists
+                      const exists = (data.itemEffects || []).some((ie: any) => ie.effectId === effectId);
+                      if (exists) {
+                        toast.error('This effect is already added to the item.');
+                        return;
+                      }
+
+                      const newEffects = [...(data.itemEffects || []), {
+                        effectId,
+                        value: val,
+                        effect: selectedEffect
+                      }];
+                      setData({ ...data, itemEffects: newEffects });
+                      selectEl.value = '';
+                    }}
+                    className="cursor-pointer px-5 py-2.5 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-all text-sm active:scale-95"
+                  >
+                    Add Effect
+                  </button>
+                </div>
+
+                {/* List of current effects */}
+                <div className="space-y-2 pt-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Effects ({ (data.itemEffects || []).length })</label>
+                  {(data.itemEffects || []).length === 0 ? (
+                    <p className="text-slate-400 text-xs italic">No effects configured for this consumable item.</p>
+                  ) : (
+                    <div className="divide-y divide-slate-100 bg-white rounded-lg border border-slate-200 overflow-hidden">
+                      {(data.itemEffects || []).map((ie: any, idx: number) => (
+                        <div key={ie.effectId || idx} className="flex justify-between items-center p-3 text-sm">
+                          <div>
+                            <span className="font-bold text-slate-800">{ie.effect?.name || 'Effect'}</span>
+                            <span className="ml-2 text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Value: +{ie.value}</span>
+                            <p className="text-slate-500 text-xs mt-0.5">{ie.effect?.description}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newEffects = (data.itemEffects || []).filter((itemEff: any) => itemEff.effectId !== ie.effectId);
+                              setData({ ...data, itemEffects: newEffects });
+                            }}
+                            className="cursor-pointer text-red-500 hover:text-red-700 font-bold text-xs"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
 
             {/* Starting Piece toggle */}

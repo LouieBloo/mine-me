@@ -1,5 +1,26 @@
 [
   {
+    "id": "cmnje1gyv000386569nj6a2tn",
+    "name": "Pink Sword",
+    "description": "Pink Sword",
+    "type": "GEAR",
+    "subType": "WEAPON",
+    "vendorBuyPrice": 0,
+    "vendorSellPrice": 0,
+    "userSellPrice": 0,
+    "userBuyPrice": 0,
+    "rarity": "LOW",
+    "iconUrl": null,
+    "gearImageUrl": "/assets/gear/cmnje1gyv000386569nj6a2tn_gear.png",
+    "isStartingPiece": true,
+    "experience": 0,
+    "combatScore": 5,
+    "defenseScore": 0,
+    "createdAt": "2026-04-06T21:51:48.656Z",
+    "updatedAt": "2026-04-06T21:51:48.656Z",
+    "itemEffects": []
+  },
+  {
     "id": "cmnc9o3in00005z6u5nr4ttl3",
     "name": "Basic Herb",
     "description": "herb",
@@ -17,7 +38,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.593Z",
-    "updatedAt": "2026-04-06T21:51:48.593Z"
+    "updatedAt": "2026-04-06T21:51:48.593Z",
+    "itemEffects": []
   },
   {
     "id": "cmnc6ct730000k21bi04iybb4",
@@ -37,7 +59,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.602Z",
-    "updatedAt": "2026-04-06T21:51:48.602Z"
+    "updatedAt": "2026-04-06T21:51:48.602Z",
+    "itemEffects": []
   },
   {
     "id": "cmni8mse50001xe1a7ur35nrx",
@@ -57,7 +80,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.612Z",
-    "updatedAt": "2026-04-06T21:51:48.612Z"
+    "updatedAt": "2026-04-06T21:51:48.612Z",
+    "itemEffects": []
   },
   {
     "id": "cmni8n4qz0002xe1acuv9mytw",
@@ -77,7 +101,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.619Z",
-    "updatedAt": "2026-04-06T21:51:48.619Z"
+    "updatedAt": "2026-04-06T21:51:48.619Z",
+    "itemEffects": []
   },
   {
     "id": "cmni8nkf00003xe1az1084gpc",
@@ -97,7 +122,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.624Z",
-    "updatedAt": "2026-04-06T21:51:48.624Z"
+    "updatedAt": "2026-04-06T21:51:48.624Z",
+    "itemEffects": []
   },
   {
     "id": "cmni8ohjt0005xe1alsscf6xp",
@@ -117,7 +143,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.630Z",
-    "updatedAt": "2026-04-06T21:51:48.630Z"
+    "updatedAt": "2026-04-06T21:51:48.630Z",
+    "itemEffects": []
   },
   {
     "id": "cmni8osk00006xe1aza26401u",
@@ -137,7 +164,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.634Z",
-    "updatedAt": "2026-04-06T21:51:48.634Z"
+    "updatedAt": "2026-04-06T21:51:48.634Z",
+    "itemEffects": []
   },
   {
     "id": "cmni8nzs20004xe1aokqxuysf",
@@ -157,7 +185,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.639Z",
-    "updatedAt": "2026-04-06T21:51:48.639Z"
+    "updatedAt": "2026-04-06T21:51:48.639Z",
+    "itemEffects": []
   },
   {
     "id": "cmnjdru4y00008656sklfwyd2",
@@ -177,7 +206,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.643Z",
-    "updatedAt": "2026-04-06T21:51:48.643Z"
+    "updatedAt": "2026-04-06T21:51:48.643Z",
+    "itemEffects": []
   },
   {
     "id": "cmnje0otv00018656nzoywcl7",
@@ -197,7 +227,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.647Z",
-    "updatedAt": "2026-04-06T21:51:48.647Z"
+    "updatedAt": "2026-04-06T21:51:48.647Z",
+    "itemEffects": []
   },
   {
     "id": "cmnje132100028656bdkw1t9p",
@@ -217,7 +248,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.651Z",
-    "updatedAt": "2026-04-06T21:51:48.651Z"
+    "updatedAt": "2026-04-06T21:51:48.651Z",
+    "itemEffects": []
   },
   {
     "id": "cmnje20qh00048656s78jsmge",
@@ -237,7 +269,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.660Z",
-    "updatedAt": "2026-04-06T21:51:48.660Z"
+    "updatedAt": "2026-04-06T21:51:48.660Z",
+    "itemEffects": []
   },
   {
     "id": "cmnje30rf00058656o0xukduf",
@@ -257,7 +290,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.664Z",
-    "updatedAt": "2026-04-06T21:51:48.664Z"
+    "updatedAt": "2026-04-06T21:51:48.664Z",
+    "itemEffects": []
   },
   {
     "id": "cmnje3cld00068656i26o6j0k",
@@ -277,7 +311,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.668Z",
-    "updatedAt": "2026-04-06T21:51:48.668Z"
+    "updatedAt": "2026-04-06T21:51:48.668Z",
+    "itemEffects": []
   },
   {
     "id": "cmni8l0zu0000xe1auwhar051",
@@ -297,7 +332,8 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-04-06T21:51:48.607Z",
-    "updatedAt": "2026-04-11T02:30:46.526Z"
+    "updatedAt": "2026-04-11T02:30:46.526Z",
+    "itemEffects": []
   },
   {
     "id": "cmp6an6oz0007idpxifchh73j",
@@ -317,12 +353,13 @@
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-05-15T02:24:03.491Z",
-    "updatedAt": "2026-05-15T02:24:03.491Z"
+    "updatedAt": "2026-05-15T02:24:03.491Z",
+    "itemEffects": []
   },
   {
     "id": "cmp6aexa30004idpx29gsz12l",
     "name": "Copperium",
-    "description": "Cop",
+    "description": "Common material used to craft items and sell",
     "type": "MATERIAL",
     "subType": "MINERAL",
     "vendorBuyPrice": 1,
@@ -330,14 +367,15 @@
     "userSellPrice": 0,
     "userBuyPrice": 0,
     "rarity": "LOW",
-    "iconUrl": null,
+    "iconUrl": "/assets/icons/items/cmp6aexa30004idpx29gsz12l_icon.png",
     "gearImageUrl": null,
     "isStartingPiece": false,
     "experience": 10,
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-05-15T02:17:38.043Z",
-    "updatedAt": "2026-05-15T02:17:38.043Z"
+    "updatedAt": "2026-06-05T02:11:08.728Z",
+    "itemEffects": []
   },
   {
     "id": "cmp6ammsn0006idpxgnpsnyk1",
@@ -350,33 +388,35 @@
     "userSellPrice": 3,
     "userBuyPrice": 3,
     "rarity": "MEDIUM",
-    "iconUrl": null,
+    "iconUrl": "/assets/icons/items/cmp6ammsn0006idpxgnpsnyk1_icon.png",
     "gearImageUrl": null,
     "isStartingPiece": false,
     "experience": 30,
     "combatScore": 0,
     "defenseScore": 0,
     "createdAt": "2026-05-15T02:23:37.703Z",
-    "updatedAt": "2026-05-15T02:23:37.703Z"
+    "updatedAt": "2026-06-05T02:11:18.409Z",
+    "itemEffects": []
   },
   {
-    "id": "cmnje1gyv000386569nj6a2tn",
-    "name": "Pink Sword",
-    "description": "Pink Sword",
-    "type": "GEAR",
-    "subType": "WEAPON",
-    "vendorBuyPrice": 0,
-    "vendorSellPrice": 0,
-    "userSellPrice": 0,
-    "userBuyPrice": 0,
+    "id": "cmq0b6kf500002rdhs7vehh63",
+    "name": "Health Potion",
+    "description": "Gives you health you",
+    "type": "CONSUMABLE",
+    "subType": "POTION",
+    "vendorBuyPrice": 5,
+    "vendorSellPrice": 15,
+    "userSellPrice": 3,
+    "userBuyPrice": 4,
     "rarity": "LOW",
-    "iconUrl": null,
-    "gearImageUrl": "/assets/gear/cmnje1gyv000386569nj6a2tn_gear.png",
-    "isStartingPiece": true,
+    "iconUrl": "/assets/icons/items/cmq0b6kf500002rdhs7vehh63_icon.png",
+    "gearImageUrl": null,
+    "isStartingPiece": false,
     "experience": 0,
-    "combatScore": 5,
+    "combatScore": 0,
     "defenseScore": 0,
-    "createdAt": "2026-04-06T21:51:48.656Z",
-    "updatedAt": "2026-04-06T21:51:48.656Z"
+    "createdAt": "2026-06-05T02:32:13.026Z",
+    "updatedAt": "2026-06-05T02:48:20.191Z",
+    "itemEffects": []
   }
 ]

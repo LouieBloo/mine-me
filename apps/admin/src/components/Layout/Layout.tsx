@@ -20,6 +20,7 @@ export default function Layout() {
           <NavLink to="/dungeons" className={navLinkClass}>Dungeons Editor</NavLink>
           <NavLink to="/inventory-items" className={navLinkClass}>Inventory Editor</NavLink>
           <NavLink to="/items" className={navLinkClass}>Items Editor</NavLink>
+          <NavLink to="/effects" className={navLinkClass}>Effects Editor</NavLink>
           <NavLink to="/mobs" className={navLinkClass}>Mobs Editor</NavLink>
           <NavLink to="/rates" className={navLinkClass}>Rates Editor</NavLink>
           <NavLink to="/character-levels" className={navLinkClass}>Levels Config</NavLink>

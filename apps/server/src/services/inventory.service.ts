@@ -78,6 +78,19 @@ export class InventoryService {
       experience: item.experience,
       combatScore: item.combatScore,
       defenseScore: item.defenseScore,
+      itemEffects: (item.itemEffects || []).map((ie: any) => ({
+        id: ie.id,
+        itemId: ie.itemId,
+        effectId: ie.effectId,
+        value: ie.value,
+        effect: ie.effect ? {
+          id: ie.effect.id,
+          name: ie.effect.name,
+          description: ie.effect.description,
+          healthGain: ie.effect.healthGain,
+          staminaGain: ie.effect.staminaGain,
+        } : undefined
+      })),
     };
   }
 

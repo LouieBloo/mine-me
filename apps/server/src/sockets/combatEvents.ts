@@ -136,7 +136,15 @@ export const handleCombatAction = async (
     include: {
       inventory: {
         include: {
-          item: true
+          item: {
+            include: {
+              itemEffects: {
+                include: {
+                  effect: true
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -255,7 +263,15 @@ export const handleCombatAction = async (
       include: {
         inventory: {
           include: {
-            item: true
+            item: {
+              include: {
+                itemEffects: {
+                  include: {
+                    effect: true
+                  }
+                }
+              }
+            }
           }
         }
       }

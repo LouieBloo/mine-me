@@ -72,20 +72,22 @@ export interface CharacterStatUpdate {
 
 export type ItemRarity = 'LOW' | 'MEDIUM' | 'RARE' | 'VERY_RARE';
 
-export type ItemType = 'GEAR' | 'MATERIAL' | 'POTION';
+export type ItemType = 'GEAR' | 'MATERIAL' | 'POTION' | 'CONSUMABLE';
 
 export type GearSubType = 'HEAD' | 'SHOULDERS' | 'CHEST' | 'GAUNTLETS' | 'LEGGINGS' | 'BOOTS' | 'WEAPON';
 export type MaterialSubType = 'LUMBER' | 'MINERAL' | 'AGRICULTURE' | 'HERB';
 export type PotionSubType = 'HEALTH' | 'STAMINA';
+export type ConsumableSubType = 'POTION' | 'FOOD' | 'OTHER';
 
-export type ItemSubType = GearSubType | MaterialSubType | PotionSubType;
+export type ItemSubType = GearSubType | MaterialSubType | PotionSubType | ConsumableSubType;
 
-export const ITEM_TYPES: ItemType[] = ['GEAR', 'MATERIAL', 'POTION'];
+export const ITEM_TYPES: ItemType[] = ['GEAR', 'MATERIAL', 'POTION', 'CONSUMABLE'];
 
 export const ITEM_SUBTYPES: Record<ItemType, string[]> = {
   GEAR: ['HEAD', 'SHOULDERS', 'CHEST', 'GAUNTLETS', 'LEGGINGS', 'BOOTS', 'WEAPON'],
   MATERIAL: ['LUMBER', 'MINERAL', 'AGRICULTURE', 'HERB'],
   POTION: ['HEALTH', 'STAMINA'],
+  CONSUMABLE: ['POTION', 'FOOD', 'OTHER'],
 };
 
 export const ITEM_RARITIES: ItemRarity[] = ['LOW', 'MEDIUM', 'RARE', 'VERY_RARE'];
@@ -104,6 +106,7 @@ export interface GameItem {
   experience?: number;
   combatScore?: number;
   defenseScore?: number;
+  itemEffects?: ObjectEffects[];
 }
 
 export interface PotionItem extends GameItem {
@@ -118,6 +121,7 @@ export interface GearItem extends GameItem {
   type: 'GEAR';
   subType: GearSubType;
   defenseBonus: number;
+  itemEffects?: ObjectEffects[];
 }
 
 export interface WeaponItem extends GearItem {
@@ -249,8 +253,28 @@ export interface CharacterLevel {
   level: number;
   xpRequired: number;
   dropTable?: DropTable | null;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Effect {
+  id: string;
+  name: string;
+  description: string;
+  healthGain: boolean;
+  staminaGain: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ObjectEffects {
+  id: string;
+  itemId?: string | null;
+  effectId: string;
+  effect?: Effect;
+  value: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export * from './combat';

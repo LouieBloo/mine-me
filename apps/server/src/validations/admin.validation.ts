@@ -64,3 +64,10 @@ export const characterLevelValidation = [
   body('level').isInt({ min: 1 }).withMessage('Level must be >= 1'),
   body('xpRequired').isInt({ min: 0 }).withMessage('XP Required must be >= 0')
 ];
+
+export const effectValidation = [
+  body('name').trim().notEmpty().withMessage('Effect name is required'),
+  body('description').trim().notEmpty().withMessage('Description is required'),
+  body('healthGain').optional().isBoolean().withMessage('healthGain must be a boolean'),
+  body('staminaGain').optional().isBoolean().withMessage('staminaGain must be a boolean')
+];

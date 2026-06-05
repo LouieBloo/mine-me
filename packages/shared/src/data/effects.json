@@ -1,0 +1,11 @@
+[
+  {
+    "id": "cmq0b7ms200012rdh7w3i7tjc",
+    "name": "Gain Life",
+    "description": "Gain Life Instantly",
+    "healthGain": true,
+    "staminaGain": false,
+    "createdAt": "2026-06-05T02:33:02.739Z",
+    "updatedAt": "2026-06-05T02:33:02.739Z"
+  }
+]

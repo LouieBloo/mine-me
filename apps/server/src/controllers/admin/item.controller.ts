@@ -54,7 +54,18 @@ export const getItems = async (req: Request, res: Response) => {
   if (req.query.subType) {
     where.subType = req.query.subType as string;
   }
-  const items = await prisma.item.findMany({ skip, take, where });
+  const items = await prisma.item.findMany({
+    skip,
+    take,
+    where,
+    include: {
+      itemEffects: {
+        include: {
+          effect: true
+        }
+      }
+    }
+  });
   res.json(items);
 };
 
@@ -67,20 +78,83 @@ export const getItemEnums = (req: Request, res: Response) => {
 };
 
 export const getItem = async (req: Request, res: Response) => {
-  const item = await prisma.item.findUnique({ where: { id: req.params.id } });
+  const item = await prisma.item.findUnique({
+    where: { id: req.params.id },
+    include: {
+      itemEffects: {
+        include: {
+          effect: true
+        }
+      }
+    }
+  });
   res.json(item);
 };
 
 export const createItem = async (req: Request, res: Response) => {
-  const item = await prisma.item.create({ data: req.body });
-  const allItems = await prisma.item.findMany();
+  const { itemEffects, ...itemData } = req.body;
+  const item = await prisma.item.create({
+    data: {
+      ...itemData,
+      itemEffects: itemEffects && Array.isArray(itemEffects) ? {
+        create: itemEffects.map((ie: any) => ({
+          effectId: ie.effectId,
+          value: Number(ie.value)
+        }))
+      } : undefined
+    },
+    include: {
+      itemEffects: {
+        include: {
+          effect: true
+        }
+      }
+    }
+  });
+  const allItems = await prisma.item.findMany({
+    include: {
+      itemEffects: {
+        include: {
+          effect: true
+        }
+      }
+    }
+  });
   syncJson('items.json', allItems);
   res.json(item);
 };
 
 export const updateItem = async (req: Request, res: Response) => {
-  const item = await prisma.item.update({ where: { id: req.params.id }, data: req.body });
-  const allItems = await prisma.item.findMany();
+  const { itemEffects, ...itemData } = req.body;
+  const item = await prisma.item.update({
+    where: { id: req.params.id },
+    data: {
+      ...itemData,
+      itemEffects: {
+        deleteMany: {},
+        create: itemEffects && Array.isArray(itemEffects) ? itemEffects.map((ie: any) => ({
+          effectId: ie.effectId,
+          value: Number(ie.value)
+        })) : []
+      }
+    },
+    include: {
+      itemEffects: {
+        include: {
+          effect: true
+        }
+      }
+    }
+  });
+  const allItems = await prisma.item.findMany({
+    include: {
+      itemEffects: {
+        include: {
+          effect: true
+        }
+      }
+    }
+  });
   syncJson('items.json', allItems);
   res.json(item);
 };

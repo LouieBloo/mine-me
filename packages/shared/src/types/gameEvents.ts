@@ -115,10 +115,19 @@ export interface UnequipItemPayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
+// Event: consume_item
+// Consumes a consumable item from inventory.
+// ----------------------------------------------------------------------------
+export interface ConsumeItemPayload extends GameEventBase {
+  type: 'consume_item';
+  inventoryItemId: string;
+}
+
+// ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
 // ----------------------------------------------------------------------------
-export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload | MinePayload | EquipItemPayload | UnequipItemPayload;
+export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload | MinePayload | EquipItemPayload | UnequipItemPayload | ConsumeItemPayload;
 
 // Utility type: extract the type string literals from the union
 export type GameEventType = GameEventPayload['type'];

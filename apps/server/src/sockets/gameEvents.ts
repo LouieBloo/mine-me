@@ -216,7 +216,17 @@ const handleEquipItem: GameEventHandler<any> = async (io, socket, payload) => {
 
   const inventoryItem = await prisma.inventoryItem.findUnique({
     where: { id: inventoryItemId },
-    include: { item: true }
+    include: {
+      item: {
+        include: {
+          itemEffects: {
+            include: {
+              effect: true
+            }
+          }
+        }
+      }
+    }
   });
 
   if (!inventoryItem || inventoryItem.characterId !== characterId) {
@@ -259,7 +269,17 @@ const handleEquipItem: GameEventHandler<any> = async (io, socket, payload) => {
     where: { id: characterId },
     include: {
       inventory: {
-        include: { item: true }
+        include: {
+          item: {
+            include: {
+              itemEffects: {
+                include: {
+                  effect: true
+                }
+              }
+            }
+          }
+        }
       }
     }
   });
@@ -314,7 +334,17 @@ const handleUnequipItem: GameEventHandler<any> = async (io, socket, payload) => 
     where: { id: characterId },
     include: {
       inventory: {
-        include: { item: true }
+        include: {
+          item: {
+            include: {
+              itemEffects: {
+                include: {
+                  effect: true
+                }
+              }
+            }
+          }
+        }
       }
     }
   });
@@ -335,6 +365,151 @@ const handleUnequipItem: GameEventHandler<any> = async (io, socket, payload) => 
 };
 
 // ----------------------------------------------------------------------------
+// Handler: consume_item
+// Consumes a consumable item, applying its health and stamina effects.
+// ----------------------------------------------------------------------------
+const handleConsumeItem: GameEventHandler<any> = async (io, socket, payload) => {
+  const userId = socket.data.userId;
+  const characterId = socket.data.characterId;
+
+  if (!characterId) {
+    return { success: false, error: 'No character selected.' };
+  }
+
+  const { inventoryItemId } = payload;
+  if (!inventoryItemId) {
+    return { success: false, error: 'inventoryItemId is required.' };
+  }
+
+  const inventoryItem = await prisma.inventoryItem.findUnique({
+    where: { id: inventoryItemId },
+    include: {
+      item: {
+        include: {
+          itemEffects: {
+            include: {
+              effect: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!inventoryItem || inventoryItem.characterId !== characterId) {
+    return { success: false, error: 'Item not found in character inventory.' };
+  }
+
+  const item = inventoryItem.item;
+  if (item.type !== 'CONSUMABLE') {
+    return { success: false, error: 'Only consumable items can be consumed.' };
+  }
+
+  if (inventoryItem.quantity < 1) {
+    return { success: false, error: 'You do not have enough of this item.' };
+  }
+
+  const character = await prisma.character.findUnique({
+    where: { id: characterId }
+  });
+
+  if (!character) {
+    return { success: false, error: 'Character not found.' };
+  }
+
+  if (character.status !== 'ACTIVE') {
+    return { success: false, error: 'Only active characters can consume items.' };
+  }
+
+  // Calculate effect gains
+  let healthGainTotal = 0;
+  let staminaGainTotal = 0;
+
+  const itemEffects = item.itemEffects || [];
+  for (const ie of itemEffects) {
+    if (ie.effect.healthGain) {
+      healthGainTotal += ie.value;
+    }
+    if (ie.effect.staminaGain) {
+      staminaGainTotal += ie.value;
+    }
+  }
+
+  const finalHealth = Math.min(character.maxHealth, character.health + healthGainTotal);
+  const finalStamina = Math.min(character.maxStamina, character.stamina + staminaGainTotal);
+
+  const healthRecovered = finalHealth - character.health;
+  const staminaRecovered = finalStamina - character.stamina;
+
+  // Transaction to update character stats, decrement/delete inventory item
+  await prisma.$transaction(async (tx) => {
+    // 1. Update character stats
+    await tx.character.update({
+      where: { id: characterId },
+      data: {
+        health: finalHealth,
+        stamina: finalStamina
+      }
+    });
+
+    // 2. Decrement or remove item
+    if (inventoryItem.quantity === 1) {
+      await tx.inventoryItem.delete({
+        where: { id: inventoryItemId }
+      });
+    } else {
+      await tx.inventoryItem.update({
+        where: { id: inventoryItemId },
+        data: {
+          quantity: { decrement: 1 }
+        }
+      });
+    }
+  });
+
+  // Fetch updated character including inventory
+  const updatedChar = await prisma.character.findUnique({
+    where: { id: characterId },
+    include: {
+      inventory: {
+        include: {
+          item: {
+            include: {
+              itemEffects: {
+                include: {
+                  effect: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!updatedChar) {
+    return { success: false, error: 'Failed to retrieve updated character.' };
+  }
+
+  const clientInventory = InventoryService.mapCharacterInventory(updatedChar);
+
+  broadcastStatUpdate(characterId, {
+    health: updatedChar.health,
+    stamina: updatedChar.stamina,
+    inventory: clientInventory
+  });
+
+  return {
+    success: true,
+    data: {
+      itemName: item.name,
+      healthRecovered,
+      staminaRecovered
+    }
+  };
+};
+
+// ----------------------------------------------------------------------------
 // Handler Registry — maps event type strings to their handler functions.
 // To add a new event, just add an entry here.
 // ----------------------------------------------------------------------------
@@ -349,6 +524,7 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   mine: handleMine,
   equip_item: handleEquipItem,
   unequip_item: handleUnequipItem,
+  consume_item: handleConsumeItem,
 };
 
 // ----------------------------------------------------------------------------

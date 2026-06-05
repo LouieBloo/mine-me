@@ -16,6 +16,8 @@ import MobDetail from './pages/Mobs/MobDetail';
 import ItemDetail from './pages/Items/ItemDetail/ItemDetail';
 import MapEditor from './pages/MapEditor/MapEditor';
 import CharacterLevel from './pages/CharacterLevel/CharacterLevel';
+import Effects from './pages/Effects/Effects';
+import EffectDetail from './pages/Effects/EffectDetail';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -49,6 +51,14 @@ const router = createBrowserRouter([
       {
         path: "items",
         element: <Items />
+      },
+      {
+        path: "effects",
+        element: <Effects />
+      },
+      {
+        path: "effects/:id",
+        element: <EffectDetail />
       },
       {
         path: "mobs",

@@ -497,3 +497,113 @@ describe('gameEvents — handleEquipItem & handleUnequipItem', () => {
     expect(characterBroadcast.broadcastStatUpdate).toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// handleConsumeItem
+// ---------------------------------------------------------------------------
+describe('gameEvents — handleConsumeItem', () => {
+  const handleConsumeItem = gameEventHandlers.consume_item;
+  let io: Server;
+  let socket: ReturnType<typeof makeSocket>;
+
+  beforeEach(() => {
+    io = {} as Server;
+    socket = makeSocket();
+    vi.clearAllMocks();
+  });
+
+  it('returns error if no character is selected', async () => {
+    socket.data.characterId = null;
+    const result = await handleConsumeItem(io, socket, { type: 'consume_item', inventoryItemId: 'inv-1' });
+    expect(result).toEqual({ success: false, error: 'No character selected.' });
+  });
+
+  it('returns error if item is not found in character inventory', async () => {
+    (prisma.inventoryItem.findUnique as any).mockResolvedValue(null);
+    const result = await handleConsumeItem(io, socket, { type: 'consume_item', inventoryItemId: 'inv-1' });
+    expect(result).toEqual({ success: false, error: 'Item not found in character inventory.' });
+  });
+
+  it('returns error if item type is not CONSUMABLE', async () => {
+    const gearItem = {
+      id: 'inv-1',
+      characterId: 'char1',
+      quantity: 1,
+      item: { id: 'item-helmet', type: 'GEAR', name: 'Helmet' },
+    };
+    (prisma.inventoryItem.findUnique as any).mockResolvedValue(gearItem);
+    const result = await handleConsumeItem(io, socket, { type: 'consume_item', inventoryItemId: 'inv-1' });
+    expect(result).toEqual({ success: false, error: 'Only consumable items can be consumed.' });
+  });
+
+  it('applies health and stamina gains and decrements inventory item quantity', async () => {
+    const consumableItem = {
+      id: 'inv-1',
+      characterId: 'char1',
+      quantity: 2,
+      item: {
+        id: 'item-potion',
+        type: 'CONSUMABLE',
+        name: 'Healing Potion',
+        itemEffects: [
+          {
+            value: 20,
+            effect: { healthGain: true, staminaGain: false }
+          },
+          {
+            value: 10,
+            effect: { healthGain: false, staminaGain: true }
+          }
+        ]
+      },
+    };
+
+    const character = {
+      id: 'char1',
+      health: 50,
+      stamina: 80,
+      maxHealth: 100,
+      maxStamina: 100,
+      status: 'ACTIVE'
+    };
+
+    const updatedChar = {
+      ...character,
+      health: 70,
+      stamina: 90,
+      maxInventorySlots: 25,
+      inventory: [
+        {
+          id: 'inv-1',
+          quantity: 1,
+          equipped: false,
+          item: consumableItem.item
+        }
+      ]
+    };
+
+    (prisma.inventoryItem.findUnique as any).mockResolvedValue(consumableItem);
+    (prisma.character.findUnique as any)
+      .mockResolvedValueOnce(character) // first fetch before apply
+      .mockResolvedValueOnce(updatedChar); // second fetch after transaction
+
+    const result = await handleConsumeItem(io, socket, { type: 'consume_item', inventoryItemId: 'inv-1' });
+
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      itemName: 'Healing Potion',
+      healthRecovered: 20,
+      staminaRecovered: 10
+    });
+
+    expect(prisma.inventoryItem.update).toHaveBeenCalledWith({
+      where: { id: 'inv-1' },
+      data: { quantity: { decrement: 1 } }
+    });
+
+    expect(characterBroadcast.broadcastStatUpdate).toHaveBeenCalledWith('char1', expect.objectContaining({
+      health: 70,
+      stamina: 90
+    }));
+  });
+});

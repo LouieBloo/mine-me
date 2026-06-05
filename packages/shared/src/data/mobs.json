@@ -40,18 +40,29 @@
       "dungeonId": null,
       "dungeonLevelId": null,
       "dungeonLevelMobId": null,
+      "characterLevelId": null,
       "createdAt": "2026-04-16T23:57:04.167Z",
-      "updatedAt": "2026-05-17T16:56:56.347Z",
+      "updatedAt": "2026-06-05T02:35:22.679Z",
       "items": [
         {
-          "id": "cmpa0pf6j0004y12ivnuvj5xn",
+          "id": "cmq0bamra000b2rdho8g1x5pe",
           "dropTableId": "cmo252azr0000ygtku562fr3f",
           "itemId": "cmp6aexa30004idpx29gsz12l",
           "chance": 75,
           "minQuantity": 1,
           "maxQuantity": 1,
-          "createdAt": "2026-05-17T16:56:56.347Z",
-          "updatedAt": "2026-05-17T16:56:56.347Z"
+          "createdAt": "2026-06-05T02:35:22.679Z",
+          "updatedAt": "2026-06-05T02:35:22.679Z"
+        },
+        {
+          "id": "cmq0bamrb000c2rdhgyous3ho",
+          "dropTableId": "cmo252azr0000ygtku562fr3f",
+          "itemId": "cmq0b6kf500002rdhs7vehh63",
+          "chance": 100,
+          "minQuantity": 1,
+          "maxQuantity": 1,
+          "createdAt": "2026-06-05T02:35:22.679Z",
+          "updatedAt": "2026-06-05T02:35:22.679Z"
         }
       ]
     }

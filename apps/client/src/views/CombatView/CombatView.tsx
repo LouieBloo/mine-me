@@ -465,16 +465,7 @@ export const CombatView: React.FC = () => {
 
       {/* Header Info */}
       <div className="absolute top-0 left-0 right-0 p-6 flex justify-between z-10 pointer-events-none">
-        <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 backdrop-blur-md pointer-events-auto">
-          <h2 className="text-xl font-black text-amber-500 uppercase">{activeCharacter.name}</h2>
-          <div className="mt-2 w-48 h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
-            <div
-              className="h-full bg-red-500 transition-all duration-300"
-              style={{ width: `${Math.max(0, (displayPlayerHealth / battleState.playerMaxHealth) * 100)}%` }}
-            />
-          </div>
-          <p className="text-xs text-slate-400 font-bold mt-1 text-right">{displayPlayerHealth} / {battleState.playerMaxHealth} HP</p>
-        </div>
+
 
         <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 backdrop-blur-md flex flex-col items-end gap-2 pointer-events-auto">
           <h2 className="text-xl font-black text-slate-300 uppercase">Round {battleState.round}</h2>

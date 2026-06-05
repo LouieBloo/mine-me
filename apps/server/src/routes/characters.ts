@@ -19,7 +19,15 @@ charactersRouter.get('/', authenticateToken, async (req: AuthRequest, res: Respo
         city: true,
         inventory: {
           include: {
-            item: true
+            item: {
+              include: {
+                itemEffects: {
+                  include: {
+                    effect: true
+                  }
+                }
+              }
+            }
           }
         }
       }
