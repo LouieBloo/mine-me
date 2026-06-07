@@ -7,5 +7,14 @@
     "staminaGain": false,
     "createdAt": "2026-06-05T02:33:02.739Z",
     "updatedAt": "2026-06-05T02:33:02.739Z"
+  },
+  {
+    "id": "cmq1lathh0000w7bkm1lbqp29",
+    "name": "Gain Stamina",
+    "description": "Instantly gain stamina",
+    "healthGain": false,
+    "staminaGain": true,
+    "createdAt": "2026-06-06T00:03:13.733Z",
+    "updatedAt": "2026-06-06T00:03:13.733Z"
   }
 ]

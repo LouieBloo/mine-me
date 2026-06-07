@@ -6,3 +6,4 @@ export { FloatingText } from './FloatingText';
 export type { FloatingTextOptions } from './FloatingText';
 export { SpriteMotion } from './SpriteMotion';
 export type { MotionOptions, LungeOptions, EasingFunction } from './SpriteMotion';
+export { RockSprite } from './RockSprite';

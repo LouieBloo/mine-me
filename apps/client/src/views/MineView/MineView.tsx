@@ -276,47 +276,33 @@ export const MineView: React.FC = () => {
 
         {/* Right Target / Rock Area */}
         <div className="w-1/2 relative flex flex-col items-center justify-center">
-          <div className="relative flex items-center gap-6">
-            <div className="absolute -top-14 left-1/2 -translate-x-1/2 w-32 flex flex-col items-center z-20">
-              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap drop-shadow-md bg-slate-900/50 px-2 py-0.5 rounded">
-                Vein of Rock
-              </span>
-            </div>
-
-            <div className="relative flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2 pointer-events-auto z-20">
+            <button
+              disabled={isInteractionDisabled}
+              onClick={handleMine}
+              title="Click to mine the vein"
+              className={`relative flex items-center justify-center rounded-xl p-4 transition-all ${isInteractionDisabled
+                  ? 'cursor-not-allowed opacity-60'
+                  : 'cursor-pointer hover:bg-slate-800/20 hover:ring-2 hover:ring-amber-500/20'
+                }`}
+            >
+              {submitting && (
+                <div className="absolute inset-0 bg-slate-950/60 rounded-xl flex items-center justify-center z-30">
+                  <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
               <SpriteRenderer
                 ref={rockSpriteRef}
                 type="rock"
-                width={160}
-                height={160}
+                width={400}
+                height={400}
               />
-            </div>
-
-            {/* Mine Controls */}
-            <div className="flex flex-col gap-3 pointer-events-auto z-20">
-              <button
-                disabled={isInteractionDisabled}
-                onClick={handleMine}
-                className={`px-8 py-3 rounded font-black uppercase tracking-widest text-sm transition-all cursor-pointer flex items-center gap-2 ${
-                  isInteractionDisabled
-                    ? 'bg-slate-900/50 text-slate-600 border border-slate-800 cursor-not-allowed'
-                    : 'bg-amber-600 hover:bg-amber-500 text-white border border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)] active:scale-95'
-                }`}
-              >
-                {submitting ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <span>⛏️</span>
-                )}
-                <span>Mine</span>
-              </button>
-
-              {stamina < 25 && (
-                <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest text-center mt-1">
-                  Requires 25 Stamina
-                </p>
-              )}
-            </div>
+            </button>
+            {stamina < 25 && (
+              <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest text-center mt-1">
+                Requires 25 Stamina
+              </p>
+            )}
           </div>
         </div>
       </PixiStageProvider>

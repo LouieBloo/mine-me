@@ -39,7 +39,7 @@ export const ItemListIcon = ({ entry }: ItemListIconProps) => {
   };
 
   const handleClick = () => {
-    if (item.type === 'CONSUMABLE' || item.type === 'POTION') {
+    if (item.type === 'CONSUMABLE') {
       setShowMenu(!showMenu);
     }
   };

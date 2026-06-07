@@ -72,21 +72,19 @@ export interface CharacterStatUpdate {
 
 export type ItemRarity = 'LOW' | 'MEDIUM' | 'RARE' | 'VERY_RARE';
 
-export type ItemType = 'GEAR' | 'MATERIAL' | 'POTION' | 'CONSUMABLE';
+export type ItemType = 'GEAR' | 'MATERIAL' | 'CONSUMABLE';
 
 export type GearSubType = 'HEAD' | 'SHOULDERS' | 'CHEST' | 'GAUNTLETS' | 'LEGGINGS' | 'BOOTS' | 'WEAPON';
 export type MaterialSubType = 'LUMBER' | 'MINERAL' | 'AGRICULTURE' | 'HERB';
-export type PotionSubType = 'HEALTH' | 'STAMINA';
 export type ConsumableSubType = 'POTION' | 'FOOD' | 'OTHER';
 
-export type ItemSubType = GearSubType | MaterialSubType | PotionSubType | ConsumableSubType;
+export type ItemSubType = GearSubType | MaterialSubType | ConsumableSubType;
 
-export const ITEM_TYPES: ItemType[] = ['GEAR', 'MATERIAL', 'POTION', 'CONSUMABLE'];
+export const ITEM_TYPES: ItemType[] = ['GEAR', 'MATERIAL', 'CONSUMABLE'];
 
 export const ITEM_SUBTYPES: Record<ItemType, string[]> = {
   GEAR: ['HEAD', 'SHOULDERS', 'CHEST', 'GAUNTLETS', 'LEGGINGS', 'BOOTS', 'WEAPON'],
   MATERIAL: ['LUMBER', 'MINERAL', 'AGRICULTURE', 'HERB'],
-  POTION: ['HEALTH', 'STAMINA'],
   CONSUMABLE: ['POTION', 'FOOD', 'OTHER'],
 };
 
@@ -107,14 +105,6 @@ export interface GameItem {
   combatScore?: number;
   defenseScore?: number;
   itemEffects?: ObjectEffects[];
-}
-
-export interface PotionItem extends GameItem {
-  type: 'POTION';
-  subType: PotionSubType;
-  effectType: 'Health' | 'Stamina' | 'Attack' | 'Defense';
-  duration: 'Instant' | 'Round' | 'Lasting';
-  power: number;
 }
 
 export interface GearItem extends GameItem {

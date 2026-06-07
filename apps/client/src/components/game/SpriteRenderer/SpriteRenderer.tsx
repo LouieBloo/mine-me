@@ -1,5 +1,5 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { Container, Graphics } from 'pixi.js';
+import { Container } from 'pixi.js';
 import { usePixiStage } from '../PixiStageContext/PixiStageContext';
 import { AnimatedEntitySprite } from '../sprites/AnimatedEntitySprite';
 import { CompositeEntitySprite } from '../sprites/CompositeEntitySprite';
@@ -7,17 +7,8 @@ import { FloatingText } from '../sprites/FloatingText';
 import type { FloatingTextOptions } from '../sprites/FloatingText';
 import type { GearLayerDescriptor } from '../sprites/CompositeEntitySprite';
 import { BaseSprite } from '../sprites/BaseSprite';
+import { RockSprite } from '../sprites';
 import './SpriteRenderer.css';
-
-class RockSprite extends BaseSprite {
-  async load(): Promise<void> {
-    const graphics = new Graphics();
-    graphics.rect(-50, -50, 100, 100);
-    graphics.fill(0x475569); // slate-600
-    graphics.stroke({ width: 4, color: 0x94a3b8 }); // slate-400 border
-    this.wrapper.addChild(graphics);
-  }
-}
 
 interface AnimatedSpriteProps {
   type: 'animated';

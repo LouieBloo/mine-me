@@ -13,21 +13,18 @@ export const GEAR_OFFSETS: Record<GearSubType, { x: number; y: number }> = {
 export const TYPE_LABELS: Record<ItemType, string> = {
   GEAR: 'Gear',
   MATERIAL: 'Materials',
-  POTION: 'Potions',
   CONSUMABLE: 'Consumables',
 };
 
 export const TYPE_COLORS: Record<ItemType, string> = {
   GEAR: 'text-yellow-400',
   MATERIAL: 'text-emerald-400',
-  POTION: 'text-violet-400',
   CONSUMABLE: 'text-indigo-400',
 };
 
 export const TYPE_BORDER: Record<ItemType, string> = {
   GEAR: 'border-yellow-500/30',
   MATERIAL: 'border-emerald-500/30',
-  POTION: 'border-violet-500/30',
   CONSUMABLE: 'border-indigo-500/30',
 };
 

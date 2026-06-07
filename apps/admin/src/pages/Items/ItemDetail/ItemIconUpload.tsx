@@ -32,8 +32,8 @@ export default function ItemIconUpload({ itemId, iconUrl, onUploadSuccess }: Ite
 
     const img = new Image();
     img.onload = () => {
-      if (img.width !== 64 || img.height !== 64) {
-        toast.error(`Icon must be exactly 64x64 pixels. This image is ${img.width}x${img.height}.`);
+      if (img.width > 256 || img.height > 256) {
+        toast.error(`Icon must be at most 256x256 pixels. This image is ${img.width}x${img.height}.`);
         setPendingIcon(null);
         if (iconInputRef.current) iconInputRef.current.value = '';
       } else {
@@ -81,7 +81,7 @@ export default function ItemIconUpload({ itemId, iconUrl, onUploadSuccess }: Ite
       <div className="bg-slate-800 p-6 flex items-center justify-between">
         <div>
            <h3 className="text-xl font-black text-white tracking-tight uppercase">Item Icon</h3>
-           <p className="text-slate-400 text-xs font-bold mt-1 uppercase tracking-widest">64x64 PNG required</p>
+           <p className="text-slate-400 text-xs font-bold mt-1 uppercase tracking-widest">Max 256x256 PNG allowed</p>
         </div>
         {!showUpload && (
           <button 
@@ -104,7 +104,7 @@ export default function ItemIconUpload({ itemId, iconUrl, onUploadSuccess }: Ite
               <svg className={`w-8 h-8 mb-2 ${pendingIcon ? 'text-green-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <span className="text-sm font-black uppercase text-slate-500">{pendingIcon ? pendingIcon.name : 'Select 64x64 PNG'}</span>
+              <span className="text-sm font-black uppercase text-slate-500">{pendingIcon ? pendingIcon.name : 'Select PNG (Max 256x256)'}</span>
               <input type="file" ref={iconInputRef} className="hidden" accept="image/png" onChange={handleFileChange} />
             </div>
             <div className="flex items-center space-x-4">

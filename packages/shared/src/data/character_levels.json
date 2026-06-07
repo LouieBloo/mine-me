@@ -4,7 +4,7 @@
     "level": 1,
     "xpRequired": 100,
     "createdAt": "2026-05-23T00:08:33.665Z",
-    "updatedAt": "2026-05-23T00:08:33.665Z",
+    "updatedAt": "2026-06-03T03:38:32.233Z",
     "dropTable": {
       "id": "cmphlbr0g0001wk65ikfjrcvb",
       "solMin": 10,
@@ -16,7 +16,7 @@
       "dungeonLevelMobId": null,
       "characterLevelId": "cmphlbr0g0000wk65k5yq179a",
       "createdAt": "2026-05-23T00:08:33.665Z",
-      "updatedAt": "2026-05-23T00:08:33.665Z",
+      "updatedAt": "2026-06-03T03:38:32.238Z",
       "items": []
     }
   },
@@ -25,7 +25,7 @@
     "level": 2,
     "xpRequired": 500,
     "createdAt": "2026-05-23T00:08:52.515Z",
-    "updatedAt": "2026-05-23T00:08:52.515Z",
+    "updatedAt": "2026-06-03T03:38:32.243Z",
     "dropTable": {
       "id": "cmphlc5k20003wk65uypj52cd",
       "solMin": 50,
@@ -37,7 +37,7 @@
       "dungeonLevelMobId": null,
       "characterLevelId": "cmphlc5k20002wk65pzrsx56s",
       "createdAt": "2026-05-23T00:08:52.515Z",
-      "updatedAt": "2026-05-23T00:08:52.515Z",
+      "updatedAt": "2026-06-03T03:38:32.247Z",
       "items": []
     }
   },
@@ -46,7 +46,7 @@
     "level": 3,
     "xpRequired": 1250,
     "createdAt": "2026-05-23T00:10:32.440Z",
-    "updatedAt": "2026-05-23T00:10:47.445Z",
+    "updatedAt": "2026-06-03T03:38:32.251Z",
     "dropTable": {
       "id": "cmphleans0005wk65rw2604j3",
       "solMin": 100,
@@ -58,7 +58,28 @@
       "dungeonLevelMobId": null,
       "characterLevelId": "cmphleans0004wk650dbjbjl8",
       "createdAt": "2026-05-23T00:10:32.440Z",
-      "updatedAt": "2026-05-23T00:10:47.445Z",
+      "updatedAt": "2026-06-03T03:38:32.254Z",
+      "items": []
+    }
+  },
+  {
+    "id": "cmq38fepz00017ayyybf0xnpi",
+    "level": 4,
+    "xpRequired": 3000,
+    "createdAt": "2026-06-07T03:38:25.223Z",
+    "updatedAt": "2026-06-07T03:38:25.223Z",
+    "dropTable": {
+      "id": "cmq38fepz00027ayycdjamxrx",
+      "solMin": 0,
+      "solMax": 0,
+      "experience": 0,
+      "mobId": null,
+      "dungeonId": null,
+      "dungeonLevelId": null,
+      "dungeonLevelMobId": null,
+      "characterLevelId": "cmq38fepz00017ayyybf0xnpi",
+      "createdAt": "2026-06-07T03:38:25.223Z",
+      "updatedAt": "2026-06-07T03:38:25.223Z",
       "items": []
     }
   }

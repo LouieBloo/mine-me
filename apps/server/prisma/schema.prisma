@@ -157,7 +157,6 @@ model DungeonLevelMob {
 enum ItemType {
   GEAR
   MATERIAL
-  POTION
   CONSUMABLE
 }
 

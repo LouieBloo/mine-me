@@ -42,27 +42,37 @@
       "dungeonLevelMobId": null,
       "characterLevelId": null,
       "createdAt": "2026-04-16T23:57:04.167Z",
-      "updatedAt": "2026-06-05T02:35:22.679Z",
+      "updatedAt": "2026-06-06T00:06:18.428Z",
       "items": [
         {
-          "id": "cmq0bamra000b2rdho8g1x5pe",
+          "id": "cmq1lerzw0009q7ocoeo29j4r",
           "dropTableId": "cmo252azr0000ygtku562fr3f",
           "itemId": "cmp6aexa30004idpx29gsz12l",
           "chance": 75,
           "minQuantity": 1,
           "maxQuantity": 1,
-          "createdAt": "2026-06-05T02:35:22.679Z",
-          "updatedAt": "2026-06-05T02:35:22.679Z"
+          "createdAt": "2026-06-06T00:06:18.428Z",
+          "updatedAt": "2026-06-06T00:06:18.428Z"
         },
         {
-          "id": "cmq0bamrb000c2rdhgyous3ho",
+          "id": "cmq1lerzw000aq7oce69fyvsp",
           "dropTableId": "cmo252azr0000ygtku562fr3f",
           "itemId": "cmq0b6kf500002rdhs7vehh63",
           "chance": 100,
           "minQuantity": 1,
           "maxQuantity": 1,
-          "createdAt": "2026-06-05T02:35:22.679Z",
-          "updatedAt": "2026-06-05T02:35:22.679Z"
+          "createdAt": "2026-06-06T00:06:18.428Z",
+          "updatedAt": "2026-06-06T00:06:18.428Z"
+        },
+        {
+          "id": "cmq1lerzw000bq7ocy6t8mssb",
+          "dropTableId": "cmo252azr0000ygtku562fr3f",
+          "itemId": "cmq1lectq0000q7ocymqq4zd3",
+          "chance": 75,
+          "minQuantity": 1,
+          "maxQuantity": 1,
+          "createdAt": "2026-06-06T00:06:18.428Z",
+          "updatedAt": "2026-06-06T00:06:18.428Z"
         }
       ]
     }

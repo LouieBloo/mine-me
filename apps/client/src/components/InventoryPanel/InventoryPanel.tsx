@@ -25,7 +25,7 @@ export const InventoryPanel = ({ inventory }: Props) => {
 
   const totalItems = inventory.items.reduce((sum, e) => sum + e.quantity, 0);
 
-  // Group items by category: Consumables (POTION) first, Materials second, Gear last
+  // Group items by category: Consumables first, Materials second, Gear last
   const sortedAndGroupedItems = useMemo(() => {
     // 1. First sort the items according to user preference
     const itemsCopy = [...inventory.items];

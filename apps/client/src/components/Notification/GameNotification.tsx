@@ -51,7 +51,10 @@ export const GameNotification: React.FC<GameNotificationProps> = ({
 
   const getIcon = () => {
     if (iconUrl) {
-      return <img src={iconUrl} alt={title} className="w-10 h-10 object-contain drop-shadow-md" />;
+      const srcUrl = iconUrl.startsWith('http')
+        ? iconUrl
+        : `${import.meta.env.VITE_API_URL || ''}${iconUrl}`;
+      return <img src={srcUrl} alt={title} className="w-10 h-10 object-contain drop-shadow-md" />;
     }
     switch (variant) {
       case 'success':
