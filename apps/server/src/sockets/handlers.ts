@@ -10,6 +10,8 @@ declare module 'socket.io' {
   interface SocketData {
     userId: string;      // Set by socketAuthMiddleware — never set by client
     characterId?: string; // Set after successful select_character
+    characterName?: string;
+    cityId?: string;
   }
 }
 
@@ -17,7 +19,7 @@ declare module 'socket.io' {
 // CITY EVENTS
 // ----------------------------------------------------------------------------
 
-const handleJoinCity = async (io: Server, socket: Socket, cityId: string, characterId: string, callback?: Function) => {
+export const handleJoinCity = async (io: Server, socket: Socket, cityId: string, characterId: string, callback?: Function) => {
   try {
     const userId = socket.data.userId;
 
@@ -44,6 +46,8 @@ const handleJoinCity = async (io: Server, socket: Socket, cityId: string, charac
 
     // Store on socket for disconnect cleanup
     socket.data.characterId = characterId;
+    socket.data.cityId = cityId;
+    socket.data.characterName = character.name;
 
     const cityRoom = `city:${cityId}`;
     socket.join(cityRoom);
@@ -75,6 +79,15 @@ const handleJoinCity = async (io: Server, socket: Socket, cityId: string, charac
       characterId: character.id,
       name: character.name,
       combatScore: character.combatScore,
+    });
+
+    // Send system message in the chat
+    io.to(cityRoom).emit('city_message', {
+      id: Math.random().toString(36).substring(7),
+      sender: 'System',
+      message: `${character.name} entered the city.`,
+      timestamp: Date.now(),
+      isSystem: true
     });
 
     // Fetch dungeons for this city + character's dungeon accomplishments
@@ -131,15 +144,26 @@ const handleJoinCity = async (io: Server, socket: Socket, cityId: string, charac
   }
 };
 
-const handleLeaveCity = async (io: Server, socket: Socket, cityId: string, callback?: Function) => {
+export const handleLeaveCity = async (io: Server, socket: Socket, cityId: string, callback?: Function) => {
   try {
     const characterId = socket.data.characterId;
     const cityRoom = `city:${cityId}`;
 
     socket.leave(cityRoom);
+    socket.data.cityId = undefined;
 
+    const characterName = socket.data.characterName;
     if (characterId) {
       socket.to(cityRoom).emit('player_left_city', { characterId });
+      if (characterName) {
+        io.to(cityRoom).emit('city_message', {
+          id: Math.random().toString(36).substring(7),
+          sender: 'System',
+          message: `${characterName} left the city.`,
+          timestamp: Date.now(),
+          isSystem: true
+        });
+      }
     }
 
     if (callback) callback({ success: true });
@@ -230,6 +254,7 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
       }
 
       socket.data.characterId = characterId;
+      socket.data.characterName = character.name;
       socket.join(`character:${characterId}`);
 
       console.log(`[Socket] User ${userId} selected character ${characterId}`);
@@ -297,6 +322,45 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
     handleLeaveCity(io, socket, cityId, callback);
   });
 
+  socket.on('send_city_message', async (payload: { message: string }, callback?: Function) => {
+    try {
+      const characterId = socket.data.characterId;
+      const cityId = socket.data.cityId;
+      const characterName = socket.data.characterName;
+
+      if (!characterId || !cityId || !characterName) {
+        if (callback) callback({ error: 'Not in a city room or character not selected' });
+        return;
+      }
+
+      const { message } = payload;
+      if (!message || typeof message !== 'string' || message.trim() === '') {
+        if (callback) callback({ error: 'Message cannot be empty' });
+        return;
+      }
+
+      if (message.length > 1000) {
+        if (callback) callback({ error: 'Message exceeds character limit of 1000' });
+        return;
+      }
+
+      const chatMessage = {
+        id: Math.random().toString(36).substring(7),
+        sender: characterName,
+        message: message.trim(),
+        timestamp: Date.now()
+      };
+
+      // Broadcast to everyone in the city room (including sender)
+      io.to(`city:${cityId}`).emit('city_message', chatMessage);
+
+      if (callback) callback({ success: true });
+    } catch (err) {
+      console.error('[Socket] send_city_message error:', err);
+      if (callback) callback({ error: 'Internal server error' });
+    }
+  });
+
   // --------------------------------------------------------------------------
   // GAME EVENTS — Typed game actions dispatched through a single channel
   // --------------------------------------------------------------------------
@@ -309,13 +373,28 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
   // --------------------------------------------------------------------------
   socket.on('disconnect', () => {
     const characterId = socket.data.characterId;
+    const characterName = socket.data.characterName;
+    const cityId = socket.data.cityId;
     console.log(`[Socket] User ${userId} disconnected (socket: ${socket.id})`);
 
     if (characterId) {
       // Notify any city rooms this socket was in
       const rooms = Array.from(socket.rooms).filter(r => r.startsWith('city:'));
+      // Fallback to socket.data.cityId room if rooms is empty (rooms can be cleared on disconnect)
+      if (rooms.length === 0 && cityId) {
+        rooms.push(`city:${cityId}`);
+      }
       rooms.forEach(room => {
         io.to(room).emit('player_left_city', { characterId });
+        if (characterName) {
+          io.to(room).emit('city_message', {
+            id: Math.random().toString(36).substring(7),
+            sender: 'System',
+            message: `${characterName} left the city.`,
+            timestamp: Date.now(),
+            isSystem: true
+          });
+        }
       });
     }
   });

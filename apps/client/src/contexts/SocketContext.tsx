@@ -10,6 +10,8 @@ interface SocketContextType {
   selectCharacter: (characterId: string) => Promise<void>;
   joinCity: (cityId: string, characterId: string) => Promise<void>;
   leaveCity: (cityId: string) => Promise<void>;
+  /** Send a city chat message to the server. */
+  sendCityMessage: (message: string) => Promise<void>;
   /** Send a typed game event to the server. Returns the result. */
   sendGameEvent: (payload: GameEventPayload) => Promise<GameEventResult>;
   /** Register a listener for a socket event. Returns a cleanup function. */
@@ -149,12 +151,16 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return () => socketService.off(event, handler);
   }, []);
 
+  const sendCityMessage = useCallback((message: string) => {
+    return socketService.sendCityMessage(message);
+  }, []);
+
   const sendGameEvent = useCallback((payload: GameEventPayload) => {
     return socketService.sendGameEvent(payload);
   }, []);
 
   return (
-    <SocketContext.Provider value={{ isConnected, selectCharacter, joinCity, leaveCity, sendGameEvent, onEvent }}>
+    <SocketContext.Provider value={{ isConnected, selectCharacter, joinCity, leaveCity, sendCityMessage, sendGameEvent, onEvent }}>
       {children}
     </SocketContext.Provider>
   );

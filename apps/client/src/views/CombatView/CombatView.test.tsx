@@ -85,7 +85,7 @@ describe('CombatView', () => {
     vi.clearAllMocks();
     (useNavigate as any).mockReturnValue(mockNavigate);
     (useSocket as any).mockReturnValue({ sendGameEvent: mockSendGameEvent });
-    (useChat as any).mockReturnValue({ setActiveTab: mockSetActiveTab, addCombatLogs: vi.fn() });
+    (useChat as any).mockReturnValue({ setActiveTab: mockSetActiveTab, addCombatLogs: vi.fn(), clearCombatLogs: vi.fn() });
     
     // Default mock implementation for useGame
     (useGame as any).mockReturnValue({

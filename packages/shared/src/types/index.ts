@@ -1,6 +1,14 @@
 export type CharacterClass = 'Warrior' | 'Mage' | 'Rogue';
 export type Profession = 'Mining' | 'Herbalism' | 'Farming' | 'Lumberjack' | 'Chemistry' | 'Blacksmithing';
 
+export interface ChatMessage {
+  id: string;
+  sender: string;
+  message: string;
+  timestamp: number;
+  isSystem?: boolean;
+}
+
 export interface PlayerAttributes {
   combatScore: number;
   defenseScore: number;

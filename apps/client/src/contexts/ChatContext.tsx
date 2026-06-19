@@ -1,13 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { socketService } from '../services/socketService';
-import type { CombatLogMessage } from '@nvg/shared';
-
-export interface ChatMessage {
-  id: string;
-  sender: string;
-  message: string;
-  timestamp: number;
-}
+import type { CombatLogMessage, ChatMessage } from '@nvg/shared';
+import { useGame } from './GameContext';
+import { useSocket } from './SocketContext';
 
 interface ChatContextType {
   activeTab: 'City' | 'Combat';
@@ -21,23 +15,34 @@ interface ChatContextType {
    * with floating text and health bar updates.
    */
   addCombatLogs: (logs: CombatLogMessage[]) => void;
+  sendCityMessage: (message: string) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { activeCity } = useGame();
+  const { sendCityMessage: socketSendCityMessage, onEvent } = useSocket();
   const [activeTab, setActiveTab] = useState<'City' | 'Combat'>('City');
-  const [cityLogs] = useState<ChatMessage[]>([]); // setCityLogs removed for now
+  const [cityLogs, setCityLogs] = useState<ChatMessage[]>([]);
   const [combatLogs, setCombatLogs] = useState<CombatLogMessage[]>([]);
 
-  // NOTE: We intentionally do NOT auto-push turnLogs from battle_state here.
-  // CombatView is responsible for distributing turnLogs at the correct moments
-  // during the animation sequence via addCombatLogs(). This keeps chat messages
-  // synchronized with floating damage text and health bar updates.
+  // Clear city logs when entering a new city
+  useEffect(() => {
+    setCityLogs([]);
+  }, [activeCity?.id]);
+
+  // Listen to socket city_message event
+  useEffect(() => {
+    const cleanup = onEvent('city_message', (msg: ChatMessage) => {
+      setCityLogs(prev => [...prev, msg]);
+    });
+    return cleanup;
+  }, [onEvent]);
 
   // Listen for combat_loot to push into the log as well
   useEffect(() => {
-    const handleCombatLoot = (loot: { sol: number; items: any[] }) => {
+    const cleanup = onEvent('combat_loot', (loot: { sol: number; items: any[] }) => {
       const logs: CombatLogMessage[] = [];
       
       if (loot.sol > 0) {
@@ -61,13 +66,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (logs.length > 0) {
         setCombatLogs(prev => [...prev, ...logs]);
       }
-    };
-    
-    socketService.on('combat_loot', handleCombatLoot);
-    return () => {
-      socketService.off('combat_loot', handleCombatLoot);
-    };
-  }, []);
+    });
+    return cleanup;
+  }, [onEvent]);
 
   /** Manually add combat logs at a specific moment during animation. */
   const addCombatLogs = useCallback((logs: CombatLogMessage[]) => {
@@ -80,6 +81,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setCombatLogs([]);
   }, []);
 
+  const sendCityMessage = useCallback(async (message: string) => {
+    await socketSendCityMessage(message);
+  }, [socketSendCityMessage]);
+
   return (
     <ChatContext.Provider value={{
       activeTab,
@@ -88,6 +93,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       combatLogs,
       clearCombatLogs,
       addCombatLogs,
+      sendCityMessage,
     }}>
       {children}
     </ChatContext.Provider>

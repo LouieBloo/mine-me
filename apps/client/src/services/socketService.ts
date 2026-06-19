@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, BattleState, CityDungeonInfo } from '@nvg/shared';
+import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, BattleState, CityDungeonInfo, ChatMessage } from '@nvg/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -19,6 +19,8 @@ export type SocketEventMap = {
   // City presence events
   player_entered_city: { characterId: string; name: string; combatScore: number };
   player_left_city: { characterId: string };
+  // City chat events
+  city_message: ChatMessage;
   // Connection
   connect: undefined;
   disconnect: string;
@@ -160,6 +162,22 @@ class SocketService {
           reject(new Error(res.error));
         } else {
           console.log(`[Socket] City room left: city:${cityId}`);
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Send a city chat message.
+   */
+  sendCityMessage(message: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) return reject(new Error('Not connected'));
+      this.socket.emit('send_city_message', { message }, (res: { success?: boolean; error?: string }) => {
+        if (res?.error) {
+          reject(new Error(res.error));
+        } else {
           resolve();
         }
       });

@@ -68,7 +68,7 @@ function groupLogsWithEvents(
 export const CombatView: React.FC = () => {
   const { battleState, activeCharacter, playerState, displayPlayerHealth, setDisplayPlayerHealth: setGlobalDisplayPlayerHealth } = useGame();
   const { sendGameEvent } = useSocket();
-  const { setActiveTab, addCombatLogs } = useChat();
+  const { setActiveTab, addCombatLogs, clearCombatLogs } = useChat();
   const navigate = useNavigate();
 
   // pendingActions maps mob.id -> 'Attack' | 'Defend'
@@ -82,6 +82,13 @@ export const CombatView: React.FC = () => {
   const [displayMobHealth, setDisplayMobHealth] = useState<Record<string, number>>({});
   const [fadedMobs, setFadedMobs] = useState<Record<string, boolean>>({});
   const [displayIntendedActions, setDisplayIntendedActions] = useState<Record<string, 'Attack' | 'Defend' | null>>({});
+
+  // Reset global display health when CombatView unmounts
+  useEffect(() => {
+    return () => {
+      setGlobalDisplayPlayerHealth(null);
+    };
+  }, [setGlobalDisplayPlayerHealth]);
 
   // Track the last processed round to avoid re-triggering animations
   const lastProcessedRound = useRef<number>(0);
@@ -129,14 +136,14 @@ export const CombatView: React.FC = () => {
     }
   }, []);
 
-  /** Helper: update display health for a damage event target */
-  const applyDisplayDamage = useCallback((event: DamageEvent) => {
-    if (event.targetId === 'player') {
-      setGlobalDisplayPlayerHealth(prev => Math.max(0, (prev ?? 0) - event.amount));
+  /** Helper: update display health for a damage event target to an absolute value */
+  const applyDisplayDamage = useCallback((targetId: string, newHealth: number) => {
+    if (targetId === 'player') {
+      setGlobalDisplayPlayerHealth(newHealth);
     } else {
       setDisplayMobHealth(prev => ({
         ...prev,
-        [event.targetId]: Math.max(0, (prev[event.targetId] ?? 0) - event.amount),
+        [targetId]: newHealth,
       }));
     }
   }, [setGlobalDisplayPlayerHealth]);
@@ -164,9 +171,12 @@ export const CombatView: React.FC = () => {
   }, [battleState?.id]);
 
   useEffect(() => {
-    // Always select Combat tab when CombatView mounts
+    // Always select Combat tab and clear combat logs when CombatView mounts
     setActiveTab('Combat');
+    clearCombatLogs();
+  }, [setActiveTab, clearCombatLogs]);
 
+  useEffect(() => {
     if (!battleState && activeCharacter) {
       // No active battle — redirect back to home.
       navigate('/home');
@@ -220,6 +230,23 @@ export const CombatView: React.FC = () => {
     // Pre-process: group turnLogs with their corresponding damage events
     const { systemLogs, eventGroups, trailingLogs } = groupLogsWithEvents(turnLogs, damageEvents);
 
+    // Compute pre-damage health from the current display values BEFORE the async
+    // animation runs.  This snapshot is used as the base for all incremental
+    // health updates inside the animation callbacks.  We also set the display
+    // health synchronously so that if a character_stat_update re-render occurs
+    // before the animation impact, the health bar keeps the pre-damage value
+    // (instead of falling through to the authoritative attributes.health which
+    // has already been updated by the server).
+    const preDamagePlayerHealth = displayPlayerHealth !== null ? displayPlayerHealth : battleState.playerHealth;
+    const preDamageMobHealth: Record<string, number> = {};
+    battleState.mobs.forEach((m: MobBattleState) => {
+      preDamageMobHealth[m.id] = displayMobHealth[m.id] ?? m.health;
+    });
+
+    // Ensure displayPlayerHealth is set to the pre-damage value so the health
+    // bar doesn't momentarily fall through to player.attributes.health.
+    setGlobalDisplayPlayerHealth(preDamagePlayerHealth);
+
     // Build the animation sequence
     const runAnimation = async () => {
       setAnimating(true);
@@ -236,17 +263,26 @@ export const CombatView: React.FC = () => {
         steps.push({ type: 'effect', execute: () => addCombatLogs(systemLogs) });
       }
 
-      // Track running health of targets during the sequence to detect the killing blow
+      // Track running health of targets during the sequence to detect the killing blow.
+      // Uses the snapshotted pre-damage values so it's immune to state races.
       const runningHealth: Record<string, number> = {
-        player: displayPlayerHealth !== null ? displayPlayerHealth : battleState.playerHealth,
+        player: preDamagePlayerHealth,
         ...Object.fromEntries(
-          battleState.mobs.map((m: MobBattleState) => [m.id, displayMobHealth[m.id] ?? m.health])
+          Object.entries(preDamageMobHealth)
         ),
       };
 
       // Build animation steps for each event group
       for (const { event, logs } of eventGroups) {
         const isPlayerAttacking = event.sourceId === 'player';
+
+        // Compute the post-damage health for this event BEFORE building closures.
+        // This way the captured `postDamageHealth` is correct per-event even when
+        // multiple events target the same entity.
+        const targetId = event.targetId;
+        const healthBefore = runningHealth[targetId];
+        runningHealth[targetId] = Math.max(0, runningHealth[targetId] - event.amount);
+        const postDamageHealth = runningHealth[targetId];
 
         if (isPlayerAttacking) {
           // Player attacks a mob
@@ -269,7 +305,7 @@ export const CombatView: React.FC = () => {
               onImpact: () => {
                 playerSpriteRef.current?.playAnimation('attacking');
                 showDamageText(event);
-                applyDisplayDamage(event);
+                applyDisplayDamage(targetId, postDamageHealth);
                 addCombatLogs(logs);
               },
               onReturnIdle: () => {
@@ -282,7 +318,7 @@ export const CombatView: React.FC = () => {
               type: 'effect',
               execute: () => {
                 showDamageText(event);
-                applyDisplayDamage(event);
+                applyDisplayDamage(targetId, postDamageHealth);
                 addCombatLogs(logs);
               },
             });
@@ -309,7 +345,7 @@ export const CombatView: React.FC = () => {
               onImpact: () => {
                 mobRef?.playAnimation('attacking');
                 showDamageText(event);
-                applyDisplayDamage(event);
+                applyDisplayDamage(targetId, postDamageHealth);
                 addCombatLogs(logs);
               },
               onReturnIdle: () => {
@@ -321,7 +357,7 @@ export const CombatView: React.FC = () => {
               type: 'effect',
               execute: () => {
                 showDamageText(event);
-                applyDisplayDamage(event);
+                applyDisplayDamage(targetId, postDamageHealth);
                 addCombatLogs(logs);
               },
             });
@@ -329,14 +365,8 @@ export const CombatView: React.FC = () => {
           }
         }
 
-        // Apply health change to running health tracker
-        const targetId = event.targetId;
-        const healthBefore = runningHealth[targetId];
-        runningHealth[targetId] = Math.max(0, runningHealth[targetId] - event.amount);
-        const healthAfter = runningHealth[targetId];
-
         // If a mob dies from this event, schedule a death animation & fade-out step
-        if (targetId !== 'player' && healthBefore > 0 && healthAfter <= 0) {
+        if (targetId !== 'player' && healthBefore > 0 && postDamageHealth <= 0) {
           steps.push({
             type: 'callback',
             execute: async () => {
