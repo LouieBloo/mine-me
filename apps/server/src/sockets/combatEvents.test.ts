@@ -70,6 +70,50 @@ describe('combatEvents', () => {
 
       expect(result).toEqual({ success: false, error: 'Dungeon level not found in this city.' });
     });
+
+    it('updates/resets existing battle if dungeonLevelId is different', async () => {
+      (prisma.character.findUnique as any).mockResolvedValue({
+        id: 'char1', userId: 'user1', cityId: 'city1', stamina: 100
+      });
+      (prisma.dungeonLevel.findUnique as any).mockResolvedValue({
+        id: 'level2',
+        staminaCost: 10,
+        dungeon: { cityDungeons: [{ cityId: 'city1' }] },
+        mobs: []
+      });
+      (prisma.battle.findUnique as any).mockResolvedValue({
+        id: 'battle1',
+        characterId: 'char1',
+        dungeonLevelId: 'level1',
+        status: 'IN_PROGRESS'
+      });
+      (prisma.battle.update as any).mockResolvedValue({
+        id: 'battle1',
+        characterId: 'char1',
+        dungeonLevelId: 'level2',
+        status: 'IN_PROGRESS',
+        mobsState: [],
+        rngSeed: 'seed123',
+        round: 1,
+        turn: 'PLAYER'
+      });
+
+      const result = await handleStartCombat(io, socket, {
+        type: 'start_combat', cityId: 'city1', dungeonLevelId: 'level2'
+      });
+
+      expect(prisma.battle.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'battle1' },
+          data: expect.objectContaining({
+            dungeonLevelId: 'level2',
+            status: 'IN_PROGRESS',
+            round: 1
+          })
+        })
+      );
+      expect(result).toEqual({ success: true });
+    });
   });
 
   describe('handleAdvanceDungeonLevel', () => {

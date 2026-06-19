@@ -18,6 +18,9 @@ interface GameContextType {
     setCityDungeonInfo: (info: CityDungeonInfo | null) => void;
     /** Merge a partial stat update into the existing playerState. */
     applyStatUpdate: (updates: CharacterStatUpdate) => void;
+    /** Current displayed player health during combat animations (delayed update). */
+    displayPlayerHealth: number | null;
+    setDisplayPlayerHealth: React.Dispatch<React.SetStateAction<number | null>>;
     /** Call on logout to clear all game state. */
     clearGameState: () => void;
 }
@@ -51,6 +54,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const [battleState, setBattleState] = useState<any | null>(null);
     const [cityDungeonInfo, setCityDungeonInfo] = useState<CityDungeonInfo | null>(null);
+    const [displayPlayerHealth, setDisplayPlayerHealth] = useState<number | null>(null);
 
     // Wrap setPlayerState so we also persist it
     const setPlayerState = (state: PlayerState | null) => {
@@ -113,6 +117,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setPlayerStateRaw(null);
         setActiveCity(null);
         setCityDungeonInfo(null);
+        setDisplayPlayerHealth(null);
         localStorage.removeItem('nvg_active_character');
         localStorage.removeItem('nvg_player_state');
     };
@@ -130,6 +135,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             cityDungeonInfo,
             setCityDungeonInfo,
             applyStatUpdate,
+            displayPlayerHealth,
+            setDisplayPlayerHealth,
             clearGameState,
         }}>
             {children}

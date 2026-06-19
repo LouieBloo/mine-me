@@ -66,7 +66,7 @@ function groupLogsWithEvents(
 }
 
 export const CombatView: React.FC = () => {
-  const { battleState, activeCharacter, playerState } = useGame();
+  const { battleState, activeCharacter, playerState, displayPlayerHealth, setDisplayPlayerHealth: setGlobalDisplayPlayerHealth } = useGame();
   const { sendGameEvent } = useSocket();
   const { setActiveTab, addCombatLogs } = useChat();
   const navigate = useNavigate();
@@ -79,9 +79,9 @@ export const CombatView: React.FC = () => {
   const [advancingLevel, setAdvancingLevel] = useState(false);
 
   // Display health: rendered in health bars, updated incrementally during animation
-  const [displayPlayerHealth, setDisplayPlayerHealth] = useState<number>(0);
   const [displayMobHealth, setDisplayMobHealth] = useState<Record<string, number>>({});
   const [fadedMobs, setFadedMobs] = useState<Record<string, boolean>>({});
+  const [displayIntendedActions, setDisplayIntendedActions] = useState<Record<string, 'Attack' | 'Defend' | null>>({});
 
   // Track the last processed round to avoid re-triggering animations
   const lastProcessedRound = useRef<number>(0);
@@ -132,31 +132,34 @@ export const CombatView: React.FC = () => {
   /** Helper: update display health for a damage event target */
   const applyDisplayDamage = useCallback((event: DamageEvent) => {
     if (event.targetId === 'player') {
-      setDisplayPlayerHealth(prev => Math.max(0, prev - event.amount));
+      setGlobalDisplayPlayerHealth(prev => Math.max(0, (prev ?? 0) - event.amount));
     } else {
       setDisplayMobHealth(prev => ({
         ...prev,
         [event.targetId]: Math.max(0, (prev[event.targetId] ?? 0) - event.amount),
       }));
     }
-  }, []);
+  }, [setGlobalDisplayPlayerHealth]);
 
-  // Initialize display health when battleState first loads (no animation needed)
+  // Initialize display health and intended actions when battleState first loads (no animation needed)
   useEffect(() => {
     if (!battleState) return;
     // Only sync on initial load (round hasn't been processed yet and no animation running)
     if (lastProcessedRound.current === 0 && !animating) {
-      setDisplayPlayerHealth(battleState.playerHealth);
+      setGlobalDisplayPlayerHealth(battleState.playerHealth);
       const mobHealth: Record<string, number> = {};
       const initialFaded: Record<string, boolean> = {};
+      const initialIntendedActions: Record<string, any> = {};
       battleState.mobs.forEach((m: MobBattleState) => {
         mobHealth[m.id] = m.health;
         if (m.health <= 0) {
           initialFaded[m.id] = true;
         }
+        initialIntendedActions[m.id] = m.intendedAction || null;
       });
       setDisplayMobHealth(mobHealth);
       setFadedMobs(initialFaded);
+      setDisplayIntendedActions(initialIntendedActions);
     }
   }, [battleState?.id]);
 
@@ -189,10 +192,15 @@ export const CombatView: React.FC = () => {
       // No damage events — sync display health directly (defend-only rounds, etc.)
       if (battleState && battleState.round > lastProcessedRound.current) {
         lastProcessedRound.current = battleState.round;
-        setDisplayPlayerHealth(battleState.playerHealth);
+        setGlobalDisplayPlayerHealth(battleState.playerHealth);
         const mobHealth: Record<string, number> = {};
-        battleState.mobs.forEach((m: MobBattleState) => { mobHealth[m.id] = m.health; });
+        const intendedActions: Record<string, any> = {};
+        battleState.mobs.forEach((m: MobBattleState) => {
+          mobHealth[m.id] = m.health;
+          intendedActions[m.id] = m.intendedAction || null;
+        });
         setDisplayMobHealth(mobHealth);
+        setDisplayIntendedActions(intendedActions);
         // Push any turnLogs immediately for no-damage rounds
         if (battleState.turnLogs?.length) {
           addCombatLogs(battleState.turnLogs);
@@ -215,6 +223,7 @@ export const CombatView: React.FC = () => {
     // Build the animation sequence
     const runAnimation = async () => {
       setAnimating(true);
+      setDisplayIntendedActions({}); // Clear predictions immediately when animations start
 
       // Cancel any in-progress sequence
       sequencerRef.current.cancel();
@@ -229,7 +238,7 @@ export const CombatView: React.FC = () => {
 
       // Track running health of targets during the sequence to detect the killing blow
       const runningHealth: Record<string, number> = {
-        player: displayPlayerHealth,
+        player: displayPlayerHealth !== null ? displayPlayerHealth : battleState.playerHealth,
         ...Object.fromEntries(
           battleState.mobs.map((m: MobBattleState) => [m.id, displayMobHealth[m.id] ?? m.health])
         ),
@@ -371,10 +380,15 @@ export const CombatView: React.FC = () => {
       }
 
       // After animation: sync display health to authoritative state (catches edge cases)
-      setDisplayPlayerHealth(battleState.playerHealth);
+      setGlobalDisplayPlayerHealth(battleState.playerHealth);
       const finalMobHealth: Record<string, number> = {};
-      battleState.mobs.forEach((m: MobBattleState) => { finalMobHealth[m.id] = m.health; });
+      const finalIntendedActions: Record<string, any> = {};
+      battleState.mobs.forEach((m: MobBattleState) => {
+        finalMobHealth[m.id] = m.health;
+        finalIntendedActions[m.id] = m.intendedAction || null;
+      });
       setDisplayMobHealth(finalMobHealth);
+      setDisplayIntendedActions(finalIntendedActions);
 
       setAnimating(false);
       setSubmitting(false);
@@ -464,7 +478,7 @@ export const CombatView: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-b from-slate-900 to-slate-950 pointer-events-none" />
 
       {/* Header Info */}
-      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between z-10 pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between z-30 pointer-events-none">
 
 
         <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 backdrop-blur-md flex flex-col items-end gap-2 pointer-events-auto">
@@ -522,13 +536,13 @@ export const CombatView: React.FC = () => {
                         style={{ width: `${Math.max(0, (mobDisplayHealth / mob.maxHealth) * 100)}%` }}
                       />
                     </div>
-                    {mob.intendedAction && (
+                    {displayIntendedActions[mob.id] && (
                       <span className={`text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded border flex items-center gap-1 shadow-md uppercase tracking-wider ${
-                        mob.intendedAction === 'Attack'
+                        displayIntendedActions[mob.id] === 'Attack'
                           ? 'bg-red-950/80 text-red-400 border-red-900/50'
                           : 'bg-blue-950/80 text-blue-400 border-blue-900/50'
                       }`}>
-                        {mob.intendedAction === 'Attack' ? '⚔️ Attacking' : '🛡️ Defending'}
+                        {displayIntendedActions[mob.id] === 'Attack' ? '⚔️ Attacking' : '🛡️ Defending'}
                       </span>
                     )}
                   </div>

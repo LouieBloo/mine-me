@@ -1,48 +1,5 @@
 [
   {
-    "id": "cmn1zlln10002ihw4wqu4tnxb",
-    "name": "Brackus",
-    "description": "City of Asss",
-    "backgroundImageUrl": "/assets/cities/backgrounds/cmn1zlln10002ihw4wqu4tnxb_background.png",
-    "mapIconUrl": null,
-    "worldPositionX": 47,
-    "worldPositionY": 19,
-    "objectCoordinates": [
-      {
-        "x": 90,
-        "y": 26,
-        "type": "MINE",
-        "label": "Mine"
-      },
-      {
-        "x": 87,
-        "y": 68,
-        "type": "FARM",
-        "label": "Farm"
-      },
-      {
-        "x": 48,
-        "y": 63,
-        "type": "MARKET",
-        "label": "Market"
-      },
-      {
-        "x": 65,
-        "y": 27,
-        "type": "DUNGEON",
-        "label": "Dungeon"
-      },
-      {
-        "x": 33,
-        "y": 21,
-        "type": "TRAINING_GROUNDS",
-        "label": "Training_grounds"
-      }
-    ],
-    "createdAt": "2026-04-06T21:51:48.671Z",
-    "updatedAt": "2026-06-03T03:32:24.180Z"
-  },
-  {
     "id": "cmn2087uu0002u72gu8lggdsw",
     "name": "Gorlon",
     "description": "test",
@@ -83,7 +40,9 @@
       }
     ],
     "createdAt": "2026-04-06T21:51:48.676Z",
-    "updatedAt": "2026-05-17T16:43:00.068Z"
+    "updatedAt": "2026-05-17T16:43:00.068Z",
+    "cityDungeons": [],
+    "cityMaterials": []
   },
   {
     "id": "cmn208bs90003u72gkkkkb62d",
@@ -95,6 +54,157 @@
     "worldPositionY": 46,
     "objectCoordinates": null,
     "createdAt": "2026-04-06T21:51:48.679Z",
-    "updatedAt": "2026-04-14T00:31:05.443Z"
+    "updatedAt": "2026-04-14T00:31:05.443Z",
+    "cityDungeons": [],
+    "cityMaterials": []
+  },
+  {
+    "id": "cmn1zlln10002ihw4wqu4tnxb",
+    "name": "Brackus",
+    "description": "City of Asss",
+    "backgroundImageUrl": "/assets/cities/backgrounds/cmn1zlln10002ihw4wqu4tnxb_background.png",
+    "mapIconUrl": null,
+    "worldPositionX": 47,
+    "worldPositionY": 19,
+    "objectCoordinates": [
+      {
+        "x": 90,
+        "y": 26,
+        "type": "MINE",
+        "label": "Mine"
+      },
+      {
+        "x": 87,
+        "y": 68,
+        "type": "FARM",
+        "label": "Farm"
+      },
+      {
+        "x": 48,
+        "y": 63,
+        "type": "MARKET",
+        "label": "Market"
+      },
+      {
+        "x": 65,
+        "y": 27,
+        "type": "DUNGEON",
+        "label": "Dungeon"
+      },
+      {
+        "x": 33,
+        "y": 21,
+        "type": "TRAINING_GROUNDS",
+        "label": "Training_grounds"
+      }
+    ],
+    "createdAt": "2026-04-06T21:51:48.671Z",
+    "updatedAt": "2026-06-19T00:42:54.555Z",
+    "cityDungeons": [
+      {
+        "id": "cmo3gz72i00014c2cy33pkqu6",
+        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
+        "dungeonId": "cmn207v6c0001u72gvuueipej",
+        "orderIndex": 0,
+        "createdAt": "2026-04-17T22:18:20.682Z",
+        "updatedAt": "2026-04-17T22:18:20.682Z",
+        "dungeon": {
+          "id": "cmn207v6c0001u72gvuueipej",
+          "name": "Dungeon 1",
+          "description": "Testing",
+          "minLevel": 1,
+          "createdAt": "2026-04-06T21:51:48.693Z",
+          "updatedAt": "2026-04-06T21:51:48.693Z"
+        }
+      },
+      {
+        "id": "cmpg7a1m4000a46yu3k3jnhrv",
+        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
+        "dungeonId": "cmpg79fy7000846yu2qjtvev6",
+        "orderIndex": 1,
+        "createdAt": "2026-05-22T00:47:33.293Z",
+        "updatedAt": "2026-05-22T00:47:33.293Z",
+        "dungeon": {
+          "id": "cmpg79fy7000846yu2qjtvev6",
+          "name": "Dungeon 3",
+          "description": "Dungeon 3",
+          "minLevel": 1,
+          "createdAt": "2026-05-22T00:47:05.216Z",
+          "updatedAt": "2026-05-22T00:47:05.216Z"
+        }
+      },
+      {
+        "id": "cmqk7fv7g0009kkfo7emmat6i",
+        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
+        "dungeonId": "cmqk7fdkn0002kkfo6f3zxhbu",
+        "orderIndex": 2,
+        "createdAt": "2026-06-19T00:42:51.964Z",
+        "updatedAt": "2026-06-19T00:42:51.964Z",
+        "dungeon": {
+          "id": "cmqk7fdkn0002kkfo6f3zxhbu",
+          "name": "Dawgs",
+          "description": "dawhg",
+          "minLevel": 1,
+          "createdAt": "2026-06-19T00:42:29.111Z",
+          "updatedAt": "2026-06-19T00:42:29.111Z"
+        }
+      }
+    ],
+    "cityMaterials": [
+      {
+        "id": "cmpdjby3k0009mw0dxhm50cbp",
+        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
+        "itemId": "cmp6aexa30004idpx29gsz12l",
+        "createdAt": "2026-05-20T04:01:38.912Z",
+        "updatedAt": "2026-06-03T03:19:19.257Z",
+        "item": {
+          "id": "cmp6aexa30004idpx29gsz12l",
+          "name": "Copperium",
+          "description": "Common material used to craft items and sell",
+          "type": "MATERIAL",
+          "subType": "MINERAL",
+          "vendorBuyPrice": 1,
+          "vendorSellPrice": 5,
+          "userSellPrice": 0,
+          "userBuyPrice": 0,
+          "rarity": "LOW",
+          "iconUrl": "/assets/icons/items/cmp6aexa30004idpx29gsz12l_icon.png",
+          "gearImageUrl": null,
+          "isStartingPiece": false,
+          "experience": 10,
+          "combatScore": 0,
+          "defenseScore": 0,
+          "createdAt": "2026-05-15T02:17:38.043Z",
+          "updatedAt": "2026-06-07T03:47:07.088Z"
+        }
+      },
+      {
+        "id": "cmpdjc0mf000bmw0dipueredu",
+        "cityId": "cmn1zlln10002ihw4wqu4tnxb",
+        "itemId": "cmp6ammsn0006idpxgnpsnyk1",
+        "createdAt": "2026-05-20T04:01:42.183Z",
+        "updatedAt": "2026-06-03T03:19:19.261Z",
+        "item": {
+          "id": "cmp6ammsn0006idpxgnpsnyk1",
+          "name": "Silverium",
+          "description": "Silver",
+          "type": "MATERIAL",
+          "subType": "MINERAL",
+          "vendorBuyPrice": 3,
+          "vendorSellPrice": 3,
+          "userSellPrice": 3,
+          "userBuyPrice": 3,
+          "rarity": "MEDIUM",
+          "iconUrl": "/assets/icons/items/cmp6ammsn0006idpxgnpsnyk1_icon.png",
+          "gearImageUrl": null,
+          "isStartingPiece": false,
+          "experience": 30,
+          "combatScore": 0,
+          "defenseScore": 0,
+          "createdAt": "2026-05-15T02:23:37.703Z",
+          "updatedAt": "2026-06-07T03:47:17.416Z"
+        }
+      }
+    ]
   }
 ]

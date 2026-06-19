@@ -72,7 +72,7 @@ export const handleStartCombat = async (
     where: { characterId }
   });
 
-  if (!battle || battle.status !== 'IN_PROGRESS') {
+  if (!battle || battle.status !== 'IN_PROGRESS' || battle.dungeonLevelId !== dungeonLevelId) {
     // Create new battle
     const rngSeed = Math.random().toString(36).substring(7);
     const mobsState = BattleService.generateInitialMobsState(dungeonLevel.mobs, rngSeed);

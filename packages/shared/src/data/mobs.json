@@ -1,22 +1,5 @@
 [
   {
-    "id": "cmn1zl1bk0001ihw48b0c492z",
-    "name": "Dawg",
-    "level": 1,
-    "health": 10,
-    "attack": 1,
-    "defense": 2,
-    "attackPercentage": 50,
-    "defendPercentage": 50,
-    "animations": {
-      "url": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_sprite.png",
-      "atlasUrl": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_atlas.json"
-    },
-    "createdAt": "2026-04-06T21:51:48.684Z",
-    "updatedAt": "2026-04-06T21:51:48.684Z",
-    "dropTable": null
-  },
-  {
     "id": "cmn1zb9op0000ihw4mgknuvlr",
     "name": "Mario",
     "level": 1,
@@ -76,5 +59,22 @@
         }
       ]
     }
+  },
+  {
+    "id": "cmn1zl1bk0001ihw48b0c492z",
+    "name": "Dawg",
+    "level": 1,
+    "health": 50,
+    "attack": 20,
+    "defense": 5,
+    "attackPercentage": 90,
+    "defendPercentage": 10,
+    "animations": {
+      "url": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_sprite.png",
+      "atlasUrl": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_atlas.json"
+    },
+    "createdAt": "2026-04-06T21:51:48.684Z",
+    "updatedAt": "2026-04-06T21:51:48.684Z",
+    "dropTable": null
   }
 ]

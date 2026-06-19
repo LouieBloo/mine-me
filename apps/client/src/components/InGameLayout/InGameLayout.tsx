@@ -11,7 +11,7 @@ import './InGameLayout.css';
 
 export const InGameLayout = () => {
     const { user } = useAuth();
-    const { activeCharacter, playerState, setActiveCity, setCityDungeonInfo } = useGame();
+    const { activeCharacter, playerState, setActiveCity, setCityDungeonInfo, displayPlayerHealth } = useGame();
     const { joinCity, leaveCity, onEvent } = useSocket();
     const cityIdRef = useRef<string | null>(null);
     const joinedCityIdRef = useRef<string | null>(null);
@@ -114,12 +114,20 @@ export const InGameLayout = () => {
         },
     };
 
+    const playerWithDelayedHealth = {
+        ...player,
+        attributes: {
+            ...player.attributes,
+            health: displayPlayerHealth !== null ? displayPlayerHealth : player.attributes.health
+        }
+    };
+
     return (
         <div className="in-game-layout flex h-full w-full bg-slate-900 overflow-hidden">
             {/* Left side: Character Sheet & Chat */}
             <div className="flex flex-col w-80 h-full border-r border-slate-700">
                 <div className="h-[60%] shrink-0 overflow-y-auto">
-                    <CharacterPanel player={player} />
+                    <CharacterPanel player={playerWithDelayedHealth} />
                 </div>
                 <div className="h-[40%] shrink-0">
                     <ChatPanel />

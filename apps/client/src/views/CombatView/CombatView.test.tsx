@@ -100,6 +100,7 @@ describe('CombatView', () => {
       },
       activeCharacter: { id: 'char_1' },
       playerState: { inventory: { items: [] } },
+      setDisplayPlayerHealth: vi.fn(),
     });
   });
 
@@ -117,6 +118,7 @@ describe('CombatView', () => {
         mobs: [],
       },
       activeCharacter: { id: 'char_1' },
+      setDisplayPlayerHealth: vi.fn(),
     });
 
     render(<CombatView />);
@@ -133,6 +135,7 @@ describe('CombatView', () => {
         mobs: [],
       },
       activeCharacter: { id: 'char_1' },
+      setDisplayPlayerHealth: vi.fn(),
     });
 
     render(<CombatView />);
@@ -147,6 +150,7 @@ describe('CombatView', () => {
         mobs: [],
       },
       activeCharacter: { id: 'char_1' },
+      setDisplayPlayerHealth: vi.fn(),
     });
 
     render(<CombatView />);
@@ -164,6 +168,7 @@ describe('CombatView', () => {
         mobs: [],
       },
       activeCharacter: { id: 'char_1' },
+      setDisplayPlayerHealth: vi.fn(),
     });
 
     render(<CombatView />);
@@ -183,6 +188,7 @@ describe('CombatView', () => {
         mobs: [],
       },
       activeCharacter: { id: 'char_1' },
+      setDisplayPlayerHealth: vi.fn(),
     });
 
     render(<CombatView />);
@@ -199,6 +205,7 @@ describe('CombatView', () => {
     (useGame as any).mockReturnValue({
       battleState: null,
       activeCharacter: { id: 'char_1' },
+      setDisplayPlayerHealth: vi.fn(),
     });
 
     render(<CombatView />);
@@ -228,6 +235,7 @@ describe('CombatView', () => {
       battleState: mockBattleState,
       activeCharacter: { id: 'char_1' },
       playerState: { inventory: { items: [] } },
+      setDisplayPlayerHealth: vi.fn(),
     };
 
     (useGame as any).mockReturnValue(mockGameContext);
