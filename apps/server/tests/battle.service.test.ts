@@ -6,6 +6,7 @@ import { CombatEngine } from '@nvg/shared/src/gameLogic/CombatEngine';
 // Mock Prisma
 const mockUpsert = vi.fn();
 const mockFindUnique = vi.fn();
+const mockMobFindUnique = vi.fn();
 
 vi.mock('../src/index', () => ({
   prisma: {
@@ -19,13 +20,18 @@ vi.mock('../src/index', () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    mob: {
+      findUnique: (...args: any) => mockMobFindUnique(...args),
+    },
   },
 }));
 
 // Mock LootService
 vi.mock('../src/services/loot.service', () => ({
   LootService: {
+    resolveDropTable: vi.fn(),
     awardLootToCharacter: vi.fn(),
+    awardLootResultToCharacter: vi.fn(),
     mergeLoot: vi.fn((acc, loot) => {
       acc.sol += loot.sol;
       acc.items.push(...loot.items);
@@ -135,12 +141,18 @@ describe('BattleService', () => {
   });
 
   describe('processVictory', () => {
-    const mockBattle = { dungeonLevelId: 'dl_1' };
-    const characterId = 'char_1';
-    const lootResults = { sol: 0, experience: 0, items: [] };
-    const newState: any = { status: 'VICTORY' };
+    beforeEach(() => {
+      // Setup default mock implementations for LootService calls inside awardAfterCombatLoot
+      vi.mocked(LootService.resolveDropTable).mockResolvedValue({ sol: 10, experience: 0, items: [] });
+      vi.mocked(LootService.awardLootResultToCharacter).mockImplementation((charId, loot) => Promise.resolve(loot));
+    });
 
     it('should award level loot and record level accomplishment for intermediate level', async () => {
+      const mockBattle = { dungeonLevelId: 'dl_1' };
+      const characterId = 'char_1';
+      const lootResults = { sol: 0, experience: 0, items: [] };
+      const newState: any = { status: 'VICTORY', mobs: [] };
+
       mockFindUnique.mockResolvedValue({
         id: 'dl_1',
         completionDropTable: { id: 'dt_level' },
@@ -153,11 +165,12 @@ describe('BattleService', () => {
         },
       });
 
-      vi.mocked(LootService.awardLootToCharacter).mockResolvedValue({ sol: 10, experience: 0, items: [] });
-
       await BattleService.processVictory(mockBattle, characterId, lootResults, newState);
 
-      expect(LootService.awardLootToCharacter).toHaveBeenCalledWith(characterId, 'dt_level');
+      expect(LootService.resolveDropTable).toHaveBeenCalledWith('dt_level');
+      expect(LootService.awardLootResultToCharacter).toHaveBeenCalledWith(characterId, expect.objectContaining({
+        sol: 10
+      }));
       expect(mockUpsert).toHaveBeenCalledWith(expect.objectContaining({
         create: expect.objectContaining({ type: 'DUNGEON_LEVEL_CLEARED', referenceId: 'dl_1' })
       }));
@@ -167,6 +180,11 @@ describe('BattleService', () => {
     });
 
     it('should award dungeon loot and record dungeon accomplishment for last level', async () => {
+      const mockBattle = { dungeonLevelId: 'dl_2' };
+      const characterId = 'char_1';
+      const lootResults = { sol: 0, experience: 0, items: [] };
+      const newState: any = { status: 'VICTORY', mobs: [] };
+
       mockFindUnique.mockResolvedValue({
         id: 'dl_2',
         completionDropTable: { id: 'dt_level' },
@@ -180,15 +198,15 @@ describe('BattleService', () => {
         },
       });
 
-      vi.mocked(LootService.awardLootToCharacter)
+      vi.mocked(LootService.resolveDropTable)
         .mockResolvedValueOnce({ sol: 10, experience: 0, items: [] }) // Level loot
         .mockResolvedValueOnce({ sol: 50, experience: 0, items: [] }); // Dungeon loot
 
-      await BattleService.processVictory({ dungeonLevelId: 'dl_2' }, characterId, lootResults, newState);
+      await BattleService.processVictory(mockBattle, characterId, lootResults, newState);
 
-      expect(LootService.awardLootToCharacter).toHaveBeenCalledTimes(2);
-      expect(LootService.awardLootToCharacter).toHaveBeenNthCalledWith(1, characterId, 'dt_level');
-      expect(LootService.awardLootToCharacter).toHaveBeenNthCalledWith(2, characterId, 'dt_dungeon');
+      expect(LootService.resolveDropTable).toHaveBeenCalledTimes(2);
+      expect(LootService.resolveDropTable).toHaveBeenNthCalledWith(1, 'dt_level');
+      expect(LootService.resolveDropTable).toHaveBeenNthCalledWith(2, 'dt_dungeon');
       
       expect(mockUpsert).toHaveBeenCalledTimes(2);
       expect(mockUpsert).toHaveBeenNthCalledWith(2, expect.objectContaining({
@@ -197,6 +215,53 @@ describe('BattleService', () => {
       
       expect(newState.nextDungeonLevelId).toBeNull();
       expect(newState.isDungeonComplete).toBe(true);
+      expect(lootResults.sol).toBe(60);
+    });
+  });
+
+  describe('awardAfterCombatLoot', () => {
+    const characterId = 'char_1';
+
+    it('should aggregate loot from defeated mobs and level/dungeon completion', async () => {
+      // Mock prisma.mob.findUnique
+      mockMobFindUnique.mockResolvedValue({
+        id: 'mob_1',
+        dropTable: { id: 'dt_mob' }
+      });
+
+      // Mock prisma.dungeonLevel.findUnique
+      mockFindUnique.mockResolvedValue({
+        id: 'dl_1',
+        completionDropTable: { id: 'dt_level' },
+        dungeon: {
+          id: 'dungeon_1',
+          levels: [{ id: 'dl_1', orderIndex: 0 }],
+          completionDropTable: { id: 'dt_dungeon' }
+        }
+      });
+
+      // Mock LootService
+      vi.mocked(LootService.resolveDropTable).mockImplementation((dtId: string) => {
+        if (dtId === 'dt_mob') return Promise.resolve({ sol: 5, experience: 0, items: [] });
+        if (dtId === 'dt_level') return Promise.resolve({ sol: 10, experience: 0, items: [] });
+        if (dtId === 'dt_dungeon') return Promise.resolve({ sol: 20, experience: 0, items: [] });
+        return Promise.resolve({ sol: 0, experience: 0, items: [] });
+      });
+
+      vi.mocked(LootService.awardLootResultToCharacter).mockImplementation((charId, loot) => {
+        return Promise.resolve(loot);
+      });
+
+      const mobsState = [{ mobId: 'mob_1', health: 0 }];
+      const result = await BattleService.awardAfterCombatLoot(characterId, 'dl_1', mobsState);
+
+      expect(LootService.resolveDropTable).toHaveBeenCalledWith('dt_mob');
+      expect(LootService.resolveDropTable).toHaveBeenCalledWith('dt_level');
+      expect(LootService.resolveDropTable).toHaveBeenCalledWith('dt_dungeon');
+      expect(LootService.awardLootResultToCharacter).toHaveBeenCalledWith(characterId, expect.objectContaining({
+        sol: 35
+      }));
+      expect(result.sol).toBe(35);
     });
   });
 });

@@ -57,6 +57,68 @@ export class BattleService {
   }
 
   /**
+   * Generates and awards all loot after combat is finished (victory).
+   * Calculates loot from all defeated mobs in mobsState, level completion, and dungeon completion.
+   */
+  public static async awardAfterCombatLoot(
+    characterId: string,
+    dungeonLevelId: string,
+    mobsState: any[]
+  ): Promise<LootResult> {
+    const lootResults: LootResult = { sol: 0, experience: 0, items: [] };
+
+    // 1. Generate loot for all defeated mobs in mobsState (health <= 0)
+    for (const mob of mobsState) {
+      if (mob.health <= 0) {
+        const mobData = await prisma.mob.findUnique({
+          where: { id: mob.mobId },
+          select: { dropTable: { select: { id: true } } }
+        });
+
+        if (mobData?.dropTable) {
+          const loot = await LootService.resolveDropTable(mobData.dropTable.id);
+          LootService.mergeLoot(lootResults, loot);
+        }
+      }
+    }
+
+    // 2. Award dungeon level completion loot
+    const dungeonLevel = await prisma.dungeonLevel.findUnique({
+      where: { id: dungeonLevelId },
+      include: {
+        completionDropTable: { select: { id: true } },
+        dungeon: {
+          include: {
+            levels: { orderBy: { orderIndex: 'asc' }, select: { id: true } },
+            completionDropTable: { select: { id: true } },
+          }
+        }
+      }
+    });
+
+    if (dungeonLevel?.completionDropTable) {
+      const loot = await LootService.resolveDropTable(dungeonLevel.completionDropTable.id);
+      LootService.mergeLoot(lootResults, loot);
+    }
+
+    // 3. Award dungeon completion loot if we completed the final level
+    if (dungeonLevel?.dungeon) {
+      const levels = dungeonLevel.dungeon.levels;
+      const currentIndex = levels.findIndex(l => l.id === dungeonLevelId);
+      const isLastLevel = currentIndex === levels.length - 1;
+
+      if (isLastLevel && dungeonLevel.dungeon.completionDropTable) {
+        const loot = await LootService.resolveDropTable(dungeonLevel.dungeon.completionDropTable.id);
+        LootService.mergeLoot(lootResults, loot);
+      }
+    }
+
+    // Award all the aggregated loot in a generic, reusable way
+    const awardedLoot = await LootService.awardLootResultToCharacter(characterId, lootResults);
+    return awardedLoot;
+  }
+
+  /**
    * Processes the progression after a victory, including:
    * - Fetching the dungeon hierarchy
    * - Awarding level and dungeon completion loot
@@ -71,25 +133,21 @@ export class BattleService {
     lootResults: LootResult,
     newState: BattleState
   ): Promise<void> {
+    // Award all after-combat loot (mobs + level completion + dungeon completion)
+    const combatLoot = await this.awardAfterCombatLoot(characterId, battle.dungeonLevelId, newState.mobs);
+    LootService.mergeLoot(lootResults, combatLoot);
+
     // Fetch current dungeon level with its dungeon and sibling levels
     const dungeonLevel = await prisma.dungeonLevel.findUnique({
       where: { id: battle.dungeonLevelId },
       include: {
-        completionDropTable: { select: { id: true } },
         dungeon: {
           include: {
             levels: { orderBy: { orderIndex: 'asc' }, select: { id: true, orderIndex: true } },
-            completionDropTable: { select: { id: true } },
           }
         }
       }
     });
-
-    // Award dungeon level completion loot
-    if (dungeonLevel?.completionDropTable) {
-      const loot = await LootService.awardLootToCharacter(characterId, dungeonLevel.completionDropTable.id);
-      LootService.mergeLoot(lootResults, loot);
-    }
 
     // Record accomplishment for this dungeon level
     await prisma.accomplishment.upsert({
@@ -124,15 +182,6 @@ export class BattleService {
         // Last level — dungeon is complete
         newState.nextDungeonLevelId = null;
         newState.isDungeonComplete = true;
-
-        // Award dungeon completion loot
-        if (dungeonLevel.dungeon.completionDropTable) {
-          const loot = await LootService.awardLootToCharacter(
-            characterId,
-            dungeonLevel.dungeon.completionDropTable.id
-          );
-          LootService.mergeLoot(lootResults, loot);
-        }
 
         // Record dungeon cleared accomplishment
         await prisma.accomplishment.upsert({

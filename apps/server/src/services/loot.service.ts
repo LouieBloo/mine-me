@@ -45,35 +45,49 @@ export class LootService {
    */
   public static async awardLootToCharacter(characterId: string, dropTableId: string): Promise<LootResult> {
     const loot = await this.resolveDropTable(dropTableId);
+    return this.awardLootResultToCharacter(characterId, loot);
+  }
 
+  /**
+   * Awards a pre-resolved LootResult directly to the character and persists it to the database.
+   * Handles Sol, Experience, and Items.
+   */
+  public static async awardLootResultToCharacter(characterId: string, loot: LootResult): Promise<LootResult> {
     if (loot.sol === 0 && loot.experience === 0 && loot.items.length === 0) {
       return loot;
     }
 
+    // Clone the input to prevent side-effects on original reference
+    const finalLoot: LootResult = {
+      sol: loot.sol,
+      experience: loot.experience,
+      items: loot.items.map(item => ({ ...item }))
+    };
+
     // 1. Give Sol
-    if (loot.sol > 0) {
+    if (finalLoot.sol > 0) {
       await prisma.character.update({
         where: { id: characterId },
-        data: { sol: { increment: loot.sol } }
+        data: { sol: { increment: finalLoot.sol } }
       });
     }
 
     // 2. Give Experience
-    if (loot.experience > 0) {
-      const result = await CharacterService.addExperience(characterId, loot.experience);
-      this.mergeLoot(loot, result.levelUpLoot);
+    if (finalLoot.experience > 0) {
+      const result = await CharacterService.addExperience(characterId, finalLoot.experience);
+      this.mergeLoot(finalLoot, result.levelUpLoot);
     }
 
     // 3. Give Items
-    for (const item of loot.items) {
+    for (const item of finalLoot.items) {
       const result = await InventoryService.giveItemToCharacter(characterId, item.itemId, item.quantity);
-      loot.experience += result.experienceGranted;
+      finalLoot.experience += result.experienceGranted;
       if (result.levelUpLoot) {
-        this.mergeLoot(loot, result.levelUpLoot);
+        this.mergeLoot(finalLoot, result.levelUpLoot);
       }
     }
 
-    return loot;
+    return finalLoot;
   }
 
   /**

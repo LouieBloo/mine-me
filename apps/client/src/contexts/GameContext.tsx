@@ -76,6 +76,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setActiveCharacterState(null);
             localStorage.removeItem('nvg_active_character');
         }
+        if (updates.health !== undefined) {
+            setDisplayPlayerHealth(prev => prev !== null ? updates.health! : null);
+        }
         setPlayerStateRaw(prev => {
             if (!prev) return prev;
 

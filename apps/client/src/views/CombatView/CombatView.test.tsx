@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CombatView } from './CombatView';
 import { useGame } from '../../contexts/GameContext';
@@ -21,6 +21,18 @@ vi.mock('../../contexts/ChatContext', () => ({
 
 vi.mock('react-router-dom', () => ({
   useNavigate: vi.fn(),
+}));
+
+vi.mock('../../components/Modal/Modal', () => ({
+  Modal: ({ isOpen, title, children }: any) => {
+    if (!isOpen) return null;
+    return (
+      <div data-testid="mock-modal">
+        <div>{title}</div>
+        <div>{children}</div>
+      </div>
+    );
+  }
 }));
 
 const mockPlayAnimation = vi.fn((_key: string, options?: any) => {
@@ -84,7 +96,10 @@ describe('CombatView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (useNavigate as any).mockReturnValue(mockNavigate);
-    (useSocket as any).mockReturnValue({ sendGameEvent: mockSendGameEvent });
+    (useSocket as any).mockReturnValue({
+      sendGameEvent: mockSendGameEvent,
+      onEvent: vi.fn(() => vi.fn())
+    });
     (useChat as any).mockReturnValue({ setActiveTab: mockSetActiveTab, addCombatLogs: vi.fn(), clearCombatLogs: vi.fn() });
     
     // Default mock implementation for useGame
@@ -268,5 +283,56 @@ describe('CombatView', () => {
     // Verify the mob's row has faded (has the opacity-0 class)
     const mobRow = screen.getByText('Goblin').closest('.transition-all.duration-1000');
     expect(mobRow?.className).toContain('opacity-0');
+  });
+
+  it('shows the loot modal when combat_loot is received', async () => {
+    let lootCallback: any = null;
+    const mockOnEvent = vi.fn((event, cb) => {
+      if (event === 'combat_loot') {
+        lootCallback = cb;
+      }
+      return vi.fn(); // cleanup
+    });
+
+    (useSocket as any).mockReturnValue({
+      sendGameEvent: mockSendGameEvent,
+      onEvent: mockOnEvent
+    });
+
+    render(<CombatView />);
+
+    expect(lootCallback).toBeDefined();
+
+    // Trigger combat_loot event
+    act(() => {
+      lootCallback({
+        sol: 50,
+        experience: 15,
+        items: [
+          {
+            itemId: 'item_1',
+            quantity: 2,
+            itemDetails: { id: 'item_1', name: 'Iron Ore', rarity: 'LOW', iconUrl: null }
+          }
+        ]
+      });
+    });
+
+    // Verify modal elements are visible
+    await waitFor(() => {
+      expect(screen.getByText(/Victory Spoils/i)).toBeDefined();
+      expect(screen.getByText('+50')).toBeDefined();
+      expect(screen.getByText('+15 XP')).toBeDefined();
+      expect(screen.getByText('Iron Ore')).toBeDefined();
+      expect(screen.getByText('2')).toBeDefined(); // Quantity
+    });
+
+    // Click accept button and verify it closes
+    const acceptBtn = screen.getByText('Accept Loot');
+    fireEvent.click(acceptBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Victory Spoils')).toBeNull();
+    });
   });
 });

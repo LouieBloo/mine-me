@@ -210,40 +210,20 @@ export const handleCombatAction = async (
     }
   });
 
-  // For MVP: sync the damage back to character's health
+  // Persist health changes to DB. Don't broadcast character_stat_update
+  // during combat — the battle_state + animation sequencer handle health
+  // display on the client. The final health is synced in handleLeaveCombat.
   if (newState.playerHealth !== currentState.playerHealth) {
     await prisma.character.update({
       where: { id: characterId },
       data: { health: newState.playerHealth }
     });
-    // Broadcast character stat update
-    io.to(`user:${socket.data.userId}`).emit('character_stat_update', { health: newState.playerHealth });
   }
 
-  // If victory or mobs died, handle loot
+  // If victory, handle loot and progression
   const lootResults: { sol: number; experience: number; items: { itemId: string; quantity: number }[] } = { sol: 0, experience: 0, items: [] };
 
-  // 1. Check for newly dead mobs in this turn
-  for (const mob of newState.mobs) {
-    const prevMob = currentState.mobs.find(m => m.id === mob.id);
-    const wasAlive = prevMob ? prevMob.health > 0 : false;
-    const isDead = mob.health <= 0;
-
-    if (wasAlive && isDead) {
-      // Fetch mob drop table
-      const mobData = await prisma.mob.findUnique({
-        where: { id: mob.mobId },
-        select: { dropTable: { select: { id: true } } }
-      });
-
-      if (mobData?.dropTable) {
-        const loot = await LootService.awardLootToCharacter(characterId, mobData.dropTable.id);
-        LootService.mergeLoot(lootResults, loot);
-      }
-    }
-  }
-
-  // 2. If victory, handle dungeon level completion loot, dungeon completion, and progression
+  // 1. If victory, handle dungeon level completion loot, dungeon completion, and progression
   if (newState.status === 'VICTORY') {
     await BattleService.processVictory(battle, characterId, lootResults, newState);
     
@@ -256,7 +236,7 @@ export const handleCombatAction = async (
 
   // 3. Emit loot event to client and push character sync if we got anything
   if (lootResults.sol > 0 || lootResults.experience > 0 || lootResults.items.length > 0) {
-    socket.emit('combat_loot', lootResults);
+    socket.emit('combat_loot', { ...lootResults, suppressToast: true });
 
     const updatedCharacter = await prisma.character.findUnique({
       where: { id: characterId },
@@ -393,6 +373,18 @@ export const handleLeaveCombat = async (
     await prisma.battle.delete({
       where: { id: battle.id }
     });
+  }
+
+  // Sync the character's authoritative health before clearing battle state.
+  // During combat, health updates are delivered via battle_state animations,
+  // not character_stat_update. This final sync ensures the client has the
+  // correct health once the battle ends.
+  const character = await prisma.character.findUnique({
+    where: { id: characterId },
+    select: { health: true }
+  });
+  if (character) {
+    io.to(`user:${socket.data.userId}`).emit('character_stat_update', { health: character.health });
   }
 
   socket.leave(`battle:${characterId}`);

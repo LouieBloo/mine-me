@@ -357,27 +357,6 @@
     "itemEffects": []
   },
   {
-    "id": "cmq0b6kf500002rdhs7vehh63",
-    "name": "Health Potion",
-    "description": "Gives you health you",
-    "type": "CONSUMABLE",
-    "subType": "POTION",
-    "vendorBuyPrice": 5,
-    "vendorSellPrice": 15,
-    "userSellPrice": 3,
-    "userBuyPrice": 4,
-    "rarity": "LOW",
-    "iconUrl": "/assets/icons/items/cmq0b6kf500002rdhs7vehh63_icon.png",
-    "gearImageUrl": null,
-    "isStartingPiece": false,
-    "experience": 0,
-    "combatScore": 0,
-    "defenseScore": 0,
-    "createdAt": "2026-06-05T02:32:13.026Z",
-    "updatedAt": "2026-06-07T03:46:54.977Z",
-    "itemEffects": []
-  },
-  {
     "id": "cmp6aexa30004idpx29gsz12l",
     "name": "Copperium",
     "description": "Common material used to craft items and sell",
@@ -420,6 +399,45 @@
     "itemEffects": []
   },
   {
+    "id": "cmq0b6kf500002rdhs7vehh63",
+    "name": "Health Potion",
+    "description": "Gives you health you",
+    "type": "CONSUMABLE",
+    "subType": "POTION",
+    "vendorBuyPrice": 5,
+    "vendorSellPrice": 15,
+    "userSellPrice": 3,
+    "userBuyPrice": 4,
+    "rarity": "LOW",
+    "iconUrl": "/assets/icons/items/cmq0b6kf500002rdhs7vehh63_icon.png",
+    "gearImageUrl": null,
+    "isStartingPiece": false,
+    "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
+    "createdAt": "2026-06-05T02:32:13.026Z",
+    "updatedAt": "2026-06-07T03:46:54.977Z",
+    "itemEffects": [
+      {
+        "id": "cmqogwbcw000e5ntf6pbosfxt",
+        "itemId": "cmq0b6kf500002rdhs7vehh63",
+        "effectId": "cmq0b7ms200012rdh7w3i7tjc",
+        "value": 10,
+        "createdAt": "2026-06-22T00:18:40.640Z",
+        "updatedAt": "2026-06-22T00:18:40.640Z",
+        "effect": {
+          "id": "cmq0b7ms200012rdh7w3i7tjc",
+          "name": "Gain Life",
+          "description": "Gain Life Instantly",
+          "healthGain": true,
+          "staminaGain": false,
+          "createdAt": "2026-06-22T00:13:18.699Z",
+          "updatedAt": "2026-06-22T00:13:18.699Z"
+        }
+      }
+    ]
+  },
+  {
     "id": "cmq1lectq0000q7ocymqq4zd3",
     "name": "Stamina Potion",
     "description": "Instantly gives stamina",
@@ -438,6 +456,24 @@
     "defenseScore": 0,
     "createdAt": "2026-06-06T00:05:58.766Z",
     "updatedAt": "2026-06-07T03:47:37.188Z",
-    "itemEffects": []
+    "itemEffects": [
+      {
+        "id": "cmqogxs3a000h5ntfn1c2yn4f",
+        "itemId": "cmq1lectq0000q7ocymqq4zd3",
+        "effectId": "cmq1lathh0000w7bkm1lbqp29",
+        "value": 50,
+        "createdAt": "2026-06-22T00:19:48.982Z",
+        "updatedAt": "2026-06-22T00:19:48.982Z",
+        "effect": {
+          "id": "cmq1lathh0000w7bkm1lbqp29",
+          "name": "Gain Stamina",
+          "description": "Instantly gain stamina",
+          "healthGain": false,
+          "staminaGain": true,
+          "createdAt": "2026-06-22T00:13:18.717Z",
+          "updatedAt": "2026-06-22T00:13:18.717Z"
+        }
+      }
+    ]
   }
 ]

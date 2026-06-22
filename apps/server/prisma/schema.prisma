@@ -325,8 +325,6 @@ model CharacterLevel {
   
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-
-  @@map("character_levels")
 }
 
 // ----------------------------------------------------------------------------
@@ -341,8 +339,6 @@ model Effect {
   objectEffects ObjectEffects[]
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
-
-  @@map("effects")
 }
 
 model ObjectEffects {
@@ -356,5 +352,4 @@ model ObjectEffects {
   updatedAt DateTime @updatedAt
 
   @@unique([itemId, effectId])
-  @@map("object_effects")
 }

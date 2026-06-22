@@ -34,16 +34,16 @@ const VIEWPORT_PADDING = 8; // px from viewport edge
 export const HoverTooltip = ({
   content,
   children,
-  offset = 12,
+  offset = 20,
   showDelay = 150,
   className = '',
   disabled = false,
 }: HoverTooltipProps) => {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState({ x: -9999, y: -9999 }); // render offscreen initially
+  const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mouseRef = useRef({ x: 0, y: 0 });
 
   const clearTimer = useCallback(() => {
     if (delayTimerRef.current) {
@@ -52,9 +52,8 @@ export const HoverTooltip = ({
     }
   }, []);
 
-  const handleMouseEnter = useCallback((e: React.MouseEvent) => {
+  const handleMouseEnter = useCallback(() => {
     if (disabled) return;
-    mouseRef.current = { x: e.clientX, y: e.clientY };
     clearTimer();
     delayTimerRef.current = setTimeout(() => setVisible(true), showDelay);
   }, [disabled, showDelay, clearTimer]);
@@ -65,45 +64,43 @@ export const HoverTooltip = ({
   }, [clearTimer]);
 
   const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current;
     const tooltip = tooltipRef.current;
-    const tooltipW = tooltip?.offsetWidth ?? 0;
-    const tooltipH = tooltip?.offsetHeight ?? 0;
+    if (!trigger || !tooltip) return;
+
+    let rect = trigger.getBoundingClientRect();
+    // Fallback if trigger has display: contents and returns 0 size
+    if (rect.width === 0 && rect.height === 0 && trigger.firstElementChild) {
+      rect = trigger.firstElementChild.getBoundingClientRect();
+    }
+
+    const tooltipW = tooltip.offsetWidth;
+    const tooltipH = tooltip.offsetHeight;
 
     const vw = document.documentElement.clientWidth || window.innerWidth;
     const vh = document.documentElement.clientHeight || window.innerHeight;
 
-    let { x, y } = mouseRef.current;
+    // Centered vertically relative to the trigger (along the horizontal centerline)
+    const triggerCenterY = rect.top + rect.height / 2;
+    let py = triggerCenterY - tooltipH / 2;
 
-    // Default: right and below the cursor
-    let px = x + offset;
-    let py = y + offset;
+    // Positioned to the left of the trigger
+    let px = rect.left - tooltipW - offset;
 
-    // If we know the width and it overflows right edge, flip to the left of the cursor
-    if (tooltipW > 0 && px + tooltipW + VIEWPORT_PADDING > vw) {
-      px = x - tooltipW - offset;
+    // If it overflows the left edge of the screen, flip it to the right of the trigger
+    if (px < VIEWPORT_PADDING) {
+      if (rect.right + tooltipW + offset + VIEWPORT_PADDING <= vw) {
+        px = rect.right + offset;
+      } else {
+        px = VIEWPORT_PADDING;
+      }
     }
 
-    // If we know the height and it overflows bottom edge, flip above the cursor
-    if (tooltipH > 0 && py + tooltipH + VIEWPORT_PADDING > vh) {
-      py = y - tooltipH - offset;
-    }
-
-    // Clamp to never go off left or top
-    px = Math.max(VIEWPORT_PADDING, px);
-    py = Math.max(VIEWPORT_PADDING, py);
+    // Clamp vertical position to keep it on screen
+    py = Math.max(VIEWPORT_PADDING, Math.min(vh - tooltipH - VIEWPORT_PADDING, py));
 
     setPosition({ x: px, y: py });
   }, [offset]);
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (disabled) return;
-      mouseRef.current = { x: e.clientX, y: e.clientY };
-      // Always update position on mouse move so it tracks
-      updatePosition();
-    },
-    [disabled, updatePosition]
-  );
 
   // Synchronously update position exactly when it mounts or content changes 
   // before the browser paints, preventing flicker or off-screen rendering
@@ -120,10 +117,10 @@ export const HoverTooltip = ({
 
   return (
     <div
+      ref={triggerRef}
       className="hover-tooltip-trigger"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onMouseMove={handleMouseMove}
     >
       {children}
 

@@ -10,6 +10,9 @@ import { CombatAnimationSequencer, buildAttackSteps } from '../../components/gam
 import type { CombatAnimationStep } from '../../components/game/combat/CombatAnimationSequencer';
 import type { GearLayerDescriptor } from '../../components/game/sprites';
 import { notificationService } from '../../services/notificationService';
+import { Modal } from '../../components/Modal/Modal';
+import { HoverTooltip } from '../../components/HoverTooltip/HoverTooltip';
+import { ItemTooltip } from '../../components/ItemTooltip/ItemTooltip';
 import './CombatView.css';
 import type { CombatActionType, MobBattleState, GearSubType, DamageEvent, CombatLogMessage } from '@nvg/shared';
 
@@ -20,6 +23,40 @@ const FLOATING_TEXT_COLORS = {
   blocked: '#6688ff',
   critical: '#ffaa00',
 } as const;
+
+const getRarityColorClass = (rarity?: string) => {
+  switch (rarity) {
+    case 'VERY_RARE':
+      return {
+        text: 'text-purple-400',
+        bg: 'bg-purple-950/30',
+        border: 'border-purple-800/50 hover:border-purple-600',
+        shadow: 'shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+      };
+    case 'RARE':
+      return {
+        text: 'text-blue-400',
+        bg: 'bg-blue-950/30',
+        border: 'border-blue-800/50 hover:border-blue-600',
+        shadow: 'shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+      };
+    case 'MEDIUM':
+      return {
+        text: 'text-emerald-400',
+        bg: 'bg-emerald-950/30',
+        border: 'border-emerald-800/50 hover:border-emerald-600',
+        shadow: 'shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+      };
+    case 'LOW':
+    default:
+      return {
+        text: 'text-slate-400',
+        bg: 'bg-slate-900/50',
+        border: 'border-slate-800 hover:border-slate-700',
+        shadow: ''
+      };
+  }
+};
 
 /**
  * Groups turnLogs into per-damage-event buckets by consuming them in order.
@@ -67,7 +104,7 @@ function groupLogsWithEvents(
 
 export const CombatView: React.FC = () => {
   const { battleState, activeCharacter, playerState, displayPlayerHealth, setDisplayPlayerHealth: setGlobalDisplayPlayerHealth } = useGame();
-  const { sendGameEvent } = useSocket();
+  const { sendGameEvent, onEvent } = useSocket();
   const { setActiveTab, addCombatLogs, clearCombatLogs } = useChat();
   const navigate = useNavigate();
 
@@ -77,6 +114,17 @@ export const CombatView: React.FC = () => {
   const [combatOver, setCombatOver] = useState(false);
   const [animating, setAnimating] = useState(false);
   const [advancingLevel, setAdvancingLevel] = useState(false);
+  const [showLootModal, setShowLootModal] = useState(false);
+  const [lootResult, setLootResult] = useState<{ sol: number; experience: number; items: any[] } | null>(null);
+
+  useEffect(() => {
+    const cleanup = onEvent('combat_loot', (loot) => {
+      console.log('[CombatView] combat_loot received:', loot);
+      setLootResult(loot);
+      setShowLootModal(true);
+    });
+    return cleanup;
+  }, [onEvent]);
 
   // Display health: rendered in health bars, updated incrementally during animation
   const [displayMobHealth, setDisplayMobHealth] = useState<Record<string, number>>({});
@@ -148,26 +196,27 @@ export const CombatView: React.FC = () => {
     }
   }, [setGlobalDisplayPlayerHealth]);
 
-  // Initialize display health and intended actions when battleState first loads (no animation needed)
+  // Initialize display health and intended actions when battleState first loads (no animation needed).
+  // NOTE: We intentionally do NOT guard on lastProcessedRound here. The [battleState?.id]
+  // dependency already scopes this to new battles, and guarding on lastProcessedRound
+  // breaks under React StrictMode (the ref persists across the unmount/remount cycle
+  // but the cleanup effect nulls displayPlayerHealth, leaving it stuck at null).
   useEffect(() => {
     if (!battleState) return;
-    // Only sync on initial load (round hasn't been processed yet and no animation running)
-    if (lastProcessedRound.current === 0 && !animating) {
-      setGlobalDisplayPlayerHealth(battleState.playerHealth);
-      const mobHealth: Record<string, number> = {};
-      const initialFaded: Record<string, boolean> = {};
-      const initialIntendedActions: Record<string, any> = {};
-      battleState.mobs.forEach((m: MobBattleState) => {
-        mobHealth[m.id] = m.health;
-        if (m.health <= 0) {
-          initialFaded[m.id] = true;
-        }
-        initialIntendedActions[m.id] = m.intendedAction || null;
-      });
-      setDisplayMobHealth(mobHealth);
-      setFadedMobs(initialFaded);
-      setDisplayIntendedActions(initialIntendedActions);
-    }
+    setGlobalDisplayPlayerHealth(battleState.playerHealth);
+    const mobHealth: Record<string, number> = {};
+    const initialFaded: Record<string, boolean> = {};
+    const initialIntendedActions: Record<string, any> = {};
+    battleState.mobs.forEach((m: MobBattleState) => {
+      mobHealth[m.id] = m.health;
+      if (m.health <= 0) {
+        initialFaded[m.id] = true;
+      }
+      initialIntendedActions[m.id] = m.intendedAction || null;
+    });
+    setDisplayMobHealth(mobHealth);
+    setFadedMobs(initialFaded);
+    setDisplayIntendedActions(initialIntendedActions);
   }, [battleState?.id]);
 
   useEffect(() => {
@@ -232,12 +281,20 @@ export const CombatView: React.FC = () => {
 
     // Compute pre-damage health from the current display values BEFORE the async
     // animation runs.  This snapshot is used as the base for all incremental
-    // health updates inside the animation callbacks.  We also set the display
-    // health synchronously so that if a character_stat_update re-render occurs
-    // before the animation impact, the health bar keeps the pre-damage value
-    // (instead of falling through to the authoritative attributes.health which
-    // has already been updated by the server).
-    const preDamagePlayerHealth = displayPlayerHealth !== null ? displayPlayerHealth : battleState.playerHealth;
+    // health updates inside the animation callbacks.
+    //
+    // Safety net: if displayPlayerHealth is null (e.g. React StrictMode race),
+    // reconstruct the pre-damage value by reversing the damage events rather
+    // than using battleState.playerHealth (which is already post-damage).
+    let preDamagePlayerHealth: number;
+    if (displayPlayerHealth !== null) {
+      preDamagePlayerHealth = displayPlayerHealth;
+    } else {
+      const totalPlayerDamage = damageEvents
+        .filter((e: DamageEvent) => e.targetId === 'player')
+        .reduce((sum: number, e: DamageEvent) => sum + e.amount, 0);
+      preDamagePlayerHealth = battleState.playerHealth + totalPlayerDamage;
+    }
     const preDamageMobHealth: Record<string, number> = {};
     battleState.mobs.forEach((m: MobBattleState) => {
       preDamageMobHealth[m.id] = displayMobHealth[m.id] ?? m.health;
@@ -694,6 +751,116 @@ export const CombatView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Loot spoils modal */}
+      {lootResult && (
+        <Modal
+          isOpen={showLootModal}
+          onClose={() => {
+            setShowLootModal(false);
+            setLootResult(null);
+          }}
+          title={
+            <span className="flex items-center gap-2 text-amber-400">
+              ⚔️ Victory Spoils
+            </span>
+          }
+          maxWidthClass="max-w-lg"
+        >
+          <div className="flex flex-col gap-6">
+            <p className="text-sm text-slate-400 uppercase tracking-widest font-bold">
+              You cleared the combat level successfully! Here is the loot generated:
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Sol Reward card */}
+              {lootResult.sol > 0 && (
+                <div className="flex items-center gap-4 bg-amber-950/20 border border-amber-900/50 rounded-xl p-4 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                  <span className="text-3xl">🪙</span>
+                  <div>
+                    <div className="text-[10px] font-black text-amber-500/70 uppercase tracking-wider">Sol Gained</div>
+                    <div className="text-2xl font-black text-amber-400">+{lootResult.sol}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* XP Reward card */}
+              {lootResult.experience > 0 && (
+                <div className="flex items-center gap-4 bg-purple-950/20 border border-purple-900/50 rounded-xl p-4 shadow-[0_0_15px_rgba(168,85,247,0.1)]">
+                  <span className="text-3xl">⚡</span>
+                  <div>
+                    <div className="text-[10px] font-black text-purple-500/70 uppercase tracking-wider">XP Gained</div>
+                    <div className="text-2xl font-black text-purple-400">+{lootResult.experience} XP</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Items reward list */}
+            {lootResult.items && lootResult.items.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Items Obtained</h3>
+                <div className="grid grid-cols-5 gap-3 bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+                  {lootResult.items.map((item, idx) => {
+                    const rarityColors = getRarityColorClass(item.itemDetails?.rarity);
+                    const mockEntry = {
+                      id: item.itemId,
+                      item: item.itemDetails,
+                      quantity: item.quantity,
+                      equipped: false,
+                    } as any;
+
+                    return (
+                      <HoverTooltip key={idx} content={<ItemTooltip entry={mockEntry} />}>
+                        <div className={`relative aspect-square ${rarityColors.bg} border-2 ${rarityColors.border} rounded-lg flex items-center justify-center overflow-hidden transition-all duration-300 ${rarityColors.shadow} hover:scale-105 cursor-pointer`}>
+                          {item.itemDetails?.iconUrl ? (
+                            <img
+                              src={
+                                item.itemDetails.iconUrl.startsWith('http')
+                                  ? item.itemDetails.iconUrl
+                                  : `${import.meta.env.VITE_API_URL}${item.itemDetails.iconUrl}`
+                              }
+                              alt={item.itemDetails.name}
+                              className="w-full h-full object-cover scale-90"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center p-2 text-center">
+                              <span className="text-[9px] font-black text-slate-500 uppercase leading-tight truncate">
+                                {item.itemDetails?.name || 'Item'}
+                              </span>
+                            </div>
+                          )}
+                          {item.quantity > 1 && (
+                            <span className="absolute bottom-1 right-1 text-[10px] font-black text-white bg-slate-900/90 border border-slate-700/50 rounded px-1.5 py-0.5 leading-none shadow-sm">
+                              {item.quantity}
+                            </span>
+                          )}
+                        </div>
+                      </HoverTooltip>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 bg-slate-950/30 border border-slate-800 rounded-xl">
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">No items obtained this level</p>
+              </div>
+            )}
+
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={() => {
+                  setShowLootModal(false);
+                  setLootResult(null);
+                }}
+                className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-black uppercase tracking-widest rounded-lg border border-amber-400 cursor-pointer transition-all active:scale-95 shadow-lg shadow-amber-950/20"
+              >
+                Accept Loot
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
