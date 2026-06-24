@@ -19,3 +19,10 @@ body {
   padding: 0;
   min-height: 100vh;
 }
+
+/* Ensure all buttons and clickable elements use the correct pointer cursor */
+button,
+[role="button"],
+.cursor-pointer {
+  cursor: pointer;
+}

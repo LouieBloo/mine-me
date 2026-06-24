@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 import type { PlayerInventory, InventoryEntry } from '@nvg/shared';
 import { ItemListIcon } from '../ItemListIcon/ItemListIcon';
 import './InventoryPanel.css';
@@ -18,6 +20,8 @@ const RARITY_VALUE: Record<string, number> = {
 };
 
 export const InventoryPanel = ({ inventory }: Props) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [sortBy, setSortBy] = useState<SortOption>('default');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
@@ -77,6 +81,28 @@ export const InventoryPanel = ({ inventory }: Props) => {
 
   return (
     <div className="flex flex-col h-full bg-slate-800 border-l border-slate-700 w-80 shadow-2xl">
+      {/* User / Profile Header Bar */}
+      <div className="p-3 border-b border-slate-700 bg-slate-900/40 flex items-center justify-between shrink-0">
+        <button
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 transition-all text-left group cursor-pointer"
+        >
+          <div className="w-5 h-5 rounded-full bg-slate-950 border border-slate-600 group-hover:border-yellow-500/80 flex items-center justify-center text-xs transition-colors">
+            👤
+          </div>
+          <span className="text-xs font-black uppercase tracking-wider text-slate-300 group-hover:text-yellow-500/80 transition-colors">
+            {user?.familyName || 'Profile'}
+          </span>
+        </button>
+
+        <button
+          onClick={logout}
+          className="text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-300 transition-colors cursor-pointer px-2 py-1 rounded hover:bg-red-500/15"
+        >
+          Logout
+        </button>
+      </div>
+
       {/* Header */}
       <div className="p-4 border-b border-slate-700 bg-slate-800/50 flex flex-col gap-3 shrink-0">
         <div className="flex justify-between items-center">

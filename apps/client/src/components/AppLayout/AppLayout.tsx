@@ -1,10 +1,17 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import './AppLayout.css';
 
 export const AppLayout = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Hide the floating profile button if we are on one of the main in-game routes 
+  // where the right sidebar is visible and displays these buttons.
+  const isGameView = ['/home', '/combat', '/training', '/mine'].some(
+    path => location.pathname.startsWith(path)
+  );
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-slate-900 selection:bg-yellow-500/30">
@@ -16,7 +23,7 @@ export const AppLayout = () => {
       {/* Main Game Area */}
       <main className="flex-1 relative overflow-y-auto w-full">
         {/* Top-right Profile Button */}
-        {user && (
+        {user && !isGameView && (
           <button 
             onClick={() => navigate('/profile')}
             className="absolute top-4 right-8 z-50 flex items-center space-x-3 bg-slate-900/80 hover:bg-slate-800 backdrop-blur-sm px-4 py-2 rounded-full border border-white/10 shadow-lg text-white group transition-all"

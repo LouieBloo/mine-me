@@ -9,6 +9,17 @@ vi.mock('../../src/components/ItemListIcon/ItemListIcon', () => ({
   ItemListIcon: ({ entry }: any) => <div data-testid="item-icon">{entry.item.name}</div>,
 }));
 
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+}));
+
+vi.mock('../../src/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { familyName: 'Stark' },
+    logout: vi.fn(),
+  }),
+}));
+
 describe('InventoryPanel', () => {
   const mockInventory: PlayerInventory = {
     slots: 10,
