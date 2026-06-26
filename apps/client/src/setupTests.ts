@@ -44,7 +44,22 @@ vi.mock('pixi.js', () => ({
   },
   Texture: {
     EMPTY: {},
+    from: vi.fn().mockReturnValue({ destroy: vi.fn() }),
   },
-  Sprite: class {},
+  Sprite: class {
+    anchor = { set: vi.fn() };
+    scale = { set: vi.fn() };
+    x = 0;
+    y = 0;
+    texture = { destroy: vi.fn() };
+    destroy = vi.fn();
+  },
   Container: class {},
 }));
+
+// Mock HTMLMediaElement methods for JSDOM
+if (typeof window !== 'undefined' && window.HTMLMediaElement) {
+  window.HTMLMediaElement.prototype.load = vi.fn();
+  window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
+  window.HTMLMediaElement.prototype.pause = vi.fn();
+}

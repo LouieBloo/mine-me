@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Application } from '@pixi/react';
-import { Assets, Texture, Sprite, Application as PixiApplication } from 'pixi.js';
+import { Texture, Sprite, Application as PixiApplication } from 'pixi.js';
 import { useGame } from '../../contexts/GameContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { useChat } from '../../contexts/ChatContext';
@@ -18,50 +18,101 @@ import './HomeView.css';
 // CityBackground — uses imperative Pixi stage API via onInit callback
 // ----------------------------------------------------------------------------
 const CityBackground = ({
-  url,
   width,
   height,
   app,
 }: {
-  url?: string | null;
   width: number;
   height: number;
   app: PixiApplication | null;
 }) => {
   const spriteRef = useRef<Sprite | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const dimsRef = useRef({ width, height });
 
   useEffect(() => {
-    if (!url || !app?.stage) return;
+    dimsRef.current = { width, height };
+  }, [width, height]);
 
-    const fullUrl = url.startsWith('http')
-      ? url
-      : `${import.meta.env.VITE_API_URL}${url}`;
+  useEffect(() => {
+    if (!app?.stage) return;
 
-    let cancelled = false;
+    const videoUrl = `${import.meta.env.VITE_API_URL}/assets/testscreen.mp4`;
 
-    Assets.load(fullUrl).then((texture: Texture) => {
-      if (cancelled || !app?.stage) return;
+    const videoElement = document.createElement('video');
+    videoElement.src = videoUrl;
+    videoElement.crossOrigin = 'anonymous';
+    videoElement.muted = true;
+    videoElement.loop = true;
+    videoElement.playsInline = true;
+    videoElement.autoplay = true;
+    videoElement.controls = false;
+    videoElement.style.display = 'none';
 
-      const sprite = new Sprite(texture);
+    videoRef.current = videoElement;
+
+    let sprite: Sprite | null = null;
+
+    const onCanPlay = () => {
+      if (!app?.stage || spriteRef.current) return;
+
+      const texture = Texture.from(videoElement);
+      sprite = new Sprite(texture);
       sprite.anchor.set(0.5);
-      sprite.x = width / 2;
-      sprite.y = height / 2;
 
-      sprite.scale.set(Math.min(width / texture.width, height / texture.height));
+      const { width: curWidth, height: curHeight } = dimsRef.current;
+      sprite.x = curWidth / 2;
+      sprite.y = curHeight / 2;
+
+      if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+        sprite.scale.set(Math.min(curWidth / videoElement.videoWidth, curHeight / videoElement.videoHeight));
+      }
 
       app.stage.addChild(sprite);
       spriteRef.current = sprite;
+    };
+
+    videoElement.addEventListener('canplay', onCanPlay);
+    if (videoElement.readyState >= 2) {
+      onCanPlay();
+    } else {
+      videoElement.load();
+    }
+
+    videoElement.play().catch((err) => {
+      console.warn('[CityBackground] Video playback failed:', err);
     });
 
     return () => {
-      cancelled = true;
-      if (spriteRef.current && app?.stage) {
-        app.stage.removeChild(spriteRef.current);
-        spriteRef.current.destroy();
+      videoElement.removeEventListener('canplay', onCanPlay);
+      videoElement.pause();
+      videoElement.src = '';
+      videoElement.load();
+      videoRef.current = null;
+
+      if (sprite && app?.stage) {
+        app.stage.removeChild(sprite);
+        const texture = sprite.texture;
+        sprite.destroy();
+        if (texture) {
+          texture.destroy(true);
+        }
         spriteRef.current = null;
       }
     };
-  }, [url, width, height, app]);
+  }, [app]);
+
+  useEffect(() => {
+    const sprite = spriteRef.current;
+    const video = videoRef.current;
+    if (sprite && video) {
+      sprite.x = width / 2;
+      sprite.y = height / 2;
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        sprite.scale.set(Math.min(width / video.videoWidth, height / video.videoHeight));
+      }
+    }
+  }, [width, height]);
 
   return null;
 };
@@ -329,7 +380,6 @@ export const HomeView = () => {
             onInit={(app) => setPixiApp(app)}
           >
             <CityBackground
-              url={city?.backgroundImageUrl}
               width={dimensions.width}
               height={dimensions.height}
               app={pixiApp}

@@ -13,8 +13,16 @@ vi.mock('pixi.js', () => ({
   },
   Texture: {
     EMPTY: {},
+    from: vi.fn().mockReturnValue({ destroy: vi.fn() }),
   },
-  Sprite: class { },
+  Sprite: class {
+    anchor = { set: vi.fn() };
+    scale = { set: vi.fn() };
+    x = 0;
+    y = 0;
+    texture = { destroy: vi.fn() };
+    destroy = vi.fn();
+  },
   Container: class { },
   Application: class { },
 }));

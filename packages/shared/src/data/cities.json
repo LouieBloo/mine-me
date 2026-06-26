@@ -74,40 +74,40 @@
         "label": "Mine"
       },
       {
-        "x": 87,
-        "y": 68,
-        "type": "FARM",
-        "label": "Farm"
+        "x": 46,
+        "y": 25,
+        "type": "TRAINING_GROUNDS",
+        "label": "Training_grounds"
       },
       {
-        "x": 48,
-        "y": 63,
+        "x": 41,
+        "y": 48,
         "type": "MARKET",
         "label": "Market"
       },
       {
-        "x": 65,
-        "y": 27,
-        "type": "DUNGEON",
-        "label": "Dungeon"
+        "x": 69,
+        "y": 59,
+        "type": "FARM",
+        "label": "Farm"
       },
       {
-        "x": 33,
-        "y": 21,
-        "type": "TRAINING_GROUNDS",
-        "label": "Training_grounds"
+        "x": 55,
+        "y": 77,
+        "type": "DUNGEON",
+        "label": "Dungeon"
       }
     ],
     "createdAt": "2026-04-06T21:51:48.671Z",
-    "updatedAt": "2026-06-19T00:42:54.555Z",
+    "updatedAt": "2026-06-24T03:12:24.678Z",
     "cityDungeons": [
       {
         "id": "cmo3gz72i00014c2cy33pkqu6",
         "cityId": "cmn1zlln10002ihw4wqu4tnxb",
         "dungeonId": "cmn207v6c0001u72gvuueipej",
         "orderIndex": 0,
-        "createdAt": "2026-04-17T22:18:20.682Z",
-        "updatedAt": "2026-04-17T22:18:20.682Z",
+        "createdAt": "2026-06-22T00:13:19.425Z",
+        "updatedAt": "2026-06-22T00:13:19.425Z",
         "dungeon": {
           "id": "cmn207v6c0001u72gvuueipej",
           "name": "Dungeon 1",
@@ -122,8 +122,8 @@
         "cityId": "cmn1zlln10002ihw4wqu4tnxb",
         "dungeonId": "cmpg79fy7000846yu2qjtvev6",
         "orderIndex": 1,
-        "createdAt": "2026-05-22T00:47:33.293Z",
-        "updatedAt": "2026-05-22T00:47:33.293Z",
+        "createdAt": "2026-06-22T00:13:19.441Z",
+        "updatedAt": "2026-06-22T00:13:19.441Z",
         "dungeon": {
           "id": "cmpg79fy7000846yu2qjtvev6",
           "name": "Dungeon 3",
@@ -138,8 +138,8 @@
         "cityId": "cmn1zlln10002ihw4wqu4tnxb",
         "dungeonId": "cmqk7fdkn0002kkfo6f3zxhbu",
         "orderIndex": 2,
-        "createdAt": "2026-06-19T00:42:51.964Z",
-        "updatedAt": "2026-06-19T00:42:51.964Z",
+        "createdAt": "2026-06-22T00:13:19.463Z",
+        "updatedAt": "2026-06-22T00:13:19.463Z",
         "dungeon": {
           "id": "cmqk7fdkn0002kkfo6f3zxhbu",
           "name": "Dawgs",
@@ -155,8 +155,8 @@
         "id": "cmpdjby3k0009mw0dxhm50cbp",
         "cityId": "cmn1zlln10002ihw4wqu4tnxb",
         "itemId": "cmp6aexa30004idpx29gsz12l",
-        "createdAt": "2026-05-20T04:01:38.912Z",
-        "updatedAt": "2026-06-03T03:19:19.257Z",
+        "createdAt": "2026-06-22T00:13:19.411Z",
+        "updatedAt": "2026-06-22T00:13:19.411Z",
         "item": {
           "id": "cmp6aexa30004idpx29gsz12l",
           "name": "Copperium",
@@ -182,8 +182,8 @@
         "id": "cmpdjc0mf000bmw0dipueredu",
         "cityId": "cmn1zlln10002ihw4wqu4tnxb",
         "itemId": "cmp6ammsn0006idpxgnpsnyk1",
-        "createdAt": "2026-05-20T04:01:42.183Z",
-        "updatedAt": "2026-06-03T03:19:19.261Z",
+        "createdAt": "2026-06-22T00:13:19.418Z",
+        "updatedAt": "2026-06-22T00:13:19.418Z",
         "item": {
           "id": "cmp6ammsn0006idpxgnpsnyk1",
           "name": "Silverium",
