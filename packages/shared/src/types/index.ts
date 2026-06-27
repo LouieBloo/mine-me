@@ -279,3 +279,4 @@ export * from './combat';
 export * from './professions';
 export * from './trade';
 export * from './gameEvents';
+export * from './mining';

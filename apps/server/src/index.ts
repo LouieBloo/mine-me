@@ -14,6 +14,7 @@ import { gameRouter } from './routes/game';
 import { handleSocketConnection } from './sockets/handlers';
 import { socketAuthMiddleware } from './sockets/socket.middleware';
 import { setIO } from './services/characterBroadcast';
+import { initRedis } from './services/redis.service';
 
 dotenv.config();
 
@@ -54,6 +55,14 @@ io.on('connection', (socket: any) => {
 
 const PORT = process.env.PORT || 4000;
 
-httpServer.listen(PORT, () => {
-  console.log(`🚀 NVG Server started on port ${PORT}`);
-});
+(async () => {
+  try {
+    await initRedis();
+  } catch (err) {
+    console.error('Failed to initialize Redis:', err);
+  }
+
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 NVG Server started on port ${PORT}`);
+  });
+})();

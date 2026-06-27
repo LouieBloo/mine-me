@@ -1,3 +1,5 @@
+import type { MiningPosition, MiningDirection } from './mining';
+
 // ============================================================================
 // Game Event Types — Discriminated Union Pattern
 //
@@ -89,11 +91,46 @@ export interface LeaveTrainingPayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
-// Event: mine
-// Mines in the current city. Costs 25 stamina.
+// Event: mining_start
+// Begins a new mining mini-game session in the character's current city.
 // ----------------------------------------------------------------------------
-export interface MinePayload extends GameEventBase {
-  type: 'mine';
+export interface MiningStartPayload extends GameEventBase {
+  type: 'mining_start';
+}
+
+// ----------------------------------------------------------------------------
+// Event: mining_move
+// Moves the character one tile in a cardinal direction within the mine.
+// ----------------------------------------------------------------------------
+export interface MiningMovePayload extends GameEventBase {
+  type: 'mining_move';
+  direction: MiningDirection;
+}
+
+// ----------------------------------------------------------------------------
+// Event: mining_mine_start
+// Begin mining a block adjacent to the player. Server records timestamp.
+// ----------------------------------------------------------------------------
+export interface MiningMineStartPayload extends GameEventBase {
+  type: 'mining_mine_start';
+  target: MiningPosition;
+}
+
+// ----------------------------------------------------------------------------
+// Event: mining_mine_complete
+// Complete mining a block. Server validates elapsed time and awards loot.
+// ----------------------------------------------------------------------------
+export interface MiningMineCompletePayload extends GameEventBase {
+  type: 'mining_mine_complete';
+  target: MiningPosition;
+}
+
+// ----------------------------------------------------------------------------
+// Event: mining_exit
+// Leave the mine through the entrance tile. Transfers temp backpack to inventory.
+// ----------------------------------------------------------------------------
+export interface MiningExitPayload extends GameEventBase {
+  type: 'mining_exit';
 }
 
 // ----------------------------------------------------------------------------
@@ -127,7 +164,7 @@ export interface ConsumeItemPayload extends GameEventBase {
 // Union of all game event payloads.
 // Extend this as new events are added.
 // ----------------------------------------------------------------------------
-export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload | MinePayload | EquipItemPayload | UnequipItemPayload | ConsumeItemPayload;
+export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload | MiningStartPayload | MiningMovePayload | MiningMineStartPayload | MiningMineCompletePayload | MiningExitPayload | EquipItemPayload | UnequipItemPayload | ConsumeItemPayload;
 
 // Utility type: extract the type string literals from the union
 export type GameEventType = GameEventPayload['type'];

@@ -4,6 +4,7 @@ import { dispatchGameEvent } from './gameEvents';
 import { BattleService } from '../services/battle.service';
 import { InventoryService } from '../services/inventory.service';
 import type { PlayerState, GameCity, GameEventPayload } from '@nvg/shared';
+import { cleanupMiningSession } from './miningEvents';
 
 // Extend socket.data type for type safety
 declare module 'socket.io' {
@@ -371,12 +372,16 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
   // --------------------------------------------------------------------------
   // DISCONNECT — Clean up city presence
   // --------------------------------------------------------------------------
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     const characterId = socket.data.characterId;
     const characterName = socket.data.characterName;
     const cityId = socket.data.cityId;
     console.log(`[Socket] User ${userId} disconnected (socket: ${socket.id})`);
 
+    // Clean up any active mining session
+    if (characterId) {
+      cleanupMiningSession(characterId);
+    }
     if (characterId) {
       // Notify any city rooms this socket was in
       const rooms = Array.from(socket.rooms).filter(r => r.startsWith('city:'));

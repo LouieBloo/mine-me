@@ -6,7 +6,7 @@ A browser-based, simplified MMORPG focused on the "Need vs. Greed" principle. Pl
 This project uses a modern **Turborepo** monorepo structure.
 - **Client App:** React, PixiJS (via `@pixi/react`), Tailwind CSS, Vite
 - **Admin App:** React, Tailwind CSS, Vite
-- **Server:** Node.js (v24), Express.js, Socket.io, Prisma, PostgreSQL
+- **Server:** Node.js (v24), Express.js, Socket.io, Prisma, PostgreSQL, Redis
 - **Shared:** A dedicated TypeScript package for shared game logic and interfaces.
 - **Testing:** Vitest across all workspaces.
 
@@ -17,10 +17,12 @@ This project uses a modern **Turborepo** monorepo structure.
 ### Prerequisites
 1. **Node.js:** Ensure you are running **Node v24+** (Use `nvm use 24`).
 2. **PostgreSQL:** A local or remote PostgreSQL database.
+3. **Redis:** A local or remote Redis instance.
 
-### 🐳 Setting up PostgreSQL with Docker
-For local development, you can quickly spin up a database using Docker:
+### 🐳 Setting up Infrastructure with Docker
+For local development, you can quickly spin up PostgreSQL and Redis using Docker:
 
+#### PostgreSQL:
 ```bash
 docker run -d \
   --name nvg-postgres \
@@ -34,6 +36,11 @@ docker run -d \
 
 > [!NOTE]
 > We use `/var/lib/postgresql` as the mount point to avoid directory permission and structure issues with Postgres 18+ images.
+
+#### Redis:
+```bash
+docker run -d --name my-redis -p 6379:6379 redis:latest
+```
 
 ### 1. Installation & Environment Setup
 Run the following from the root of the project to set up your environment (installs dependencies and initializes the database):
@@ -54,6 +61,9 @@ Create a `.env` file inside `apps/server` with the following variables:
 
 # The connection string for the Prisma schema
 DATABASE_URL="postgresql://user:password@localhost:5432/nvg_db?schema=public"
+
+# The connection string for the Redis client
+REDIS_URL="redis://localhost:6379"
 
 # The port the Express API will listen on
 PORT=4000

@@ -3,7 +3,7 @@ import { prisma } from '../index';
 import { broadcastStatUpdate } from '../services/characterBroadcast';
 import { handleStartCombat, handleCombatAction, handleLeaveCombat, handleAdvanceDungeonLevel } from './combatEvents';
 import { handleTrainingAction } from './trainingEvents';
-import { handleMine } from './miningEvents';
+import { handleMiningStart, handleMiningMove, handleMiningMineStart, handleMiningMineComplete, handleMiningExit } from './miningEvents';
 import { InventoryService } from '../services/inventory.service';
 import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays, getStaminaRecoveryPerDay } from '@nvg/shared';
 
@@ -521,7 +521,11 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   advance_dungeon_level: handleAdvanceDungeonLevel,
   rest: handleRest,
   training_action: handleTrainingAction,
-  mine: handleMine,
+  mining_start: handleMiningStart,
+  mining_move: handleMiningMove,
+  mining_mine_start: handleMiningMineStart,
+  mining_mine_complete: handleMiningMineComplete,
+  mining_exit: handleMiningExit,
   equip_item: handleEquipItem,
   unequip_item: handleUnequipItem,
   consume_item: handleConsumeItem,

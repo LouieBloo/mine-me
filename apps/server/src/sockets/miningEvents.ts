@@ -1,31 +1,41 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { broadcastStatUpdate } from '../services/characterBroadcast';
-import type { GameEventResult } from '@nvg/shared';
 import { InventoryService } from '../services/inventory.service';
+import {
+  MINING_CONFIG,
+  type GameEventResult,
+  type MiningMovePayload,
+  type MiningMineStartPayload,
+  type MiningMineCompletePayload,
+} from '@nvg/shared';
+import {
+  createSession,
+  getSession,
+  updateSession,
+  deleteSession,
+  processMove,
+  startMining,
+  completeMining,
+  extractFromMine,
+  buildClientState,
+} from '../services/miningSession.service';
+import { getTargetPosition, isInBounds } from '../services/miningMap.service';
 
-const MINING_STAMINA_COST = 25;
-
-const RARITY_CHANCES: Record<string, number> = {
-  LOW: 50,       // 50% chance
-  MEDIUM: 25,    // 25% chance
-  RARE: 10,      // 10% chance
-  VERY_RARE: 3,  // 3% chance
-};
+// ============================================================================
+// Mining Mini-Game Event Handlers
+//
+// Each handler is registered in gameEvents.ts and dispatched via the
+// game_event socket channel. Sessions are stored in Redis.
+// ============================================================================
 
 /**
- * Handler: mine
- *
- * Processes a single mining action in the character's current city.
- * - Costs 25 stamina per action.
- * - Determines dropped materials based on the city's available materials and their rarity.
- * - Adds dropped materials to character inventory.
- * - Emits 'combat_loot' socket event to show notifications on the client.
- * - Broadcasts character stat updates (stamina, inventory) via user and character channels.
+ * Handler: mining_start
+ * Begins a new mining session in the character's current city.
  */
-export const handleMine = async (
+export const handleMiningStart = async (
   io: Server,
-  socket: Socket
+  socket: Socket,
 ): Promise<GameEventResult> => {
   const userId = socket.data.userId;
   const characterId = socket.data.characterId;
@@ -43,111 +53,308 @@ export const handleMine = async (
   }
 
   if (character.status !== 'ACTIVE') {
-    return { success: false, error: 'Only active characters can mine.' };
+    return { success: false, error: 'Only active characters can enter the mine.' };
   }
 
-  if (character.stamina < MINING_STAMINA_COST) {
-    return { success: false, error: 'Not enough stamina to mine. Please rest.' };
+  try {
+    const sessionState = await createSession(characterId, character.cityId);
+
+    console.log(`[Mining] ${character.name} entered the mine in city ${character.cityId}`);
+
+    return {
+      success: true,
+      data: { sessionState },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Handler: mining_move
+ * Moves the player one tile in a cardinal direction.
+ */
+export const handleMiningMove = async (
+  io: Server,
+  socket: Socket,
+  payload: MiningMovePayload,
+): Promise<GameEventResult> => {
+  const userId = socket.data.userId;
+  const characterId = socket.data.characterId;
+
+  if (!characterId) {
+    return { success: false, error: 'No character selected.' };
   }
 
-  // Fetch materials available in this city
-  const cityMaterials = await prisma.cityMaterial.findMany({
-    where: { cityId: character.cityId },
-    include: { item: true },
-  });
+  const session = await getSession(characterId);
+  if (!session) {
+    return { success: false, error: 'No active mining session.' };
+  }
 
-  const rewards: { itemId: string; quantity: number; itemDetails?: any }[] = [];
+  // Block movement while mining
+  if (session.pendingAction) {
+    return { success: false, error: 'Cannot move while mining.' };
+  }
 
-  for (const cm of cityMaterials) {
-    const chance = RARITY_CHANCES[cm.item.rarity] ?? 50;
-    const roll = Math.random() * 100;
-    if (roll <= chance) {
-      rewards.push({
-        itemId: cm.itemId,
-        quantity: 1,
-        itemDetails: InventoryService.mapItem(cm.item) as any,
+  const { direction } = payload;
+  if (!direction || !['up', 'down', 'left', 'right'].includes(direction)) {
+    return { success: false, error: 'Invalid direction.' };
+  }
+
+  const target = getTargetPosition(session.position, direction);
+
+  if (!isInBounds(target.x, target.y)) {
+    return { success: false, error: 'Cannot move out of bounds.' };
+  }
+
+  try {
+    const result = await processMove(session, target.x, target.y);
+
+    // Apply damage if player was crushed by a rock
+    if (result.damageTaken > 0) {
+      const updatedCharacter = await prisma.character.update({
+        where: { id: characterId },
+        data: {
+          health: { decrement: result.damageTaken },
+        },
       });
+
+      broadcastStatUpdate(characterId, {
+        health: updatedCharacter.health,
+      });
+
+      // Check if character died
+      if (updatedCharacter.health <= 0) {
+        await deleteSession(characterId);
+        return {
+          success: true,
+          data: {
+            sessionState: null,
+            damageTaken: result.damageTaken,
+            message: 'You were crushed by a falling rock and lost all your loot!',
+          },
+        };
+      }
     }
+
+    await updateSession(characterId, result.session);
+
+    return {
+      success: true,
+      data: {
+        sessionState: buildClientState(result.session),
+        itemsGained: result.itemsGained.length > 0 ? result.itemsGained : undefined,
+        damageTaken: result.damageTaken > 0 ? result.damageTaken : undefined,
+        message: result.message,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Handler: mining_mine_start
+ * Begins mining a block adjacent to the player. Records the start timestamp.
+ */
+export const handleMiningMineStart = async (
+  io: Server,
+  socket: Socket,
+  payload: MiningMineStartPayload,
+): Promise<GameEventResult> => {
+  const userId = socket.data.userId;
+  const characterId = socket.data.characterId;
+
+  if (!characterId) {
+    return { success: false, error: 'No character selected.' };
   }
 
-  // Deduct stamina and save character changes
-  const updatedCharacter = await prisma.character.update({
+  const session = await getSession(characterId);
+  if (!session) {
+    return { success: false, error: 'No active mining session.' };
+  }
+
+  if (session.pendingAction) {
+    return { success: false, error: 'Already mining or performing an action.' };
+  }
+
+  const { target } = payload;
+  if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') {
+    return { success: false, error: 'Invalid target position.' };
+  }
+
+  if (!isInBounds(target.x, target.y)) {
+    return { success: false, error: 'Target out of bounds.' };
+  }
+
+  // Check stamina
+  const character = await prisma.character.findUnique({
     where: { id: characterId },
-    data: {
-      stamina: { decrement: MINING_STAMINA_COST },
-    },
+    select: { stamina: true },
   });
 
-  let totalItemExperience = 0;
-  // Save rewards to database
-  for (const reward of rewards) {
-    const result = await InventoryService.giveItemToCharacter(characterId, reward.itemId, reward.quantity);
-    totalItemExperience += result.experienceGranted;
+  if (!character || character.stamina < MINING_CONFIG.MINING_STAMINA_COST) {
+    return { success: false, error: 'Not enough stamina to mine.' };
   }
 
-  // Retrieve full updated character inventory to sync client state
-  const characterWithInventory = await prisma.character.findUnique({
-    where: { id: characterId },
-    include: {
-      inventory: {
-        include: {
-          item: {
-            include: {
-              itemEffects: {
-                include: {
-                  effect: true
-                }
-              }
-            }
+  try {
+    const { miningTimeMs } = startMining(session, target);
+    await updateSession(characterId, session);
+
+    return {
+      success: true,
+      data: {
+        sessionState: buildClientState(session),
+        miningTimeMs,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Handler: mining_mine_complete
+ * Completes mining a block. Validates timing, deducts stamina, generates loot.
+ */
+export const handleMiningMineComplete = async (
+  io: Server,
+  socket: Socket,
+  payload: MiningMineCompletePayload,
+): Promise<GameEventResult> => {
+  const userId = socket.data.userId;
+  const characterId = socket.data.characterId;
+
+  if (!characterId) {
+    return { success: false, error: 'No character selected.' };
+  }
+
+  const session = await getSession(characterId);
+  if (!session) {
+    return { success: false, error: 'No active mining session.' };
+  }
+
+  try {
+    const result = await completeMining(session);
+
+    // Deduct stamina from the database
+    const updatedCharacter = await prisma.character.update({
+      where: { id: characterId },
+      data: {
+        stamina: { decrement: MINING_CONFIG.MINING_STAMINA_COST },
+        ...(result.damageTaken > 0 ? { health: { decrement: result.damageTaken } } : {}),
+      },
+    });
+
+    broadcastStatUpdate(characterId, {
+      stamina: updatedCharacter.stamina,
+      ...(result.damageTaken > 0 ? { health: updatedCharacter.health } : {}),
+    });
+
+    // Check if character died from falling rock
+    if (updatedCharacter.health <= 0) {
+      await deleteSession(characterId);
+      return {
+        success: true,
+        data: {
+          sessionState: null,
+          damageTaken: result.damageTaken,
+          message: 'You were crushed by a falling rock and lost all your loot!',
+        },
+      };
+    }
+
+    await updateSession(characterId, result.session);
+
+    return {
+      success: true,
+      data: {
+        sessionState: buildClientState(result.session),
+        itemsGained: result.itemsGained.length > 0 ? result.itemsGained : undefined,
+        damageTaken: result.damageTaken > 0 ? result.damageTaken : undefined,
+        message: result.message,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Handler: mining_exit
+ * Extracts from the mine. Transfers temp backpack to real inventory.
+ */
+export const handleMiningExit = async (
+  io: Server,
+  socket: Socket,
+): Promise<GameEventResult> => {
+  const userId = socket.data.userId;
+  const characterId = socket.data.characterId;
+
+  if (!characterId) {
+    return { success: false, error: 'No character selected.' };
+  }
+
+  const session = await getSession(characterId);
+  if (!session) {
+    return { success: false, error: 'No active mining session.' };
+  }
+
+  try {
+    const extractedItems = await extractFromMine(characterId, session);
+
+    // Fetch updated inventory to broadcast
+    const characterWithInventory = await prisma.character.findUnique({
+      where: { id: characterId },
+      include: {
+        inventory: {
+          include: {
+            item: {
+              include: {
+                itemEffects: {
+                  include: { effect: true },
+                },
+              },
+            },
           },
         },
       },
-    },
-  });
-
-  if (!characterWithInventory) {
-    return { success: false, error: 'Failed to retrieve updated inventory.' };
-  }
-
-  const clientInventory = InventoryService.mapCharacterInventory(characterWithInventory);
-
-  // Broadcast stat update
-  broadcastStatUpdate(characterId, {
-    stamina: updatedCharacter.stamina,
-  });
-
-  // Push character stat update with updated inventory to this user
-  io.to(`user:${userId}`).emit('character_stat_update', {
-    stamina: updatedCharacter.stamina,
-    experience: characterWithInventory.experience,
-    inventory: clientInventory,
-  });
-
-  // Emit 'combat_loot' socket event if items were found so they display as standard loot popups
-  if (rewards.length > 0) {
-    socket.emit('combat_loot', {
-      sol: 0,
-      experience: totalItemExperience,
-      items: rewards,
     });
+
+    if (characterWithInventory) {
+      const clientInventory = InventoryService.mapCharacterInventory(characterWithInventory);
+      broadcastStatUpdate(characterId, {
+        inventory: clientInventory,
+      });
+    }
+
+    console.log(
+      `[Mining] ${socket.data.characterName} extracted from mine with ${extractedItems.length} item types`
+    );
+
+    return {
+      success: true,
+      data: {
+        extractedItems,
+        message: extractedItems.length > 0
+          ? `Successfully extracted with ${extractedItems.reduce((sum, i) => sum + i.quantity, 0)} items!`
+          : 'You left the mine with nothing.',
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
+};
 
-  console.log(
-    `[Mining] ${character.name} mined in city ${character.cityId}. ` +
-    `Stamina: ${updatedCharacter.stamina}, Rewards: ${rewards.map(r => r.itemDetails.name).join(', ') || 'None'}`
-  );
-
-  return {
-    success: true,
-    data: {
-      stamina: updatedCharacter.stamina,
-      rewards: rewards.map((r) => ({
-        id: r.itemId,
-        name: r.itemDetails.name,
-        description: r.itemDetails.description,
-        rarity: r.itemDetails.rarity,
-        quantity: r.quantity,
-      })),
-    },
-  };
+/**
+ * Clean up mining session on disconnect.
+ * Called from the main socket disconnect handler.
+ */
+export const cleanupMiningSession = async (characterId: string): Promise<void> => {
+  try {
+    await deleteSession(characterId);
+    console.log(`[Mining] Cleaned up session for character ${characterId} (disconnect)`);
+  } catch (err) {
+    // Silently ignore — session may not exist
+  }
 };

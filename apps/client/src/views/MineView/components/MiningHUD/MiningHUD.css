@@ -1,0 +1,11 @@
+/* MiningHUD scoped styles */
+.mining-hud-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.mining-hud-overlay * {
+  pointer-events: auto;
+}

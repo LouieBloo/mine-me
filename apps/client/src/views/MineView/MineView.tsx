@@ -1,329 +1,354 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ticker } from 'pixi.js';
 import { useGame } from '../../contexts/GameContext';
 import { useSocket } from '../../contexts/SocketContext';
-import { SpriteRenderer } from '../../components/game/SpriteRenderer/SpriteRenderer';
-import type { SpriteRendererHandle } from '../../components/game/SpriteRenderer/SpriteRenderer';
 import { PixiStageProvider } from '../../components/game/PixiStageContext/PixiStageContext';
-import { CombatAnimationSequencer } from '../../components/game/combat/CombatAnimationSequencer';
-import type { CombatAnimationStep } from '../../components/game/combat/CombatAnimationSequencer';
-import { SpriteMotion } from '../../components/game/sprites/SpriteMotion';
-import type { GearLayerDescriptor } from '../../components/game/sprites';
+import { MiningGrid } from './components/MiningGrid/MiningGrid';
+import { MiningHUD } from './components/MiningHUD/MiningHUD';
 import { notificationService } from '../../services/notificationService';
-import type { GearSubType } from '@nvg/shared';
+import type { MiningPosition, MiningDirection, MiningBackpackItem } from '@nvg/shared';
+import { Modal } from '../../components/Modal/Modal';
+import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
 import './MineView.css';
 
-/**
- * Shake a container horizontally back and forth using the Pixi Ticker.
- */
-const shakeContainer = (container: any, duration = 350, intensity = 8) => {
-  if (!container || container.destroyed) return;
-  const startX = container.x;
-  const startTime = Date.now();
-
-  const animate = () => {
-    if (container.destroyed) {
-      Ticker.shared.remove(animate);
-      return;
-    }
-    const elapsed = Date.now() - startTime;
-    if (elapsed >= duration) {
-      container.x = startX;
-      Ticker.shared.remove(animate);
-      return;
-    }
-
-    const progress = elapsed / duration;
-    const currentIntensity = intensity * (1 - progress);
-    const offset = Math.sin(progress * Math.PI * 12) * currentIntensity;
-    container.x = startX + offset;
-  };
-
-  Ticker.shared.add(animate);
-};
-
 export const MineView: React.FC = () => {
-  const { activeCharacter, playerState } = useGame();
+  const { activeCharacter, playerState, miningSession, setMiningSession } = useGame();
   const { sendGameEvent } = useSocket();
   const navigate = useNavigate();
 
-  const [submitting, setSubmitting] = useState(false);
-  const [animating, setAnimating] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // Refs for Sprite Renderers
-  const playerSpriteRef = useRef<SpriteRendererHandle>(null);
-  const rockSpriteRef = useRef<SpriteRendererHandle>(null);
+  // Modal & Summary States
+  const [hasMovedOffEntrance, setHasMovedOffEntrance] = useState<boolean>(false);
+  const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
+  const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
+  const [summaryLoot, setSummaryLoot] = useState<MiningBackpackItem[]>([]);
 
-  // Persistent sequencer instance
-  const sequencerRef = useRef<CombatAnimationSequencer>(new CombatAnimationSequencer());
+  // A ref to prevent double initialization in StrictMode
+  const hasStartedRef = useRef<boolean>(false);
 
-  const baseBodyUrl = `${import.meta.env.VITE_API_URL}/assets/gear/base-body.png`;
-
-  // Derive gear layers from inventory
-  const gearLayers: GearLayerDescriptor[] = useMemo(() => {
-    if (!playerState?.inventory?.items) return [];
-    return playerState.inventory.items
-      .filter(inv => inv.item.type === 'GEAR' && inv.item.gearImageUrl && inv.equipped)
-      .map(inv => ({
-        url: `${import.meta.env.VITE_API_URL}${inv.item.gearImageUrl}`,
-        subType: inv.item.subType as GearSubType,
-      }));
-  }, [playerState?.inventory?.items]);
-
-  // Derived stats from playerState
-  const stamina = playerState?.attributes.stamina ?? 0;
-  const maxStamina = playerState?.attributes.maxStamina ?? 100;
-
-  const isInteractionDisabled = submitting || animating || stamina < 25;
-
-  const handleLeaveMine = () => {
-    sequencerRef.current.cancel();
-    navigate('/home');
-  };
-
-  /**
-   * Perform mining action with full walking, striking, shaking, and reward presentation.
-   */
-  const handleMine = useCallback(async () => {
-    if (submitting || animating || stamina < 25) return;
-
-    setSubmitting(true);
-    setAnimating(true);
-
-    // Call server immediately to resolve drops while moving
-    const resultPromise = sendGameEvent({ type: 'mine' });
-
-    try {
-      const playerContainer = playerSpriteRef.current?.getContainer();
-      const playerOrigin = playerSpriteRef.current?.getOriginPosition();
-      const rockContainer = rockSpriteRef.current?.getContainer();
-
-      if (playerContainer && rockContainer && playerOrigin) {
-        // Reset sequencer
-        sequencerRef.current.cancel();
-        sequencerRef.current = new CombatAnimationSequencer();
-
-        const steps: CombatAnimationStep[] = [];
-
-        // 1. Move start animation
-        steps.push({
-          type: 'effect',
-          execute: () => {
-            playerSpriteRef.current?.playAnimation('walking');
-          },
-        });
-
-        // 2. Slide toward the rock
-        const offset = SpriteMotion.calculateLungeOffset(playerContainer, rockContainer, 40, 'right');
-        steps.push({
-          type: 'moveTo',
-          container: playerContainer,
-          targetX: offset.x,
-          targetY: offset.y,
-          duration: 350,
-          easing: 'easeIn',
-        });
-
-        // 3. Impact callback: strike, shake, fetch result, show floating text
-        steps.push({
-          type: 'callback',
-          execute: async () => {
-            playerSpriteRef.current?.playAnimation('attacking');
-            shakeContainer(rockContainer);
-
-            try {
-              const result = await resultPromise;
-              if (result.success) {
-                if (result.data?.rewards && result.data.rewards.length > 0) {
-                  for (const reward of result.data.rewards) {
-                    rockSpriteRef.current?.showFloatingText({
-                      text: `+${reward.quantity} ${reward.name}`,
-                      color: '#f59e0b', // amber-500
-                      fontSize: 28,
-                    });
-                  }
-                } else {
-                  rockSpriteRef.current?.showFloatingText({
-                    text: 'Empty',
-                    color: '#94a3b8', // slate-400
-                    fontSize: 28,
-                  });
-                }
-              } else {
-                notificationService.error('Mining Failed', result.error || 'Unknown error');
-                rockSpriteRef.current?.showFloatingText({
-                  text: 'Failed',
-                  color: '#ef4444', // red-500
-                  fontSize: 28,
-                });
-              }
-            } catch (err: any) {
-              console.error('[MineView] Error receiving loot:', err);
-              rockSpriteRef.current?.showFloatingText({
-                text: 'Error',
-                color: '#ef4444',
-                fontSize: 28,
-              });
-            }
-          },
-        });
-
-        // 4. Hold briefly at the rock
-        steps.push({ type: 'wait', duration: 400 });
-
-        // 5. Walk back
-        steps.push({
-          type: 'effect',
-          execute: () => {
-            playerSpriteRef.current?.playAnimation('idle');
-          },
-        });
-        steps.push({
-          type: 'moveBack',
-          container: playerContainer,
-          originX: playerOrigin.x,
-          originY: playerOrigin.y,
-          duration: 350,
-        });
-
-        // 6. Final cool down wait
-        steps.push({ type: 'wait', duration: 150 });
-
-        // Play entire sequence
-        await sequencerRef.current.playSequence(steps);
-      } else {
-        // Fallback if Pixi elements aren't initialized yet
-        const result = await resultPromise;
-        if (!result.success) {
-          notificationService.error('Mining Failed', result.error || 'Unknown error');
-        }
-      }
-    } catch (err: any) {
-      console.error('[MineView] Mining action error:', err);
-      notificationService.error('Error', err.message);
-    } finally {
-      setSubmitting(false);
-      setAnimating(false);
-    }
-  }, [submitting, animating, stamina, sendGameEvent]);
-
-  // Redirect if no character is selected
+  // Mount/Session Initialization
   useEffect(() => {
     if (!activeCharacter) {
       navigate('/home');
+      return;
     }
-  }, [activeCharacter, navigate]);
 
-  if (!activeCharacter || !playerState) {
+    if (hasStartedRef.current) return;
+    hasStartedRef.current = true;
+
+    const startSession = async () => {
+      try {
+        setLoading(true);
+        const result = await sendGameEvent({ type: 'mining_start' });
+        if (result.success && result.data?.sessionState) {
+          setMiningSession(result.data.sessionState);
+        } else {
+          notificationService.error('Mining Error', result.error || 'Failed to start mining session');
+          navigate('/home');
+        }
+      } catch (err: any) {
+        console.error('[MineView] Start session error:', err);
+        notificationService.error('Error', err.message || 'Could not connect to mining server');
+        navigate('/home');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    startSession();
+
+    // Clean up local reference on unmount
+    return () => {
+      hasStartedRef.current = false;
+    };
+  }, [activeCharacter, navigate, sendGameEvent, setMiningSession]);
+
+  // Track if player has moved off the entrance and then landed back on it to trigger modal
+  useEffect(() => {
+    if (!miningSession) return;
+    const isAtEntrance = miningSession.position.x === 15 && miningSession.position.y === 0;
+    if (!isAtEntrance) {
+      setHasMovedOffEntrance(true);
+    } else if (hasMovedOffEntrance && isAtEntrance) {
+      setShowExitConfirmation(true);
+    }
+  }, [miningSession?.position?.x, miningSession?.position?.y, hasMovedOffEntrance]);
+
+  // Movement Action Handler
+  const handleMove = useCallback(
+    async (direction: MiningDirection) => {
+      if (isProcessing || !miningSession || miningSession.isMining) return;
+
+      setIsProcessing(true);
+      try {
+        const result = await sendGameEvent({ type: 'mining_move', direction });
+        if (result.success && result.data) {
+          const { sessionState, itemsGained, damageTaken, message } = result.data;
+
+          // Update state
+          setMiningSession(sessionState);
+
+          // Notifications
+          if (itemsGained && itemsGained.length > 0) {
+            itemsGained.forEach((item: any) => {
+              notificationService.item(
+                {
+                  id: item.itemId,
+                  name: item.itemName,
+                  description: `You collected ${item.itemName}!`,
+                  iconUrl: item.iconUrl,
+                  rarity: 'COMMON' as any,
+                } as any,
+                item.quantity
+              );
+            });
+          }
+
+          if (damageTaken && damageTaken > 0) {
+            notificationService.error('Damage Taken', `You took ${damageTaken} damage! ${message || ''}`);
+          }
+
+          // Check for character death (sessionState will be null if died)
+          if (!sessionState) {
+            notificationService.error('Defeat', 'You have fainted and lost your temporary loot sack.');
+            navigate('/home');
+          }
+        } else {
+          notificationService.error('Action Failed', result.error || 'Cannot move');
+        }
+      } catch (err: any) {
+        console.error('[MineView] Move error:', err);
+        notificationService.error('Error', err.message);
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [isProcessing, miningSession, sendGameEvent, setMiningSession, navigate]
+  );
+
+  // Mining Start Handler
+  const handleMineStart = useCallback(
+    async (target: MiningPosition) => {
+      if (isProcessing || !miningSession || miningSession.isMining) return;
+
+      setIsProcessing(true);
+      try {
+        const result = await sendGameEvent({ type: 'mining_mine_start', target });
+        if (result.success && result.data) {
+          const { sessionState, miningTimeMs } = result.data;
+          setMiningSession(sessionState);
+
+          // Set up client-side auto-complete timeout
+          // Add a 50ms buffer to match latency and ensure server validation passes
+          setTimeout(async () => {
+            await handleMineComplete(target);
+          }, miningTimeMs + 50);
+        } else {
+          notificationService.error('Mining Failed', result.error || 'Cannot mine block');
+          setIsProcessing(false);
+        }
+      } catch (err: any) {
+        console.error('[MineView] Mine start error:', err);
+        notificationService.error('Error', err.message);
+        setIsProcessing(false);
+      }
+    },
+    [isProcessing, miningSession, sendGameEvent, setMiningSession]
+  );
+
+  // Mining Complete Handler
+  const handleMineComplete = async (target: MiningPosition) => {
+    try {
+      const result = await sendGameEvent({ type: 'mining_mine_complete', target });
+      if (result.success && result.data) {
+        const { sessionState, itemsGained, damageTaken, message } = result.data;
+        setMiningSession(sessionState);
+
+        // Notifications
+        if (itemsGained && itemsGained.length > 0) {
+          itemsGained.forEach((item: any) => {
+            notificationService.item(
+              {
+                id: item.itemId,
+                name: item.itemName,
+                description: `You collected ${item.itemName}!`,
+                iconUrl: item.iconUrl,
+                rarity: 'COMMON' as any,
+              } as any,
+              item.quantity
+            );
+          });
+        }
+
+        if (damageTaken && damageTaken > 0) {
+          notificationService.error('Damage Taken', `You took ${damageTaken} damage! ${message || ''}`);
+        }
+
+        // Check for character death
+        if (!sessionState) {
+          notificationService.error('Defeat', 'You fainted from a falling rock and lost your temporary loot.');
+          navigate('/home');
+        }
+      } else {
+        notificationService.error('Mining Failed', result.error || 'Could not complete mining action');
+      }
+    } catch (err: any) {
+      console.error('[MineView] Mine complete error:', err);
+      notificationService.error('Error', err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Safe Extraction Handler
+  const handleExit = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await sendGameEvent({ type: 'mining_exit' });
+      if (result.success) {
+        const items = result.data?.extractedItems || [];
+        setSummaryLoot(items);
+        setShowSummaryModal(true);
+        setMiningSession(null);
+      } else {
+        notificationService.error('Extraction Failed', result.error || 'Cannot extract');
+      }
+    } catch (err: any) {
+      console.error('[MineView] Extraction error:', err);
+      notificationService.error('Error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sendGameEvent, setMiningSession]);
+
+  // Abandon Session Handler (without extraction)
+  const handleAbandon = useCallback(() => {
+    setMiningSession(null);
+    notificationService.info('Mine Abandoned', 'You abandoned the mine and lost your temporary loot.');
+    navigate('/home');
+  }, [setMiningSession, navigate]);
+  const xpGained = summaryLoot.reduce((sum, item) => sum + item.quantity * 5, 0);
+  const mappedLootItems = (() => {
+    const groupedMap: Record<string, typeof summaryLoot[number]> = {};
+    for (const item of summaryLoot) {
+      if (groupedMap[item.itemId]) {
+        groupedMap[item.itemId] = {
+          ...groupedMap[item.itemId],
+          quantity: groupedMap[item.itemId].quantity + item.quantity
+        };
+      } else {
+        groupedMap[item.itemId] = { ...item };
+      }
+    }
+    return Object.values(groupedMap).map((item) => ({
+      itemId: item.itemId,
+      quantity: item.quantity,
+      itemDetails: {
+        id: item.itemId,
+        name: item.itemName,
+        description: 'A resource extracted from the dungeon mine.',
+        iconUrl: item.iconUrl,
+        type: 'MATERIAL',
+        rarity: 'LOW',
+      },
+    }));
+  })();
+
+  if ((loading && !showSummaryModal) || !activeCharacter || !playerState || (!miningSession && !showSummaryModal)) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-slate-900">
-        <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-        <p className="mt-4 text-slate-400 font-bold tracking-widest uppercase animate-pulse">Loading Mine...</p>
+      <div className="flex-1 flex flex-col items-center justify-center bg-slate-950">
+        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(245,158,11,0.2)]" />
+        <p className="mt-4 text-slate-400 text-sm font-black tracking-widest uppercase animate-pulse">
+          Entering Dungeon Mine...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 relative overflow-hidden">
-      {/* Background overlay */}
+    <div className="flex-1 flex flex-col bg-slate-950 relative overflow-hidden h-full">
+      {/* Background layer */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-900 to-slate-950 pointer-events-none" />
 
-      {/* Top Header Controls */}
-      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between z-10 pointer-events-none">
-        <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 backdrop-blur-md pointer-events-auto">
-          <h2 className="text-xl font-black text-amber-500 uppercase tracking-widest">Dungeon Mine</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Location: {activeCharacter.cityId}</p>
-        </div>
+      {/* PixiJS Visual Stage */}
+      {miningSession && (
+        <PixiStageProvider className="flex-1 relative flex overflow-hidden">
+          <MiningGrid
+            sessionState={miningSession}
+            playerState={playerState}
+            onMove={handleMove}
+            onMineStart={handleMineStart}
+            isProcessing={isProcessing}
+          />
+        </PixiStageProvider>
+      )}
 
-        <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 backdrop-blur-md flex flex-col items-end gap-2 pointer-events-auto">
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Stamina</span>
-            <div className="w-32 h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
-              <div
-                className="h-full bg-emerald-500 transition-all duration-300"
-                style={{ width: `${Math.max(0, (stamina / maxStamina) * 100)}%` }}
-              />
-            </div>
-            <span className="text-xs text-slate-400 font-bold">{stamina}/{maxStamina}</span>
-          </div>
-          <button
-            onClick={handleLeaveMine}
-            className="px-4 py-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 text-[10px] font-black uppercase tracking-widest border border-red-900/50 rounded-lg transition-all active:scale-95 cursor-pointer shadow-lg"
-          >
-            Leave Mine
-          </button>
-        </div>
-      </div>
+      {/* HTML HUD Overlay */}
+      {miningSession && (
+        <MiningHUD
+          sessionState={miningSession}
+          playerState={playerState}
+          onExit={handleExit}
+          onAbandon={handleAbandon}
+        />
+      )}
 
-      {/* Visual stage area */}
-      <PixiStageProvider className="flex-1 relative flex overflow-hidden">
-        {/* Left Character Area */}
-        <div className="w-1/2 flex items-center justify-center relative z-10">
-          <div className="w-32 h-64 bg-slate-700 rounded-full blur-xl absolute bottom-1/4 opacity-40"></div>
-          <div className="z-10">
-            <SpriteRenderer
-              ref={playerSpriteRef}
-              type="composite"
-              baseBodyUrl={baseBodyUrl}
-              gearLayers={gearLayers}
-              width={256}
-              height={320}
-              flipped={false}
-            />
-          </div>
-        </div>
-
-        {/* Right Target / Rock Area */}
-        <div className="w-1/2 relative flex flex-col items-center justify-center">
-          <div className="flex flex-col items-center gap-2 pointer-events-auto z-20">
-            <button
-              disabled={isInteractionDisabled}
-              onClick={handleMine}
-              title="Click to mine the vein"
-              className={`relative flex items-center justify-center rounded-xl p-4 transition-all ${isInteractionDisabled
-                  ? 'cursor-not-allowed opacity-60'
-                  : 'cursor-pointer hover:bg-slate-800/20 hover:ring-2 hover:ring-amber-500/20'
-                }`}
-            >
-              {submitting && (
-                <div className="absolute inset-0 bg-slate-950/60 rounded-xl flex items-center justify-center z-30">
-                  <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
-              <SpriteRenderer
-                ref={rockSpriteRef}
-                type="rock"
-                width={400}
-                height={400}
-              />
-            </button>
-            {stamina < 25 && (
-              <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest text-center mt-1">
-                Requires 25 Stamina
-              </p>
-            )}
-          </div>
-        </div>
-      </PixiStageProvider>
-
-      {/* Footer controls & guide */}
-      <div className="h-28 bg-slate-900 border-t border-slate-800 p-6 flex items-center justify-center relative z-20 pointer-events-auto shrink-0">
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-            {animating
-              ? 'Mining vein...'
-              : stamina < 25
-                ? 'Not enough stamina — leave and rest!'
-                : 'Strike the rock to extract minerals'}
+      {/* Exit Confirmation Modal */}
+      <Modal
+        isOpen={showExitConfirmation}
+        onClose={() => setShowExitConfirmation(false)}
+        title={
+          <span className="flex items-center gap-2 text-emerald-400">
+            🚪 Leave Mine?
+          </span>
+        }
+        maxWidthClass="max-w-md"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-slate-300">
+            You have returned to the exit ladder. Would you like to safely extract all items in your temporary loot sack and leave the mine?
           </p>
-          <div className="flex items-center gap-3 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-            <span>Each strike costs 25 stamina</span>
-            <span className="text-slate-700">|</span>
-            <span>Yields random city materials based on rarity</span>
+          <div className="flex justify-end gap-3 mt-2">
+            <button
+              onClick={() => setShowExitConfirmation(false)}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-black uppercase tracking-widest rounded-lg border border-slate-700 cursor-pointer transition-all active:scale-95"
+            >
+              Keep Exploring
+            </button>
+            <button
+              onClick={async () => {
+                setShowExitConfirmation(false);
+                await handleExit();
+              }}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-lg border border-emerald-400 cursor-pointer transition-all active:scale-95 shadow-md shadow-emerald-950/20"
+            >
+              Extract & Leave
+            </button>
           </div>
         </div>
-      </div>
+      </Modal>
+
+      {/* Summary Loot spoils modal */}
+      <LootSpoilsModal
+        isOpen={showSummaryModal}
+        onClose={() => {
+          setShowSummaryModal(false);
+          setSummaryLoot([]);
+          navigate('/home');
+        }}
+        title={
+          <span className="flex items-center gap-2 text-amber-400">
+            ⛏️ Expedition Summary
+          </span>
+        }
+        description="You successfully extracted from the mine! Here are the spoils gathered:"
+        sol={0}
+        experience={xpGained}
+        items={mappedLootItems}
+        acceptButtonText="Accept Spoils"
+      />
     </div>
   );
 };

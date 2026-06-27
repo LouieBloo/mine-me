@@ -1,0 +1,7 @@
+/* Scoped styling for the MiningGrid Pixi canvas container */
+.mining-grid-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
