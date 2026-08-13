@@ -5,7 +5,7 @@ import { Assets, Texture } from 'pixi.js';
 
 import { type Character } from '../CharacterSelection';
 import './CreateCharacter.css';
-import { type GameItem, type GearSubType, GEAR_OFFSETS } from '@nvg/shared';
+import { type GameItem, type GearSubType, GEAR_OFFSETS } from '@mine-me/shared';
 
 interface Props {
     onCreated: (char: Character) => void;

@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, type ReactNode } from 'react';
 import type { Character } from '../views/CharacterSelection/CharacterSelection';
-import type { GameCity, PlayerState, CharacterStatUpdate, CityDungeonInfo, MiningSessionClientState } from '@nvg/shared';
+import type { GameCity, PlayerState, CharacterStatUpdate, CityDungeonInfo, MiningSessionClientState } from '@mine-me/shared';
 
 interface GameContextType {
     activeCharacter: Character | null;

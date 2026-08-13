@@ -12,7 +12,7 @@ import type { GearLayerDescriptor } from '../../components/game/sprites';
 import { notificationService } from '../../services/notificationService';
 import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
 import './CombatView.css';
-import type { CombatActionType, MobBattleState, GearSubType, DamageEvent, CombatLogMessage } from '@nvg/shared';
+import type { CombatActionType, MobBattleState, GearSubType, DamageEvent, CombatLogMessage } from '@mine-me/shared';
 
 /** Color palette for floating damage indicators */
 const FLOATING_TEXT_COLORS = {

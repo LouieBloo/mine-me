@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BattleService } from '../src/services/battle.service';
 import { LootService } from '../src/services/loot.service';
-import { CombatEngine } from '@nvg/shared/src/gameLogic/CombatEngine';
+import { CombatEngine } from '@mine-me/shared/src/gameLogic/CombatEngine';
 
 // Mock Prisma
 const mockUpsert = vi.fn();
@@ -40,7 +40,7 @@ vi.mock('../src/services/loot.service', () => ({
 }));
 
 // Mock CombatEngine
-vi.mock('@nvg/shared/src/gameLogic/CombatEngine', () => ({
+vi.mock('@mine-me/shared/src/gameLogic/CombatEngine', () => ({
   CombatEngine: {
     generateMobAction: vi.fn().mockReturnValue('Attack'),
   },

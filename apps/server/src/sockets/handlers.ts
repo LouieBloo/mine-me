@@ -3,7 +3,7 @@ import { prisma } from '../index';
 import { dispatchGameEvent } from './gameEvents';
 import { BattleService } from '../services/battle.service';
 import { InventoryService } from '../services/inventory.service';
-import type { PlayerState, GameCity, GameEventPayload } from '@nvg/shared';
+import type { PlayerState, GameCity, GameEventPayload } from '@mine-me/shared';
 import { cleanupMiningSession } from './miningEvents';
 
 // Extend socket.data type for type safety

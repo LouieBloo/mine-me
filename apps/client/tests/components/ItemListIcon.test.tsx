@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ItemListIcon } from '../../src/components/ItemListIcon/ItemListIcon';
-import type { InventoryEntry } from '@nvg/shared';
+import type { InventoryEntry } from '@mine-me/shared';
 import { useSocket } from '../../src/contexts/SocketContext';
 import { notificationService } from '../../src/services/notificationService';
 

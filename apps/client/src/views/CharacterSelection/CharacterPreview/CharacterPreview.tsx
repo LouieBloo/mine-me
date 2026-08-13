@@ -5,7 +5,7 @@ import { type Character } from '../CharacterSelection';
 import { useGame } from '../../../contexts/GameContext';
 import { Application } from '@pixi/react';
 import { Assets, Texture } from 'pixi.js';
-import { type GearSubType, GEAR_OFFSETS } from '@nvg/shared';
+import { type GearSubType, GEAR_OFFSETS } from '@mine-me/shared';
 import { useCharacterLevel } from '../../../hooks/useLevels';
 import './CharacterPreview.css';
 import { ConfirmationModal } from '../../../components/ConfirmationModal/ConfirmationModal';

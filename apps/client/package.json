@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.10",
-    "@nvg/shared": "^1.0.0",
+    "@mine-me/shared": "^1.0.0",
     "@pixi/react": "^8.0.5",
     "emoji-picker-react": "^4.19.1",
     "pixi.js": "^8.17.0",

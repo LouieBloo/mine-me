@@ -1,6 +1,6 @@
-import { CharacterModEngine } from '@nvg/shared';
+import { CharacterModEngine } from '@mine-me/shared';
 import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
-import type { PlayerState } from '@nvg/shared';
+import type { PlayerState } from '@mine-me/shared';
 import { useLevelProgress } from '../../hooks/useLevels';
 import './CharacterPanel.css';
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { DropTable, DropTableItem } from '@nvg/shared/types';
+import type { DropTable, DropTableItem } from '@mine-me/shared/types';
 import { EntityPicker } from '../EntityPicker/EntityPicker';
 import './DropTableEditor.css';
 

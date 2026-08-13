@@ -24,7 +24,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "@nvg/shared/*": ["../../packages/shared/src/*"]
+      "@mine-me/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": ["src"]

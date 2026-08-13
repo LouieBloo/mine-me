@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
-import { CombatEngine } from '@nvg/shared/src/gameLogic/CombatEngine';
-import { CharacterModEngine } from '@nvg/shared';
+import { CombatEngine } from '@mine-me/shared/src/gameLogic/CombatEngine';
+import { CharacterModEngine } from '@mine-me/shared';
 import type {
   StartCombatPayload,
   CombatActionPayload,
@@ -10,7 +10,7 @@ import type {
   GameEventResult,
   BattleState,
   MobBattleState
-} from '@nvg/shared';
+} from '@mine-me/shared';
 import { LootService } from '../services/loot.service';
 import { BattleService } from '../services/battle.service';
 import { InventoryService } from '../services/inventory.service';

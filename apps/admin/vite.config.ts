@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@nvg/shared': path.resolve(__dirname, '../../packages/shared/src'),
+      '@mine-me/shared': path.resolve(__dirname, '../../packages/shared/src'),
     },
   },
   server: {

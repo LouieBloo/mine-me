@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import type { CharacterStatUpdate } from '@nvg/shared';
+import type { CharacterStatUpdate } from '@mine-me/shared';
 
 /**
  * Singleton broadcast service for pushing character stat updates via WebSocket.

@@ -1,6 +1,6 @@
 import { prisma } from '../index';
-import { CombatEngine } from '@nvg/shared/src/gameLogic/CombatEngine';
-import type { BattleState, MobBattleState } from '@nvg/shared';
+import { CombatEngine } from '@mine-me/shared/src/gameLogic/CombatEngine';
+import type { BattleState, MobBattleState } from '@mine-me/shared';
 import { LootService, type LootResult } from './loot.service';
 
 export class BattleService {

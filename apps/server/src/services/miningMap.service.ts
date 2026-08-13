@@ -1,4 +1,4 @@
-import { MiningTileType, MINING_CONFIG } from '@nvg/shared';
+import { MiningTileType, MINING_CONFIG } from '@mine-me/shared';
 
 // ============================================================================
 // Mining Map Generator
@@ -264,7 +264,7 @@ export function revealTiles(grid: ServerMiningGrid, position: MiningPosition, vi
 /**
  * Convert server grid to client-safe grid (hide unrevealed tile types).
  */
-export function toClientGrid(grid: ServerMiningGrid): import('@nvg/shared').MiningClientTile[][] {
+export function toClientGrid(grid: ServerMiningGrid): import('@mine-me/shared').MiningClientTile[][] {
   return grid.map(row =>
     row.map(tile => ({
       type: tile.revealed ? tile.type : MiningTileType.DIRT,

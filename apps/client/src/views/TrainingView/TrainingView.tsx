@@ -9,7 +9,7 @@ import { CombatAnimationSequencer, buildAttackSteps } from '../../components/gam
 import type { CombatAnimationStep } from '../../components/game/combat/CombatAnimationSequencer';
 import type { GearLayerDescriptor } from '../../components/game/sprites';
 import { notificationService } from '../../services/notificationService';
-import type { GearSubType } from '@nvg/shared';
+import type { GearSubType } from '@mine-me/shared';
 import './TrainingView.css';
 
 /**

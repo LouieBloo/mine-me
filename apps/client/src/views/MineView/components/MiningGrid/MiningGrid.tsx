@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { Container, Graphics, Sprite, Assets } from 'pixi.js';
 import { usePixiStage } from '../../../../components/game/PixiStageContext/PixiStageContext';
 import { CompositeEntitySprite, type GearLayerDescriptor } from '../../../../components/game/sprites/CompositeEntitySprite';
-import type { MiningSessionClientState, MiningPosition, MiningDirection, PlayerState } from '@nvg/shared';
-import { MINING_CONFIG, MiningTileType } from '@nvg/shared';
+import type { MiningSessionClientState, MiningPosition, MiningDirection, PlayerState } from '@mine-me/shared';
+import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
 import { notificationService } from '../../../../services/notificationService';
 import './MiningGrid.css';
 

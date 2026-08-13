@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
-import type { GameCity } from '@nvg/shared';
+import type { GameCity } from '@mine-me/shared';
 import './MapEditor.css';
 
 export default function MapEditor() {

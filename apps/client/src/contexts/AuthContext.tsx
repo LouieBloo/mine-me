@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, type ReactNode } from 'react';
-import { getTokenTimeRemaining, isTokenExpired } from '@nvg/shared';
+import { getTokenTimeRemaining, isTokenExpired } from '@mine-me/shared';
 
 interface User {
   id: string;

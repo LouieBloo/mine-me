@@ -1,4 +1,4 @@
-import type { InventoryEntry, ItemType } from '@nvg/shared';
+import type { InventoryEntry, ItemType } from '@mine-me/shared';
 import {
   RARITY_COLORS,
   RARITY_LABELS,
@@ -6,7 +6,7 @@ import {
   SUBTYPE_LABEL,
   TYPE_COLORS,
   TYPE_LABELS,
-} from '@nvg/shared';
+} from '@mine-me/shared';
 
 import './ItemTooltip.css';
 

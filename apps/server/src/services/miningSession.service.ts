@@ -7,7 +7,7 @@ import {
   type MiningBackpackItem,
   type MiningDroppedItem,
   type MiningSessionClientState,
-} from '@nvg/shared';
+} from '@mine-me/shared';
 import {
   generateMiningMap,
   revealTiles,

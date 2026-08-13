@@ -6,7 +6,7 @@ import { useSocket } from '../../contexts/SocketContext';
 import { CharacterPanel } from '../CharacterPanel/CharacterPanel';
 import { InventoryPanel } from '../InventoryPanel/InventoryPanel';
 import { ChatPanel } from '../ChatPanel/ChatPanel';
-import type { PlayerState, GameCity, CityDungeonInfo } from '@nvg/shared';
+import type { PlayerState, GameCity, CityDungeonInfo } from '@mine-me/shared';
 import './InGameLayout.css';
 
 export const InGameLayout = () => {

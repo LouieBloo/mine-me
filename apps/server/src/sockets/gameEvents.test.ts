@@ -71,7 +71,7 @@ const makeCity = (id: string, x: number, y: number, overrides = {}) => ({
 // ---------------------------------------------------------------------------
 // calculateTravelDays — tested via the shared utility directly
 // ---------------------------------------------------------------------------
-import { calculateTravelDays } from '@nvg/shared';
+import { calculateTravelDays } from '@mine-me/shared';
 
 describe('calculateTravelDays (shared utility)', () => {
   it('returns 0 when both cities have the same id', () => {

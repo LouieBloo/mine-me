@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../index';
 import { syncJson, getPagination } from '../../services/admin.service';
-import { ITEM_TYPES, ITEM_SUBTYPES, ITEM_RARITIES } from '@nvg/shared';
+import { ITEM_TYPES, ITEM_SUBTYPES, ITEM_RARITIES } from '@mine-me/shared';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';

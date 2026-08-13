@@ -4,7 +4,7 @@ import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
 
-import type { MobAtlas } from '@nvg/shared/types';
+import type { MobAtlas } from '@mine-me/shared/types';
 import SpritePreview from '../../components/SpritePreview/SpritePreview';
 import SpriteAtlasOverview from '../../components/SpriteAtlasOverview/SpriteAtlasOverview';
 import { DropTableEditor } from '../../components/DropTableEditor/DropTableEditor';

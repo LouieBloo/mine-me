@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import type { MobAtlas } from '@nvg/shared/types';
+import type { MobAtlas } from '@mine-me/shared/types';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
 import { useToast } from '../../contexts/ToastContext';

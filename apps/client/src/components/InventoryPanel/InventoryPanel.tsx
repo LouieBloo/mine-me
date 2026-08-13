@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import type { PlayerInventory, InventoryEntry } from '@nvg/shared';
+import type { PlayerInventory, InventoryEntry } from '@mine-me/shared';
 import { ItemListIcon } from '../ItemListIcon/ItemListIcon';
 import './InventoryPanel.css';
 

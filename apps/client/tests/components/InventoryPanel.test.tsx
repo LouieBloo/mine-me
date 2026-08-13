@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { InventoryPanel } from '../../src/components/InventoryPanel/InventoryPanel';
-import type { PlayerInventory } from '@nvg/shared';
+import type { PlayerInventory } from '@mine-me/shared';
 
 // Mock components
 vi.mock('../../src/components/ItemListIcon/ItemListIcon', () => ({

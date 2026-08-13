@@ -12,7 +12,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@nvg/shared": "^1.0.0",
+    "@mine-me/shared": "^1.0.0",
     "@prisma/client": "^5.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

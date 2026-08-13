@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { InventoryEntry } from '@nvg/shared';
+import type { InventoryEntry } from '@mine-me/shared';
 import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 import { ItemTooltip } from '../ItemTooltip/ItemTooltip';
 import { useSocket } from '../../contexts/SocketContext';

@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { broadcastStatUpdate } from '../services/characterBroadcast';
-import type { TrainingActionPayload, GameEventResult } from '@nvg/shared';
+import type { TrainingActionPayload, GameEventResult } from '@mine-me/shared';
 
 const TRAINING_STAMINA_COST = 20;
 

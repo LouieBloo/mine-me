@@ -1,7 +1,7 @@
 import { Assets, Sprite, Texture, Container } from 'pixi.js';
 import { BaseSprite } from './BaseSprite';
-import type { GearSubType } from '@nvg/shared';
-import { GEAR_OFFSETS } from '@nvg/shared';
+import type { GearSubType } from '@mine-me/shared';
+import { GEAR_OFFSETS } from '@mine-me/shared';
 
 /**
  * Descriptor for a gear layer to be rendered on top of the base body.

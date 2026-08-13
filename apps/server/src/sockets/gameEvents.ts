@@ -5,7 +5,7 @@ import { handleStartCombat, handleCombatAction, handleLeaveCombat, handleAdvance
 import { handleTrainingAction } from './trainingEvents';
 import { handleMiningStart, handleMiningMove, handleMiningMineStart, handleMiningMineComplete, handleMiningExit } from './miningEvents';
 import { InventoryService } from '../services/inventory.service';
-import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays, getStaminaRecoveryPerDay } from '@nvg/shared';
+import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays, getStaminaRecoveryPerDay } from '@mine-me/shared';
 
 // ============================================================================
 // Game Event Handler Registry

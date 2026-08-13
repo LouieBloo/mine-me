@@ -3,8 +3,8 @@ import { Application } from '@pixi/react';
 import { Application as PixiApplication } from 'pixi.js';
 import { useApi } from '../../hooks/useApi';
 import { MobSprite } from '../../components/game/MobSprite/MobSprite';
-import { MOB_ANIMATION_KEYS } from '@nvg/shared';
-import type { Mob, MobAtlas } from '@nvg/shared';
+import { MOB_ANIMATION_KEYS } from '@mine-me/shared';
+import type { Mob, MobAtlas } from '@mine-me/shared';
 import './TestMobView.css';
 
 /**

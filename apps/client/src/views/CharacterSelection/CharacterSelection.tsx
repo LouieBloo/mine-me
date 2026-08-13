@@ -6,7 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useApi } from '../../hooks/useApi';
 import './CharacterSelection.css';
 
-import { type GameItem, type GameCity } from '@nvg/shared';
+import { type GameItem, type GameCity } from '@mine-me/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import { useGame } from '../../contexts/GameContext';
 import { useNavigate } from 'react-router-dom';

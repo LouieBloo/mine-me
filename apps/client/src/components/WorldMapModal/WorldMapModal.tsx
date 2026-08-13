@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Application } from '@pixi/react';
 import { Assets, Texture } from 'pixi.js';
-import { type GameCity, calculateTravelDays } from '@nvg/shared';
+import { type GameCity, calculateTravelDays } from '@mine-me/shared';
 import { Modal } from '../Modal/Modal';
 import './WorldMapModal.css';
 

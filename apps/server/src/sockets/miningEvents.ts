@@ -8,7 +8,7 @@ import {
   type MiningMovePayload,
   type MiningMineStartPayload,
   type MiningMineCompletePayload,
-} from '@nvg/shared';
+} from '@mine-me/shared';
 import {
   createSession,
   getSession,

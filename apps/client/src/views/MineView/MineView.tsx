@@ -6,7 +6,7 @@ import { PixiStageProvider } from '../../components/game/PixiStageContext/PixiSt
 import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
 import { notificationService } from '../../services/notificationService';
-import type { MiningPosition, MiningDirection, MiningBackpackItem } from '@nvg/shared';
+import type { MiningPosition, MiningDirection, MiningBackpackItem } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
 import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
 import './MineView.css';

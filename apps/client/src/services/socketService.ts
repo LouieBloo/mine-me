@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, BattleState, CityDungeonInfo, ChatMessage } from '@nvg/shared';
+import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, BattleState, CityDungeonInfo, ChatMessage } from '@mine-me/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 

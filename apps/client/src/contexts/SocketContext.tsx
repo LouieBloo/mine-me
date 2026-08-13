@@ -3,7 +3,7 @@ import { socketService, type SocketEventMap } from '../services/socketService';
 import { useAuth } from '../hooks/useAuth';
 import { useGame } from './GameContext';
 import { notificationService } from '../services/notificationService';
-import type { PlayerState, CharacterStatUpdate, GameEventPayload, GameEventResult } from '@nvg/shared';
+import type { PlayerState, CharacterStatUpdate, GameEventPayload, GameEventResult } from '@mine-me/shared';
 
 interface SocketContextType {
   isConnected: boolean;

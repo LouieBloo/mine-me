@@ -6,7 +6,7 @@ import { useApi } from '../../hooks/useApi';
 import { EntityPicker } from '../../components/EntityPicker/EntityPicker';
 import CityBackgroundUpload from './CityBackgroundUpload/CityBackgroundUpload';
 import CityMapIconUpload from './CityMapIconUpload/CityMapIconUpload';
-import { ITEM_SUBTYPES, type CityObject, type CityObjectType, CITY_OBJECT_TYPES } from '@nvg/shared';
+import { ITEM_SUBTYPES, type CityObject, type CityObjectType, CITY_OBJECT_TYPES } from '@mine-me/shared';
 import './CityDetail.css';
 
 const MATERIAL_SUBTYPES = ITEM_SUBTYPES.MATERIAL;

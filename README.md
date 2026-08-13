@@ -2,6 +2,7 @@
 
 A browser-based, simplified MMORPG focused on the "Need vs. Greed" principle. Players gather resources, craft, trade on a global marketplace, and unite weekly to defeat world bosses for real-world currency rewards.
 
+
 ## Tech Stack
 This project uses a modern **Turborepo** monorepo structure.
 - **Client App:** React, PixiJS (via `@pixi/react`), Tailwind CSS, Vite
@@ -89,7 +90,7 @@ From the **root** of the monorepo, you can run the following commands to manage 
 ```bash
 npm run dev
 ```
-*This starts the Vite dev server for `client` (Port 3001), the Vite dev server for `admin` (Port 3002), runs the TypeScript compiler `tsc -w` for `@nvg/shared`, and runs the Node API server (Port 4000) concurrently.*
+*This starts the Vite dev server for `client` (Port 3001), the Vite dev server for `admin` (Port 3002), runs the TypeScript compiler `tsc -w` for `@mine-me/shared`, and runs the Node API server (Port 4000) concurrently.*
 
 ### Build for Production
 ```bash

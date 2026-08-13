@@ -1,4 +1,4 @@
-import { PlayerState } from '@nvg/shared';
+import { PlayerState } from '@mine-me/shared';
 
 /**
  * Validates if a player has enough stamina to perform an action.

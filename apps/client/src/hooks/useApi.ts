@@ -1,5 +1,5 @@
 import { useAuth } from './useAuth';
-import { isTokenExpired } from '@nvg/shared';
+import { isTokenExpired } from '@mine-me/shared';
 import { useCallback } from 'react';
 
 export const useApi = () => {

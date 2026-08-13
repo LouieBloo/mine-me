@@ -1,5 +1,5 @@
 import { body } from 'express-validator';
-import { ITEM_TYPES, ITEM_SUBTYPES, ITEM_RARITIES } from '@nvg/shared';
+import { ITEM_TYPES, ITEM_SUBTYPES, ITEM_RARITIES } from '@mine-me/shared';
 
 export const cityValidation = [
   body('name').trim().notEmpty().withMessage('City Name is required'),

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { CombatLogMessage, ChatMessage } from '@nvg/shared';
+import type { CombatLogMessage, ChatMessage } from '@mine-me/shared';
 import { useGame } from './GameContext';
 import { useSocket } from './SocketContext';
 

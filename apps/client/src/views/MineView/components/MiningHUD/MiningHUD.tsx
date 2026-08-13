@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { MiningSessionClientState, PlayerState } from '@nvg/shared';
+import type { MiningSessionClientState, PlayerState } from '@mine-me/shared';
 import './MiningHUD.css';
 
 interface MiningHUDProps {

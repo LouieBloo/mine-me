@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal } from '../Modal/Modal';
-import type { CityDungeonInfo } from '@nvg/shared';
+import type { CityDungeonInfo } from '@mine-me/shared';
 import './DungeonModal.css';
 
 interface DungeonModalProps {

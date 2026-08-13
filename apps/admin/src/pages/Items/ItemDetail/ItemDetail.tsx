@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../contexts/ToastContext';
 import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../../hooks/useApi';
-import type { ItemType } from '@nvg/shared/types';
+import type { ItemType } from '@mine-me/shared/types';
 import ItemIconUpload from './ItemIconUpload';
 import ItemGearUpload from './ItemGearUpload';
 import './ItemDetail.css';

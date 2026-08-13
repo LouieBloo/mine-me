@@ -10,7 +10,7 @@ import { WorldMapModal } from '../../components/WorldMapModal/WorldMapModal';
 import { DungeonModal } from '../../components/DungeonModal/DungeonModal';
 import { ConfirmationModal } from '../../components/ConfirmationModal/ConfirmationModal';
 import { notificationService } from '../../services/notificationService';
-import { type GameCity, calculateTravelDays, getStaminaRecoveryPerDay, calculateRestDaysToFull } from '@nvg/shared';
+import { type GameCity, calculateTravelDays, getStaminaRecoveryPerDay, calculateRestDaysToFull } from '@mine-me/shared';
 import { useCharacterLevel } from '../../hooks/useLevels';
 import './HomeView.css';
 

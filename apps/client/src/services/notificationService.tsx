@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import { GameNotification } from '../components/Notification/GameNotification';
 import type { NotificationVariant } from '../components/Notification/GameNotification';
-import type { GameItem } from '@nvg/shared';
+import type { GameItem } from '@mine-me/shared';
 
 /**
  * NotificationService provides a centralized way to trigger rich notifications
