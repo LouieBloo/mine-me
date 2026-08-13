@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, ChatMessage } from '@mine-me/shared';
+import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, ChatMessage, MiningStateTickPayload } from '@mine-me/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -16,6 +16,8 @@ export type SocketEventMap = {
   player_left_city: { characterId: string };
   // City chat events
   city_message: ChatMessage;
+  // Real-time mining 30 Hz ticks
+  mining_state_tick: MiningStateTickPayload;
   // Connection
   connect: undefined;
   disconnect: string;

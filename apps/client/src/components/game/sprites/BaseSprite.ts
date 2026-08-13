@@ -42,6 +42,19 @@ export abstract class BaseSprite {
   }
 
   /**
+   * Scale the sprite uniformly to fit within a target size (in pixels).
+   * Uses the wrapper's current width as the reference dimension.
+   */
+  scaleToFit(targetSize: number): void {
+    if (this.wrapper.width > 0) {
+      const currentScale = this.wrapper.scale.x;
+      const nativeWidth = this.wrapper.width / currentScale;
+      const scaleFactor = targetSize / nativeWidth;
+      this.wrapper.scale.set(scaleFactor);
+    }
+  }
+
+  /**
    * Flip the sprite horizontally (e.g. player facing right in combat).
    */
   setFlipped(flipped: boolean): void {

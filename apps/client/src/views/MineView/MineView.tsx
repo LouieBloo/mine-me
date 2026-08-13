@@ -6,7 +6,7 @@ import { PixiStageProvider } from '../../components/game/PixiStageContext/PixiSt
 import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
 import { notificationService } from '../../services/notificationService';
-import type { MiningPosition, MiningDirection, MiningBackpackItem } from '@mine-me/shared';
+import type { MiningBackpackItem } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
 import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
 import './MineView.css';
@@ -17,7 +17,6 @@ export const MineView: React.FC = () => {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState<boolean>(true);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   // Modal & Summary States
   const [hasMovedOffEntrance, setHasMovedOffEntrance] = useState<boolean>(false);
@@ -58,11 +57,6 @@ export const MineView: React.FC = () => {
     };
 
     startSession();
-
-    // Clean up local reference on unmount
-    return () => {
-      hasStartedRef.current = false;
-    };
   }, [activeCharacter, navigate, sendGameEvent, setMiningSession]);
 
   // Track if player has moved off the entrance and then landed back on it to trigger modal
@@ -75,132 +69,6 @@ export const MineView: React.FC = () => {
       setShowExitConfirmation(true);
     }
   }, [miningSession?.position?.x, miningSession?.position?.y, hasMovedOffEntrance]);
-
-  // Movement Action Handler
-  const handleMove = useCallback(
-    async (direction: MiningDirection) => {
-      if (isProcessing || !miningSession || miningSession.isMining) return;
-
-      setIsProcessing(true);
-      try {
-        const result = await sendGameEvent({ type: 'mining_move', direction });
-        if (result.success && result.data) {
-          const { sessionState, itemsGained, damageTaken, message } = result.data;
-
-          // Update state
-          setMiningSession(sessionState);
-
-          // Notifications
-          if (itemsGained && itemsGained.length > 0) {
-            itemsGained.forEach((item: any) => {
-              notificationService.item(
-                {
-                  id: item.itemId,
-                  name: item.itemName,
-                  description: `You collected ${item.itemName}!`,
-                  iconUrl: item.iconUrl,
-                  rarity: 'COMMON' as any,
-                } as any,
-                item.quantity
-              );
-            });
-          }
-
-          if (damageTaken && damageTaken > 0) {
-            notificationService.error('Damage Taken', `You took ${damageTaken} damage! ${message || ''}`);
-          }
-
-          // Check for character death (sessionState will be null if died)
-          if (!sessionState) {
-            notificationService.error('Defeat', 'You have fainted and lost your temporary loot sack.');
-            navigate('/home');
-          }
-        } else {
-          notificationService.error('Action Failed', result.error || 'Cannot move');
-        }
-      } catch (err: any) {
-        console.error('[MineView] Move error:', err);
-        notificationService.error('Error', err.message);
-      } finally {
-        setIsProcessing(false);
-      }
-    },
-    [isProcessing, miningSession, sendGameEvent, setMiningSession, navigate]
-  );
-
-  // Mining Start Handler
-  const handleMineStart = useCallback(
-    async (target: MiningPosition) => {
-      if (isProcessing || !miningSession || miningSession.isMining) return;
-
-      setIsProcessing(true);
-      try {
-        const result = await sendGameEvent({ type: 'mining_mine_start', target });
-        if (result.success && result.data) {
-          const { sessionState, miningTimeMs } = result.data;
-          setMiningSession(sessionState);
-
-          // Set up client-side auto-complete timeout
-          // Add a 50ms buffer to match latency and ensure server validation passes
-          setTimeout(async () => {
-            await handleMineComplete(target);
-          }, miningTimeMs + 50);
-        } else {
-          notificationService.error('Mining Failed', result.error || 'Cannot mine block');
-          setIsProcessing(false);
-        }
-      } catch (err: any) {
-        console.error('[MineView] Mine start error:', err);
-        notificationService.error('Error', err.message);
-        setIsProcessing(false);
-      }
-    },
-    [isProcessing, miningSession, sendGameEvent, setMiningSession]
-  );
-
-  // Mining Complete Handler
-  const handleMineComplete = async (target: MiningPosition) => {
-    try {
-      const result = await sendGameEvent({ type: 'mining_mine_complete', target });
-      if (result.success && result.data) {
-        const { sessionState, itemsGained, damageTaken, message } = result.data;
-        setMiningSession(sessionState);
-
-        // Notifications
-        if (itemsGained && itemsGained.length > 0) {
-          itemsGained.forEach((item: any) => {
-            notificationService.item(
-              {
-                id: item.itemId,
-                name: item.itemName,
-                description: `You collected ${item.itemName}!`,
-                iconUrl: item.iconUrl,
-                rarity: 'COMMON' as any,
-              } as any,
-              item.quantity
-            );
-          });
-        }
-
-        if (damageTaken && damageTaken > 0) {
-          notificationService.error('Damage Taken', `You took ${damageTaken} damage! ${message || ''}`);
-        }
-
-        // Check for character death
-        if (!sessionState) {
-          notificationService.error('Defeat', 'You fainted from a falling rock and lost your temporary loot.');
-          navigate('/home');
-        }
-      } else {
-        notificationService.error('Mining Failed', result.error || 'Could not complete mining action');
-      }
-    } catch (err: any) {
-      console.error('[MineView] Mine complete error:', err);
-      notificationService.error('Error', err.message);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   // Safe Extraction Handler
   const handleExit = useCallback(async () => {
@@ -278,9 +146,7 @@ export const MineView: React.FC = () => {
           <MiningGrid
             sessionState={miningSession}
             playerState={playerState}
-            onMove={handleMove}
-            onMineStart={handleMineStart}
-            isProcessing={isProcessing}
+            onExit={handleExit}
           />
         </PixiStageProvider>
       )}

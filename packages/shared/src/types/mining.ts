@@ -20,7 +20,7 @@ export const MINING_CONFIG = {
   ENTRANCE_Y: 0,
 
   /** Default vision range in tiles (cardinally adjacent) */
-  DEFAULT_VISION_RANGE: 1,
+  DEFAULT_VISION_RANGE: 3,
 
   /** Stamina cost per block mined */
   MINING_STAMINA_COST: 1,
@@ -41,6 +41,12 @@ export const MINING_CONFIG = {
 
   /** Approximate percentage of tiles that are minerals */
   MINERAL_PERCENTAGE: 10,
+
+  /** Continuous physics parameters */
+  TILE_SIZE: 32,
+  PLAYER_RADIUS: 12,
+  MOVE_SPEED: 4.5, // Grid tiles per second
+  SIMULATION_TICK_RATE_HZ: 30,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -80,7 +86,10 @@ export type MiningDirection = 'up' | 'down' | 'left' | 'right';
 export interface MiningClientTile {
   type: MiningTileType;
   revealed: boolean;
+  /** Crack damage stage (0 = undamaged, 1 = 25%, 2 = 50%, 3 = 75%, 4 = 90% cracked) */
+  damageStage?: number;
 }
+
 
 /**
  * An item dropped on the ground (e.g. from dynamite explosions).
@@ -146,3 +155,33 @@ export interface MiningEventResultData {
   /** Message to display to the player. */
   message?: string;
 }
+
+/** 2D Vector representation for continuous physics. */
+export interface Vector2D {
+  x: number;
+  y: number;
+}
+
+/** Input state payload sent from client to server on input changes. */
+export interface MiningInputState {
+  up: boolean;
+  down: boolean;
+  left: boolean;
+  right: boolean;
+  miningKey: boolean;
+  sequence: number;
+}
+
+/** 30 Hz real-time simulation snapshot emitted by server to client. */
+export interface MiningStateTickPayload {
+  tick: number;
+  position: Vector2D;
+  velocity: Vector2D;
+  isMining: boolean;
+  miningTarget?: MiningPosition;
+  miningProgressMs?: number;
+  temporaryBackpack: MiningBackpackItem[];
+  droppedItems: MiningDroppedItem[];
+  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
+}
+

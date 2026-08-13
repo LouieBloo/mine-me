@@ -15,7 +15,30 @@ export interface ServerTile {
   type: MiningTileType;
   /** Whether this tile has been revealed to the client via fog of war. */
   revealed: boolean;
+  /** Accumulated damage in milliseconds. */
+  damageMs?: number;
 }
+
+/**
+ * Calculate damage stage (0-4) based on accumulated damage vs tile mining time.
+ */
+export function getDamageStage(tile: ServerTile): number {
+  if (!tile.damageMs || tile.damageMs <= 0 || tile.type === MiningTileType.EMPTY || tile.type === MiningTileType.ENTRANCE) {
+    return 0;
+  }
+  let totalTimeMs: number = MINING_CONFIG.DIRT_MINE_TIME_MS;
+  if (tile.type === MiningTileType.MINERAL) totalTimeMs = MINING_CONFIG.MINERAL_MINE_TIME_MS;
+  if (tile.type === MiningTileType.CHEST) totalTimeMs = MINING_CONFIG.CHEST_MINE_TIME_MS;
+  if (tile.type === MiningTileType.ROCK) return 0;
+
+  const ratio = tile.damageMs / totalTimeMs;
+  if (ratio >= 0.9) return 4;
+  if (ratio >= 0.75) return 3;
+  if (ratio >= 0.5) return 2;
+  if (ratio >= 0.25) return 1;
+  return 0;
+}
+
 
 /** The full server-side grid. */
 export type ServerMiningGrid = ServerTile[][];
@@ -190,17 +213,23 @@ export function getTargetPosition(
   }
 }
 
+export interface GravityMove {
+  from: MiningPosition;
+  to: MiningPosition;
+}
+
 /**
  * Resolve gravity for falling rocks after a tile is cleared.
  * Rocks fall instantly until they hit a solid block or the grid floor.
  *
- * Returns the list of positions where rocks landed and whether
+ * Returns the list of positions where rocks landed, the specific moves, and whether
  * the player was crushed (if a rock landed on the player position).
  */
 export function resolveGravity(
   grid: ServerMiningGrid,
   playerPosition: MiningPosition,
-): { rocksLanded: MiningPosition[]; playerCrushed: boolean } {
+): { moves: GravityMove[]; rocksLanded: MiningPosition[]; playerCrushed: boolean } {
+  const moves: GravityMove[] = [];
   const rocksLanded: MiningPosition[] = [];
   let playerCrushed = false;
 
@@ -229,6 +258,7 @@ export function resolveGravity(
       // Move rock from (x, y) to (x, finalY)
       grid[y][x] = { type: MiningTileType.EMPTY, revealed: grid[y][x].revealed };
       grid[finalY][x] = { type: MiningTileType.ROCK, revealed: grid[finalY][x].revealed };
+      moves.push({ from: { x, y }, to: { x, y: finalY } });
       rocksLanded.push({ x, y: finalY });
 
       // Check if rock landed on player
@@ -238,8 +268,9 @@ export function resolveGravity(
     }
   }
 
-  return { rocksLanded, playerCrushed };
+  return { moves, rocksLanded, playerCrushed };
 }
+
 
 /**
  * Apply fog of war — reveal tiles within vision range of the given position.
@@ -269,6 +300,8 @@ export function toClientGrid(grid: ServerMiningGrid): import('@mine-me/shared').
     row.map(tile => ({
       type: tile.revealed ? tile.type : MiningTileType.DIRT,
       revealed: tile.revealed,
+      damageStage: tile.revealed ? getDamageStage(tile) : 0,
     }))
   );
 }
+

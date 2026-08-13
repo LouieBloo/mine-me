@@ -1,4 +1,4 @@
-import type { MiningPosition, MiningDirection } from './mining';
+import type { MiningPosition, MiningDirection, MiningInputState } from './mining';
 
 // ============================================================================
 // Game Event Types — Discriminated Union Pattern
@@ -125,11 +125,35 @@ export interface ConsumeItemPayload extends GameEventBase {
   inventoryItemId: string;
 }
 
+export interface MiningInputPayload extends GameEventBase {
+  type: 'mining_input';
+  input: MiningInputState;
+}
+
+export interface MiningInteractPayload extends GameEventBase {
+  type: 'mining_interact';
+  target: MiningPosition;
+}
+
 // ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
 // ----------------------------------------------------------------------------
-export type GameEventPayload = ChangeCityPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload | MiningStartPayload | MiningMovePayload | MiningMineStartPayload | MiningMineCompletePayload | MiningExitPayload | EquipItemPayload | UnequipItemPayload | ConsumeItemPayload;
+export type GameEventPayload =
+  | ChangeCityPayload
+  | RestPayload
+  | TrainingActionPayload
+  | LeaveTrainingPayload
+  | MiningStartPayload
+  | MiningInputPayload
+  | MiningInteractPayload
+  | MiningMovePayload
+  | MiningMineStartPayload
+  | MiningMineCompletePayload
+  | MiningExitPayload
+  | EquipItemPayload
+  | UnequipItemPayload
+  | ConsumeItemPayload;
 
 // Utility type: extract the type string literals from the union
 export type GameEventType = GameEventPayload['type'];

@@ -2,7 +2,12 @@ import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { broadcastStatUpdate } from '../services/characterBroadcast';
 import { handleTrainingAction } from './trainingEvents';
-import { handleMiningStart, handleMiningMove, handleMiningMineStart, handleMiningMineComplete, handleMiningExit } from './miningEvents';
+import {
+  handleMiningStart,
+  handleMiningInput,
+  handleMiningInteract,
+  handleMiningExit,
+} from './miningEvents';
 import { InventoryService } from '../services/inventory.service';
 import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays, getStaminaRecoveryPerDay } from '@mine-me/shared';
 
@@ -517,9 +522,8 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   rest: handleRest,
   training_action: handleTrainingAction,
   mining_start: handleMiningStart,
-  mining_move: handleMiningMove,
-  mining_mine_start: handleMiningMineStart,
-  mining_mine_complete: handleMiningMineComplete,
+  mining_input: handleMiningInput,
+  mining_interact: handleMiningInteract,
   mining_exit: handleMiningExit,
   equip_item: handleEquipItem,
   unequip_item: handleUnequipItem,
