@@ -9,7 +9,7 @@ import { CombatAnimationSequencer, buildAttackSteps } from '../../components/gam
 import type { CombatAnimationStep } from '../../components/game/combat/CombatAnimationSequencer';
 import type { GearLayerDescriptor } from '../../components/game/sprites';
 import { notificationService } from '../../services/notificationService';
-import type { GearSubType } from '@mine-me/shared';
+import { type GearSubType, getAssetUrl } from '@mine-me/shared';
 import './TrainingView.css';
 
 /**
@@ -34,7 +34,7 @@ export const TrainingView: React.FC = () => {
   // Persistent sequencer instance
   const sequencerRef = useRef<CombatAnimationSequencer>(new CombatAnimationSequencer());
 
-  const baseBodyUrl = `${import.meta.env.VITE_API_URL}/assets/gear/base-body.png`;
+  const baseBodyUrl = getAssetUrl('/assets/gear/base-body.png');
 
   // Derive gear layers from inventory
   const gearLayers: GearLayerDescriptor[] = useMemo(() => {
@@ -42,7 +42,7 @@ export const TrainingView: React.FC = () => {
     return playerState.inventory.items
       .filter(inv => inv.item.type === 'GEAR' && inv.item.gearImageUrl && inv.equipped)
       .map(inv => ({
-        url: `${import.meta.env.VITE_API_URL}${inv.item.gearImageUrl}`,
+        url: getAssetUrl(inv.item.gearImageUrl),
         subType: inv.item.subType as GearSubType,
       }));
   }, [playerState?.inventory?.items]);

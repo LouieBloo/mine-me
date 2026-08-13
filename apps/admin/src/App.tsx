@@ -9,8 +9,6 @@ import Rates from './pages/Rates/Rates';
 import Users from './pages/Users/Users';
 import Login from './pages/Login/Login';
 import Inventory from './pages/Inventory/Inventory';
-import Dungeons from './pages/Dungeons/Dungeons';
-import DungeonDetail from './pages/Dungeons/DungeonDetail';
 import { EntityDetail } from './pages/EntityDetail/EntityDetail';
 import MobDetail from './pages/Mobs/MobDetail';
 import ItemDetail from './pages/Items/ItemDetail/ItemDetail';
@@ -79,14 +77,6 @@ const router = createBrowserRouter([
       {
         path: "inventory-items",
         element: <Inventory />
-      },
-      {
-        path: "dungeons",
-        element: <Dungeons />
-      },
-      {
-        path: "dungeons/:id",
-        element: <DungeonDetail />
       },
       {
         path: "mobs/:id",

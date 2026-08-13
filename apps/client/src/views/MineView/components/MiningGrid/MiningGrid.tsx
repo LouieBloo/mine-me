@@ -3,7 +3,7 @@ import { Container, Graphics, Sprite, Assets } from 'pixi.js';
 import { usePixiStage } from '../../../../components/game/PixiStageContext/PixiStageContext';
 import { CompositeEntitySprite, type GearLayerDescriptor } from '../../../../components/game/sprites/CompositeEntitySprite';
 import type { MiningSessionClientState, MiningPosition, MiningDirection, PlayerState } from '@mine-me/shared';
-import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
+import { MINING_CONFIG, MiningTileType, getAssetUrl } from '@mine-me/shared';
 import { notificationService } from '../../../../services/notificationService';
 import './MiningGrid.css';
 
@@ -51,13 +51,13 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   }, [sessionState, onMove, onMineStart, isProcessing]);
 
   // Derive player gear layers
-  const baseBodyUrl = `${import.meta.env.VITE_API_URL || ''}/assets/gear/base-body.png`;
+  const baseBodyUrl = getAssetUrl('/assets/gear/base-body.png');
   const gearLayers: GearLayerDescriptor[] = React.useMemo(() => {
     if (!playerState.inventory?.items) return [];
     return playerState.inventory.items
       .filter((inv) => inv.item.type === 'GEAR' && inv.item.gearImageUrl && inv.equipped)
       .map((inv) => ({
-        url: `${import.meta.env.VITE_API_URL || ''}${inv.item.gearImageUrl}`,
+        url: getAssetUrl(inv.item.gearImageUrl),
         subType: inv.item.subType as any,
       }));
   }, [playerState.inventory?.items]);
@@ -337,7 +337,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         if (item.iconUrl) {
           const loadAndAddSprite = async () => {
             try {
-              const srcUrl = `${import.meta.env.VITE_API_URL || ''}${item.iconUrl}`;
+              const srcUrl = getAssetUrl(item.iconUrl);
               const texture = await Assets.load({ src: srcUrl, alias: `dropped_${item.itemId}` });
               const sprite = new Sprite(texture);
               sprite.anchor.set(0.5);

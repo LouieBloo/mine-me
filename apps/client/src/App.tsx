@@ -11,7 +11,6 @@ import { CharacterSelection } from './views/CharacterSelection/CharacterSelectio
 import { HomeView } from './views/HomeView/HomeView';
 import { UserProfile } from './views/UserProfile/UserProfile';
 import { TestMobView } from './views/TestMobView/TestMobView';
-import { CombatView } from './views/CombatView/CombatView';
 import { TrainingView } from './views/TrainingView/TrainingView';
 import { MineView } from './views/MineView/MineView';
 
@@ -39,7 +38,6 @@ function App() {
                     {/* Views WITH sidebars (in-game) */}
                     <Route element={<InGameLayout />}>
                       <Route path="home" element={<HomeView />} />
-                      <Route path="combat" element={<CombatView />} />
                       <Route path="training" element={<TrainingView />} />
                       <Route path="mine" element={<MineView />} />
                     </Route>

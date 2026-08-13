@@ -71,7 +71,7 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
     const [startingGear, setStartingGear] = useState<GameItem[]>([]);
     const [selectedGear, setSelectedGear] = useState<Record<string, string>>({});
     
-    const baseBodyUrl = `${import.meta.env.VITE_API_URL}/assets/gear/base-body.png`;
+    const baseBodyUrl = `${import.meta.env.VITE_API_URL || ''}/assets/gear/base-body.png`;
 
     // Debug offset tracker for the visual rendering
     const [offsets, setOffsets] = useState<Record<string, { x: number; y: number }>>(GEAR_OFFSETS);
@@ -253,7 +253,7 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
 
                                 const offset = offsets[slot] || { x: 0, y: 0 };
                                 return (
-                                    <GearLayer key={slot} url={`${import.meta.env.VITE_API_URL}${itemDef.gearImageUrl}`} offset={offset} />
+                                    <GearLayer key={slot} url={`${import.meta.env.VITE_API_URL || ''}${itemDef.gearImageUrl}`} offset={offset} />
                                 );
                             })}
                         {/* @ts-ignore */}

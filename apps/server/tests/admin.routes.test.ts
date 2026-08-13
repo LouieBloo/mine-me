@@ -35,11 +35,8 @@ vi.mock('../src/index', () => ({
     city: mockDbOp({ id: 'city_1', name: 'Test City' }),
     item: mockDbOp({ id: 'item_1', name: 'Test Item', isStartingPiece: false, gearImageUrl: null }),
     mob: mockDbOp({ id: 'mob_1', name: 'Test Mob' }),
-    dungeon: mockDbOp({ id: 'dungeon_1', name: 'Test Dungeon' }),
-    dungeonLevel: mockDbOp({ id: 'level_1', name: 'Test Level' }),
     inventoryItem: mockDbOp({ id: 'inv_1', quantity: 5 }),
     user: mockDbOp({ id: 'user_1' }),
-    cityDungeon: mockDbOp({ id: 'cd_1', cityId: 'city_1', dungeonId: 'dungeon_1', dungeon: { id: 'dungeon_1', name: 'Test Dungeon' } }),
     cityMaterial: mockDbOp({ id: 'cm_1', cityId: 'city_1', itemId: 'item_1', item: { id: 'item_1', name: 'Test Item' } })
   }
 }));
@@ -50,8 +47,6 @@ describe('Admin API Routes', () => {
     { path: '/admin/cities', data: { name: 'New City', description: 'A city' } },
     { path: '/admin/items', data: { name: 'New Item', description: 'An item', type: 'MATERIAL', subType: 'MINERAL', vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW' } },
     { path: '/admin/mobs', data: { name: 'New Mob', level: 1, health: 10, attack: 1, defense: 1 } },
-    { path: '/admin/dungeons', data: { name: 'New Dungeon', description: 'A dungeon', minLevel: 1 } },
-    { path: '/admin/dungeon-levels', data: { name: 'New Level' } },
     { path: '/admin/inventory-items', data: { characterId: 'char_1', itemId: 'item_1', quantity: 1 } }
   ];
 
@@ -109,38 +104,6 @@ describe('Admin API Routes', () => {
        expect(res.body.dropTable.create.items.create[0].itemId).toBe('item_1');
     });
 
-    it('maps completionDropTable and mobs for /admin/dungeon-levels POST', async () => {
-       const completionDropTable = { solMin: 100, solMax: 200, items: [] };
-       const mobs = [{ mobId: 'mob_x', dropTable: { solMin: 5, solMax: 10, items: [] } }];
-       const res = await request(app).post('/admin/dungeon-levels').send({
-         name: 'Boss Level', dungeonId: 'dungeon_1', orderIndex: 1,
-         completionDropTable, mobs
-       });
-       expect(res.status).toBe(200);
-       expect(res.body.completionDropTable.create.solMin).toBe(100);
-       expect(res.body.mobs.create[0].mobId).toBe('mob_x');
-       expect(res.body.mobs.create[0].dropTable.create.solMin).toBe(5);
-    });
-  });
-
-  describe('City Dungeon Assignments', () => {
-    it('GET /cities/:id/dungeons - should return array', async () => {
-      const res = await request(app).get('/admin/cities/city_1/dungeons');
-      expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
-    });
-
-    it('POST /cities/:id/dungeons - should add dungeon to city', async () => {
-      const res = await request(app).post('/admin/cities/city_1/dungeons').send({ dungeonId: 'dungeon_1' });
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('id');
-    });
-
-    it('DELETE /cities/:id/dungeons/:cityDungeonId - should remove', async () => {
-      const res = await request(app).delete('/admin/cities/city_1/dungeons/cd_1');
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('success', true);
-    });
   });
 
   describe('City Material Assignments', () => {

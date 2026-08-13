@@ -114,7 +114,6 @@ describe('socket handlers', () => {
         backgroundImageUrl: 'url',
         objectCoordinates: {},
       });
-      (prisma.cityDungeon.findMany as any).mockResolvedValue([]);
       (prisma.accomplishment.findMany as any).mockResolvedValue([]);
 
       const callback = vi.fn();

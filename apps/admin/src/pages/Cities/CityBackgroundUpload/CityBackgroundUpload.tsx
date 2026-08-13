@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useApi } from '../../../hooks/useApi';
 import { useToast } from '../../../contexts/ToastContext';
+import { getAssetUrl } from '@mine-me/shared';
 import './CityBackgroundUpload.css';
 
 interface CityBackgroundUploadProps {
@@ -63,9 +64,7 @@ export default function CityBackgroundUpload({ cityId, backgroundImageUrl, onUpl
     }
   };
 
-  const fullUrl = backgroundImageUrl?.startsWith('http') 
-    ? backgroundImageUrl 
-    : (backgroundImageUrl ? `${import.meta.env.VITE_API_URL}${backgroundImageUrl}` : '');
+  const fullUrl = getAssetUrl(backgroundImageUrl);
 
   return (
     <div className="city-background-upload bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">

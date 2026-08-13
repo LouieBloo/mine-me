@@ -6,22 +6,19 @@ import { useSocket } from '../../contexts/SocketContext';
 import { CharacterPanel } from '../CharacterPanel/CharacterPanel';
 import { InventoryPanel } from '../InventoryPanel/InventoryPanel';
 import { ChatPanel } from '../ChatPanel/ChatPanel';
-import type { PlayerState, GameCity, CityDungeonInfo } from '@mine-me/shared';
+import type { PlayerState, GameCity } from '@mine-me/shared';
 import './InGameLayout.css';
 
 export const InGameLayout = () => {
     const { user } = useAuth();
-    const { activeCharacter, playerState, setActiveCity, setCityDungeonInfo, displayPlayerHealth } = useGame();
+    const { activeCharacter, playerState, setActiveCity, displayPlayerHealth } = useGame();
     const { joinCity, leaveCity, onEvent } = useSocket();
     const cityIdRef = useRef<string | null>(null);
     const joinedCityIdRef = useRef<string | null>(null);
 
     // -----------------------------------------------------------------------
     // City room join/leave
-    //
-    // Managed here (instead of HomeView) because InGameLayout wraps both the
-    // /home and /combat routes.  This prevents the socket from leaving the
-    // city room when the player navigates into a dungeon and back.
+    // Managed here (instead of HomeView) because InGameLayout wraps routes.
     // -----------------------------------------------------------------------
     useEffect(() => {
         if (!activeCharacter?.cityId || !activeCharacter?.id) return;
@@ -43,8 +40,6 @@ export const InGameLayout = () => {
             if (cityIdRef.current) {
                 leaveCity(cityIdRef.current).catch(() => {});
                 cityIdRef.current = null;
-                // Intentionally NOT resetting joinedCityIdRef here so the
-                // StrictMode re-mount doesn't double-join.
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -58,15 +53,6 @@ export const InGameLayout = () => {
         });
         return cleanup;
     }, [onEvent, setActiveCity]);
-
-    // city_dungeons arrives after join_city — update cityDungeonInfo in GameContext.
-    useEffect(() => {
-        const cleanup = onEvent('city_dungeons', (info: CityDungeonInfo) => {
-            console.log('[InGameLayout] city_dungeons received:', info.dungeons.length, 'dungeons');
-            setCityDungeonInfo(info);
-        });
-        return cleanup;
-    }, [onEvent, setCityDungeonInfo]);
 
     if (!activeCharacter) {
         return <Navigate to="/characters" replace />;

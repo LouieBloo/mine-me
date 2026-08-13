@@ -5,6 +5,7 @@ import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
 
 import type { MobAtlas } from '@mine-me/shared/types';
+import { getAssetUrl } from '@mine-me/shared';
 import SpritePreview from '../../components/SpritePreview/SpritePreview';
 import SpriteAtlasOverview from '../../components/SpriteAtlasOverview/SpriteAtlasOverview';
 import { DropTableEditor } from '../../components/DropTableEditor/DropTableEditor';
@@ -47,7 +48,7 @@ export default function MobDetail() {
       return;
     }
 
-    const fullUrl = atlasUrl.startsWith('http') ? atlasUrl : `${import.meta.env.VITE_API_URL}${atlasUrl}`;
+    const fullUrl = getAssetUrl(atlasUrl);
     fetch(fullUrl)
       .then(res => res.json())
       .then(json => {
@@ -199,8 +200,8 @@ export default function MobDetail() {
               {detectedAnimations.length > 0 ? (
                 (() => {
                   const config = data.animations as MobAtlas;
-                  const fullSpriteUrl = config?.url?.startsWith('http') ? config.url : `${import.meta.env.VITE_API_URL}${config?.url}`;
-                  const fullAtlasUrl = config?.atlasUrl?.startsWith('http') ? config.atlasUrl : `${import.meta.env.VITE_API_URL}${config?.atlasUrl}`;
+                  const fullSpriteUrl = getAssetUrl(config?.url);
+                  const fullAtlasUrl = getAssetUrl(config?.atlasUrl);
                   return (
                     <SpritePreview
                       spriteUrl={fullSpriteUrl}

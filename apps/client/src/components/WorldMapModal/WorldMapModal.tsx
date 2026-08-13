@@ -189,7 +189,7 @@ export const WorldMapModal: React.FC<WorldMapModalProps> = ({ cities, currentCit
   const mapIconFullUrl = (url: string | null | undefined) => {
     if (!url) return '/assets/cities/city_icon.png';
     if (url.startsWith('http')) return url;
-    return `${import.meta.env.VITE_API_URL}${url}`;
+    return `${import.meta.env.VITE_API_URL || ''}${url}`;
   };
 
   return (

@@ -3,7 +3,7 @@ import { useApi } from '../../hooks/useApi';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 
 interface EntityPickerProps {
-    entityType: 'cities' | 'mobs' | 'items' | 'dungeons' | 'users' | 'inventory-items' | 'characters';
+    entityType: 'cities' | 'mobs' | 'items' | 'users' | 'inventory-items' | 'characters';
     value: string;
     onChange: (id: string, item?: any) => void;
     error?: string;

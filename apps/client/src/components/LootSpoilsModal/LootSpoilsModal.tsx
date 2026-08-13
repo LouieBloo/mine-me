@@ -1,4 +1,5 @@
 import React from 'react';
+import { getAssetUrl } from '@mine-me/shared';
 import { Modal } from '../Modal/Modal';
 import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 import { ItemTooltip } from '../ItemTooltip/ItemTooltip';
@@ -125,11 +126,7 @@ export const LootSpoilsModal: React.FC<LootSpoilsModalProps> = ({
                     >
                       {item.itemDetails?.iconUrl ? (
                         <img
-                          src={
-                            item.itemDetails.iconUrl.startsWith('http')
-                              ? item.itemDetails.iconUrl
-                              : `${import.meta.env.VITE_API_URL || ''}${item.itemDetails.iconUrl}`
-                          }
+                          src={getAssetUrl(item.itemDetails.iconUrl)}
                           alt={item.itemDetails.name}
                           className="w-full h-full object-cover scale-90"
                         />

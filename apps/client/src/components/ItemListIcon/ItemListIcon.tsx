@@ -117,7 +117,7 @@ export const ItemListIcon = ({ entry }: ItemListIconProps) => {
             src={
               item.iconUrl.startsWith('http')
                 ? item.iconUrl
-                : `${import.meta.env.VITE_API_URL}${item.iconUrl}`
+                : `${import.meta.env.VITE_API_URL || ''}${item.iconUrl}`
             }
             alt={item.name}
             className="w-full h-full object-cover scale-90 group-hover:scale-100 transition-transform"

@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useApi } from '../../../hooks/useApi';
 import { useToast } from '../../../contexts/ToastContext';
+import { getAssetUrl } from '@mine-me/shared';
 import './CityMapIconUpload.css';
 
 interface CityMapIconUploadProps {
@@ -63,9 +64,7 @@ export default function CityMapIconUpload({ cityId, mapIconUrl, onUploadSuccess 
     }
   };
 
-  const fullUrl = mapIconUrl?.startsWith('http') 
-    ? mapIconUrl 
-    : (mapIconUrl ? `${import.meta.env.VITE_API_URL}${mapIconUrl}` : '');
+  const fullUrl = getAssetUrl(mapIconUrl);
 
   return (
     <div className="city-mapicon-upload bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden mt-4">

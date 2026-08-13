@@ -43,12 +43,6 @@ export const mobValidation = [
   body('defense').isInt({ min: 0 }).withMessage('Defense must be >= 0')
 ];
 
-export const dungeonValidation = [
-  body('name').trim().notEmpty().withMessage('Dungeon Name is required'),
-  body('description').trim().notEmpty().withMessage('Description is required'),
-  body('minLevel').isInt({ min: 1 }).withMessage('Min Level must be >= 1')
-];
-
 export const userValidation = [
   body('phoneNumber').trim().notEmpty().withMessage('Phone Number is required'),
   body('familyName').trim().notEmpty().withMessage('Family Name is required')

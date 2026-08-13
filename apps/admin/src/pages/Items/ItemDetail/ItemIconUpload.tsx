@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useApi } from '../../../hooks/useApi';
 import { useToast } from '../../../contexts/ToastContext';
+import { getAssetUrl } from '@mine-me/shared';
 
 interface ItemIconUploadProps {
   itemId: string;
@@ -72,9 +73,7 @@ export default function ItemIconUpload({ itemId, iconUrl, onUploadSuccess }: Ite
     }
   };
 
-  const fullIconUrl = iconUrl?.startsWith('http') 
-    ? iconUrl 
-    : (iconUrl ? `${import.meta.env.VITE_API_URL}${iconUrl}` : '');
+  const fullIconUrl = getAssetUrl(iconUrl);
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">

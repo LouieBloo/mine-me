@@ -4,16 +4,13 @@ import path from 'path';
 
 const prisma = new PrismaClient();
 
-async function seedDropTable(dropTableData: any, relations: { mobId?: string | null; dungeonId?: string | null; dungeonLevelId?: string | null; dungeonLevelMobId?: string | null; characterLevelId?: string | null }) {
+async function seedDropTable(dropTableData: any, relations: { mobId?: string | null; characterLevelId?: string | null }) {
   if (!dropTableData) return;
   const { items, ...dropTableRoot } = dropTableData;
 
-  // Clean relation keys to match Prisma schema constraints (remove undefined/null values where not needed, ensure schema-valid properties)
+  // Clean relation keys to match Prisma schema constraints
   const cleanRelations: any = {};
   if (relations.mobId) cleanRelations.mobId = relations.mobId;
-  if (relations.dungeonId) cleanRelations.dungeonId = relations.dungeonId;
-  if (relations.dungeonLevelId) cleanRelations.dungeonLevelId = relations.dungeonLevelId;
-  if (relations.dungeonLevelMobId) cleanRelations.dungeonLevelMobId = relations.dungeonLevelMobId;
   if (relations.characterLevelId) cleanRelations.characterLevelId = relations.characterLevelId;
 
   await prisma.dropTable.upsert({
@@ -154,71 +151,7 @@ async function main() {
   }
   console.log('✅ Mobs seeded.');
 
-  // 4. Seed Dungeons and Levels
-  const dungeons = JSON.parse(fs.readFileSync(path.join(dataPath, 'dungeons.json'), 'utf-8'));
-  for (const dungeonData of dungeons) {
-    const { levels, cityDungeons, completionDropTable, ...dungeonRoot } = dungeonData;
-    await prisma.dungeon.upsert({
-      where: { id: dungeonRoot.id },
-      update: dungeonRoot,
-      create: dungeonRoot,
-    });
-
-    if (completionDropTable) {
-      await seedDropTable(completionDropTable, { dungeonId: dungeonRoot.id });
-    }
-
-    if (levels && levels.length > 0) {
-      for (const level of levels) {
-        const { completionDropTable: lvlDrops, mobs: lvlMobs, battles, ...lvlRoot } = level;
-        await prisma.dungeonLevel.upsert({
-          where: { id: lvlRoot.id },
-          update: {
-            dungeonId: lvlRoot.dungeonId,
-            name: lvlRoot.name,
-            orderIndex: lvlRoot.orderIndex,
-            staminaCost: lvlRoot.staminaCost
-          },
-          create: {
-            id: lvlRoot.id,
-            dungeonId: lvlRoot.dungeonId,
-            name: lvlRoot.name,
-            orderIndex: lvlRoot.orderIndex,
-            staminaCost: lvlRoot.staminaCost
-          }
-        });
-
-        if (lvlDrops) {
-          await seedDropTable(lvlDrops, { dungeonLevelId: lvlRoot.id });
-        }
-
-        if (lvlMobs && lvlMobs.length > 0) {
-          for (const levelMob of lvlMobs) {
-            const { dropTable: mobLvlDrops, ...levelMobRoot } = levelMob;
-            await prisma.dungeonLevelMob.upsert({
-              where: { id: levelMobRoot.id },
-              update: {
-                dungeonLevelId: levelMobRoot.dungeonLevelId,
-                mobId: levelMobRoot.mobId
-              },
-              create: {
-                id: levelMobRoot.id,
-                dungeonLevelId: levelMobRoot.dungeonLevelId,
-                mobId: levelMobRoot.mobId
-              }
-            });
-
-            if (mobLvlDrops) {
-              await seedDropTable(mobLvlDrops, { dungeonLevelMobId: levelMobRoot.id });
-            }
-          }
-        }
-      }
-    }
-  }
-  console.log('✅ Dungeons and levels seeded.');
-
-  // 5. Seed Cities, Materials, and City Dungeons
+  // 4. Seed Cities and Materials
   const cities = JSON.parse(fs.readFileSync(path.join(dataPath, 'cities.json'), 'utf-8'));
   for (const cityData of cities) {
     const { cityDungeons, cityMaterials, characters, ...cityRoot } = cityData;
@@ -249,32 +182,8 @@ async function main() {
         });
       }
     }
-
-    if (cityDungeons && cityDungeons.length > 0) {
-      for (const cd of cityDungeons) {
-        await prisma.cityDungeon.upsert({
-          where: {
-            cityId_dungeonId: {
-              cityId: cd.cityId,
-              dungeonId: cd.dungeonId
-            }
-          },
-          update: {
-            cityId: cd.cityId,
-            dungeonId: cd.dungeonId,
-            orderIndex: cd.orderIndex
-          },
-          create: {
-            id: cd.id,
-            cityId: cd.cityId,
-            dungeonId: cd.dungeonId,
-            orderIndex: cd.orderIndex
-          }
-        });
-      }
-    }
   }
-  console.log('✅ Cities, materials, and city dungeons seeded.');
+  console.log('✅ Cities and materials seeded.');
 
   console.log('🎉 Seed completed successfully!');
 }

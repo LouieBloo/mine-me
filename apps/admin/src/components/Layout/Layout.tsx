@@ -17,7 +17,6 @@ export default function Layout() {
           <NavLink to="/" className={navLinkClass}>Dashboard</NavLink>
           <NavLink to="/cities" className={navLinkClass}>Cities Editor</NavLink>
           <NavLink to="/map-editor" className={navLinkClass}>Map Editor</NavLink>
-          <NavLink to="/dungeons" className={navLinkClass}>Dungeons Editor</NavLink>
           <NavLink to="/inventory-items" className={navLinkClass}>Inventory Editor</NavLink>
           <NavLink to="/items" className={navLinkClass}>Items Editor</NavLink>
           <NavLink to="/effects" className={navLinkClass}>Effects Editor</NavLink>

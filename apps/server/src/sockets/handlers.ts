@@ -1,7 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../index';
 import { dispatchGameEvent } from './gameEvents';
-import { BattleService } from '../services/battle.service';
 import { InventoryService } from '../services/inventory.service';
 import type { PlayerState, GameCity, GameEventPayload } from '@mine-me/shared';
 import { cleanupMiningSession } from './miningEvents';
@@ -91,57 +90,10 @@ export const handleJoinCity = async (io: Server, socket: Socket, cityId: string,
       isSystem: true
     });
 
-    // Fetch dungeons for this city + character's dungeon accomplishments
-    const cityDungeons = await prisma.cityDungeon.findMany({
-      where: { cityId },
-      include: {
-        dungeon: {
-          include: {
-            levels: {
-              orderBy: { orderIndex: 'asc' },
-              select: { id: true, name: true, orderIndex: true }
-            }
-          }
-        }
-      },
-      orderBy: { orderIndex: 'asc' }
-    });
-
-    // Get all dungeon level IDs for this city's dungeons
-    const allLevelIds = cityDungeons.flatMap(cd => cd.dungeon.levels.map(l => l.id));
-
-    // Fetch accomplishments for those levels
-    const accomplishments = await prisma.accomplishment.findMany({
-      where: {
-        characterId,
-        type: 'DUNGEON_LEVEL_CLEARED',
-        referenceId: { in: allLevelIds }
-      },
-      select: { referenceId: true }
-    });
-
-    const clearedLevelIds = accomplishments.map(a => a.referenceId);
-
-    socket.emit('city_dungeons', {
-      dungeons: cityDungeons.map(cd => ({
-        id: cd.id,
-        cityId: cd.cityId,
-        dungeonId: cd.dungeonId,
-        dungeon: {
-          id: cd.dungeon.id,
-          name: cd.dungeon.name,
-          description: cd.dungeon.description,
-          minLevel: cd.dungeon.minLevel,
-          levels: cd.dungeon.levels,
-        }
-      })),
-      clearedLevelIds,
-    });
-
     if (callback) callback({ success: true });
-  } catch (err: any) {
-    console.error('[Socket] join_city error:', err);
-    if (callback) callback({ error: 'Internal server error' });
+  } catch (error: any) {
+    console.error('[Socket] handleJoinCity error:', error);
+    if (callback) callback({ error: 'Failed to join city' });
   }
 };
 
@@ -239,8 +191,7 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
                 }
               }
             }
-          },
-          battle: true
+          }
         }
       });
 
@@ -297,13 +248,6 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
       };
 
       socket.emit('character_state', playerState);
-
-      // If there's an active battle, join the battle room and emit state
-      if (character.battle && character.battle.status === 'IN_PROGRESS') {
-        socket.join(`battle:${characterId}`);
-        const battleState = BattleService.buildBattleState(character.battle, character);
-        socket.emit('battle_state', battleState);
-      }
 
       if (callback) callback({ success: true });
     } catch (err: any) {

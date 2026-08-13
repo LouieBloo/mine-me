@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, type ReactNode } from 'react';
 import type { Character } from '../views/CharacterSelection/CharacterSelection';
-import type { GameCity, PlayerState, CharacterStatUpdate, CityDungeonInfo, MiningSessionClientState } from '@mine-me/shared';
+import type { GameCity, PlayerState, CharacterStatUpdate, MiningSessionClientState } from '@mine-me/shared';
 
 interface GameContextType {
     activeCharacter: Character | null;
@@ -10,12 +10,6 @@ interface GameContextType {
     /** Authoritative character state pushed from the server via the socket. */
     playerState: PlayerState | null;
     setPlayerState: (state: PlayerState | null) => void;
-    /** Current active battle state. */
-    battleState: any | null; // using any temporarily or import BattleState
-    setBattleState: (state: any | null) => void;
-    /** Dungeon info for the current city (dungeons + cleared levels). */
-    cityDungeonInfo: CityDungeonInfo | null;
-    setCityDungeonInfo: (info: CityDungeonInfo | null) => void;
     /** Merge a partial stat update into the existing playerState. */
     applyStatUpdate: (updates: CharacterStatUpdate) => void;
     /** Current displayed player health during combat animations (delayed update). */
@@ -55,8 +49,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return ps?.city ?? null;
     });
 
-    const [battleState, setBattleState] = useState<any | null>(null);
-    const [cityDungeonInfo, setCityDungeonInfo] = useState<CityDungeonInfo | null>(null);
     const [displayPlayerHealth, setDisplayPlayerHealth] = useState<number | null>(null);
     const [miningSession, setMiningSession] = useState<MiningSessionClientState | null>(null);
 
@@ -123,7 +115,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setActiveCharacterState(null);
         setPlayerStateRaw(null);
         setActiveCity(null);
-        setCityDungeonInfo(null);
         setDisplayPlayerHealth(null);
         setMiningSession(null);
         localStorage.removeItem('nvg_active_character');
@@ -138,10 +129,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setActiveCity,
             playerState,
             setPlayerState,
-            battleState,
-            setBattleState,
-            cityDungeonInfo,
-            setCityDungeonInfo,
             applyStatUpdate,
             displayPlayerHealth,
             setDisplayPlayerHealth,

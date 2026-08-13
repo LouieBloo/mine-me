@@ -7,11 +7,9 @@ import { useSocket } from '../../contexts/SocketContext';
 import { useChat } from '../../contexts/ChatContext';
 import { useApi } from '../../hooks/useApi';
 import { WorldMapModal } from '../../components/WorldMapModal/WorldMapModal';
-import { DungeonModal } from '../../components/DungeonModal/DungeonModal';
 import { ConfirmationModal } from '../../components/ConfirmationModal/ConfirmationModal';
 import { notificationService } from '../../services/notificationService';
 import { type GameCity, calculateTravelDays, getStaminaRecoveryPerDay, calculateRestDaysToFull } from '@mine-me/shared';
-import { useCharacterLevel } from '../../hooks/useLevels';
 import './HomeView.css';
 
 // ----------------------------------------------------------------------------
@@ -37,7 +35,7 @@ const CityBackground = ({
   useEffect(() => {
     if (!app?.stage) return;
 
-    const videoUrl = `${import.meta.env.VITE_API_URL}/assets/testscreen.mp4`;
+    const videoUrl = `${import.meta.env.VITE_API_URL || ''}/assets/testscreen.mp4`;
 
     const videoElement = document.createElement('video');
     videoElement.src = videoUrl;
@@ -121,21 +119,18 @@ const CityBackground = ({
 // HomeView
 // ----------------------------------------------------------------------------
 export const HomeView = () => {
-  const { activeCharacter, setActiveCharacter, activeCity, playerState, cityDungeonInfo, setCityDungeonInfo } = useGame();
+  const { activeCharacter, setActiveCharacter, activeCity, playerState } = useGame();
   const { sendGameEvent } = useSocket();
   const { setActiveTab } = useChat();
   const { fetchWithAuth } = useApi();
-  const characterLevel = useCharacterLevel(playerState?.attributes.experience ?? 0);
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [switchingCity, setSwitchingCity] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
-  const [showDungeonModal, setShowDungeonModal] = useState(false);
   const [showTravelConfirm, setShowTravelConfirm] = useState(false);
   const [pendingCityId, setPendingCityId] = useState<string | null>(null);
   const [cities, setCities] = useState<GameCity[]>([]);
-  const [enteringDungeon, setEnteringDungeon] = useState(false);
   const [pixiApp, setPixiApp] = useState<PixiApplication | null>(null);
   const [resting, setResting] = useState(false);
 
@@ -199,37 +194,10 @@ export const HomeView = () => {
       setShowMapModal(false);
       setShowTravelConfirm(false);
       setPendingCityId(null);
-      // Reset dungeon info since we changed cities
-      setCityDungeonInfo(null);
     } catch (err: any) {
       console.error('[HomeView] Failed to travel:', err.message);
     } finally {
       setSwitchingCity(false);
-    }
-  };
-
-  const handleSelectDungeon = async (dungeonLevelId: string) => {
-    if (!activeCharacter) return;
-
-    setEnteringDungeon(true);
-    try {
-      const result = await sendGameEvent({
-        type: 'start_combat',
-        cityId: activeCharacter.cityId,
-        dungeonLevelId,
-      });
-      if (result.success) {
-        setShowDungeonModal(false);
-        navigate('/combat');
-      } else {
-        console.error('[HomeView] Failed to start combat:', result.error);
-        notificationService.error('Cannot enter dungeon', result.error);
-      }
-    } catch (err: any) {
-      console.error('[HomeView] Error starting combat:', err.message);
-      notificationService.error('Error', err.message);
-    } finally {
-      setEnteringDungeon(false);
     }
   };
 
@@ -359,16 +327,6 @@ export const HomeView = () => {
         />
       )}
 
-      {showDungeonModal && cityDungeonInfo && (
-        <DungeonModal
-          dungeonInfo={cityDungeonInfo}
-          onSelectDungeon={handleSelectDungeon}
-          onClose={() => setShowDungeonModal(false)}
-          loading={enteringDungeon}
-          characterLevel={characterLevel ?? 1}
-        />
-      )}
-
       {/* PixiJS Canvas */}
       <div ref={containerRef} className="flex-1 w-full h-full bg-slate-950 relative overflow-hidden">
         {dimensions.width > 0 && dimensions.height > 0 && (
@@ -393,10 +351,9 @@ export const HomeView = () => {
             {city.objectCoordinates.map((obj, index) => {
               const getIcon = (type: string) => {
                 switch (type) {
-                  case 'DUNGEON': return '🏰';
                   case 'MINE': return '⛏️';
                   case 'FARM': return '🌾';
-                  case 'MARKET': return '⚖️';
+                  case 'MARKET': return '秤';
                   case 'TRAINING_GROUNDS': return '⚔️';
                   default: return '📍';
                 }
@@ -408,9 +365,7 @@ export const HomeView = () => {
                   className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group transition-all hover:scale-110 active:scale-95"
                   style={{ left: `${obj.x}%`, top: `${obj.y}%` }}
                   onClick={() => {
-                    if (obj.type === 'DUNGEON') {
-                      setShowDungeonModal(true);
-                    } else if (obj.type === 'TRAINING_GROUNDS') {
+                    if (obj.type === 'TRAINING_GROUNDS') {
                       navigate('/training');
                     } else if (obj.type === 'MINE') {
                       navigate('/mine');

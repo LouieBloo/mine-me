@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import type { MobAtlas } from '@mine-me/shared/types';
+import { getAssetUrl } from '@mine-me/shared';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
 import { useToast } from '../../contexts/ToastContext';
@@ -27,8 +28,7 @@ export default function SpriteAtlasOverview({ mobId, config, onUploadSuccess }: 
   useEffect(() => {
     if (config?.atlasUrl) {
       setLoadingJson(true);
-      const atlasUrlPath = config.atlasUrl;
-      const url = atlasUrlPath.startsWith('http') ? atlasUrlPath : `${import.meta.env.VITE_API_URL}${atlasUrlPath}`;
+      const url = getAssetUrl(config.atlasUrl);
       fetch(url)
         .then(res => res.text())
         .then(text => {
@@ -77,9 +77,7 @@ export default function SpriteAtlasOverview({ mobId, config, onUploadSuccess }: 
   };
 
   const hasConfig = !!config?.url && !!config?.atlasUrl;
-  const fullSpriteUrl = config?.url?.startsWith('http') 
-    ? config.url 
-    : (config?.url ? `${import.meta.env.VITE_API_URL}${config.url}` : '');
+  const fullSpriteUrl = getAssetUrl(config?.url);
 
   return (
     <div className="atlas-overview-card">

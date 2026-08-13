@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useApi } from '../../../hooks/useApi';
 import { useToast } from '../../../contexts/ToastContext';
+import { getAssetUrl } from '@mine-me/shared';
 
 interface ItemGearUploadProps {
   itemId: string;
@@ -62,9 +63,7 @@ export default function ItemGearUpload({ itemId, gearImageUrl, onUploadSuccess }
     }
   };
 
-  const fullIconUrl = gearImageUrl?.startsWith('http') 
-    ? gearImageUrl 
-    : (gearImageUrl ? `${import.meta.env.VITE_API_URL}${gearImageUrl}` : '');
+  const fullIconUrl = getAssetUrl(gearImageUrl);
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden mt-8">

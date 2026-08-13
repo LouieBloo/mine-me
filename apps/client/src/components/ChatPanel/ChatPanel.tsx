@@ -2,13 +2,12 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useChat } from '../../contexts/ChatContext';
 import { useGame } from '../../contexts/GameContext';
 import { Virtuoso } from 'react-virtuoso';
-import ScrollToBottom from 'react-scroll-to-bottom';
 import TextareaAutosize from 'react-textarea-autosize';
 import EmojiPicker from 'emoji-picker-react';
 import './ChatPanel.css';
 
 export const ChatPanel = () => {
-  const { activeTab, setActiveTab, cityLogs, combatLogs, sendCityMessage } = useChat();
+  const { cityLogs, sendCityMessage } = useChat();
   const { playerState } = useGame();
   const currentCharacterName = playerState?.characterName;
   const [inputText, setInputText] = useState('');
@@ -51,102 +50,60 @@ export const ChatPanel = () => {
 
   return (
     <div className="flex flex-col h-full bg-slate-900/40 backdrop-blur-sm w-full">
-      {/* Tabs */}
-      <div className="flex border-b border-slate-700/50 bg-slate-900/60 shrink-0">
-        <button
-          onClick={() => setActiveTab('City')}
-          className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
-            activeTab === 'City'
-              ? 'text-amber-500 border-b-2 border-amber-500 bg-slate-800/50'
-              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
-          }`}
-        >
-          City
-        </button>
-        <button
-          onClick={() => setActiveTab('Combat')}
-          className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
-            activeTab === 'Combat'
-              ? 'text-red-500 border-b-2 border-red-500 bg-slate-800/50'
-              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
-          }`}
-        >
-          Combat
-        </button>
+      {/* Header */}
+      <div className="flex border-b border-slate-700/50 bg-slate-900/60 shrink-0 px-4 py-3">
+        <span className="text-xs font-black uppercase tracking-widest text-amber-500">
+          City Chat
+        </span>
       </div>
 
       {/* Log Area */}
       <div className="flex-1 relative flex flex-col min-h-0">
-        {activeTab === 'City' ? (
-          cityLogs.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-slate-600 italic text-xs">
-              Welcome to the city channel. No messages yet.
-            </div>
-          ) : (
-            <Virtuoso
-              data={cityLogs}
-              followOutput="auto"
-              className="flex-1 custom-scrollbar text-sm"
-              style={{ height: '100%' }}
-              components={{
-                Header: () => <div className="h-4" />,
-                Footer: () => <div className="h-4" />,
-              }}
-              itemContent={(_index, log) => {
-                if (log.isSystem) {
-                  return (
-                    <div key={log.id} className="break-words py-1 px-4 text-slate-500 italic text-xs transition-colors">
-                      <span className="text-[10px] mr-2 opacity-60">
-                        [{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]
-                      </span>
-                      <span>{log.message}</span>
-                    </div>
-                  );
-                }
-
-                const isOwnMessage = log.sender === currentCharacterName;
-                const nameColorClass = isOwnMessage ? 'text-amber-400' : 'text-sky-400';
-
+        {cityLogs.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-slate-600 italic text-xs">
+            Welcome to the city channel. No messages yet.
+          </div>
+        ) : (
+          <Virtuoso
+            data={cityLogs}
+            followOutput="auto"
+            className="flex-1 custom-scrollbar text-sm"
+            style={{ height: '100%' }}
+            components={{
+              Header: () => <div className="h-4" />,
+              Footer: () => <div className="h-4" />,
+            }}
+            itemContent={(_index, log) => {
+              if (log.isSystem) {
                 return (
-                  <div key={log.id} className="break-words py-1.5 px-4 hover:bg-slate-800/20 rounded transition-colors group">
-                    <span className="text-slate-500 text-[10px] mr-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                  <div key={log.id} className="break-words py-1 px-4 text-slate-500 italic text-xs transition-colors">
+                    <span className="text-[10px] mr-2 opacity-60">
                       [{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]
                     </span>
-                    <span className={`${nameColorClass} font-black mr-2 tracking-wide`}>{log.sender}:</span>
-                    <span className="text-slate-300 tracking-wide leading-relaxed">{log.message}</span>
+                    <span>{log.message}</span>
                   </div>
                 );
-              }}
-            />
-          )
-        ) : (
-          <ScrollToBottom className="flex-1 overflow-y-auto p-4 custom-scrollbar text-sm">
-            <div className="space-y-3">
-              {combatLogs.length === 0 ? (
-                <div className="text-slate-600 italic text-center text-xs mt-4">Combat logs will appear here.</div>
-              ) : (
-                combatLogs.map(log => {
-                  let colorClass = 'text-slate-400';
-                  if (log.type === 'damage') colorClass = 'text-red-400 font-semibold';
-                  if (log.type === 'defense') colorClass = 'text-blue-400';
-                  if (log.type === 'system') colorClass = 'text-yellow-500 font-black uppercase tracking-widest mt-6 mb-2 border-b border-slate-800 pb-1';
-                  if (log.type === 'loot') colorClass = 'text-emerald-400 font-bold';
+              }
 
-                  return (
-                    <div key={log.id} className={`break-words ${colorClass}`}>
-                      {log.message}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </ScrollToBottom>
+              const isOwnMessage = log.sender === currentCharacterName;
+              const nameColorClass = isOwnMessage ? 'text-amber-400' : 'text-sky-400';
+
+              return (
+                <div key={log.id} className="break-words py-1.5 px-4 hover:bg-slate-800/20 rounded transition-colors group">
+                  <span className="text-slate-500 text-[10px] mr-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                    [{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]
+                  </span>
+                  <span className={`${nameColorClass} font-black mr-2 tracking-wide`}>{log.sender}:</span>
+                  <span className="text-slate-300 tracking-wide leading-relaxed">{log.message}</span>
+                </div>
+              );
+            }}
+          />
         )}
       </div>
 
-      {/* Input Area (City Only) */}
-      {activeTab === 'City' && (
-        <div className="p-3 bg-slate-900/85 border-t border-slate-700/50 shrink-0 relative flex flex-col gap-2">
+      {/* Input Area */}
+      <div className="p-3 bg-slate-900/85 border-t border-slate-700/50 shrink-0 relative flex flex-col gap-2">
           {showEmojiPicker && (
             <div ref={emojiPickerRef} className="absolute bottom-16 left-3 z-50 shadow-2xl rounded-xl overflow-hidden border border-slate-700">
               <EmojiPicker 
@@ -189,7 +146,6 @@ export const ChatPanel = () => {
             </button>
           </div>
         </div>
-      )}
     </div>
   );
 };

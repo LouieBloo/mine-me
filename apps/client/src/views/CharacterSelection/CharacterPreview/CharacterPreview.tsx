@@ -44,7 +44,7 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
     const [showRetireConfirm, setShowRetireConfirm] = useState(false);
     const [alertInfo, setAlertInfo] = useState({ isOpen: false, title: '', message: '' });
     
-    const baseBodyUrl = `${import.meta.env.VITE_API_URL}/assets/gear/base-body.png`;
+    const baseBodyUrl = `${import.meta.env.VITE_API_URL || ''}/assets/gear/base-body.png`;
 
     // The base body image is 518x698. We can purely use this ratio to calculate scale directly
     // instead of waiting for the texture to load, which causes PIXI rendering issues.
@@ -110,7 +110,7 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
                             {character.inventory?.map(inv => {
                                 if (inv.item.type === 'GEAR' && inv.item.gearImageUrl) {
                                     const offset = GEAR_OFFSETS[inv.item.subType as GearSubType];
-                                    return <GearLayer key={inv.item.id} url={`${import.meta.env.VITE_API_URL}${inv.item.gearImageUrl}`} offset={offset} />;
+                                    return <GearLayer key={inv.item.id} url={`${import.meta.env.VITE_API_URL || ''}${inv.item.gearImageUrl}`} offset={offset} />;
                                 }
                                 return null;
                             })}

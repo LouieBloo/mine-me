@@ -12,6 +12,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3002
+    port: 3002,
+    proxy: {
+      '/assets': 'http://localhost:4000',
+      '/api': 'http://localhost:4000',
+      '/auth': 'http://localhost:4000',
+    },
   }
 })

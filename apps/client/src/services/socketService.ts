@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, BattleState, CityDungeonInfo, ChatMessage } from '@mine-me/shared';
+import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, ChatMessage } from '@mine-me/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -11,11 +11,6 @@ export type SocketEventMap = {
   character_stat_update: CharacterStatUpdate;
   // City data — emitted after join_city succeeds (replaces HTTP /api/game/city/:id)
   city_data: GameCity;
-  // Dungeon data — emitted after join_city with dungeon info + completion status
-  city_dungeons: CityDungeonInfo;
-  // Combat data
-  battle_state: BattleState | null;
-  combat_loot: { sol: number; experience: number; items: { itemId: string; quantity: number; itemDetails?: any }[] };
   // City presence events
   player_entered_city: { characterId: string; name: string; combatScore: number };
   player_left_city: { characterId: string };

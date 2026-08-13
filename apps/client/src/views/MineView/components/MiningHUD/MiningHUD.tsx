@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { MiningSessionClientState, PlayerState } from '@mine-me/shared';
+import { getAssetUrl } from '@mine-me/shared';
 import './MiningHUD.css';
 
 interface MiningHUDProps {
@@ -145,7 +146,7 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
                   <div className="w-8 h-8 rounded bg-slate-900 border border-slate-800 flex items-center justify-center relative overflow-hidden shrink-0">
                     {item.iconUrl ? (
                       <img
-                        src={`${import.meta.env.VITE_API_URL || ''}${item.iconUrl}`}
+                        src={getAssetUrl(item.iconUrl)}
                         alt={item.itemName}
                         className="w-full h-full object-contain"
                       />

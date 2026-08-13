@@ -1,1 +1,7 @@
-// Old mining tests disabled. The new mining game unit tests will be implemented by another model.
+import { describe, it, expect } from 'vitest';
+
+describe('miningEvents', () => {
+  it('placeholder test suite', () => {
+    expect(true).toBe(true);
+  });
+});

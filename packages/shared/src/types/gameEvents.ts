@@ -29,41 +29,6 @@ export interface ChangeCityPayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
-// Event: start_combat
-// Initializes a battle against mobs in a specific dungeon level
-// ----------------------------------------------------------------------------
-export interface StartCombatPayload extends GameEventBase {
-  type: 'start_combat';
-  cityId: string;
-  dungeonLevelId: string;
-}
-
-// ----------------------------------------------------------------------------
-// Event: combat_action
-// Submits player combat actions for a round
-// ----------------------------------------------------------------------------
-export interface CombatActionPayload extends GameEventBase {
-  type: 'combat_action';
-  actions: { targetId: string, action: 'Attack' | 'Defend' }[];
-}
-
-// ----------------------------------------------------------------------------
-// Event: leave_combat
-// Flees or leaves a completed battle
-// ----------------------------------------------------------------------------
-export interface LeaveCombatPayload extends GameEventBase {
-  type: 'leave_combat';
-}
-
-// ----------------------------------------------------------------------------
-// Event: advance_dungeon_level
-// Advances to the next dungeon level after a VICTORY, starting a new battle.
-// ----------------------------------------------------------------------------
-export interface AdvanceDungeonLevelPayload extends GameEventBase {
-  type: 'advance_dungeon_level';
-}
-
-// ----------------------------------------------------------------------------
 // Event: rest
 // Character rests to recover health and stamina at the cost of 1 day of age.
 // ----------------------------------------------------------------------------
@@ -164,7 +129,7 @@ export interface ConsumeItemPayload extends GameEventBase {
 // Union of all game event payloads.
 // Extend this as new events are added.
 // ----------------------------------------------------------------------------
-export type GameEventPayload = ChangeCityPayload | StartCombatPayload | CombatActionPayload | LeaveCombatPayload | AdvanceDungeonLevelPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload | MiningStartPayload | MiningMovePayload | MiningMineStartPayload | MiningMineCompletePayload | MiningExitPayload | EquipItemPayload | UnequipItemPayload | ConsumeItemPayload;
+export type GameEventPayload = ChangeCityPayload | RestPayload | TrainingActionPayload | LeaveTrainingPayload | MiningStartPayload | MiningMovePayload | MiningMineStartPayload | MiningMineCompletePayload | MiningExitPayload | EquipItemPayload | UnequipItemPayload | ConsumeItemPayload;
 
 // Utility type: extract the type string literals from the union
 export type GameEventType = GameEventPayload['type'];

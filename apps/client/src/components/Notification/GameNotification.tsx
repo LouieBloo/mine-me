@@ -1,4 +1,5 @@
 import React from 'react';
+import { getAssetUrl } from '@mine-me/shared';
 import './GameNotification.css';
 
 export type NotificationVariant = 'success' | 'error' | 'info' | 'item' | 'gold' | 'xp';
@@ -51,9 +52,7 @@ export const GameNotification: React.FC<GameNotificationProps> = ({
 
   const getIcon = () => {
     if (iconUrl) {
-      const srcUrl = iconUrl.startsWith('http')
-        ? iconUrl
-        : `${import.meta.env.VITE_API_URL || ''}${iconUrl}`;
+      const srcUrl = getAssetUrl(iconUrl);
       return <img src={srcUrl} alt={title} className="w-10 h-10 object-contain drop-shadow-md" />;
     }
     switch (variant) {

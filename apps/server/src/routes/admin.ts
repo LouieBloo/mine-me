@@ -4,7 +4,6 @@ import { adminMiddleware } from '../middleware/auth';
 import * as CityController from '../controllers/admin/city.controller';
 import * as ItemController from '../controllers/admin/item.controller';
 import * as MobController from '../controllers/admin/mob.controller';
-import * as DungeonController from '../controllers/admin/dungeon.controller';
 import * as UserController from '../controllers/admin/user.controller';
 import * as InventoryController from '../controllers/admin/inventory.controller';
 import * as CharacterController from '../controllers/admin/character.controller';
@@ -24,12 +23,6 @@ adminRouter.patch('/cities/:id/coordinates', runValidation(AdminValidation.cityC
 adminRouter.post('/cities/:id/background', CityController.cityBackgroundUpload, CityController.uploadCityBackground);
 adminRouter.post('/cities/:id/map-icon', CityController.cityMapIconUpload, CityController.uploadCityMapIcon);
 adminRouter.patch('/cities/:id/objects', CityController.updateCityObjects);
-
-// CITY DUNGEONS
-adminRouter.get('/cities/:id/dungeons', CityController.getCityDungeons);
-adminRouter.post('/cities/:id/dungeons', CityController.addCityDungeon);
-adminRouter.put('/cities/:id/dungeons/reorder', CityController.reorderCityDungeons);
-adminRouter.delete('/cities/:id/dungeons/:cityDungeonId', CityController.removeCityDungeon);
 
 // CITY MATERIALS
 adminRouter.get('/cities/:id/materials', CityController.getCityMaterials);
@@ -51,18 +44,6 @@ adminRouter.get('/mobs/:id', MobController.getMob);
 adminRouter.post('/mobs', runValidation(AdminValidation.mobValidation), MobController.createMob);
 adminRouter.put('/mobs/:id', runValidation(AdminValidation.mobValidation), MobController.updateMob);
 adminRouter.post('/mobs/:id/sprite-atlas', MobController.mobSpriteUpload, MobController.uploadMobSpriteAtlas);
-
-// DUNGEONS
-adminRouter.get('/dungeons', DungeonController.getDungeons);
-adminRouter.get('/dungeons/:id', DungeonController.getDungeon);
-adminRouter.post('/dungeons', runValidation(AdminValidation.dungeonValidation), DungeonController.createDungeon);
-adminRouter.put('/dungeons/:id', runValidation(AdminValidation.dungeonValidation), DungeonController.updateDungeon);
-
-// DUNGEON LEVELS
-adminRouter.get('/dungeon-levels', DungeonController.getDungeonLevels);
-adminRouter.post('/dungeon-levels', DungeonController.createDungeonLevel);
-adminRouter.put('/dungeon-levels/:id', DungeonController.updateDungeonLevel);
-adminRouter.delete('/dungeon-levels/:id', DungeonController.deleteDungeonLevel);
 
 // USERS
 adminRouter.get('/users', UserController.getUsers);

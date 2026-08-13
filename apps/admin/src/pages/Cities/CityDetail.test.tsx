@@ -56,11 +56,9 @@ describe('CityDetail Page', () => {
     expect(screen.getByText('NEW CITY')).toBeDefined();
   });
 
-  it('shows DUNGEONS and MATERIALS sections for existing city', async () => {
+  it('shows MATERIALS section for existing city', async () => {
     renderDetail('city_1');
     // Wait for data to load
-    const dungeonsHeading = await screen.findByText('DUNGEONS');
-    expect(dungeonsHeading).toBeDefined();
     const materialsHeading = await screen.findByText('MATERIALS');
     expect(materialsHeading).toBeDefined();
   });

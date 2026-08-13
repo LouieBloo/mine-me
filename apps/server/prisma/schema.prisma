@@ -51,7 +51,6 @@ model Character {
   
   // Relationships
   inventory      InventoryItem[]
-  battle         Battle?
   accomplishments Accomplishment[]
 }
 
@@ -69,27 +68,12 @@ model City {
   name           String          @unique
   description    String
   characters     Character[]
-  cityDungeons   CityDungeon[]
   cityMaterials  CityMaterial[]
   backgroundImageUrl String?
   mapIconUrl     String?
   worldPositionX Int     @default(0)
   worldPositionY Int     @default(0)
   objectCoordinates Json?
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-model CityDungeon {
-  id         String  @id @default(cuid())
-  cityId     String
-  city       City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  dungeonId  String
-  dungeon    Dungeon @relation(fields: [dungeonId], references: [id], onDelete: Cascade)
-  orderIndex Int     @default(0)
-
-  @@unique([cityId, dungeonId])
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -103,49 +87,6 @@ model CityMaterial {
   item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@unique([cityId, itemId])
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-model Dungeon {
-  id             String         @id @default(cuid())
-  name           String
-  description    String
-  minLevel       Int            @default(1)
-  levels         DungeonLevel[]
-  cityDungeons   CityDungeon[]
-  
-  completionDropTable DropTable? @relation("DungeonCompletionDrops")
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-model DungeonLevel {
-  id        String   @id @default(cuid())
-  dungeonId String
-  dungeon   Dungeon  @relation(fields: [dungeonId], references: [id])
-  name      String
-  orderIndex Int     @default(0)
-  staminaCost Int    @default(100)
-  mobs      DungeonLevelMob[]
-  
-  completionDropTable DropTable? @relation("DungeonLevelCompletionDrops")
-  battles        Battle[]
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-model DungeonLevelMob {
-  id              String       @id @default(cuid())
-  dungeonLevelId  String
-  dungeonLevel    DungeonLevel @relation(fields: [dungeonLevelId], references: [id], onDelete: Cascade)
-  mobId           String
-  mob             Mob          @relation(fields: [mobId], references: [id])
-  
-  dropTable       DropTable?   @relation("DungeonLevelMobDrops")
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -207,15 +148,6 @@ model DropTable {
   mobId                 String? @unique
   mob                   Mob?    @relation("MobDrops", fields: [mobId], references: [id], onDelete: Cascade)
   
-  dungeonId             String? @unique
-  dungeon               Dungeon? @relation("DungeonCompletionDrops", fields: [dungeonId], references: [id], onDelete: Cascade)
-  
-  dungeonLevelId        String? @unique
-  dungeonLevel          DungeonLevel? @relation("DungeonLevelCompletionDrops", fields: [dungeonLevelId], references: [id], onDelete: Cascade)
-  
-  dungeonLevelMobId     String? @unique
-  dungeonLevelMob       DungeonLevelMob? @relation("DungeonLevelMobDrops", fields: [dungeonLevelMobId], references: [id], onDelete: Cascade)
-  
   characterLevelId      String? @unique
   characterLevel        CharacterLevel? @relation("CharacterLevelDrops", fields: [characterLevelId], references: [id], onDelete: Cascade)
   
@@ -270,31 +202,8 @@ model Mob {
   
   animations     Json?       // e.g., { idle: { url: '...', frameWidth: 64, frameHeight: 64 } }
   
-  dungeonLevelMobs DungeonLevelMob[]
-  
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-}
-
-// ----------------------------------------------------------------------------
-// COMBAT
-// ----------------------------------------------------------------------------
-model Battle {
-  id              String       @id @default(cuid())
-  characterId     String       @unique
-  character       Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  
-  dungeonLevelId  String
-  dungeonLevel    DungeonLevel @relation(fields: [dungeonLevelId], references: [id], onDelete: Cascade)
-  
-  mobsState       Json
-  round           Int          @default(1)
-  turn            String       @default("PLAYER")
-  rngSeed         String
-  status          String       @default("IN_PROGRESS")
-  
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
 }
 
 // ----------------------------------------------------------------------------
