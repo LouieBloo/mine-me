@@ -9,7 +9,7 @@ import type {
   MiningInputState,
   Vector2D,
 } from '@mine-me/shared';
-import { MiningTileType, getAssetUrl } from '@mine-me/shared';
+import { MiningTileType, MINING_CONFIG, getAssetUrl } from '@mine-me/shared';
 import { useSocket } from '../../../../contexts/SocketContext';
 import './MiningGrid.css';
 
@@ -38,6 +38,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const tileGraphicsMap = useRef<Map<string, Graphics>>(new Map());
   const droppedSpritesMap = useRef<Map<string, Sprite | Graphics>>(new Map());
   const playerSpriteRef = useRef<CompositeEntitySprite | null>(null);
+  const isFacingLeftRef = useRef<boolean>(false);
 
   // Floating point lerp position refs for 60+ FPS rendering
   const currentRenderPosRef = useRef<Vector2D>({
@@ -134,8 +135,20 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         if (current.down !== isKeyDown) { current.down = isKeyDown; changed = true; }
       } else if (key === 'a' || key === 'arrowleft') {
         if (current.left !== isKeyDown) { current.left = isKeyDown; changed = true; }
+        if (isKeyDown) {
+          isFacingLeftRef.current = true;
+          if (playerSpriteRef.current) {
+            playerSpriteRef.current.setFlipped(true);
+          }
+        }
       } else if (key === 'd' || key === 'arrowright') {
         if (current.right !== isKeyDown) { current.right = isKeyDown; changed = true; }
+        if (isKeyDown) {
+          isFacingLeftRef.current = false;
+          if (playerSpriteRef.current) {
+            playerSpriteRef.current.setFlipped(false);
+          }
+        }
       }
 
       if (changed) {
@@ -163,10 +176,29 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     if (!app) return;
 
     const gridContainer = new Container();
+    const backgroundContainer = new Container();
     const tilesContainer = new Container();
     const droppedItemsContainer = new Container();
     const playerContainer = new Container();
 
+    // Render background: Sky above ground (y <= 0), solid black underground (y > 0)
+    const bgGraphics = new Graphics();
+    const bgWidth = MINING_CONFIG.GRID_WIDTH * TILE_SIZE;
+    const bgHeight = MINING_CONFIG.GRID_HEIGHT * TILE_SIZE;
+    const skyHeight = 2000;
+    const extraMargin = 2000;
+
+    // Sky above ground (nice blue: #38bdf8 / 0x38bdf8 or sky-500 #0ea5e9 / 0x0ea5e9)
+    bgGraphics.rect(-extraMargin, -skyHeight, bgWidth + extraMargin * 2, skyHeight);
+    bgGraphics.fill(0x38bdf8);
+
+    // Underground solid black (y >= 0)
+    bgGraphics.rect(-extraMargin, 0, bgWidth + extraMargin * 2, bgHeight + extraMargin * 2);
+    bgGraphics.fill(0x000000);
+
+    backgroundContainer.addChild(bgGraphics);
+
+    gridContainer.addChild(backgroundContainer);
     gridContainer.addChild(tilesContainer);
     gridContainer.addChild(droppedItemsContainer);
     gridContainer.addChild(playerContainer);
@@ -184,6 +216,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     sprite.load().then(() => {
       // Scale sprite to fit within a single tile cell
       sprite.scaleToFit(TILE_SIZE);
+      if (isFacingLeftRef.current) {
+        sprite.setFlipped(true);
+      }
       if (gearLayers.length > 0) {
         sprite.setGearLayers(gearLayers);
       }
@@ -217,14 +252,11 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         graphics.clear();
         if (!tile.revealed) {
           graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
-          graphics.fill(0x020617);
-          graphics.stroke({ width: 0.5, color: 0x0f172a });
+          graphics.fill(0x000000);
         } else {
           switch (tile.type) {
             case MiningTileType.EMPTY:
-              graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
-              graphics.fill(0x0f172a);
-              graphics.stroke({ width: 0.5, color: 0x1e293b });
+              // Empty space shows background
               break;
             case MiningTileType.DIRT:
               graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
@@ -233,12 +265,10 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
               graphics.circle(48, 12, 1.5);
               graphics.circle(32, 44, 2);
               graphics.fill(0x78350f);
-              graphics.stroke({ width: 0.5, color: 0x270e00 });
               break;
             case MiningTileType.ROCK:
               graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
               graphics.fill(0x334155);
-              graphics.stroke({ width: 2, color: 0x1e293b });
               break;
             case MiningTileType.MINERAL:
               graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
@@ -246,12 +276,10 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
               graphics.circle(20, 20, 3);
               graphics.circle(44, 24, 4);
               graphics.fill(0xf59e0b);
-              graphics.stroke({ width: 0.5, color: 0x1e1b4b });
               break;
             case MiningTileType.CHEST:
               graphics.rect(4, 4, TILE_SIZE - 8, TILE_SIZE - 8);
               graphics.fill(0xd97706);
-              graphics.stroke({ width: 1, color: 0x270e00 });
               break;
             case MiningTileType.ENTRANCE:
               graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
@@ -361,7 +389,18 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
       // Linear interpolation (lerp) towards target server position
       const lerpSpeed = 0.25;
-      currentPos.x += (targetPos.x - currentPos.x) * lerpSpeed;
+      const dx = targetPos.x - currentPos.x;
+      if (Math.abs(dx) > 0.005) {
+        const isMovingLeft = dx < 0;
+        if (isFacingLeftRef.current !== isMovingLeft) {
+          isFacingLeftRef.current = isMovingLeft;
+          if (playerSpriteRef.current) {
+            playerSpriteRef.current.setFlipped(isMovingLeft);
+          }
+        }
+      }
+
+      currentPos.x += dx * lerpSpeed;
       currentPos.y += (targetPos.y - currentPos.y) * lerpSpeed;
 
       // Position player sprite in pixel world space
