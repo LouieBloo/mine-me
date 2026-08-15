@@ -55,9 +55,11 @@ export abstract class MiningPhysicsBody {
     let targetX = this.position.x + this.velocity.x * dt;
     let targetY = this.position.y + this.velocity.y * dt;
 
-    // Boundaries clamping
-    targetX = Math.max(this.radius, Math.min(MINING_CONFIG.GRID_WIDTH - 1 - this.radius, targetX));
-    targetY = Math.max(this.radius, Math.min(MINING_CONFIG.GRID_HEIGHT - 1 - this.radius, targetY));
+    // Boundaries clamping:
+    // X is clamped between [radius, GRID_WIDTH - radius]
+    // Y allows jumping freely up into the open sky (e.g. up to y = -50), and is clamped at the bedrock bottom
+    targetX = Math.max(this.radius, Math.min(MINING_CONFIG.GRID_WIDTH - this.radius, targetX));
+    targetY = Math.max(-50, Math.min(MINING_CONFIG.GRID_HEIGHT - this.radius, targetY));
 
     // Horizontal Movement test
     if (!this.checkTileCollision(targetX, this.position.y, grid)) {
@@ -73,11 +75,15 @@ export abstract class MiningPhysicsBody {
       this.isGrounded = false;
     } else {
       if (this.velocity.y > 0) {
-        // Hitting the floor
+        // Hitting the floor -> ground the body and snap to top surface of floor tile
         this.isGrounded = true;
+        const floorTileY = Math.floor(targetY + this.radius);
+        this.position.y = Math.min(this.position.y, floorTileY - this.radius);
         this.onGroundHit();
       } else if (this.velocity.y < 0) {
-        // Hitting the ceiling
+        // Hitting the ceiling -> stop upward momentum and snap under ceiling
+        const ceilingTileY = Math.floor(targetY - this.radius);
+        this.position.y = Math.max(this.position.y, ceilingTileY + 1.0 + this.radius);
         this.onCeilingHit();
       }
       this.velocity.y = 0;
@@ -88,16 +94,22 @@ export abstract class MiningPhysicsBody {
    * Collision check against solid unmined tiles.
    */
   public checkTileCollision(x: number, y: number, grid: ServerMiningGrid): boolean {
-    const minTileX = Math.max(0, Math.floor(x - this.radius));
-    const maxTileX = Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.floor(x + this.radius));
-    const minTileY = Math.max(0, Math.floor(y - this.radius));
-    const maxTileY = Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.floor(y + this.radius));
+    const minTileX = Math.floor(x - this.radius + 0.001);
+    const maxTileX = Math.floor(x + this.radius - 0.001);
+    const minTileY = Math.floor(y - this.radius + 0.001);
+    const maxTileY = Math.floor(y + this.radius - 0.001);
 
     for (let ty = minTileY; ty <= maxTileY; ty++) {
       for (let tx = minTileX; tx <= maxTileX; tx++) {
-        if (!isInBounds(tx, ty)) return true;
+        // Left & Right world boundaries
+        if (tx < 0 || tx >= MINING_CONFIG.GRID_WIDTH) return true;
+        // Bottom bedrock boundary
+        if (ty >= MINING_CONFIG.GRID_HEIGHT) return true;
+        // Above ground (ty < 0) is open sky (no collision)
+        if (ty < 0) continue;
+
         const tile = grid[ty][tx];
-        if (tile.type !== MiningTileType.EMPTY && tile.type !== MiningTileType.ENTRANCE) {
+        if (tile && tile.type !== MiningTileType.EMPTY && tile.type !== MiningTileType.ENTRANCE) {
           return true;
         }
       }

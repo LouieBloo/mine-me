@@ -28,5 +28,15 @@ describe('MiningSessionManager', () => {
     expect(session2).not.toBe(session1);
     expect(miningSessionManager.getSession('char-test-2')).toBe(session2);
   });
+
+  it('cancels and terminates an active session on cancelSession', () => {
+    const session = miningSessionManager.createSession('char-test-cancel', 'city-1', mockSocket);
+    expect(miningSessionManager.getSession('char-test-cancel')).toBe(session);
+
+    miningSessionManager.cancelSession('char-test-cancel');
+    expect(miningSessionManager.getSession('char-test-cancel')).toBeUndefined();
+    // Subsequent calls are safe no-ops
+    expect(() => miningSessionManager.cancelSession('char-test-cancel')).not.toThrow();
+  });
 });
 

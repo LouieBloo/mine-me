@@ -33,7 +33,14 @@ export class MiningSessionManager {
     if (engine) {
       engine.setSocket(socket);
     } else {
-      engine = new MiningGameEngine({ characterId, cityId, socket });
+      engine = new MiningGameEngine({
+        characterId,
+        cityId,
+        socket,
+        onTimeout: (charId) => {
+          this.activeSessions.delete(charId);
+        },
+      });
       this.activeSessions.set(characterId, engine);
       engine.start();
     }
@@ -98,6 +105,18 @@ export class MiningSessionManager {
     }
 
     return { extractedItems };
+  }
+
+  /**
+   * Cancel and immediately stop an active session without saving lost loot.
+   */
+  public cancelSession(characterId: string): void {
+    const engine = this.activeSessions.get(characterId);
+    if (!engine) return;
+
+    // Stop 30 Hz simulation loop and remove from active sessions map
+    engine.stop();
+    this.activeSessions.delete(characterId);
   }
 }
 

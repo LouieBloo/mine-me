@@ -188,4 +188,35 @@ describe('MiningGameEngine', () => {
     expect(engine.isMining).toBe(true);
     expect(engine.miningTarget).toEqual({ x: MINING_CONFIG.ENTRANCE_X - 1, y: 0 });
   });
+
+  it('automatically times out and stops session after max duration (15 min)', () => {
+    const onTimeoutMock = vi.fn();
+    const emitSpy = vi.fn();
+    const testSocket = {
+      ...mockSocket,
+      connected: true,
+      emit: emitSpy,
+    } as any;
+
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: testSocket,
+      maxDurationSeconds: 10, // 10 seconds for unit test
+      onTimeout: onTimeoutMock,
+    });
+
+    // Advance 5 seconds — should still run
+    (engine as any).tick(5.0);
+    expect(emitSpy).not.toHaveBeenCalledWith('mining_session_timeout', expect.anything());
+    expect(onTimeoutMock).not.toHaveBeenCalled();
+
+    // Advance past 10 seconds — should trigger timeout
+    (engine as any).tick(5.1);
+    expect(emitSpy).toHaveBeenCalledWith('mining_session_timeout', expect.objectContaining({
+      message: expect.stringContaining('15-minute time limit'),
+    }));
+    expect(onTimeoutMock).toHaveBeenCalledWith('char-1');
+  });
 });

@@ -54,6 +54,13 @@ vi.mock('pixi.js', () => ({
     texture = { destroy: vi.fn() };
     destroy = vi.fn();
   },
+  TilingSprite: class {
+    anchor = { set: vi.fn() };
+    tileScale = { set: vi.fn() };
+    x = 0;
+    y = 0;
+    destroy = vi.fn();
+  },
   Container: class {},
 }));
 

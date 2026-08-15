@@ -41,6 +41,12 @@ export class MiningPlayerBody extends MiningPhysicsBody {
 
     // Set horizontal velocity directly based on move speed
     this.velocity.x = dx * MINING_CONFIG.MOVE_SPEED;
+
+    // Handle Jump if grounded and spacebar/jump key is pressed
+    if (inputs.jump && this.isGrounded) {
+      this.velocity.y = -MINING_CONFIG.JUMP_FORCE;
+      this.isGrounded = false;
+    }
   }
 
   public override update(dt: number, grid: ServerMiningGrid): void {

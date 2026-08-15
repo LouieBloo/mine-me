@@ -221,7 +221,22 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
               <span>Move / Mine</span>
             </span>
             <span className="text-slate-700">|</span>
-            <span>Exit requires Ladder at (15, 0)</span>
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">Space</kbd>
+              <span>Jump</span>
+            </span>
+            <span className="text-slate-700">|</span>
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">F</kbd>
+              <span>Flashlight</span>
+            </span>
+            <span className="text-slate-700">|</span>
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">T</kbd>
+              <span>Debug</span>
+            </span>
+            <span className="text-slate-700">|</span>
+            <span>Exit at (15, 0)</span>
           </div>
 
           {/* Leave/Extract Button */}

@@ -18,6 +18,8 @@ export type SocketEventMap = {
   city_message: ChatMessage;
   // Real-time mining 30 Hz ticks
   mining_state_tick: MiningStateTickPayload;
+  // Mining session timeout event (15 min limit reached)
+  mining_session_timeout: { message?: string };
   // Connection
   connect: undefined;
   disconnect: string;

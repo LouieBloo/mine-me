@@ -23,8 +23,10 @@ import { MiningRockEntity } from './physics/MiningRockEntity';
 export interface MiningEngineOptions {
   characterId: string;
   cityId: string;
-  seed?: number;
   socket: Socket;
+  seed?: number;
+  maxDurationSeconds?: number;
+  onTimeout?: (characterId: string) => void;
 }
 
 export class MiningGameEngine {
@@ -67,6 +69,7 @@ export class MiningGameEngine {
     down: false,
     left: false,
     right: false,
+    jump: false,
     miningKey: false,
     sequence: 0,
   };
@@ -80,6 +83,10 @@ export class MiningGameEngine {
   public miningProgressMs = 0;
   public miningTimeMs = 0;
 
+  public maxDurationSeconds = MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
+  public elapsedTimeSeconds = 0;
+  private onTimeout?: (characterId: string) => void;
+
   private tickCount = 0;
   private intervalId: NodeJS.Timeout | null = null;
   private isStopped = false;
@@ -90,6 +97,8 @@ export class MiningGameEngine {
     this.cityId = options.cityId;
     this.socket = options.socket;
     this.seed = options.seed ?? Math.floor(Math.random() * 2147483647);
+    this.maxDurationSeconds = options.maxDurationSeconds ?? MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
+    this.onTimeout = options.onTimeout;
 
     // Generate authoritative grid
     this.grid = generateMiningMap({ seed: this.seed });
@@ -186,6 +195,13 @@ export class MiningGameEngine {
   private tick(dt: number): void {
     if (this.isStopped) return;
     this.tickCount++;
+    this.elapsedTimeSeconds += dt;
+
+    // Check max session duration limit (e.g. 15 minutes)
+    if (this.elapsedTimeSeconds >= this.maxDurationSeconds) {
+      this.handleSessionTimeout();
+      return;
+    }
 
     // 1. Process player input velocity
     this.playerBody.processInputs(this.inputs);
@@ -444,6 +460,26 @@ export class MiningGameEngine {
     this.pendingRevealedTiles = [];
 
     this.socket.emit('mining_state_tick', payload);
+  }
+
+  /**
+   * Handle automatic session timeout when max mining duration is reached.
+   */
+  private handleSessionTimeout(): void {
+    if (this.isStopped) return;
+    console.log(`[Mining] Session timed out for character ${this.characterId} (${this.elapsedTimeSeconds.toFixed(1)}s elapsed)`);
+
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('mining_session_timeout', {
+        message: 'Your mining expedition has reached its 15-minute time limit and ended.',
+      });
+    }
+
+    this.stop();
+
+    if (this.onTimeout) {
+      this.onTimeout(this.characterId);
+    }
   }
 }
 

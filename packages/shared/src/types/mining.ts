@@ -46,9 +46,23 @@ export const MINING_CONFIG = {
   TILE_SIZE: 32,
   PLAYER_RADIUS: 12,
   MOVE_SPEED: 4.5, // Grid tiles per second
-  GRAVITY: 16.0, // Grid tiles per second squared
-  TERMINAL_FALL_SPEED: 18.0, // Maximum downward velocity in tiles per second
+  GRAVITY: 28.0, // Grid tiles per second squared (snappy natural 2D gravity)
+  TERMINAL_FALL_SPEED: 20.0, // Maximum downward velocity in tiles per second
+  JUMP_FORCE: 8.5, // Initial upward velocity for jumping (~1.3 tiles height)
   SIMULATION_TICK_RATE_HZ: 30,
+
+  /** Lighting system configuration */
+  SUNLIGHT_MAX_DEPTH: 8, // tiles before sunlight fully fades
+  SUNLIGHT_LATERAL_FALLOFF: 0.4, // multiplier per lateral tile
+  FLASHLIGHT_RADIUS: 5.5, // tiles
+  FLASHLIGHT_CONE_ANGLE: 75, // degrees
+  FLASHLIGHT_AURA_RADIUS: 1.6, // small 360° aura so player is never blind behind
+  TORCH_RADIUS: 3.8, // tiles
+  TORCH_FLICKER_SPEED: 4.0, // Hz
+  TORCH_FLICKER_AMOUNT: 0.15, // intensity variation
+
+  /** Max session duration before server automatically closes session (15 minutes) */
+  MAX_SESSION_DURATION_SECONDS: 15 * 60,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -179,6 +193,7 @@ export interface MiningInputState {
   down: boolean;
   left: boolean;
   right: boolean;
+  jump?: boolean;
   miningKey: boolean;
   sequence: number;
 }

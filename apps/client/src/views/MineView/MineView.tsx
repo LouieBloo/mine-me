@@ -13,7 +13,7 @@ import './MineView.css';
 
 export const MineView: React.FC = () => {
   const { activeCharacter, playerState, miningSession, setMiningSession } = useGame();
-  const { sendGameEvent } = useSocket();
+  const { sendGameEvent, onEvent } = useSocket();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -27,6 +27,35 @@ export const MineView: React.FC = () => {
 
   // A ref to prevent double initialization in StrictMode
   const hasStartedRef = useRef<boolean>(false);
+  // Track whether session has already been extracted/cleaned up so unmount doesn't double-cancel
+  const isCleanedUpRef = useRef<boolean>(false);
+
+  // Listen for Server-Side Session Timeout (15 minute max limit)
+  useEffect(() => {
+    const cleanup = onEvent('mining_session_timeout', (payload: { message?: string }) => {
+      isCleanedUpRef.current = true;
+      setMiningSession(null);
+      notificationService.info(
+        'Time Limit Reached',
+        payload?.message || 'Your mining expedition has reached its 15-minute time limit and ended.'
+      );
+      navigate('/home');
+    });
+
+    return () => {
+      cleanup();
+    };
+  }, [onEvent, setMiningSession, navigate]);
+
+  // Clean up server session if player navigates away (e.g. Browser Back button or /home) without extraction
+  useEffect(() => {
+    return () => {
+      if (!isCleanedUpRef.current && hasStartedRef.current) {
+        isCleanedUpRef.current = true;
+        sendGameEvent({ type: 'mining_cancel' }).catch(() => {});
+      }
+    };
+  }, [sendGameEvent]);
 
   // Mount/Session Initialization
   useEffect(() => {
@@ -45,10 +74,12 @@ export const MineView: React.FC = () => {
         if (result.success && result.data?.sessionState) {
           setMiningSession(result.data.sessionState);
         } else {
+          isCleanedUpRef.current = true;
           notificationService.error('Mining Error', result.error || 'Failed to start mining session');
           navigate('/home');
         }
       } catch (err: any) {
+        isCleanedUpRef.current = true;
         console.error('[MineView] Start session error:', err);
         notificationService.error('Error', err.message || 'Could not connect to mining server');
         navigate('/home');
@@ -77,6 +108,7 @@ export const MineView: React.FC = () => {
     try {
       const result = await sendGameEvent({ type: 'mining_exit' });
       if (result.success) {
+        isCleanedUpRef.current = true;
         const items = result.data?.extractedItems || [];
         setSummaryLoot(items);
         setShowSummaryModal(true);
@@ -94,10 +126,12 @@ export const MineView: React.FC = () => {
 
   // Abandon Session Handler (without extraction)
   const handleAbandon = useCallback(() => {
+    isCleanedUpRef.current = true;
+    sendGameEvent({ type: 'mining_cancel' }).catch(() => {});
     setMiningSession(null);
     notificationService.info('Mine Abandoned', 'You abandoned the mine and lost your temporary loot.');
     navigate('/home');
-  }, [setMiningSession, navigate]);
+  }, [sendGameEvent, setMiningSession, navigate]);
 
   // Restart / New Game Handler
   const [isRestarting, setIsRestarting] = useState<boolean>(false);

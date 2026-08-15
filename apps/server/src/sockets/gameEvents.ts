@@ -7,6 +7,7 @@ import {
   handleMiningInput,
   handleMiningInteract,
   handleMiningExit,
+  handleMiningCancel,
 } from './miningEvents';
 import { InventoryService } from '../services/inventory.service';
 import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays, getStaminaRecoveryPerDay } from '@mine-me/shared';
@@ -525,6 +526,7 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   mining_input: handleMiningInput,
   mining_interact: handleMiningInteract,
   mining_exit: handleMiningExit,
+  mining_cancel: handleMiningCancel,
   equip_item: handleEquipItem,
   unequip_item: handleUnequipItem,
   consume_item: handleConsumeItem,

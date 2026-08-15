@@ -170,11 +170,27 @@ export const handleMiningExit = async (
 };
 
 /**
+ * Handler: mining_cancel
+ * Explicitly cancels/abandons the mining session when the user leaves or navigates away.
+ */
+export const handleMiningCancel = async (
+  io: Server,
+  socket: Socket,
+): Promise<GameEventResult> => {
+  const characterId = socket.data.characterId;
+  if (!characterId) return { success: false, error: 'No character selected.' };
+
+  miningSessionManager.cancelSession(characterId);
+  console.log(`[Mining] Cancelled and stopped real-time session for character ${characterId}`);
+  return { success: true };
+};
+
+/**
  * Clean up mining session on disconnect.
  */
 export const cleanupMiningSession = async (characterId: string): Promise<void> => {
   try {
-    await miningSessionManager.endSession(characterId);
+    miningSessionManager.cancelSession(characterId);
     console.log(`[Mining] Cleaned up real-time session for character ${characterId} (disconnect)`);
   } catch (err) {
     // Silently ignore

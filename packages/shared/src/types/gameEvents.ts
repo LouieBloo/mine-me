@@ -100,6 +100,14 @@ export interface MiningExitPayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
+// Event: mining_cancel
+// Abandon or leave the mine without extraction. Halts server simulation loop.
+// ----------------------------------------------------------------------------
+export interface MiningCancelPayload extends GameEventBase {
+  type: 'mining_cancel';
+}
+
+// ----------------------------------------------------------------------------
 // Event: equip_item
 // Equips a gear item from inventory.
 // ----------------------------------------------------------------------------
@@ -152,6 +160,7 @@ export type GameEventPayload =
   | MiningMineStartPayload
   | MiningMineCompletePayload
   | MiningExitPayload
+  | MiningCancelPayload
   | EquipItemPayload
   | UnequipItemPayload
   | ConsumeItemPayload;

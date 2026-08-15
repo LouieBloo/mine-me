@@ -94,6 +94,76 @@ describe('MiningPhysicsBody & Subclasses (Gravity & Collision)', () => {
       // Up key does not propel upward against gravity
       expect(player.velocity.y).toBeGreaterThan(0);
     });
+
+    it('jumps upward with configurable JUMP_FORCE when grounded', () => {
+      const player = new MiningPlayerBody({ x: 5, y: 2 });
+      // Ground the player on solid dirt floor at y=3
+      grid[3][5] = { type: MiningTileType.DIRT, revealed: true };
+      player.isGrounded = true;
+
+      player.processInputs({
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+        jump: true,
+        miningKey: false,
+        sequence: 1,
+      });
+
+      // Upward velocity is negative in screen coordinates
+      expect(player.velocity.y).toBeCloseTo(-MINING_CONFIG.JUMP_FORCE);
+      expect(player.isGrounded).toBe(false);
+
+      // Subsequent input while airborne should not jump again
+      player.velocity.y = 2.0; // falling
+      player.processInputs({
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+        jump: true,
+        miningKey: false,
+        sequence: 2,
+      });
+      // Velocity unchanged because not grounded
+      expect(player.velocity.y).toBe(2.0);
+    });
+
+    it('allows player at surface to jump into the open sky (y < 0) without ceiling clamp', () => {
+      // Surface level: player standing at entrance y=0 on dirt below
+      const player = new MiningPlayerBody({ x: 15, y: 0.625 });
+      grid[1][15] = { type: MiningTileType.DIRT, revealed: true };
+      player.isGrounded = true;
+
+      player.processInputs({
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+        jump: true,
+        miningKey: false,
+        sequence: 1,
+      });
+
+      // Update physics for several frames to ascend into the open sky
+      for (let i = 0; i < 10; i++) {
+        player.update(0.033, grid);
+      }
+
+      // Player should have ascended smoothly into the sky (y < 0)
+      expect(player.position.y).toBeLessThan(0);
+      expect(player.isGrounded).toBe(false);
+
+      // Continue simulating until gravity pulls player back down to surface
+      for (let i = 0; i < 30; i++) {
+        player.update(0.033, grid);
+      }
+
+      // Player lands safely back on the surface
+      expect(player.isGrounded).toBe(true);
+      expect(player.position.y).toBeCloseTo(0.625, 1);
+    });
   });
 
   describe('MiningRockEntity', () => {
