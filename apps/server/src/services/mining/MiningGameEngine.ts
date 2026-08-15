@@ -4,6 +4,7 @@ import {
   MiningTileType,
   type MiningBackpackItem,
   type MiningDroppedItem,
+  type MiningFallingRock,
   type MiningInputState,
   type MiningPosition,
   type MiningStateTickPayload,
@@ -13,11 +14,11 @@ import {
   generateMiningMap,
   getDamageStage,
   isInBounds,
-  resolveGravity,
   revealTiles,
   type ServerMiningGrid,
 } from '../miningMap.service';
-
+import { MiningPlayerBody } from './physics/MiningPlayerBody';
+import { MiningRockEntity } from './physics/MiningRockEntity';
 
 export interface MiningEngineOptions {
   characterId: string;
@@ -33,8 +34,34 @@ export class MiningGameEngine {
   private socket: Socket;
 
   public grid: ServerMiningGrid;
-  public position: Vector2D;
-  public velocity: Vector2D = { x: 0, y: 0 };
+  public playerBody: MiningPlayerBody;
+  public activeRocks: MiningRockEntity[] = [];
+  private rockCounter = 0;
+
+  public get position(): Vector2D {
+    return this.playerBody.position;
+  }
+
+  public set position(pos: Vector2D) {
+    this.playerBody.position = { ...pos };
+  }
+
+  public get velocity(): Vector2D {
+    return this.playerBody.velocity;
+  }
+
+  public set velocity(vel: Vector2D) {
+    this.playerBody.velocity = { ...vel };
+  }
+
+  public get facing(): Vector2D {
+    return this.playerBody.facing;
+  }
+
+  public set facing(f: Vector2D) {
+    this.playerBody.facing = { ...f };
+  }
+
   public inputs: MiningInputState = {
     up: false,
     down: false,
@@ -58,7 +85,6 @@ export class MiningGameEngine {
   private isStopped = false;
   private pendingRevealedTiles: { x: number; y: number; type: MiningTileType; damageStage?: number }[] = [];
 
-
   constructor(options: MiningEngineOptions) {
     this.characterId = options.characterId;
     this.cityId = options.cityId;
@@ -69,10 +95,11 @@ export class MiningGameEngine {
     this.grid = generateMiningMap({ seed: this.seed });
 
     // Initial position floating point at entrance
-    this.position = {
+    const initialPos = {
       x: MINING_CONFIG.ENTRANCE_X,
       y: MINING_CONFIG.ENTRANCE_Y,
     };
+    this.playerBody = new MiningPlayerBody(initialPos);
 
     // Reveal starting area
     revealTiles(this.grid, { x: MINING_CONFIG.ENTRANCE_X, y: MINING_CONFIG.ENTRANCE_Y }, this.visionRange);
@@ -126,11 +153,11 @@ export class MiningGameEngine {
       return false;
     }
 
-    // Distance check to target tile center
+    // Distance check to target tile center (blocks are 1.0 unit wide, adjacent center distance ~1.0)
     const tileCenterX = target.x + 0.5;
     const tileCenterY = target.y + 0.5;
-    const dist = Math.hypot(this.position.x - tileCenterX, this.position.y - tileCenterY);
-    if (dist > 1.5) return false;
+    const dist = Math.hypot(this.playerBody.position.x - tileCenterX, this.playerBody.position.y - tileCenterY);
+    if (dist > 1.15) return false;
 
     let timeMs: number = MINING_CONFIG.DIRT_MINE_TIME_MS;
     if (tile.type === MiningTileType.MINERAL) timeMs = MINING_CONFIG.MINERAL_MINE_TIME_MS;
@@ -144,7 +171,14 @@ export class MiningGameEngine {
     return true;
   }
 
-  public facing: Vector2D = { x: 0, y: 1 };
+  /**
+   * Stop mining the current block (preserves accumulated tile damage on the grid).
+   */
+  public stopMining(): void {
+    this.isMining = false;
+    this.miningTarget = null;
+    this.miningProgressMs = 0;
+  }
 
   /**
    * Main 30 Hz simulation tick execution.
@@ -153,143 +187,143 @@ export class MiningGameEngine {
     if (this.isStopped) return;
     this.tickCount++;
 
-    // 1. Calculate Velocity from inputs
-    let dx = 0;
-    let dy = 0;
-    if (this.inputs.left) dx -= 1;
-    if (this.inputs.right) dx += 1;
-    if (this.inputs.up) dy -= 1;
-    if (this.inputs.down) dy += 1;
+    // 1. Process player input velocity
+    this.playerBody.processInputs(this.inputs);
 
-    if (dx !== 0 || dy !== 0) {
-      // Strictly cardinal facing vector (up, down, left, right)
-      if (Math.abs(dx) >= Math.abs(dy)) {
-        this.facing = { x: Math.sign(dx), y: 0 };
-      } else {
-        this.facing = { x: 0, y: Math.sign(dy) };
-      }
-      const invLen = 1 / Math.sqrt(dx * dx + dy * dy);
-      dx *= invLen;
-      dy *= invLen;
-    }
+    // 2. Physics & Collision Handling for Player
+    this.playerBody.update(dt, this.grid);
 
-    const moveSpeed = MINING_CONFIG.MOVE_SPEED;
-    this.velocity = { x: dx * moveSpeed, y: dy * moveSpeed };
+    // 3. Physics & Collision Handling for Falling Rocks
+    this.updateFallingRocks(dt);
 
-    // 2. Physics & Collision Handling
-    const radius = MINING_CONFIG.PLAYER_RADIUS / MINING_CONFIG.TILE_SIZE; // Player radius in tile units (~0.375)
-
-    let targetX = this.position.x + this.velocity.x * dt;
-    let targetY = this.position.y + this.velocity.y * dt;
-
-    targetX = Math.max(radius, Math.min(MINING_CONFIG.GRID_WIDTH - 1 - radius, targetX));
-    targetY = Math.max(radius, Math.min(MINING_CONFIG.GRID_HEIGHT - 1 - radius, targetY));
-
-    let collisionX = false;
-    let collisionY = false;
-
-    // Axis X Movement test
-    if (!this.checkTileCollision(targetX, this.position.y, radius)) {
-      this.position.x = targetX;
-    } else {
-      collisionX = true;
-      this.velocity.x = 0;
-    }
-
-    // Axis Y Movement test
-    if (!this.checkTileCollision(this.position.x, targetY, radius)) {
-      this.position.y = targetY;
-    } else {
-      collisionY = true;
-      this.velocity.y = 0;
-    }
-
-    // 3. Reveal Fog of War — track newly revealed tiles for client
+    // 4. Reveal Fog of War — track newly revealed tiles for client
     const currentGridPos = {
-      x: Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.round(this.position.x))),
-      y: Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.round(this.position.y))),
+      x: Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.round(this.playerBody.position.x))),
+      y: Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.round(this.playerBody.position.y))),
     };
     this.revealAndTrackTiles(currentGridPos, this.visionRange);
 
-    // 4. Item Pickup check
+    // 5. Item Pickup check
     this.checkItemPickups();
 
-    // 5. Auto-mine: when player bumps into a block while holding a direction, mine the adjacent cardinal block
-    if (!this.isMining && (collisionX || collisionY) && (dx !== 0 || dy !== 0)) {
-      const playerTileX = Math.floor(this.position.x);
-      const playerTileY = Math.floor(this.position.y);
+    // 6. Mining logic & Auto-mine:
+    // Direction input is required to mine.
+    const hasDirectionInput = this.inputs.left || this.inputs.right || this.inputs.up || this.inputs.down;
 
-      const targetTileX = playerTileX + this.facing.x;
-      const targetTileY = playerTileY + this.facing.y;
+    const playerTileX = Math.floor(this.playerBody.position.x);
+    const playerTileY = Math.floor(this.playerBody.position.y);
+    const desiredTargetX = playerTileX + this.playerBody.facing.x;
+    const desiredTargetY = playerTileY + this.playerBody.facing.y;
 
-      if (isInBounds(targetTileX, targetTileY)) {
-        const tile = this.grid[targetTileY][targetTileX];
+    if (this.isMining && this.miningTarget) {
+      // If player has released input OR is pushing in a different direction / facing a different target, cancel current mining
+      const isFacingCurrentTarget = hasDirectionInput && this.miningTarget.x === desiredTargetX && this.miningTarget.y === desiredTargetY;
+      const tileCenterX = this.miningTarget.x + 0.5;
+      const tileCenterY = this.miningTarget.y + 0.5;
+      const dist = Math.hypot(this.playerBody.position.x - tileCenterX, this.playerBody.position.y - tileCenterY);
+
+      if (!isFacingCurrentTarget || dist > 1.25) {
+        this.stopMining();
+      }
+    }
+
+    // If not currently mining and player has direction input, check if we should start mining the target block
+    if (!this.isMining && hasDirectionInput) {
+      if (isInBounds(desiredTargetX, desiredTargetY)) {
+        const tile = this.grid[desiredTargetY][desiredTargetX];
         if (
           tile.type === MiningTileType.DIRT ||
           tile.type === MiningTileType.MINERAL ||
           tile.type === MiningTileType.CHEST
         ) {
-          this.startMining({ x: targetTileX, y: targetTileY });
+          this.startMining({ x: desiredTargetX, y: desiredTargetY });
         }
       }
     }
 
-    // 6. Mining Progress Tick
+    // 7. Mining Progress Tick
     if (this.isMining && this.miningTarget) {
       const tile = this.grid[this.miningTarget.y][this.miningTarget.x];
-      const tileCenterX = this.miningTarget.x + 0.5;
-      const tileCenterY = this.miningTarget.y + 0.5;
-      const dist = Math.hypot(this.position.x - tileCenterX, this.position.y - tileCenterY);
-      if (dist > 1.5) {
-        // Player walked away from target, cancel mining but keep accumulated tile damage!
-        this.isMining = false;
-        this.miningTarget = null;
-        this.miningProgressMs = 0;
-      } else {
-        const prevStage = getDamageStage(tile);
-        tile.damageMs = (tile.damageMs || 0) + dt * 1000;
-        this.miningProgressMs = tile.damageMs;
+      const prevStage = getDamageStage(tile);
+      tile.damageMs = (tile.damageMs || 0) + dt * 1000;
+      this.miningProgressMs = tile.damageMs;
 
-        const newStage = getDamageStage(tile);
-        if (newStage !== prevStage) {
-          this.pendingRevealedTiles.push({
-            x: this.miningTarget.x,
-            y: this.miningTarget.y,
-            type: tile.type,
-            damageStage: newStage,
-          });
-        }
+      const newStage = getDamageStage(tile);
+      if (newStage !== prevStage) {
+        this.pendingRevealedTiles.push({
+          x: this.miningTarget.x,
+          y: this.miningTarget.y,
+          type: tile.type,
+          damageStage: newStage,
+        });
+      }
 
-        if (tile.damageMs >= this.miningTimeMs) {
-          this.completeMiningBlock(this.miningTarget);
-        }
+      if (tile.damageMs >= this.miningTimeMs) {
+        this.completeMiningBlock(this.miningTarget);
       }
     }
 
-
-    // 7. Broadcast 30 Hz State Tick
+    // 8. Broadcast 30 Hz State Tick
     this.broadcastStateTick();
   }
 
   /**
-   * Collision check against solid unmined tiles.
+   * Update active falling rock entities and settle them back to grid on impact.
    */
-  private checkTileCollision(x: number, y: number, radius: number): boolean {
-    const minTileX = Math.max(0, Math.floor(x - radius));
-    const maxTileX = Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.floor(x + radius));
-    const minTileY = Math.max(0, Math.floor(y - radius));
-    const maxTileY = Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.floor(y + radius));
+  private updateFallingRocks(dt: number): void {
+    if (this.activeRocks.length === 0) return;
 
-    for (let ty = minTileY; ty <= maxTileY; ty++) {
-      for (let tx = minTileX; tx <= maxTileX; tx++) {
-        if (!isInBounds(tx, ty)) return true;
-        const tile = this.grid[ty][tx];
-        if (tile.type !== MiningTileType.EMPTY && tile.type !== MiningTileType.ENTRANCE) {
-          return true;
+    this.activeRocks = this.activeRocks.filter((rock) => {
+      rock.update(dt, this.grid);
+
+      // Check if rock crushed the player
+      const dist = Math.hypot(rock.position.x - this.playerBody.position.x, rock.position.y - this.playerBody.position.y);
+      if (dist < 0.6 && rock.velocity.y > 2.0 && rock.totalFallenDistance > 0.5) {
+        // Falling rock hit player
+        this.socket.emit('mining_event_result', {
+          success: true,
+          data: {
+            damageTaken: MINING_CONFIG.ROCK_CRUSH_DAMAGE,
+            message: 'You were hit by a falling rock!',
+          },
+        });
+      }
+
+      if (rock.hasSettled && rock.settledTile) {
+        const { x, y } = rock.settledTile;
+        if (isInBounds(x, y)) {
+          this.grid[y][x] = { type: MiningTileType.ROCK, revealed: true };
+          this.pendingRevealedTiles.push({ x, y, type: MiningTileType.ROCK });
         }
+        return false; // Remove from active falling rocks
+      }
+      return true;
+    });
+  }
+
+  /**
+   * Check tiles directly above the mined block and trigger falling rock physics if unsupported.
+   */
+  private checkAndTriggerFallingRocks(clearedX: number, clearedY: number): void {
+    // Scan upward in the column above cleared tile
+    for (let y = clearedY - 1; y >= 0; y--) {
+      if (this.grid[y][clearedX].type === MiningTileType.ROCK) {
+        // Convert static rock tile to dynamic falling rock entity
+        this.grid[y][clearedX] = { type: MiningTileType.EMPTY, revealed: true };
+        this.pendingRevealedTiles.push({ x: clearedX, y, type: MiningTileType.EMPTY });
+
+        this.rockCounter++;
+        const rockId = `rock_${clearedX}_${y}_${this.rockCounter}`;
+        const rockEntity = new MiningRockEntity(rockId, clearedX, y);
+        this.activeRocks.push(rockEntity);
+      } else if (
+        this.grid[y][clearedX].type !== MiningTileType.EMPTY &&
+        this.grid[y][clearedX].type !== MiningTileType.ENTRANCE
+      ) {
+        // Another solid block (dirt, mineral, chest) supports whatever is above it
+        break;
       }
     }
-    return false;
   }
 
   /**
@@ -323,12 +357,8 @@ export class MiningGameEngine {
       });
     }
 
-    // Resolve falling rock gravity
-    const gravityResult = resolveGravity(this.grid, { x: Math.round(this.position.x), y: Math.round(this.position.y) });
-    for (const move of gravityResult.moves) {
-      this.pendingRevealedTiles.push({ x: move.from.x, y: move.from.y, type: MiningTileType.EMPTY });
-      this.pendingRevealedTiles.push({ x: move.to.x, y: move.to.y, type: MiningTileType.ROCK });
-    }
+    // Trigger dynamic falling rock gravity for rocks directly above
+    this.checkAndTriggerFallingRocks(target.x, target.y);
 
     // Reset mining state
     this.isMining = false;
@@ -343,7 +373,7 @@ export class MiningGameEngine {
     if (this.droppedItems.length === 0) return;
 
     this.droppedItems = this.droppedItems.filter((item) => {
-      const dist = Math.hypot(this.position.x - item.position.x, this.position.y - item.position.y);
+      const dist = Math.hypot(this.playerBody.position.x - item.position.x, this.playerBody.position.y - item.position.y);
       if (dist <= 0.7) {
         // Collect into temporary backpack
         const existing = this.temporaryBackpack.find((b) => b.itemId === item.itemId);
@@ -363,9 +393,6 @@ export class MiningGameEngine {
     });
   }
 
-  /**
-   * Emit 30 Hz snapshot broadcast to client socket room.
-   */
   /**
    * Reveal tiles and track newly revealed ones for the client.
    */
@@ -388,19 +415,28 @@ export class MiningGameEngine {
     }
   }
 
-
   private broadcastStateTick(): void {
     if (!this.socket || !this.socket.connected) return;
 
+    const fallingRocksPayload: MiningFallingRock[] | undefined =
+      this.activeRocks.length > 0
+        ? this.activeRocks.map((r) => ({
+            id: r.id,
+            position: { x: r.position.x, y: r.position.y },
+            velocity: { x: r.velocity.x, y: r.velocity.y },
+          }))
+        : undefined;
+
     const payload: MiningStateTickPayload = {
       tick: this.tickCount,
-      position: this.position,
-      velocity: this.velocity,
+      position: this.playerBody.position,
+      velocity: this.playerBody.velocity,
       isMining: this.isMining,
       miningTarget: this.miningTarget || undefined,
       miningProgressMs: this.isMining ? this.miningProgressMs : undefined,
       temporaryBackpack: this.temporaryBackpack,
       droppedItems: this.droppedItems,
+      fallingRocks: fallingRocksPayload,
       revealedTiles: this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined,
     };
 
@@ -410,3 +446,4 @@ export class MiningGameEngine {
     this.socket.emit('mining_state_tick', payload);
   }
 }
+

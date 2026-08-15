@@ -17,6 +17,7 @@ export const MineView: React.FC = () => {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState<boolean>(true);
+  const [sessionKey, setSessionKey] = useState<number>(0);
 
   // Modal & Summary States
   const [hasMovedOffEntrance, setHasMovedOffEntrance] = useState<boolean>(false);
@@ -97,6 +98,30 @@ export const MineView: React.FC = () => {
     notificationService.info('Mine Abandoned', 'You abandoned the mine and lost your temporary loot.');
     navigate('/home');
   }, [setMiningSession, navigate]);
+
+  // Restart / New Game Handler
+  const [isRestarting, setIsRestarting] = useState<boolean>(false);
+  const handleRestart = useCallback(async () => {
+    if (isRestarting) return;
+    try {
+      setIsRestarting(true);
+      const result = await sendGameEvent({ type: 'mining_start', forceNew: true });
+      if (result.success && result.data?.sessionState) {
+        setMiningSession(result.data.sessionState);
+        setSessionKey((prev) => prev + 1);
+        setHasMovedOffEntrance(false);
+        setShowExitConfirmation(false);
+        notificationService.success('New Mine Generated', 'Started a fresh mining expedition.');
+      } else {
+        notificationService.error('Mining Error', result.error || 'Failed to start a new mining session');
+      }
+    } catch (err: any) {
+      console.error('[MineView] Restart session error:', err);
+      notificationService.error('Error', err.message || 'Could not restart mining session');
+    } finally {
+      setIsRestarting(false);
+    }
+  }, [isRestarting, sendGameEvent, setMiningSession]);
   const xpGained = summaryLoot.reduce((sum, item) => sum + item.quantity * 5, 0);
   const mappedLootItems = (() => {
     const groupedMap: Record<string, typeof summaryLoot[number]> = {};
@@ -142,7 +167,7 @@ export const MineView: React.FC = () => {
 
       {/* PixiJS Visual Stage */}
       {miningSession && (
-        <PixiStageProvider className="flex-1 relative flex overflow-hidden">
+        <PixiStageProvider key={sessionKey} className="flex-1 relative flex overflow-hidden">
           <MiningGrid
             sessionState={miningSession}
             playerState={playerState}
@@ -158,6 +183,8 @@ export const MineView: React.FC = () => {
           playerState={playerState}
           onExit={handleExit}
           onAbandon={handleAbandon}
+          onRestart={handleRestart}
+          isRestarting={isRestarting}
         />
       )}
 

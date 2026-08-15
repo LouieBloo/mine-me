@@ -105,4 +105,87 @@ describe('MiningGameEngine', () => {
     expect(engine.temporaryBackpack[0].itemName).toBe('Gold Ore');
     expect(engine.temporaryBackpack[0].quantity).toBe(3);
   });
+
+  it('stops mining when user releases all movement inputs', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: MINING_CONFIG.ENTRANCE_Y + 0.5 };
+
+    // Make tile directly to the right a dirt block
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
+
+    // Move right into it to start mining
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: true,
+      miningKey: false,
+      sequence: 1,
+    });
+
+    (engine as any).tick(0.033);
+    expect(engine.isMining).toBe(true);
+    expect(engine.miningTarget).toEqual({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
+
+    // Release all movement inputs
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      miningKey: false,
+      sequence: 2,
+    });
+
+    (engine as any).tick(0.033);
+    expect(engine.isMining).toBe(false);
+    expect(engine.miningTarget).toBeNull();
+  });
+
+  it('stops mining the first block and switches to the new block when input direction changes', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: MINING_CONFIG.ENTRANCE_Y + 0.5 };
+
+    // Make tile right and tile left dirt blocks
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X - 1] = { type: MiningTileType.DIRT, revealed: true };
+
+    // Mine right
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: true,
+      miningKey: false,
+      sequence: 1,
+    });
+
+    (engine as any).tick(0.033);
+    expect(engine.isMining).toBe(true);
+    expect(engine.miningTarget).toEqual({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
+
+    // Switch input direction to left
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: true,
+      right: false,
+      miningKey: false,
+      sequence: 2,
+    });
+
+    (engine as any).tick(0.033);
+    expect(engine.isMining).toBe(true);
+    expect(engine.miningTarget).toEqual({ x: MINING_CONFIG.ENTRANCE_X - 1, y: 0 });
+  });
 });

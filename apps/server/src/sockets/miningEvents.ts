@@ -20,6 +20,7 @@ import { miningSessionManager } from '../services/mining/MiningSessionManager';
 export const handleMiningStart = async (
   io: Server,
   socket: Socket,
+  payload?: { forceNew?: boolean },
 ): Promise<GameEventResult> => {
   const userId = socket.data.userId;
   const characterId = socket.data.characterId;
@@ -41,10 +42,19 @@ export const handleMiningStart = async (
   }
 
   try {
-    const engine = miningSessionManager.createSession(characterId, character.cityId, socket);
+    const engine = miningSessionManager.createSession(
+      characterId,
+      character.cityId,
+      socket,
+      payload?.forceNew,
+    );
     const sessionState = miningSessionManager.buildClientState(engine);
 
-    console.log(`[Mining] ${character.name} entered real-time mine simulation in city ${character.cityId}`);
+    console.log(
+      `[Mining] ${character.name} entered real-time mine simulation in city ${character.cityId}${
+        payload?.forceNew ? ' (fresh session)' : ''
+      }`,
+    );
 
     return {
       success: true,

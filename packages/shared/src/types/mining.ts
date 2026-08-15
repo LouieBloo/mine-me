@@ -46,6 +46,8 @@ export const MINING_CONFIG = {
   TILE_SIZE: 32,
   PLAYER_RADIUS: 12,
   MOVE_SPEED: 4.5, // Grid tiles per second
+  GRAVITY: 16.0, // Grid tiles per second squared
+  TERMINAL_FALL_SPEED: 18.0, // Maximum downward velocity in tiles per second
   SIMULATION_TICK_RATE_HZ: 30,
 } as const;
 
@@ -111,6 +113,15 @@ export interface MiningBackpackItem {
   itemName: string;
   iconUrl: string | null;
   quantity: number;
+}
+
+/**
+ * A dynamic falling rock rendered in continuous space.
+ */
+export interface MiningFallingRock {
+  id: string;
+  position: Vector2D;
+  velocity: Vector2D;
 }
 
 /**
@@ -182,6 +193,7 @@ export interface MiningStateTickPayload {
   miningProgressMs?: number;
   temporaryBackpack: MiningBackpackItem[];
   droppedItems: MiningDroppedItem[];
+  fallingRocks?: MiningFallingRock[];
   revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
 }
 

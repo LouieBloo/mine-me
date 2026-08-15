@@ -61,6 +61,7 @@ export interface LeaveTrainingPayload extends GameEventBase {
 // ----------------------------------------------------------------------------
 export interface MiningStartPayload extends GameEventBase {
   type: 'mining_start';
+  forceNew?: boolean;
 }
 
 // ----------------------------------------------------------------------------

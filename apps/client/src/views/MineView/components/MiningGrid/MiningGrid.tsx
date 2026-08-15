@@ -32,13 +32,18 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
   // References to Pixi containers and graphics
   const gridContainerRef = useRef<Container | null>(null);
+  const backgroundContainerRef = useRef<Container | null>(null);
   const tilesContainerRef = useRef<Container | null>(null);
+  const fallingRocksContainerRef = useRef<Container | null>(null);
   const droppedItemsContainerRef = useRef<Container | null>(null);
   const playerContainerRef = useRef<Container | null>(null);
   const tileGraphicsMap = useRef<Map<string, Graphics>>(new Map());
   const droppedSpritesMap = useRef<Map<string, Sprite | Graphics>>(new Map());
+  const fallingRockGraphicsMap = useRef<Map<string, Graphics>>(new Map());
   const playerSpriteRef = useRef<CompositeEntitySprite | null>(null);
   const isFacingLeftRef = useRef<boolean>(false);
+  const activeFallingRocksRef = useRef<{ id: string; x: number; y: number }[]>([]);
+  const debugGraphicsRef = useRef<Graphics | null>(null);
 
   // Floating point lerp position refs for 60+ FPS rendering
   const currentRenderPosRef = useRef<Vector2D>({
@@ -83,6 +88,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   useEffect(() => {
     const cleanup = onEvent('mining_state_tick', (payload: MiningStateTickPayload) => {
       targetServerPosRef.current = payload.position;
+      activeFallingRocksRef.current = payload.fallingRocks
+        ? payload.fallingRocks.map((r) => ({ id: r.id, x: r.position.x, y: r.position.y }))
+        : [];
 
       setSessionState((prev) => {
         // Apply newly revealed tiles to our local grid copy
@@ -99,7 +107,6 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
             }
           }
         }
-
 
         return {
           ...prev,
@@ -178,8 +185,10 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     const gridContainer = new Container();
     const backgroundContainer = new Container();
     const tilesContainer = new Container();
+    const fallingRocksContainer = new Container();
     const droppedItemsContainer = new Container();
     const playerContainer = new Container();
+    const debugContainer = new Container();
 
     // Render background: Sky above ground (y <= 0), solid black underground (y > 0)
     const bgGraphics = new Graphics();
@@ -188,7 +197,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     const skyHeight = 2000;
     const extraMargin = 2000;
 
-    // Sky above ground (nice blue: #38bdf8 / 0x38bdf8 or sky-500 #0ea5e9 / 0x0ea5e9)
+    // Sky above ground (nice blue)
     bgGraphics.rect(-extraMargin, -skyHeight, bgWidth + extraMargin * 2, skyHeight);
     bgGraphics.fill(0x38bdf8);
 
@@ -198,14 +207,22 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
     backgroundContainer.addChild(bgGraphics);
 
+    const debugGraphics = new Graphics();
+    debugContainer.addChild(debugGraphics);
+    debugGraphicsRef.current = debugGraphics;
+
     gridContainer.addChild(backgroundContainer);
     gridContainer.addChild(tilesContainer);
+    gridContainer.addChild(fallingRocksContainer);
     gridContainer.addChild(droppedItemsContainer);
     gridContainer.addChild(playerContainer);
+    gridContainer.addChild(debugContainer);
     app.stage.addChild(gridContainer);
 
     gridContainerRef.current = gridContainer;
+    backgroundContainerRef.current = backgroundContainer;
     tilesContainerRef.current = tilesContainer;
+    fallingRocksContainerRef.current = fallingRocksContainer;
     droppedItemsContainerRef.current = droppedItemsContainer;
     playerContainerRef.current = playerContainer;
     setContainersReady(true);
@@ -214,7 +231,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     const sprite = new CompositeEntitySprite(playerContainer, baseBodyUrl);
     playerSpriteRef.current = sprite;
     sprite.load().then(() => {
-      // Scale sprite to fit within a single tile cell
+      // Scale sprite to fit within a tile cell and align feet with the collision body bottom
+      const feetOffset = -((TILE_SIZE - 2 * MINING_CONFIG.PLAYER_RADIUS) / 2); // -4px
+      sprite.setPosition(0, feetOffset);
       sprite.scaleToFit(TILE_SIZE);
       if (isFacingLeftRef.current) {
         sprite.setFlipped(true);
@@ -382,6 +401,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     const tickerCallback = () => {
       const playerContainer = playerContainerRef.current;
       const gridContainer = gridContainerRef.current;
+      const fallingRocksContainer = fallingRocksContainerRef.current;
       if (!playerContainer || !gridContainer) return;
 
       const currentPos = currentRenderPosRef.current;
@@ -407,18 +427,74 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       playerContainer.x = currentPos.x * TILE_SIZE;
       playerContainer.y = currentPos.y * TILE_SIZE;
 
+      // Render active falling rocks in continuous space
+      if (fallingRocksContainer) {
+        const activeRockKeys = new Set<string>();
+        for (const rock of activeFallingRocksRef.current) {
+          activeRockKeys.add(rock.id);
+          let rockGraphics = fallingRockGraphicsMap.current.get(rock.id);
+          if (!rockGraphics) {
+            rockGraphics = new Graphics();
+            rockGraphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
+            rockGraphics.fill(0x334155);
+            fallingRocksContainer.addChild(rockGraphics);
+            fallingRockGraphicsMap.current.set(rock.id, rockGraphics);
+          }
+          // rock.x and rock.y are CENTER coordinates (e.g. tileX+0.5, tileY+0.5)
+          // Convert to top-left pixel coordinates to align with grid tile rendering
+          rockGraphics.x = (rock.x - 0.5) * TILE_SIZE;
+          rockGraphics.y = (rock.y - 0.5) * TILE_SIZE;
+        }
+
+        // Clean up graphics for rocks that have settled back into grid
+        fallingRockGraphicsMap.current.forEach((graphics, id) => {
+          if (!activeRockKeys.has(id)) {
+            fallingRocksContainer.removeChild(graphics);
+            graphics.destroy();
+            fallingRockGraphicsMap.current.delete(id);
+          }
+        });
+      }
+
+      // Render debug shapes for player collision box and mining reach
+      const debugGraphics = debugGraphicsRef.current;
+      if (debugGraphics) {
+        debugGraphics.clear();
+
+        const playerPixelX = currentPos.x * TILE_SIZE;
+        const playerPixelY = currentPos.y * TILE_SIZE;
+        const playerPixelRadius = (MINING_CONFIG.PLAYER_RADIUS / MINING_CONFIG.TILE_SIZE) * TILE_SIZE;
+
+        // 1. Collision shape (Green outline around player collision circle)
+        debugGraphics.circle(playerPixelX, playerPixelY, playerPixelRadius);
+        debugGraphics.stroke({ width: 2, color: 0x22c55e, alpha: 0.8 }); // emerald-500
+
+        // 2. Mining Reach Radius (Yellow dashed/semi-transparent circle at 1.15 tiles)
+        const reachPixelRadius = 1.15 * TILE_SIZE;
+        debugGraphics.circle(playerPixelX, playerPixelY, reachPixelRadius);
+        debugGraphics.stroke({ width: 1.5, color: 0xeab308, alpha: 0.5 }); // amber-500
+
+        // 3. Highlight currently mining target block if active
+        if (sessionState.isMining && sessionState.miningTarget) {
+          const targetX = sessionState.miningTarget.x * TILE_SIZE;
+          const targetY = sessionState.miningTarget.y * TILE_SIZE;
+          debugGraphics.rect(targetX, targetY, TILE_SIZE, TILE_SIZE);
+          debugGraphics.stroke({ width: 2.5, color: 0xef4444, alpha: 0.9 }); // red-500
+        }
+      }
+
       // Center camera view on player sprite
       const screenWidth = app.screen.width;
       const screenHeight = app.screen.height;
-      gridContainer.x = screenWidth / 2 - (playerContainer.x + TILE_SIZE / 2);
-      gridContainer.y = screenHeight / 2 - (playerContainer.y + TILE_SIZE / 2);
+      gridContainer.x = screenWidth / 2 - playerContainer.x;
+      gridContainer.y = screenHeight / 2 - playerContainer.y;
     };
 
     app.ticker.add(tickerCallback);
     return () => {
       app.ticker.remove(tickerCallback);
     };
-  }, [app]);
+  }, [app, sessionState.isMining, sessionState.miningTarget]);
 
   return <div className="mining-grid-container" />;
 };
