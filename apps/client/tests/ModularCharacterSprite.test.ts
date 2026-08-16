@@ -134,12 +134,18 @@ describe('ModularCharacterSprite', () => {
 
   it('should initialize joint hierarchy and load skeleton parts', async () => {
     const sprite = new ModularCharacterSprite(parentContainer);
+    // Initially wrapper is hidden
+    expect(sprite.getContainer().visible).toBe(false);
+
     await sprite.load();
 
     const container = sprite.getContainer();
     expect(container).toBeDefined();
     expect(container.scale.x).toBe(1);
     expect(sprite.getState()).toBe('idle');
+
+    sprite.setVisible(true);
+    expect(container.visible).toBe(true);
   });
 
   it('should handle flipping direction without altering scale magnitude', () => {

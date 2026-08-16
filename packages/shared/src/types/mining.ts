@@ -45,6 +45,9 @@ export const MINING_CONFIG = {
   /** Continuous physics parameters */
   TILE_SIZE: 32,
   PLAYER_RADIUS: 12,
+  PLAYER_COLLIDER_WIDTH: 20, // Fall & movement rectangle collider width in pixels (~0.625 tiles)
+  PLAYER_COLLIDER_HEIGHT: 28, // Fall & movement rectangle collider height in pixels (~0.875 tiles)
+  PLAYER_MINING_REACH: 1.15, // Mining interaction reach radius in tiles
   MOVE_SPEED: 4.5, // Grid tiles per second
   GRAVITY: 28.0, // Grid tiles per second squared (snappy natural 2D gravity)
   TERMINAL_FALL_SPEED: 20.0, // Maximum downward velocity in tiles per second

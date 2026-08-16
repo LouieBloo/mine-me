@@ -1,0 +1,15 @@
+.zoom-control-container {
+  user-select: none;
+}
+
+.zoom-slider-input {
+  accent-color: #f59e0b;
+}
+
+.zoom-slider-input::-webkit-slider-thumb {
+  cursor: pointer;
+}
+
+.zoom-slider-input::-moz-range-thumb {
+  cursor: pointer;
+}

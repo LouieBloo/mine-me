@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { type MiningSessionClientState, type PlayerState, MINING_CONFIG } from '@mine-me/shared';
 import { getAssetUrl } from '@mine-me/shared';
+import { ZoomControl } from '../ZoomControl/ZoomControl';
 import './MiningHUD.css';
 
 interface MiningHUDProps {
@@ -10,6 +11,8 @@ interface MiningHUDProps {
   onAbandon: () => void;
   onRestart: () => void;
   isRestarting?: boolean;
+  zoom?: number;
+  onZoomChange?: (zoom: number) => void;
 }
 
 export const MiningHUD: React.FC<MiningHUDProps> = ({
@@ -19,6 +22,8 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
   onAbandon,
   onRestart,
   isRestarting = false,
+  zoom = 1.0,
+  onZoomChange,
 }) => {
   const [miningProgress, setMiningProgress] = useState(0);
 
@@ -83,17 +88,24 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
     <div className="mining-hud-overlay absolute inset-0 flex flex-col justify-between p-6 pointer-events-none select-none">
       {/* Top HUD Row */}
       <div className="flex justify-between items-start w-full">
-        {/* Location & Title */}
-        <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 shadow-2xl backdrop-blur-md flex flex-col gap-1 w-64">
-          <h2 className="text-lg font-black text-amber-500 tracking-widest uppercase">Subterranean Mine</h2>
-          <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-            <span>City: {playerState.cityId}</span>
-            <span>Vision: {sessionState.visionRange}</span>
-          </div>
-          {sessionState.isMining && (
-            <div className="text-[10px] text-amber-400 font-black animate-pulse uppercase tracking-wider mt-1">
-              ⛏️ Excavating block...
+        {/* Top Left: Location/Title & Zoom Control */}
+        <div className="flex flex-col gap-2.5">
+          <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 shadow-2xl backdrop-blur-md flex flex-col gap-1 w-64">
+            <h2 className="text-lg font-black text-amber-500 tracking-widest uppercase">Subterranean Mine</h2>
+            <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+              <span>City: {playerState.cityId}</span>
+              <span>Vision: {sessionState.visionRange}</span>
             </div>
+            {sessionState.isMining && (
+              <div className="text-[10px] text-amber-400 font-black animate-pulse uppercase tracking-wider mt-1">
+                ⛏️ Excavating block...
+              </div>
+            )}
+          </div>
+
+          {/* Camera Zoom Control Widget */}
+          {onZoomChange && (
+            <ZoomControl zoom={zoom} onZoomChange={onZoomChange} />
           )}
         </div>
 

@@ -279,4 +279,47 @@ describe('MiningGameEngine', () => {
     expect(engine.isMining).toBe(false);
     expect(engine.miningTarget).toBeNull();
   });
+
+  it('allows mining in diagonal directions (NE, NW, SE, SW)', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+    engine.playerBody.position = { x: 10.5, y: 1.0 - engine.playerBody.halfHeight };
+    engine.playerBody.isGrounded = true;
+
+    // Place dirt block at South-East (11, 1) and South-West (9, 1)
+    engine.grid[1][11] = { type: MiningTileType.DIRT, revealed: true };
+    engine.grid[1][9] = { type: MiningTileType.DIRT, revealed: true };
+
+    // Mine South-East (down + right)
+    engine.handleInput({
+      up: false,
+      down: true,
+      left: false,
+      right: true,
+      miningKey: false,
+      sequence: 1,
+    });
+
+    (engine as any).tick(0.033);
+    expect(engine.isMining).toBe(true);
+    expect(engine.miningTarget).toEqual({ x: 11, y: 1 });
+
+    // Switch to South-West (down + left)
+    engine.handleInput({
+      up: false,
+      down: true,
+      left: true,
+      right: false,
+      miningKey: false,
+      sequence: 2,
+    });
+
+    (engine as any).tick(0.033);
+    expect(engine.isMining).toBe(true);
+    expect(engine.miningTarget).toEqual({ x: 9, y: 1 });
+  });
 });

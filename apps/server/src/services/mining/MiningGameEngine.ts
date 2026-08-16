@@ -163,11 +163,16 @@ export class MiningGameEngine {
       return false;
     }
 
-    // Distance check to target tile center (blocks are 1.0 unit wide, adjacent center distance ~1.0)
+    // Distance check to target tile center (supports cardinal & diagonal targets)
+    const playerTileX = Math.floor(this.playerBody.position.x);
+    const playerTileY = Math.floor(this.playerBody.position.y);
+    const isDiagonal = target.x !== playerTileX && target.y !== playerTileY;
+    const maxReach = isDiagonal ? 1.75 : 1.25;
+
     const tileCenterX = target.x + 0.5;
     const tileCenterY = target.y + 0.5;
     const dist = Math.hypot(this.playerBody.position.x - tileCenterX, this.playerBody.position.y - tileCenterY);
-    if (dist > 1.15) return false;
+    if (dist > maxReach) return false;
 
     let timeMs: number = MINING_CONFIG.DIRT_MINE_TIME_MS;
     if (tile.type === MiningTileType.MINERAL) timeMs = MINING_CONFIG.MINERAL_MINE_TIME_MS;
@@ -235,11 +240,13 @@ export class MiningGameEngine {
     if (this.isMining && this.miningTarget) {
       // If player released input, faces a different target, moves out of range, or becomes airborne (jumping/falling), stop mining
       const isFacingCurrentTarget = hasDirectionInput && this.miningTarget.x === desiredTargetX && this.miningTarget.y === desiredTargetY;
+      const isDiagonalTarget = this.miningTarget.x !== playerTileX && this.miningTarget.y !== playerTileY;
+      const maxAllowedDist = isDiagonalTarget ? 1.85 : 1.35;
       const tileCenterX = this.miningTarget.x + 0.5;
       const tileCenterY = this.miningTarget.y + 0.5;
       const dist = Math.hypot(this.playerBody.position.x - tileCenterX, this.playerBody.position.y - tileCenterY);
 
-      if (!isFacingCurrentTarget || dist > 1.25 || !this.playerBody.isGrounded) {
+      if (!isFacingCurrentTarget || dist > maxAllowedDist || !this.playerBody.isGrounded) {
         this.stopMining();
       }
     }

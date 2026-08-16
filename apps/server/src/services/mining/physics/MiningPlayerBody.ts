@@ -10,7 +10,8 @@ export class MiningPlayerBody extends MiningPhysicsBody {
   constructor(position: Vector2D) {
     super({
       position,
-      radius: MINING_CONFIG.PLAYER_RADIUS / MINING_CONFIG.TILE_SIZE,
+      width: MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE,
+      height: MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE,
       hasGravity: true,
       gravityScale: 1.0,
       mass: 1.0,
@@ -30,13 +31,9 @@ export class MiningPlayerBody extends MiningPhysicsBody {
     if (inputs.up) dy -= 1;
     if (inputs.down) dy += 1;
 
-    // Update facing direction based on active inputs
+    // Update facing direction based on active inputs (supports diagonals: NW, NE, SW, SE)
     if (dx !== 0 || dy !== 0) {
-      if (Math.abs(dx) >= Math.abs(dy)) {
-        this.facing = { x: Math.sign(dx), y: 0 };
-      } else {
-        this.facing = { x: 0, y: Math.sign(dy) };
-      }
+      this.facing = { x: Math.sign(dx), y: Math.sign(dy) };
     }
 
     // Set horizontal velocity directly based on move speed

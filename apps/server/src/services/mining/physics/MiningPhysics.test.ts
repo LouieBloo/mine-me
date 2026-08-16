@@ -95,6 +95,26 @@ describe('MiningPhysicsBody & Subclasses (Gravity & Collision)', () => {
       expect(player.velocity.y).toBeGreaterThan(0);
     });
 
+    it('supports diagonal facing directions (NW, NE, SW, SE)', () => {
+      const player = new MiningPlayerBody({ x: 5, y: 2 });
+
+      // North-West (Up + Left)
+      player.processInputs({ left: true, right: false, up: true, down: false, miningKey: false, sequence: 1 });
+      expect(player.facing).toEqual({ x: -1, y: -1 });
+
+      // North-East (Up + Right)
+      player.processInputs({ left: false, right: true, up: true, down: false, miningKey: false, sequence: 2 });
+      expect(player.facing).toEqual({ x: 1, y: -1 });
+
+      // South-West (Down + Left)
+      player.processInputs({ left: true, right: false, up: false, down: true, miningKey: false, sequence: 3 });
+      expect(player.facing).toEqual({ x: -1, y: 1 });
+
+      // South-East (Down + Right)
+      player.processInputs({ left: false, right: true, up: false, down: true, miningKey: false, sequence: 4 });
+      expect(player.facing).toEqual({ x: 1, y: 1 });
+    });
+
     it('jumps upward with configurable JUMP_FORCE when grounded', () => {
       const player = new MiningPlayerBody({ x: 5, y: 2 });
       // Ground the player on solid dirt floor at y=3
@@ -131,8 +151,9 @@ describe('MiningPhysicsBody & Subclasses (Gravity & Collision)', () => {
     });
 
     it('allows player at surface to jump into the open sky (y < 0) without ceiling clamp', () => {
-      // Surface level: player standing at entrance y=0 on dirt below
-      const player = new MiningPlayerBody({ x: 15, y: 0.625 });
+      const expectedRestingY = 1.0 - MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE);
+      // Surface level: player standing at entrance y=0 on dirt below (tile y=1)
+      const player = new MiningPlayerBody({ x: 15, y: expectedRestingY });
       grid[1][15] = { type: MiningTileType.DIRT, revealed: true };
       player.isGrounded = true;
 
@@ -162,7 +183,7 @@ describe('MiningPhysicsBody & Subclasses (Gravity & Collision)', () => {
 
       // Player lands safely back on the surface
       expect(player.isGrounded).toBe(true);
-      expect(player.position.y).toBeCloseTo(0.625, 1);
+      expect(player.position.y).toBeCloseTo(expectedRestingY, 1);
     });
   });
 

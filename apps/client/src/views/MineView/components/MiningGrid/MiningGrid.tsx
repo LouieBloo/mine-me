@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Container, Graphics, Sprite, TilingSprite, Assets } from 'pixi.js';
+import { Container, Graphics, Sprite, TilingSprite, Assets, Texture } from 'pixi.js';
 import { usePixiStage } from '../../../../components/game/PixiStageContext/PixiStageContext';
 import { ModularCharacterSprite, type GearLayerDescriptor } from '../../../../components/game/sprites';
 import type {
@@ -14,12 +14,16 @@ import { useSocket } from '../../../../contexts/SocketContext';
 import { LightingEngine } from '../../../../components/game/lighting/LightingEngine';
 import { PointLight } from '../../../../components/game/lighting/PointLight';
 import { SpotLight } from '../../../../components/game/lighting/SpotLight';
+import { Camera2D } from '../../../../components/game/camera/Camera2D';
 import './MiningGrid.css';
 
 interface MiningGridProps {
   sessionState: MiningSessionClientState;
   playerState: PlayerState;
   onExit: () => void;
+  onAssetsLoaded?: () => void;
+  zoom?: number;
+  onZoomChange?: (zoom: number) => void;
 }
 
 const TILE_SIZE = 64;
@@ -27,13 +31,17 @@ const TILE_SIZE = 64;
 export const MiningGrid: React.FC<MiningGridProps> = ({
   sessionState: initialSessionState,
   playerState,
+  onAssetsLoaded,
+  zoom = 1.5,
+  onZoomChange,
 }) => {
   const { app } = usePixiStage();
   const { onEvent, sendGameEvent } = useSocket();
 
   const [sessionState, setSessionState] = useState<MiningSessionClientState>(initialSessionState);
 
-  // References to Pixi containers and graphics
+  // References to Pixi containers, camera and graphics
+  const cameraRef = useRef<Camera2D | null>(null);
   const gridContainerRef = useRef<Container | null>(null);
   const backgroundContainerRef = useRef<Container | null>(null);
   const tilesContainerRef = useRef<Container | null>(null);
@@ -41,6 +49,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const droppedItemsContainerRef = useRef<Container | null>(null);
   const playerContainerRef = useRef<Container | null>(null);
   const tileGraphicsMap = useRef<Map<string, Graphics>>(new Map());
+  const tileSpritesMap = useRef<Map<string, Sprite>>(new Map());
+  const dirtTextureRef = useRef<Texture | null>(null);
   const droppedSpritesMap = useRef<Map<string, Sprite | Graphics>>(new Map());
   const fallingRockGraphicsMap = useRef<Map<string, Graphics>>(new Map());
   const playerSpriteRef = useRef<ModularCharacterSprite | null>(null);
@@ -150,38 +160,24 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   // Keyboard Event Handlers for Real-Time Continuous Input
   useEffect(() => {
     const updateInputState = (e: KeyboardEvent, isKeyDown: boolean) => {
+      // Ignore keystrokes when typing in inputs/textareas
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
       const key = e.key.toLowerCase();
       let changed = false;
       const current = keysPressedRef.current;
 
       if (key === 'w' || key === 'arrowup') {
         if (current.up !== isKeyDown) { current.up = isKeyDown; changed = true; }
-        if (isKeyDown) {
-          playerFacingDirRef.current = { x: current.left ? -0.7 : current.right ? 0.7 : 0, y: -1 };
-        }
       } else if (key === 's' || key === 'arrowdown') {
         if (current.down !== isKeyDown) { current.down = isKeyDown; changed = true; }
-        if (isKeyDown) {
-          playerFacingDirRef.current = { x: current.left ? -0.7 : current.right ? 0.7 : 0, y: 1 };
-        }
       } else if (key === 'a' || key === 'arrowleft') {
         if (current.left !== isKeyDown) { current.left = isKeyDown; changed = true; }
-        if (isKeyDown) {
-          isFacingLeftRef.current = true;
-          playerFacingDirRef.current = { x: -1, y: current.up ? -0.7 : current.down ? 0.7 : 0 };
-          if (playerSpriteRef.current) {
-            playerSpriteRef.current.setFlipped(true);
-          }
-        }
       } else if (key === 'd' || key === 'arrowright') {
         if (current.right !== isKeyDown) { current.right = isKeyDown; changed = true; }
-        if (isKeyDown) {
-          isFacingLeftRef.current = false;
-          playerFacingDirRef.current = { x: 1, y: current.up ? -0.7 : current.down ? 0.7 : 0 };
-          if (playerSpriteRef.current) {
-            playerSpriteRef.current.setFlipped(false);
-          }
-        }
       } else if (key === ' ' || e.code === 'Space') {
         if (current.jump !== isKeyDown) {
           current.jump = isKeyDown;
@@ -198,6 +194,25 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       }
 
       if (changed) {
+        let fx = 0;
+        let fy = 0;
+        if (current.left) fx -= 1;
+        if (current.right) fx += 1;
+        if (current.up) fy -= 1;
+        if (current.down) fy += 1;
+
+        if (fx !== 0 || fy !== 0) {
+          const len = Math.hypot(fx, fy);
+          playerFacingDirRef.current = { x: fx / len, y: fy / len };
+          if (fx < 0) {
+            isFacingLeftRef.current = true;
+            playerSpriteRef.current?.setFlipped(true);
+          } else if (fx > 0) {
+            isFacingLeftRef.current = false;
+            playerSpriteRef.current?.setFlipped(false);
+          }
+        }
+
         current.sequence++;
         const payloadInput: MiningInputState = { ...current };
         sendGameEvent({ type: 'mining_input', input: payloadInput });
@@ -206,16 +221,61 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => updateInputState(e, true);
     const handleKeyUp = (e: KeyboardEvent) => updateInputState(e, false);
+    const handleBlur = () => {
+      const current = keysPressedRef.current;
+      if (current.up || current.down || current.left || current.right || current.jump || current.miningKey) {
+        current.up = false;
+        current.down = false;
+        current.left = false;
+        current.right = false;
+        current.jump = false;
+        current.miningKey = false;
+        current.sequence++;
+        sendGameEvent({ type: 'mining_input', input: { ...current } });
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      // Prevent default page scroll and adjust camera zoom
+      e.preventDefault();
+      // Scrolling up (deltaY < 0) zooms IN, scrolling down (deltaY > 0) zooms OUT
+      const delta = e.deltaY < 0 ? 0.05 : -0.05;
+      const current = zoomRef.current;
+      const nextZoom = Math.min(2.0, Math.max(1.0, Math.round((current + delta) * 100) / 100));
+      if (nextZoom !== current && onZoomChangeRef.current) {
+        onZoomChangeRef.current(nextZoom);
+      }
+    };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('wheel', handleWheel, { passive: false });
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('wheel', handleWheel);
     };
   }, [sendGameEvent]);
 
   const [containersReady, setContainersReady] = useState<boolean>(false);
+  const [tileTextureLoaded, setTileTextureLoaded] = useState<number>(0);
+
+  const zoomRef = useRef(zoom);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  const onZoomChangeRef = useRef(onZoomChange);
+  useEffect(() => {
+    onZoomChangeRef.current = onZoomChange;
+  }, [onZoomChange]);
+
+  const onAssetsLoadedRef = useRef(onAssetsLoaded);
+  useEffect(() => {
+    onAssetsLoadedRef.current = onAssetsLoaded;
+  }, [onAssetsLoaded]);
 
   // Setup Pixi Containers
   useEffect(() => {
@@ -246,26 +306,6 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
     backgroundContainer.addChild(bgGraphics);
 
-    // Async load seamless underground dirt cave wall texture for excavated areas
-    const dirtBgUrl = getAssetUrl('/assets/mining/underground-dirt-bg.jpg');
-    let dirtTilingSprite: TilingSprite | null = null;
-    Assets.load(dirtBgUrl)
-      .then((texture) => {
-        if (!gridContainerRef.current) return;
-        dirtTilingSprite = new TilingSprite({
-          texture,
-          width: bgWidth + extraMargin * 2,
-          height: bgHeight + extraMargin * 2,
-        });
-        dirtTilingSprite.x = -extraMargin;
-        dirtTilingSprite.y = 0;
-        dirtTilingSprite.tileScale.set(0.125); // Dense fine-grain repeat so rocks and gravel are small and subtle
-        backgroundContainer.addChild(dirtTilingSprite);
-      })
-      .catch((err) => {
-        console.warn('[MiningGrid] Could not load underground dirt background texture, using procedural fallback:', err);
-      });
-
     const debugGraphics = new Graphics();
     debugContainer.addChild(debugGraphics);
     debugGraphicsRef.current = debugGraphics;
@@ -285,6 +325,15 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     droppedItemsContainerRef.current = droppedItemsContainer;
     playerContainerRef.current = playerContainer;
     setContainersReady(true);
+
+    // Initialize Camera2D system
+    const camera = new Camera2D({
+      targetContainer: gridContainer,
+      screenWidth: app.screen.width,
+      screenHeight: app.screen.height,
+      defaultZoom: zoom,
+    });
+    cameraRef.current = camera;
 
     // Initialize 2D Lighting Engine with Flashlight and Entrance Torch
     const lightingEngine = new LightingEngine(
@@ -328,39 +377,109 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     lightingEngine.updateGrid(initialSessionState.grid);
     lightingEngineRef.current = lightingEngine;
 
-    // Create Modular Character Sprite
-    const sprite = new ModularCharacterSprite(playerContainer);
-    playerSpriteRef.current = sprite;
-    sprite.load().then(() => {
-      // Scale sprite deterministically based on reference height to fit tile height (~34px tall)
-      const targetHeight = TILE_SIZE * 1.08; // ~34.5px tall
-      sprite.scaleToHeight(targetHeight);
+    // Load assets in parallel: cave tiling background, dirt block texture + modular character sprite with gear
+    const loadAllAssets = async () => {
+      const dirtBgUrl = getAssetUrl('/assets/mining/underground-dirt-bg.jpg');
+      const bgPromise = Assets.load(dirtBgUrl)
+        .then((texture) => {
+          if (!gridContainerRef.current) return;
+          const dirtTilingSprite = new TilingSprite({
+            texture,
+            width: bgWidth + extraMargin * 2,
+            height: bgHeight + extraMargin * 2,
+          });
+          dirtTilingSprite.x = -extraMargin;
+          dirtTilingSprite.y = 0;
+          dirtTilingSprite.tileScale.set(0.125); // Dense fine-grain repeat
+          backgroundContainer.addChild(dirtTilingSprite);
+        })
+        .catch((err) => {
+          console.warn('[MiningGrid] Could not load underground dirt background texture:', err);
+        });
 
-      // Foot alignment: unscaled feet are ~426px below pelvis origin.
-      // Align bottom of feet with bottom of collision body (+PLAYER_RADIUS = +12px).
-      const unscaledFootDepth = 426;
-      const footOffset =
-        MINING_CONFIG.PLAYER_RADIUS -
-        unscaledFootDepth * (targetHeight / ModularCharacterSprite.REFERENCE_HEIGHT);
-      sprite.setPosition(0, footOffset);
+      const dirtTileUrl = getAssetUrl('/assets/mining/dirt-block.jpg');
+      const dirtTilePromise = Assets.load(dirtTileUrl)
+        .then((texture) => {
+          dirtTextureRef.current = texture;
+          // Force re-rendering of existing tile sprites if any
+          setTileTextureLoaded((prev) => prev + 1);
+        })
+        .catch((err) => {
+          console.warn('[MiningGrid] Could not load dirt block texture:', err);
+        });
 
-      if (isFacingLeftRef.current) {
-        sprite.setFlipped(true);
+      // Create Modular Character Sprite (initially hidden)
+      const sprite = new ModularCharacterSprite(playerContainer);
+      playerSpriteRef.current = sprite;
+
+      const spritePromise = (async () => {
+        try {
+          await sprite.load();
+          if (gearLayersRef.current && gearLayersRef.current.length > 0) {
+            await sprite.setGearLayers(gearLayersRef.current);
+          }
+
+          // Scale sprite deterministically based on reference height to fit tile height (~34.5px tall)
+          const targetHeight = TILE_SIZE * 1.08;
+          sprite.scaleToHeight(targetHeight);
+
+          // Foot alignment: unscaled feet are ~426px below pelvis origin.
+          // Lower sprite by 15px so feet are firmly planted on the ground.
+          const unscaledFootDepth = 426;
+          const visualGroundOffset = 15;
+          const footOffset =
+            MINING_CONFIG.PLAYER_RADIUS -
+            unscaledFootDepth * (targetHeight / ModularCharacterSprite.REFERENCE_HEIGHT) +
+            visualGroundOffset;
+          sprite.setPosition(0, footOffset);
+
+          if (isFacingLeftRef.current) {
+            sprite.setFlipped(true);
+          }
+
+          // Now that sprite is fully loaded, rigged, scaled, and equipped, reveal it if still active
+          if (gridContainerRef.current && playerSpriteRef.current === sprite) {
+            sprite.setVisible(true);
+          }
+        } catch (err) {
+          console.error('[MiningGrid] Error loading character sprite:', err);
+        }
+      })();
+
+      await Promise.allSettled([bgPromise, dirtTilePromise, spritePromise]);
+      if (gridContainerRef.current) {
+        onAssetsLoadedRef.current?.();
       }
-      if (gearLayersRef.current && gearLayersRef.current.length > 0) {
-        sprite.setGearLayers(gearLayersRef.current);
-      }
-    });
+    };
+
+    loadAllAssets();
 
     return () => {
       setContainersReady(false);
+      if (cameraRef.current) {
+        cameraRef.current.destroy();
+        cameraRef.current = null;
+      }
+      if (playerSpriteRef.current) {
+        playerSpriteRef.current.destroy();
+        playerSpriteRef.current = null;
+      }
       lightingEngine.destroy();
       lightingEngineRef.current = null;
       flashlightRef.current = null;
-      app.stage.removeChild(gridContainer);
+      if (app.stage && gridContainer.parent === app.stage) {
+        app.stage.removeChild(gridContainer);
+      }
       gridContainer.destroy({ children: true });
     };
   }, [app]);
+
+  // Synchronize zoom level dynamically with Camera2D
+  useEffect(() => {
+    if (cameraRef.current && zoom) {
+      cameraRef.current.setZoom(zoom);
+    }
+  }, [zoom]);
 
   // Render Grid Tiles & Dropped Items
   useEffect(() => {
@@ -380,6 +499,27 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           tileGraphicsMap.current.set(key, graphics);
         }
 
+        const dirtTexture = dirtTextureRef.current;
+        let tileSprite = tileSpritesMap.current.get(key);
+
+        if (tile.revealed && tile.type === MiningTileType.DIRT && dirtTexture) {
+          if (!tileSprite) {
+            tileSprite = new Sprite(dirtTexture);
+            tileSprite.x = x * TILE_SIZE;
+            tileSprite.y = y * TILE_SIZE;
+            tileSprite.width = TILE_SIZE;
+            tileSprite.height = TILE_SIZE;
+            // Add below graphics overlay (cracks)
+            tilesContainer.addChildAt(tileSprite, Math.max(0, tilesContainer.getChildIndex(graphics)));
+            tileSpritesMap.current.set(key, tileSprite);
+          } else {
+            tileSprite.texture = dirtTexture;
+            tileSprite.visible = true;
+          }
+        } else if (tileSprite) {
+          tileSprite.visible = false;
+        }
+
         graphics.clear();
         if (!tile.revealed) {
           graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
@@ -390,12 +530,14 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
               // Empty space shows background
               break;
             case MiningTileType.DIRT:
-              graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
-              graphics.fill(0x451a03);
-              graphics.circle(16, 20, 2);
-              graphics.circle(48, 12, 1.5);
-              graphics.circle(32, 44, 2);
-              graphics.fill(0x78350f);
+              if (!dirtTexture) {
+                graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
+                graphics.fill(0x451a03);
+                graphics.circle(16, 20, 2);
+                graphics.circle(48, 12, 1.5);
+                graphics.circle(32, 44, 2);
+                graphics.fill(0x78350f);
+              }
               break;
             case MiningTileType.ROCK:
               graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
@@ -499,7 +641,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         });
       });
     }
-  }, [sessionState.grid, containersReady]);
+  }, [sessionState.grid, containersReady, tileTextureLoaded]);
 
 
   // Render Dropped Items
@@ -636,14 +778,20 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         if (showDebugRef.current) {
           const playerPixelX = currentPos.x * TILE_SIZE;
           const playerPixelY = currentPos.y * TILE_SIZE;
-          const playerPixelRadius = (MINING_CONFIG.PLAYER_RADIUS / MINING_CONFIG.TILE_SIZE) * TILE_SIZE;
+          const colliderPixelW = (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE) * TILE_SIZE;
+          const colliderPixelH = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE) * TILE_SIZE;
 
-          // 1. Collision shape (Green outline around player collision circle)
-          debugGraphics.circle(playerPixelX, playerPixelY, playerPixelRadius);
-          debugGraphics.stroke({ width: 2, color: 0x22c55e, alpha: 0.8 }); // emerald-500
+          // 1. Fall & Movement Collider (Green AABB rectangle encompassing character body)
+          debugGraphics.rect(
+            playerPixelX - colliderPixelW / 2,
+            playerPixelY - colliderPixelH / 2,
+            colliderPixelW,
+            colliderPixelH
+          );
+          debugGraphics.stroke({ width: 2, color: 0x22c55e, alpha: 0.9 }); // emerald-500
 
-          // 2. Mining Reach Radius (Yellow dashed/semi-transparent circle at 1.15 tiles)
-          const reachPixelRadius = 1.15 * TILE_SIZE;
+          // 2. Mining Reach Radius (Yellow circle for block excavation reach)
+          const reachPixelRadius = (MINING_CONFIG.PLAYER_MINING_REACH ?? 1.15) * TILE_SIZE;
           debugGraphics.circle(playerPixelX, playerPixelY, reachPixelRadius);
           debugGraphics.stroke({ width: 1.5, color: 0xeab308, alpha: 0.5 }); // amber-500
 
@@ -667,11 +815,17 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       // Update and re-render lighting engine lightmap
       lightingEngineRef.current?.update(dt, currentPos, playerFacingDirRef.current);
 
-      // Center camera view on player sprite
-      const screenWidth = app.screen.width;
-      const screenHeight = app.screen.height;
-      gridContainer.x = screenWidth / 2 - playerContainer.x;
-      gridContainer.y = screenHeight / 2 - playerContainer.y;
+      // Update camera viewport tracking & zoom
+      if (cameraRef.current) {
+        cameraRef.current.setScreenSize(app.screen.width, app.screen.height);
+        cameraRef.current.update({ x: playerContainer.x, y: playerContainer.y }, dt);
+      } else {
+        // Fallback if camera is not initialized
+        const screenWidth = app.screen.width;
+        const screenHeight = app.screen.height;
+        gridContainer.x = screenWidth / 2 - playerContainer.x;
+        gridContainer.y = screenHeight / 2 - playerContainer.y;
+      }
     };
 
     app.ticker.add(tickerCallback);

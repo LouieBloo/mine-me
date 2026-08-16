@@ -5,6 +5,7 @@ import { useSocket } from '../../contexts/SocketContext';
 import { PixiStageProvider } from '../../components/game/PixiStageContext/PixiStageContext';
 import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
+import { MiningLoadingScreen } from './components/MiningLoadingScreen/MiningLoadingScreen';
 import { notificationService } from '../../services/notificationService';
 import { type MiningBackpackItem, MINING_CONFIG } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
@@ -17,7 +18,34 @@ export const MineView: React.FC = () => {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState<boolean>(true);
+  const [isAssetsLoaded, setIsAssetsLoaded] = useState<boolean>(false);
   const [sessionKey, setSessionKey] = useState<number>(0);
+
+  // Camera Zoom State (persisted in localStorage, default 150%, range 100% - 200%)
+  const [zoom, setZoom] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('mining_camera_zoom');
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= 1.0 && parsed <= 2.0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+    return 1.5;
+  });
+
+  const handleZoomChange = useCallback((newZoom: number) => {
+    const clamped = Math.min(2.0, Math.max(1.0, Math.round(newZoom * 100) / 100));
+    setZoom(clamped);
+    try {
+      localStorage.setItem('mining_camera_zoom', clamped.toString());
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
 
   // Modal & Summary States
   const [hasMovedOffEntrance, setHasMovedOffEntrance] = useState<boolean>(false);
@@ -25,8 +53,6 @@ export const MineView: React.FC = () => {
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const [summaryLoot, setSummaryLoot] = useState<MiningBackpackItem[]>([]);
 
-  // A ref to prevent double initialization in StrictMode
-  const hasStartedRef = useRef<boolean>(false);
   // Track whether session has already been extracted/cleaned up so unmount doesn't double-cancel
   const isCleanedUpRef = useRef<boolean>(false);
 
@@ -47,11 +73,10 @@ export const MineView: React.FC = () => {
     };
   }, [onEvent, setMiningSession, navigate]);
 
-  // Clean up server session if player navigates away (e.g. Browser Back button or /home) without extraction
+  // Clean up server session if player navigates away without extraction
   useEffect(() => {
     return () => {
-      if (!isCleanedUpRef.current && hasStartedRef.current) {
-        isCleanedUpRef.current = true;
+      if (!isCleanedUpRef.current) {
         sendGameEvent({ type: 'mining_cancel' }).catch(() => {});
       }
     };
@@ -64,13 +89,15 @@ export const MineView: React.FC = () => {
       return;
     }
 
-    if (hasStartedRef.current) return;
-    hasStartedRef.current = true;
+    let isSubscribed = true;
 
     const startSession = async () => {
       try {
         setLoading(true);
+        setIsAssetsLoaded(false);
         const result = await sendGameEvent({ type: 'mining_start' });
+        if (!isSubscribed) return;
+
         if (result.success && result.data?.sessionState) {
           setMiningSession(result.data.sessionState);
         } else {
@@ -79,17 +106,24 @@ export const MineView: React.FC = () => {
           navigate('/home');
         }
       } catch (err: any) {
+        if (!isSubscribed) return;
         isCleanedUpRef.current = true;
         console.error('[MineView] Start session error:', err);
         notificationService.error('Error', err.message || 'Could not connect to mining server');
         navigate('/home');
       } finally {
-        setLoading(false);
+        if (isSubscribed) {
+          setLoading(false);
+        }
       }
     };
 
     startSession();
-  }, [activeCharacter, navigate, sendGameEvent, setMiningSession]);
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [activeCharacter?.id, navigate, sendGameEvent, setMiningSession]);
 
   // Track if player has moved off the entrance and then landed back on it to trigger modal
   useEffect(() => {
@@ -139,6 +173,7 @@ export const MineView: React.FC = () => {
     if (isRestarting) return;
     try {
       setIsRestarting(true);
+      setIsAssetsLoaded(false);
       const result = await sendGameEvent({ type: 'mining_start', forceNew: true });
       if (result.success && result.data?.sessionState) {
         setMiningSession(result.data.sessionState);
@@ -163,7 +198,7 @@ export const MineView: React.FC = () => {
       if (groupedMap[item.itemId]) {
         groupedMap[item.itemId] = {
           ...groupedMap[item.itemId],
-          quantity: groupedMap[item.itemId].quantity + item.quantity
+          quantity: groupedMap[item.itemId].quantity + item.quantity,
         };
       } else {
         groupedMap[item.itemId] = { ...item };
@@ -183,21 +218,27 @@ export const MineView: React.FC = () => {
     }));
   })();
 
-  if ((loading && !showSummaryModal) || !activeCharacter || !playerState || (!miningSession && !showSummaryModal)) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-slate-950">
-        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(245,158,11,0.2)]" />
-        <p className="mt-4 text-slate-400 text-sm font-black tracking-widest uppercase animate-pulse">
-          Entering Dungeon Mine...
-        </p>
-      </div>
-    );
+  if (!activeCharacter || !playerState) {
+    return null;
   }
+
+  const handleAssetsLoaded = useCallback(() => {
+    setIsAssetsLoaded(true);
+  }, []);
+
+  const isScreenLoading = loading || !isAssetsLoaded || !miningSession;
 
   return (
     <div className="flex-1 flex flex-col bg-slate-950 relative overflow-hidden h-full">
       {/* Background layer */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-900 to-slate-950 pointer-events-none" />
+
+      {/* Atmospheric Loading Screen Overlay */}
+      <MiningLoadingScreen
+        isLoading={isScreenLoading}
+        message="Entering Dungeon Mine..."
+        subMessage="Rigging equipment, lighting cavern depths & generating veins..."
+      />
 
       {/* PixiJS Visual Stage */}
       {miningSession && (
@@ -206,6 +247,9 @@ export const MineView: React.FC = () => {
             sessionState={miningSession}
             playerState={playerState}
             onExit={handleExit}
+            onAssetsLoaded={handleAssetsLoaded}
+            zoom={zoom}
+            onZoomChange={handleZoomChange}
           />
         </PixiStageProvider>
       )}
@@ -219,6 +263,8 @@ export const MineView: React.FC = () => {
           onAbandon={handleAbandon}
           onRestart={handleRestart}
           isRestarting={isRestarting}
+          zoom={zoom}
+          onZoomChange={handleZoomChange}
         />
       )}
 

@@ -104,14 +104,25 @@ export class ModularCharacterSprite extends BaseSprite {
     this.pelvisNode.addChild(this.torsoNode);
     this.pelvisNode.addChild(this.legFrontNode);
 
+    // Keep hidden initially until fully loaded, scaled, and rigged
+    this.wrapper.visible = false;
     this.wrapper.addChild(this.pelvisNode);
+  }
+
+  /**
+   * Toggle visibility of character wrapper.
+   */
+  setVisible(visible: boolean): void {
+    if (!this.destroyed && this.wrapper) {
+      this.wrapper.visible = visible;
+    }
   }
 
   /**
    * Load the skeleton manifest and all sub-part textures.
    */
   async load(): Promise<void> {
-    if (this.destroyed) return;
+    if (this.destroyed || this.wrapper?.destroyed) return;
 
     try {
       const resp = await fetch(this.manifestUrl);
@@ -124,7 +135,7 @@ export class ModularCharacterSprite extends BaseSprite {
       return;
     }
 
-    if (!this.manifest || this.destroyed) return;
+    if (!this.manifest || this.destroyed || this.wrapper?.destroyed) return;
 
     // Derive base directory from manifest URL
     const lastSlash = this.manifestUrl.lastIndexOf('/');
@@ -133,13 +144,13 @@ export class ModularCharacterSprite extends BaseSprite {
     // Load textures and instantiate part sprites
     const parts = this.manifest.parts;
     for (const [partName, partDef] of Object.entries(parts)) {
-      if (this.destroyed) return;
+      if (this.destroyed || this.wrapper?.destroyed) return;
 
       const partUrl = `${baseDir}${partDef.file}`;
       const cacheKey = `modular_part_${partUrl}`;
       try {
         const texture: Texture = await Assets.load({ src: partUrl, alias: cacheKey });
-        if (this.destroyed) return;
+        if (this.destroyed || this.wrapper?.destroyed) return;
 
         const sprite = new Sprite(texture);
         if (partDef.width && partDef.width > 0) {
@@ -153,20 +164,26 @@ export class ModularCharacterSprite extends BaseSprite {
 
         // Position joint node and attach sprite
         const targetNode = this.getNodeForPart(partName);
-        if (targetNode) {
+        if (targetNode && !targetNode.destroyed && partDef.offset_from_pelvis) {
           targetNode.x = partDef.offset_from_pelvis[0];
           targetNode.y = partDef.offset_from_pelvis[1];
           this.baseOffsets[partName] = { x: targetNode.x, y: targetNode.y };
           targetNode.addChild(sprite);
         }
       } catch (e) {
-        console.warn(`[ModularCharacterSprite] Could not load part texture ${partUrl}:`, e);
+        if (!this.destroyed && !this.wrapper?.destroyed) {
+          console.warn(`[ModularCharacterSprite] Could not load part texture ${partUrl}:`, e);
+        }
       }
     }
 
+    if (this.destroyed || this.wrapper?.destroyed) return;
+
     // Hand/tool socket default position on arm_front
-    this.toolSocket.x = -10;
-    this.toolSocket.y = 120;
+    if (this.toolSocket && !this.toolSocket.destroyed) {
+      this.toolSocket.x = -10;
+      this.toolSocket.y = 120;
+    }
   }
 
   /**
@@ -300,17 +317,17 @@ export class ModularCharacterSprite extends BaseSprite {
    * Attaches gear sprites directly to corresponding joint nodes.
    */
   async setGearLayers(layers: GearLayerDescriptor[]): Promise<void> {
-    if (this.destroyed) return;
+    if (this.destroyed || this.wrapper?.destroyed) return;
 
     this.clearGearLayers();
 
     for (const layer of layers) {
-      if (this.destroyed) return;
+      if (this.destroyed || this.wrapper?.destroyed) return;
 
       try {
         const cacheKey = `modular_gear_${layer.url}`;
         const texture: Texture = await Assets.load({ src: layer.url, alias: cacheKey });
-        if (this.destroyed) return;
+        if (this.destroyed || this.wrapper?.destroyed) return;
 
         const sprite = new Sprite(texture);
         sprite.anchor.set(0.5);
@@ -319,14 +336,16 @@ export class ModularCharacterSprite extends BaseSprite {
         const slotNodeName = MODULAR_GEAR_SLOTS[layer.subType] || 'torsoNode';
         const targetNode = (this as any)[slotNodeName] as Container | undefined;
 
-        if (targetNode) {
+        if (targetNode && !targetNode.destroyed) {
           targetNode.addChild(sprite);
           const list = this.gearSprites.get(layer.subType) || [];
           list.push(sprite);
           this.gearSprites.set(layer.subType, list);
         }
       } catch (err) {
-        console.warn(`[ModularCharacterSprite] Failed to load gear layer: ${layer.url}`, err);
+        if (!this.destroyed && !this.wrapper?.destroyed) {
+          console.warn(`[ModularCharacterSprite] Failed to load gear layer: ${layer.url}`, err);
+        }
       }
     }
   }
