@@ -113,7 +113,8 @@ describe('MiningGameEngine', () => {
       seed: 12345,
       socket: mockSocket,
     });
-    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: MINING_CONFIG.ENTRANCE_Y + 0.5 };
+    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
+    engine.playerBody.isGrounded = true;
 
     // Make tile directly to the right a dirt block
     engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
@@ -154,7 +155,8 @@ describe('MiningGameEngine', () => {
       seed: 12345,
       socket: mockSocket,
     });
-    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: MINING_CONFIG.ENTRANCE_Y + 0.5 };
+    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
+    engine.playerBody.isGrounded = true;
 
     // Make tile right and tile left dirt blocks
     engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
@@ -218,5 +220,63 @@ describe('MiningGameEngine', () => {
       message: expect.stringContaining('15-minute time limit'),
     }));
     expect(onTimeoutMock).toHaveBeenCalledWith('char-1');
+  });
+
+  it('prevents starting mining while jumping or airborne', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: MINING_CONFIG.ENTRANCE_Y + 0.5 };
+    engine.playerBody.isGrounded = false;
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
+
+    const started = engine.startMining({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
+    expect(started).toBe(false);
+    expect(engine.isMining).toBe(false);
+  });
+
+  it('cancels active mining immediately when player jumps or becomes airborne', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
+    engine.playerBody.isGrounded = true;
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
+
+    // Move right into it to start mining while grounded
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: true,
+      miningKey: false,
+      sequence: 1,
+    });
+
+    (engine as any).tick(0.033);
+    expect(engine.isMining).toBe(true);
+
+    // Player jumps (spacebar)
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: true,
+      jump: true,
+      miningKey: false,
+      sequence: 2,
+    });
+
+    (engine as any).tick(0.033);
+    // Player is now airborne with upward velocity, mining should be stopped
+    expect(engine.playerBody.isGrounded).toBe(false);
+    expect(engine.isMining).toBe(false);
+    expect(engine.miningTarget).toBeNull();
   });
 });

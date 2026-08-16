@@ -14,6 +14,9 @@ export abstract class BaseSprite {
   protected wrapper: Container;
   protected destroyed = false;
 
+  protected currentScale: number = 1.0;
+  protected isFlipped: boolean = false;
+
   constructor(parentContainer: Container) {
     this.parentContainer = parentContainer;
     this.wrapper = new Container();
@@ -35,32 +38,44 @@ export abstract class BaseSprite {
   }
 
   /**
-   * Set uniform scale.
+   * Set uniform scale while preserving horizontal flip state.
    */
   setScale(scale: number): void {
-    this.wrapper.scale.set(scale);
+    this.currentScale = Math.abs(scale);
+    this.wrapper.scale.y = this.currentScale;
+    this.wrapper.scale.x = this.isFlipped ? -this.currentScale : this.currentScale;
   }
 
   /**
-   * Scale the sprite uniformly to fit within a target size (in pixels).
-   * Uses the wrapper's current width as the reference dimension.
+   * Get current scale magnitude.
    */
-  scaleToFit(targetSize: number): void {
-    if (this.wrapper.width > 0) {
-      const currentScale = this.wrapper.scale.x;
-      const nativeWidth = this.wrapper.width / currentScale;
-      const scaleFactor = targetSize / nativeWidth;
-      this.wrapper.scale.set(scaleFactor);
+  getScale(): number {
+    return this.currentScale;
+  }
+
+  /**
+   * Scale uniformly based on a reference height.
+   */
+  scaleToHeight(targetHeight: number, referenceHeight: number = 880): void {
+    if (referenceHeight > 0) {
+      this.setScale(targetHeight / referenceHeight);
     }
   }
 
   /**
-   * Flip the sprite horizontally (e.g. player facing right in combat).
+   * Scale the sprite uniformly to fit within a target size (in pixels).
+   * Default implementation scales by target height.
+   */
+  scaleToFit(targetSize: number): void {
+    this.scaleToHeight(targetSize);
+  }
+
+  /**
+   * Flip the sprite horizontally (e.g. player facing left/right).
    */
   setFlipped(flipped: boolean): void {
-    this.wrapper.scale.x = flipped
-      ? -Math.abs(this.wrapper.scale.x)
-      : Math.abs(this.wrapper.scale.x);
+    this.isFlipped = flipped;
+    this.wrapper.scale.x = flipped ? -this.currentScale : this.currentScale;
   }
 
   /**

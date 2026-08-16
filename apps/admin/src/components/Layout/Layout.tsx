@@ -21,6 +21,7 @@ export default function Layout() {
           <NavLink to="/items" className={navLinkClass}>Items Editor</NavLink>
           <NavLink to="/effects" className={navLinkClass}>Effects Editor</NavLink>
           <NavLink to="/mobs" className={navLinkClass}>Mobs Editor</NavLink>
+          <NavLink to="/character-viewer" className={navLinkClass}>Character Viewer</NavLink>
           <NavLink to="/rates" className={navLinkClass}>Rates Editor</NavLink>
           <NavLink to="/character-levels" className={navLinkClass}>Levels Config</NavLink>
           <NavLink to="/users" className={navLinkClass}>Users Editor</NavLink>

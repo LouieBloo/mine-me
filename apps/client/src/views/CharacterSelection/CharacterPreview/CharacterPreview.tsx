@@ -1,34 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../../../hooks/useApi';
 import { type Character } from '../CharacterSelection';
 import { useGame } from '../../../contexts/GameContext';
-import { Application } from '@pixi/react';
-import { Assets, Texture } from 'pixi.js';
-import { type GearSubType, GEAR_OFFSETS } from '@mine-me/shared';
+import { type GearSubType } from '@mine-me/shared';
 import { useCharacterLevel } from '../../../hooks/useLevels';
+import { PixiStageProvider } from '../../../components/game/PixiStageContext/PixiStageContext';
+import { SpriteRenderer } from '../../../components/game/SpriteRenderer/SpriteRenderer';
 import './CharacterPreview.css';
 import { ConfirmationModal } from '../../../components/ConfirmationModal/ConfirmationModal';
-
-const useTexture = (url: string | null | undefined) => {
-    const [texture, setTexture] = useState<Texture | null>(null);
-    useEffect(() => {
-        if (!url) {
-            setTexture(null);
-            return;
-        }
-        Assets.load(url).then(setTexture).catch(console.error);
-    }, [url]);
-    return texture;
-};
-
-const GearLayer = ({ url, offset }: { url: string, offset?: { x: number, y: number } }) => {
-    const texture = useTexture(url);
-    if (!texture) return null;
-    const { x = 0, y = 0 } = offset || {};
-    // @ts-ignore
-    return <pixiSprite texture={texture} anchor={0.5} x={x} y={y} />;
-};
 
 interface Props {
     character: Character | null;
@@ -43,12 +23,16 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
     const [retiring, setRetiring] = useState(false);
     const [showRetireConfirm, setShowRetireConfirm] = useState(false);
     const [alertInfo, setAlertInfo] = useState({ isOpen: false, title: '', message: '' });
-    
-    const baseBodyUrl = `${import.meta.env.VITE_API_URL || ''}/assets/gear/base-body.png`;
 
-    // The base body image is 518x698. We can purely use this ratio to calculate scale directly
-    // instead of waiting for the texture to load, which causes PIXI rendering issues.
-    const calculatedScale = Math.min(192 / 518, 192 / 698) * 0.75;
+    const gearLayers = React.useMemo(() => {
+        if (!character?.inventory) return [];
+        return character.inventory
+            .filter(inv => inv.item.type === 'GEAR' && inv.item.gearImageUrl)
+            .map(inv => ({
+                url: `${import.meta.env.VITE_API_URL || ''}${inv.item.gearImageUrl}`,
+                subType: inv.item.subType as GearSubType,
+            }));
+    }, [character?.inventory]);
 
     if (!character) {
         return (
@@ -102,21 +86,14 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
             <div className="relative group mb-8">
                 <div className="absolute -inset-1 bg-gradient-to-r from-sol to-amber-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
                 <div className="relative w-48 h-48 rounded-full bg-slate-800 border-2 border-sol/50 overflow-hidden flex items-center justify-center shadow-2xl">
-                    <Application backgroundAlpha={0} width={192} height={192}>
-                        {/* @ts-ignore */}
-                        <pixiContainer x={96} y={96} scale={calculatedScale}>
-                            <GearLayer url={baseBodyUrl} />
-                            
-                            {character.inventory?.map(inv => {
-                                if (inv.item.type === 'GEAR' && inv.item.gearImageUrl) {
-                                    const offset = GEAR_OFFSETS[inv.item.subType as GearSubType];
-                                    return <GearLayer key={inv.item.id} url={`${import.meta.env.VITE_API_URL || ''}${inv.item.gearImageUrl}`} offset={offset} />;
-                                }
-                                return null;
-                            })}
-                        {/* @ts-ignore */}
-                        </pixiContainer>
-                    </Application>
+                    <PixiStageProvider className="w-full h-full flex items-center justify-center">
+                        <SpriteRenderer
+                            type="modular"
+                            gearLayers={gearLayers}
+                            width={192}
+                            height={192}
+                        />
+                    </PixiStageProvider>
                 </div>
                 <div className="absolute -bottom-2 -right-2 w-12 h-12 rounded-full bg-sol text-slate-900 flex items-center justify-center font-bold text-lg border-4 border-slate-900 shadow-lg">
                     {level ?? '...'}

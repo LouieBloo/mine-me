@@ -2,10 +2,9 @@ import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Container } from 'pixi.js';
 import { usePixiStage } from '../PixiStageContext/PixiStageContext';
 import { AnimatedEntitySprite } from '../sprites/AnimatedEntitySprite';
-import { CompositeEntitySprite } from '../sprites/CompositeEntitySprite';
+import { ModularCharacterSprite, type GearLayerDescriptor, type CharacterAnimationState } from '../sprites/ModularCharacterSprite';
 import { FloatingText } from '../sprites/FloatingText';
 import type { FloatingTextOptions } from '../sprites/FloatingText';
-import type { GearLayerDescriptor } from '../sprites/CompositeEntitySprite';
 import { BaseSprite } from '../sprites/BaseSprite';
 import { RockSprite } from '../sprites';
 import './SpriteRenderer.css';
@@ -17,10 +16,11 @@ interface AnimatedSpriteProps {
   animationKey?: string;
 }
 
-interface CompositeSpriteProps {
-  type: 'composite';
-  baseBodyUrl: string;
+interface ModularSpriteProps {
+  type: 'modular';
+  skeletonUrl?: string;
   gearLayers?: GearLayerDescriptor[];
+  animationState?: CharacterAnimationState;
   flipped?: boolean;
 }
 
@@ -28,7 +28,7 @@ interface RockSpriteProps {
   type: 'rock';
 }
 
-type SpriteRendererProps = (AnimatedSpriteProps | CompositeSpriteProps | RockSpriteProps) & {
+type SpriteRendererProps = (AnimatedSpriteProps | ModularSpriteProps | RockSpriteProps) & {
   width?: number;
   height?: number;
   scale?: number;
@@ -109,6 +109,18 @@ export const SpriteRenderer = forwardRef<SpriteRendererHandle, SpriteRendererPro
         if (options?.onComplete) {
           spriteRef.current.onAnimationComplete(options.onComplete);
         }
+      } else if (spriteRef.current instanceof ModularCharacterSprite) {
+        const lower = key.toLowerCase();
+        if (lower === 'walk' || lower === 'walking') {
+          spriteRef.current.setState('walk');
+        } else if (lower === 'mine' || lower === 'attacking' || lower === 'attack') {
+          spriteRef.current.setState('mine');
+          if (options?.onComplete) {
+            setTimeout(options.onComplete, 500);
+          }
+        } else {
+          spriteRef.current.setState('idle');
+        }
       }
     },
 
@@ -119,13 +131,15 @@ export const SpriteRenderer = forwardRef<SpriteRendererHandle, SpriteRendererPro
           (k) => k.toLowerCase() === key.toLowerCase()
         );
       }
+      if (spriteRef.current instanceof ModularCharacterSprite) {
+        const lower = key.toLowerCase();
+        return ['idle', 'walk', 'walking', 'mine', 'attack', 'attacking'].includes(lower);
+      }
       return false;
     },
   }), [width, height]);
 
   // Load/reload the sprite AND set up position syncing in a single effect.
-  // These must be in the same effect because the sync logic depends on the
-  // originContainer existing, and refs don't trigger re-renders.
   useEffect(() => {
     if (!pixiApp?.stage || !stageElement || !wrapperRef.current) return;
 
@@ -161,6 +175,13 @@ export const SpriteRenderer = forwardRef<SpriteRendererHandle, SpriteRendererPro
     const tickHandler = (ticker: any) => {
       syncPosition();
 
+      const deltaSeconds = ticker.deltaMS ? ticker.deltaMS / 1000 : (ticker.deltaTime || 1) / 60;
+
+      // Update procedural animation if modular sprite
+      if (spriteRef.current instanceof ModularCharacterSprite) {
+        spriteRef.current.update(deltaSeconds);
+      }
+
       const target = targetAlphaRef.current;
       if (originContainer && !originContainer.destroyed) {
         const delta = ticker.deltaTime || 1;
@@ -189,8 +210,8 @@ export const SpriteRenderer = forwardRef<SpriteRendererHandle, SpriteRendererPro
           sprite.playAnimation(props.animationKey);
         }
         spriteRef.current = sprite;
-      } else if (props.type === 'composite') {
-        const sprite = new CompositeEntitySprite(originContainer, props.baseBodyUrl);
+      } else if (props.type === 'modular') {
+        const sprite = new ModularCharacterSprite(originContainer, props.skeletonUrl);
         await sprite.load();
         if (!active) {
           sprite.destroy();
@@ -198,11 +219,16 @@ export const SpriteRenderer = forwardRef<SpriteRendererHandle, SpriteRendererPro
         }
         sprite.setPosition(width / 2, height / 2);
 
-        const baseScale = Math.min(width / 518, height / 698) * 0.75;
+        // Native miner height is ~900px on a 1024x1024 frame
+        const baseScale = Math.min(width / 450, height / 850) * 0.85;
         sprite.setScale(scaleProp ?? baseScale);
 
         if (props.flipped) {
           sprite.setFlipped(true);
+        }
+
+        if (props.animationState) {
+          sprite.setState(props.animationState);
         }
 
         if (props.gearLayers && props.gearLayers.length > 0) {
@@ -256,9 +282,10 @@ export const SpriteRenderer = forwardRef<SpriteRendererHandle, SpriteRendererPro
     props.type,
     props.type === 'animated' ? props.spriteUrl : undefined,
     props.type === 'animated' ? props.atlasUrl : undefined,
-    props.type === 'composite' ? props.baseBodyUrl : undefined,
-    props.type === 'composite' ? JSON.stringify(props.gearLayers) : undefined,
-    props.type === 'composite' ? props.flipped : undefined,
+    props.type === 'modular' ? props.skeletonUrl : undefined,
+    props.type === 'modular' ? JSON.stringify(props.gearLayers) : undefined,
+    props.type === 'modular' ? props.animationState : undefined,
+    props.type === 'modular' ? props.flipped : undefined,
     width,
     height,
     scaleProp,
@@ -268,8 +295,13 @@ export const SpriteRenderer = forwardRef<SpriteRendererHandle, SpriteRendererPro
   useEffect(() => {
     if (props.type === 'animated' && spriteRef.current && props.animationKey) {
       (spriteRef.current as AnimatedEntitySprite).playAnimation(props.animationKey);
+    } else if (props.type === 'modular' && spriteRef.current && props.animationState) {
+      (spriteRef.current as ModularCharacterSprite).setState(props.animationState);
     }
-  }, [props.type === 'animated' ? props.animationKey : undefined]);
+  }, [
+    props.type === 'animated' ? props.animationKey : undefined,
+    props.type === 'modular' ? props.animationState : undefined,
+  ]);
 
   return (
     <div ref={wrapperRef} className={`relative ${className}`} style={{ width, height }} />

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Container, Graphics, Sprite, TilingSprite, Assets } from 'pixi.js';
 import { usePixiStage } from '../../../../components/game/PixiStageContext/PixiStageContext';
-import { CompositeEntitySprite, type GearLayerDescriptor } from '../../../../components/game/sprites/CompositeEntitySprite';
+import { ModularCharacterSprite, type GearLayerDescriptor } from '../../../../components/game/sprites';
 import type {
   MiningSessionClientState,
   PlayerState,
@@ -43,7 +43,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const tileGraphicsMap = useRef<Map<string, Graphics>>(new Map());
   const droppedSpritesMap = useRef<Map<string, Sprite | Graphics>>(new Map());
   const fallingRockGraphicsMap = useRef<Map<string, Graphics>>(new Map());
-  const playerSpriteRef = useRef<CompositeEntitySprite | null>(null);
+  const playerSpriteRef = useRef<ModularCharacterSprite | null>(null);
   const isFacingLeftRef = useRef<boolean>(false);
   const playerFacingDirRef = useRef<Vector2D>({ x: 1, y: 0 });
   const activeFallingRocksRef = useRef<{ id: string; x: number; y: number }[]>([]);
@@ -84,7 +84,6 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   });
 
   // Gear layers derivation
-  const baseBodyUrl = getAssetUrl('/assets/gear/base-body.png');
   const gearLayers: GearLayerDescriptor[] = React.useMemo(() => {
     if (!playerState.inventory?.items) return [];
     return playerState.inventory.items
@@ -94,6 +93,14 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         subType: inv.item.subType as any,
       }));
   }, [playerState.inventory?.items]);
+
+  const gearLayersRef = useRef<GearLayerDescriptor[]>(gearLayers);
+  useEffect(() => {
+    gearLayersRef.current = gearLayers;
+    if (playerSpriteRef.current) {
+      playerSpriteRef.current.setGearLayers(gearLayers);
+    }
+  }, [gearLayers]);
 
   // Subscribe to real-time 30 Hz server ticks
   useEffect(() => {
@@ -321,19 +328,27 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     lightingEngine.updateGrid(initialSessionState.grid);
     lightingEngineRef.current = lightingEngine;
 
-    // Create Composite Character Sprite
-    const sprite = new CompositeEntitySprite(playerContainer, baseBodyUrl);
+    // Create Modular Character Sprite
+    const sprite = new ModularCharacterSprite(playerContainer);
     playerSpriteRef.current = sprite;
     sprite.load().then(() => {
-      // Scale sprite to fit within a tile cell and align feet with the collision body bottom
-      const feetOffset = -((TILE_SIZE - 2 * MINING_CONFIG.PLAYER_RADIUS) / 2); // -4px
-      sprite.setPosition(0, feetOffset);
-      sprite.scaleToFit(TILE_SIZE);
+      // Scale sprite deterministically based on reference height to fit tile height (~34px tall)
+      const targetHeight = TILE_SIZE * 1.08; // ~34.5px tall
+      sprite.scaleToHeight(targetHeight);
+
+      // Foot alignment: unscaled feet are ~426px below pelvis origin.
+      // Align bottom of feet with bottom of collision body (+PLAYER_RADIUS = +12px).
+      const unscaledFootDepth = 426;
+      const footOffset =
+        MINING_CONFIG.PLAYER_RADIUS -
+        unscaledFootDepth * (targetHeight / ModularCharacterSprite.REFERENCE_HEIGHT);
+      sprite.setPosition(0, footOffset);
+
       if (isFacingLeftRef.current) {
         sprite.setFlipped(true);
       }
-      if (gearLayers.length > 0) {
-        sprite.setGearLayers(gearLayers);
+      if (gearLayersRef.current && gearLayersRef.current.length > 0) {
+        sprite.setGearLayers(gearLayersRef.current);
       }
     });
 
@@ -345,7 +360,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       app.stage.removeChild(gridContainer);
       gridContainer.destroy({ children: true });
     };
-  }, [app, baseBodyUrl, gearLayers]);
+  }, [app]);
 
   // Render Grid Tiles & Dropped Items
   useEffect(() => {
@@ -569,6 +584,16 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
       currentPos.x += dx * smoothFactor;
       currentPos.y += (targetPos.y - currentPos.y) * smoothFactor;
+
+      // Update modular sprite animation
+      if (playerSpriteRef.current) {
+        if (sessionState.isMining) {
+          playerSpriteRef.current.setState('mine');
+        } else {
+          playerSpriteRef.current.setMoveVelocity(dx, targetPos.y - currentPos.y);
+        }
+        playerSpriteRef.current.update(dt);
+      }
 
       // Position player sprite in pixel world space
       playerContainer.x = currentPos.x * TILE_SIZE;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { MiningSessionClientState, PlayerState } from '@mine-me/shared';
+import { type MiningSessionClientState, type PlayerState, MINING_CONFIG } from '@mine-me/shared';
 import { getAssetUrl } from '@mine-me/shared';
 import './MiningHUD.css';
 
@@ -236,7 +236,7 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
               <span>Debug</span>
             </span>
             <span className="text-slate-700">|</span>
-            <span>Exit at (15, 0)</span>
+            <span>Exit at ({MINING_CONFIG.ENTRANCE_X}, {MINING_CONFIG.ENTRANCE_Y})</span>
           </div>
 
           {/* Leave/Extract Button */}

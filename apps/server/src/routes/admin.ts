@@ -60,6 +60,7 @@ adminRouter.delete('/inventory-items/:id', InventoryController.deleteInventoryIt
 
 // CHARACTERS
 adminRouter.get('/characters', CharacterController.getCharacters);
+adminRouter.put('/characters/skeleton', CharacterController.updateSkeleton);
 adminRouter.get('/characters/:id', CharacterController.getCharacter);
 adminRouter.put('/characters/:id', CharacterController.updateCharacter);
 

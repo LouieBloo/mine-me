@@ -18,11 +18,11 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [message, setMessage] = useState('');
   const [severity, setSeverity] = useState<AlertColor>('info');
 
-  const showToast = (msg: string, sev: AlertColor = 'info') => {
+  const showToast = React.useCallback((msg: string, sev: AlertColor = 'info') => {
     setMessage(msg);
     setSeverity(sev);
     setOpen(true);
-  };
+  }, []);
 
   const handleClose = (_event?: React.SyntheticEvent | Event, reason?: string) => {
     if (reason === 'clickaway') {
@@ -31,13 +31,13 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setOpen(false);
   };
 
-  const value = {
+  const value = React.useMemo(() => ({
     showToast,
     success: (msg: string) => showToast(msg, 'success'),
     error: (msg: string) => showToast(msg, 'error'),
     info: (msg: string) => showToast(msg, 'info'),
     warning: (msg: string) => showToast(msg, 'warning'),
-  };
+  }), [showToast]);
 
   return (
     <ToastContext.Provider value={value}>

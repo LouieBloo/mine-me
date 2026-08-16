@@ -2,7 +2,7 @@ import { Socket } from 'socket.io';
 import { MiningGameEngine } from './MiningGameEngine';
 import { prisma } from '../../index';
 import { InventoryService } from '../inventory.service';
-import type { MiningSessionClientState } from '@mine-me/shared';
+import { type MiningSessionClientState, MINING_CONFIG } from '@mine-me/shared';
 import { toClientGrid } from '../miningMap.service';
 
 export class MiningSessionManager {
@@ -58,7 +58,7 @@ export class MiningSessionManager {
    * Build client-safe session state snapshot for initial connection.
    */
   public buildClientState(engine: MiningGameEngine): MiningSessionClientState {
-    const isAtEntrance = Math.round(engine.position.x) === 15 && Math.round(engine.position.y) === 0;
+    const isAtEntrance = Math.round(engine.position.x) === MINING_CONFIG.ENTRANCE_X && Math.round(engine.position.y) === MINING_CONFIG.ENTRANCE_Y;
 
     return {
       grid: toClientGrid(engine.grid),

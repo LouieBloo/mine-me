@@ -11,12 +11,12 @@
 // ---------------------------------------------------------------------------
 
 export const MINING_CONFIG = {
-  /** Grid dimensions */
-  GRID_WIDTH: 30,
-  GRID_HEIGHT: 30,
+  /** Grid dimensions (45x45, 50% larger than 30x30) */
+  GRID_WIDTH: 45,
+  GRID_HEIGHT: 45,
 
   /** Entrance tile position (top-center of the grid) */
-  ENTRANCE_X: 15,
+  ENTRANCE_X: 22,
   ENTRANCE_Y: 0,
 
   /** Default vision range in tiles (cardinally adjacent) */
@@ -34,7 +34,7 @@ export const MINING_CONFIG = {
   ROCK_CRUSH_DAMAGE: 50,
 
   /** Number of treasure chests per map */
-  TREASURE_CHEST_COUNT: 2,
+  TREASURE_CHEST_COUNT: 4,
 
   /** Approximate percentage of tiles that are rocks */
   ROCK_PERCENTAGE: 12,

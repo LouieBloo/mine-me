@@ -155,6 +155,7 @@ export class MiningGameEngine {
    */
   public startMining(target: MiningPosition): boolean {
     if (this.isMining) return false;
+    if (!this.playerBody.isGrounded) return false;
     if (!isInBounds(target.x, target.y)) return false;
 
     const tile = this.grid[target.y][target.x];
@@ -223,7 +224,7 @@ export class MiningGameEngine {
     this.checkItemPickups();
 
     // 6. Mining logic & Auto-mine:
-    // Direction input is required to mine.
+    // Direction input and grounded stance are required to mine.
     const hasDirectionInput = this.inputs.left || this.inputs.right || this.inputs.up || this.inputs.down;
 
     const playerTileX = Math.floor(this.playerBody.position.x);
@@ -232,19 +233,19 @@ export class MiningGameEngine {
     const desiredTargetY = playerTileY + this.playerBody.facing.y;
 
     if (this.isMining && this.miningTarget) {
-      // If player has released input OR is pushing in a different direction / facing a different target, cancel current mining
+      // If player released input, faces a different target, moves out of range, or becomes airborne (jumping/falling), stop mining
       const isFacingCurrentTarget = hasDirectionInput && this.miningTarget.x === desiredTargetX && this.miningTarget.y === desiredTargetY;
       const tileCenterX = this.miningTarget.x + 0.5;
       const tileCenterY = this.miningTarget.y + 0.5;
       const dist = Math.hypot(this.playerBody.position.x - tileCenterX, this.playerBody.position.y - tileCenterY);
 
-      if (!isFacingCurrentTarget || dist > 1.25) {
+      if (!isFacingCurrentTarget || dist > 1.25 || !this.playerBody.isGrounded) {
         this.stopMining();
       }
     }
 
-    // If not currently mining and player has direction input, check if we should start mining the target block
-    if (!this.isMining && hasDirectionInput) {
+    // If not currently mining, player has direction input, and player is grounded, check if we should start mining the target block
+    if (!this.isMining && hasDirectionInput && this.playerBody.isGrounded) {
       if (isInBounds(desiredTargetX, desiredTargetY)) {
         const tile = this.grid[desiredTargetY][desiredTargetX];
         if (

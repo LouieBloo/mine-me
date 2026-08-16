@@ -6,7 +6,7 @@ import { PixiStageProvider } from '../../components/game/PixiStageContext/PixiSt
 import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
 import { notificationService } from '../../services/notificationService';
-import type { MiningBackpackItem } from '@mine-me/shared';
+import { type MiningBackpackItem, MINING_CONFIG } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
 import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
 import './MineView.css';
@@ -94,7 +94,7 @@ export const MineView: React.FC = () => {
   // Track if player has moved off the entrance and then landed back on it to trigger modal
   useEffect(() => {
     if (!miningSession) return;
-    const isAtEntrance = miningSession.position.x === 15 && miningSession.position.y === 0;
+    const isAtEntrance = miningSession.position.x === MINING_CONFIG.ENTRANCE_X && miningSession.position.y === MINING_CONFIG.ENTRANCE_Y;
     if (!isAtEntrance) {
       setHasMovedOffEntrance(true);
     } else if (hasMovedOffEntrance && isAtEntrance) {

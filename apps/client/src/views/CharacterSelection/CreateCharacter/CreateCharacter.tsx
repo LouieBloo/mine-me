@@ -1,65 +1,16 @@
 import React, { useState } from 'react';
 import { useApi } from '../../../hooks/useApi';
-import { Application } from '@pixi/react';
-import { Assets, Texture } from 'pixi.js';
-
 import { type Character } from '../CharacterSelection';
 import './CreateCharacter.css';
-import { type GameItem, type GearSubType, GEAR_OFFSETS } from '@mine-me/shared';
+import { type GameItem, type GearSubType } from '@mine-me/shared';
+import { PixiStageProvider } from '../../../components/game/PixiStageContext/PixiStageContext';
+import { SpriteRenderer } from '../../../components/game/SpriteRenderer/SpriteRenderer';
+import type { GearLayerDescriptor } from '../../../components/game/sprites';
 
 interface Props {
     onCreated: (char: Character) => void;
     onCancel: () => void;
 }
-
-const useTexture = (url: string | null | undefined) => {
-    const [texture, setTexture] = useState<Texture | null>(null);
-    React.useEffect(() => {
-        if (!url) {
-            setTexture(null);
-            return;
-        }
-        // Assets.load will cache the texture
-        Assets.load(url).then(setTexture).catch(console.error);
-    }, [url]);
-    return texture;
-};
-
-const GearLayer = ({ url, offset }: { url: string, offset: { x: number, y: number } }) => {
-    const texture = useTexture(url);
-    if (!texture) return null;
-    {/* @ts-ignore */}
-    return <pixiSprite texture={texture} anchor={0.5} x={offset.x} y={offset.y} />;
-};
-
-const ContinuousButton = ({ onClick, children, className }: { onClick: () => void, children: React.ReactNode, className: string }) => {
-    const [intervalId, setIntervalId] = React.useState<ReturnType<typeof setInterval> | null>(null);
-
-    const start = () => {
-        onClick();
-        const id = setInterval(onClick, 50); // fast repeat
-        setIntervalId(id);
-    };
-
-    const stop = () => {
-        if (intervalId) {
-            clearInterval(intervalId);
-            setIntervalId(null);
-        }
-    };
-
-    return (
-        <button
-            type="button"
-            onMouseDown={start}
-            onMouseUp={stop}
-            onMouseLeave={stop}
-            className={className}
-        >
-            {children}
-        </button>
-    );
-};
 
 export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
     const { fetchWithAuth } = useApi();
@@ -70,16 +21,8 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
 
     const [startingGear, setStartingGear] = useState<GameItem[]>([]);
     const [selectedGear, setSelectedGear] = useState<Record<string, string>>({});
-    
-    const baseBodyUrl = `${import.meta.env.VITE_API_URL || ''}/assets/gear/base-body.png`;
-
-    // Debug offset tracker for the visual rendering
-    const [offsets, setOffsets] = useState<Record<string, { x: number; y: number }>>(GEAR_OFFSETS);
 
     const slots: GearSubType[] = ['HEAD', 'SHOULDERS', 'CHEST', 'GAUNTLETS', 'LEGGINGS', 'BOOTS', 'WEAPON'];
-
-    // The base body image is 518x698. Hardcoded safe ratio.
-    const calculatedScale = Math.min(400 / 518, 500 / 698) * 0.75;
 
     React.useEffect(() => {
         fetchWithAuth('/api/public/items?isStartingPiece=true')
@@ -91,6 +34,21 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
     }, []);
 
     const classes = ['Warrior', 'Mage', 'Rogue'];
+
+    const gearLayers: GearLayerDescriptor[] = React.useMemo(() => {
+        return slots
+            .map(slot => {
+                const selectedId = selectedGear[slot];
+                if (!selectedId) return null;
+                const itemDef = startingGear.find(g => g.id === selectedId);
+                if (!itemDef || !itemDef.gearImageUrl) return null;
+                return {
+                    url: `${import.meta.env.VITE_API_URL || ''}${itemDef.gearImageUrl}`,
+                    subType: slot,
+                };
+            })
+            .filter((layer): layer is GearLayerDescriptor => layer !== null);
+    }, [selectedGear, startingGear]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -112,16 +70,6 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleShiftOffset = (slot: string, dx: number, dy: number) => {
-        setOffsets(prev => {
-            const current = prev[slot] || { x: 0, y: 0 };
-            return {
-                ...prev,
-                [slot]: { x: current.x + dx, y: current.y + dy }
-            };
-        });
     };
 
     return (
@@ -153,7 +101,7 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
                                     onClick={() => setCharClass(c)}
                                     className={`py-3 rounded-xl border font-bold transition-all cursor-pointer ${charClass === c
                                             ? 'bg-sol border-sol text-slate-900 shadow-lg shadow-sol/20'
-                                            : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10'
+                                             : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10'
                                         }`}
                                 >
                                     {c}
@@ -174,35 +122,13 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
                                         <select
                                             value={selectedGear[slot] || ''}
                                             onChange={(e) => setSelectedGear({ ...selectedGear, [slot]: e.target.value })}
-                                            className={`w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white outline-none ${selectedGear[slot] ? 'mb-3' : ''}`}
+                                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white outline-none"
                                         >
                                             <option value="">-- No {slot} --</option>
                                             {available.map(item => (
                                                 <option key={item.id} value={item.id}>{item.name}</option>
                                             ))}
                                         </select>
-
-                                        {/* Debug offset tools for this piece */}
-                                        {selectedGear[slot] && (
-                                            <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
-                                                <div className="flex flex-col items-center">
-                                                    <div className="grid grid-cols-3 gap-1 w-24">
-                                                        <div></div>
-                                                        <ContinuousButton onClick={() => handleShiftOffset(slot, 0, -1)} className="bg-slate-700 hover:bg-slate-600 text-white rounded text-xs p-1">▲</ContinuousButton>
-                                                        <div></div>
-                                                        <ContinuousButton onClick={() => handleShiftOffset(slot, -1, 0)} className="bg-slate-700 hover:bg-slate-600 text-white rounded text-xs p-1">◀</ContinuousButton>
-                                                        <ContinuousButton onClick={() => handleShiftOffset(slot, 0, 1)} className="bg-slate-700 hover:bg-slate-600 text-white rounded text-xs p-1">▼</ContinuousButton>
-                                                        <ContinuousButton onClick={() => handleShiftOffset(slot, 1, 0)} className="bg-slate-700 hover:bg-slate-600 text-white rounded text-xs p-1">▶</ContinuousButton>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right flex flex-col justify-center h-full">
-                                                    <div className="text-[10px] text-slate-500 uppercase font-bold leading-none mb-1">Offset</div>
-                                                    <div className="text-yellow-400 font-mono text-xs leading-none">
-                                                        {offsets[slot]?.x || 0}, {offsets[slot]?.y || 0}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
                                 );
                             })}
@@ -238,27 +164,15 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
             <div className="create-character-preview flex-1 bg-slate-900 rounded-3xl overflow-hidden border border-slate-700 relative shadow-2xl flex flex-col items-center p-8">
                 <h3 className="text-xl font-bold text-white mb-6 uppercase tracking-widest absolute top-6 left-6 z-10">Preview</h3>
 
-                <div className="canvas-container bg-slate-800 rounded-2xl p-4 shadow-inner flex items-center justify-center filter drop-shadow-xl border border-white/5" style={{ height: '530px' }}>
-                    <Application backgroundAlpha={0} width={400} height={500}>
-                        {/* @ts-ignore */}
-                        <pixiContainer x={200} y={250} scale={calculatedScale}>
-                            <GearLayer url={baseBodyUrl} offset={{ x: 0, y: 0 }} />
-
-                            {/* Selected Gear Overlays */}
-                            {slots.map(slot => {
-                                const selectedId = selectedGear[slot];
-                                if (!selectedId) return null;
-                                const itemDef = startingGear.find(g => g.id === selectedId);
-                                if (!itemDef || !itemDef.gearImageUrl) return null;
-
-                                const offset = offsets[slot] || { x: 0, y: 0 };
-                                return (
-                                    <GearLayer key={slot} url={`${import.meta.env.VITE_API_URL || ''}${itemDef.gearImageUrl}`} offset={offset} />
-                                );
-                            })}
-                        {/* @ts-ignore */}
-                        </pixiContainer>
-                    </Application>
+                <div className="canvas-container bg-slate-800 rounded-2xl p-4 shadow-inner flex items-center justify-center filter drop-shadow-xl border border-white/5 w-full" style={{ height: '530px' }}>
+                    <PixiStageProvider className="w-full h-full flex items-center justify-center">
+                        <SpriteRenderer
+                            type="modular"
+                            gearLayers={gearLayers}
+                            width={380}
+                            height={480}
+                        />
+                    </PixiStageProvider>
                 </div>
             </div>
         </div>

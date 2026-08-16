@@ -34,8 +34,6 @@ export const TrainingView: React.FC = () => {
   // Persistent sequencer instance
   const sequencerRef = useRef<CombatAnimationSequencer>(new CombatAnimationSequencer());
 
-  const baseBodyUrl = getAssetUrl('/assets/gear/base-body.png');
-
   // Derive gear layers from inventory
   const gearLayers: GearLayerDescriptor[] = useMemo(() => {
     if (!playerState?.inventory?.items) return [];
@@ -215,8 +213,7 @@ export const TrainingView: React.FC = () => {
           <div className="z-10">
             <SpriteRenderer
               ref={playerSpriteRef}
-              type="composite"
-              baseBodyUrl={baseBodyUrl}
+              type="modular"
               gearLayers={gearLayers}
               width={256}
               height={320}
@@ -239,8 +236,7 @@ export const TrainingView: React.FC = () => {
             <div className="relative flex items-center justify-center">
               <SpriteRenderer
                 ref={dummySpriteRef}
-                type="composite"
-                baseBodyUrl={baseBodyUrl}
+                type="modular"
                 gearLayers={[]}
                 width={200}
                 height={280}

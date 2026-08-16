@@ -157,7 +157,13 @@ export default function SpritePreview({ spriteUrl, atlasUrl, animationKeys, whit
     return () => {
       destroyed = true;
       if (pixiApp) {
-        pixiApp.destroy(true, { children: true, texture: false });
+        try {
+          if (pixiApp.renderer) {
+            pixiApp.destroy({ removeView: true });
+          }
+        } catch (err) {
+          console.warn('[SpritePreview] Cleanup warning:', err);
+        }
       }
       appRef.current = null;
     };

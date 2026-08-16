@@ -1,5 +1,6 @@
 import type { GearSubType, ItemType } from './types';
 
+// Legacy knight body gear offsets (deprecated in favor of modular character skeleton)
 export const GEAR_OFFSETS: Record<GearSubType, { x: number; y: number }> = {
     HEAD: { x: 33, y: -293 },
     SHOULDERS: { x: 1, y: -203 },
@@ -9,6 +10,19 @@ export const GEAR_OFFSETS: Record<GearSubType, { x: number; y: number }> = {
     BOOTS: { x: 23, y: 221 },
     WEAPON: { x: 0, y: 91 }
 };
+
+export const MINER_SKELETON_PATH = '/assets/sprites/characters/miner/miner_skeleton.json';
+
+export const MODULAR_GEAR_SLOTS: Record<GearSubType, string> = {
+  HEAD: 'headNode',
+  SHOULDERS: 'torsoNode',
+  CHEST: 'torsoNode',
+  GAUNTLETS: 'armFrontNode',
+  LEGGINGS: 'pelvisNode',
+  BOOTS: 'legFrontNode',
+  WEAPON: 'toolSocket',
+};
+
 
 export const TYPE_LABELS: Record<ItemType, string> = {
   GEAR: 'Gear',
