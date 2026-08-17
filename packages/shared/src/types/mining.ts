@@ -64,6 +64,9 @@ export const MINING_CONFIG = {
   TORCH_FLICKER_SPEED: 4.0, // Hz
   TORCH_FLICKER_AMOUNT: 0.15, // intensity variation
 
+  CLIMB_SPEED: 3.5, // Grid tiles per second while ascending or descending ladders
+  LADDER_GRAB_WIDTH: 0.55, // Horizontal distance in tiles from ladder center within which player grips ladder
+
   /** Max session duration before server automatically closes session (15 minutes) */
   MAX_SESSION_DURATION_SECONDS: 15 * 60,
 } as const;
@@ -79,10 +82,24 @@ export const MiningTileType = {
   MINERAL: 3,
   CHEST: 4,
   ENTRANCE: 5,
+  LADDER: 6,
 } as const;
 
 export type MiningTileType = (typeof MiningTileType)[keyof typeof MiningTileType];
 
+export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE' | 'LADDER';
+
+export interface MiningBlockConfig {
+  id: string;
+  typeKey: MiningBlockTypeKey;
+  name: string;
+  description?: string | null;
+  textureUrl?: string | null;
+  mineTimeMs: number;
+  staminaCost: number;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
 
 // ---------------------------------------------------------------------------
 // Shared Data Structures

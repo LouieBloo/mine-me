@@ -23,13 +23,19 @@ export interface ServerTile {
  * Calculate damage stage (0-4) based on accumulated damage vs tile mining time.
  */
 export function getDamageStage(tile: ServerTile): number {
-  if (!tile.damageMs || tile.damageMs <= 0 || tile.type === MiningTileType.EMPTY || tile.type === MiningTileType.ENTRANCE) {
+  if (
+    !tile.damageMs ||
+    tile.damageMs <= 0 ||
+    tile.type === MiningTileType.EMPTY ||
+    tile.type === MiningTileType.ENTRANCE ||
+    tile.type === MiningTileType.LADDER ||
+    tile.type === MiningTileType.ROCK
+  ) {
     return 0;
   }
   let totalTimeMs: number = MINING_CONFIG.DIRT_MINE_TIME_MS;
   if (tile.type === MiningTileType.MINERAL) totalTimeMs = MINING_CONFIG.MINERAL_MINE_TIME_MS;
   if (tile.type === MiningTileType.CHEST) totalTimeMs = MINING_CONFIG.CHEST_MINE_TIME_MS;
-  if (tile.type === MiningTileType.ROCK) return 0;
 
   const ratio = tile.damageMs / totalTimeMs;
   if (ratio >= 0.9) return 4;

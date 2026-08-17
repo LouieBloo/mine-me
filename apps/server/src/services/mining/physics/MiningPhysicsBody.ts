@@ -123,7 +123,12 @@ export abstract class MiningPhysicsBody {
         if (ty < 0) continue;
 
         const tile = grid[ty][tx];
-        if (tile && tile.type !== MiningTileType.EMPTY && tile.type !== MiningTileType.ENTRANCE) {
+        if (
+          tile &&
+          tile.type !== MiningTileType.EMPTY &&
+          tile.type !== MiningTileType.ENTRANCE &&
+          tile.type !== MiningTileType.LADDER
+        ) {
           return true;
         }
       }

@@ -322,4 +322,78 @@ describe('MiningGameEngine', () => {
     expect(engine.isMining).toBe(true);
     expect(engine.miningTarget).toEqual({ x: 9, y: 1 });
   });
+
+  it('places a ladder tile at target or current player position', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+
+    engine.playerBody.position = { x: 12.5, y: 5.5 };
+
+    // Place ladder at player position
+    const placed = engine.placeLadder();
+    expect(placed).toBe(true);
+    expect(engine.grid[5][12].type).toBe(MiningTileType.LADDER);
+    expect(engine.grid[5][12].revealed).toBe(true);
+
+    // Place ladder at explicit coordinate
+    const placedTarget = engine.placeLadder({ x: 12, y: 6 });
+    expect(placedTarget).toBe(true);
+    expect(engine.grid[6][12].type).toBe(MiningTileType.LADDER);
+  });
+
+  it('allows mining adjacent blocks while climbing/holding on a ladder', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+
+    // Place ladder at (10, 5) and dirt at (11, 5)
+    engine.grid[5][10] = { type: MiningTileType.LADDER, revealed: true };
+    engine.grid[5][11] = { type: MiningTileType.DIRT, revealed: true };
+
+    // Player on ladder at (10.5, 5.5), in mid-air (not grounded)
+    engine.playerBody.position = { x: 10.5, y: 5.5 };
+    engine.playerBody.isGrounded = false;
+    engine.playerBody.isOnLadder = true;
+
+    // Face right towards the dirt block while on ladder
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: true,
+      miningKey: false,
+      sequence: 1,
+    });
+
+    (engine as any).tick(0.033);
+
+    expect(engine.isMining).toBe(true);
+    expect(engine.miningTarget).toEqual({ x: 11, y: 5 });
+  });
+
+  it('prevents mining or damaging ladder tiles', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+
+    // Place ladder above player at (10, 4)
+    engine.grid[4][10] = { type: MiningTileType.LADDER, revealed: true };
+    engine.playerBody.position = { x: 10.5, y: 5.0 };
+    engine.playerBody.isGrounded = true;
+
+    // Try to mine the ladder tile above
+    const started = engine.startMining({ x: 10, y: 4 });
+    expect(started).toBe(false);
+    expect(engine.isMining).toBe(false);
+  });
 });

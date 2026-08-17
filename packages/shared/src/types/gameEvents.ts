@@ -144,6 +144,11 @@ export interface MiningInteractPayload extends GameEventBase {
   target: MiningPosition;
 }
 
+export interface MiningPlaceLadderPayload extends GameEventBase {
+  type: 'mining_place_ladder';
+  target?: MiningPosition;
+}
+
 // ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
@@ -156,6 +161,7 @@ export type GameEventPayload =
   | MiningStartPayload
   | MiningInputPayload
   | MiningInteractPayload
+  | MiningPlaceLadderPayload
   | MiningMovePayload
   | MiningMineStartPayload
   | MiningMineCompletePayload

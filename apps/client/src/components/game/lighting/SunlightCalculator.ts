@@ -26,7 +26,11 @@ export function calculateSunlightMap(
   const isAirTile = (x: number, y: number): boolean => {
     if (x < 0 || x >= width || y < 0 || y >= height) return false;
     const tile = grid[y][x];
-    return tile.type === MiningTileType.EMPTY || tile.type === MiningTileType.ENTRANCE;
+    return (
+      tile.type === MiningTileType.EMPTY ||
+      tile.type === MiningTileType.ENTRANCE ||
+      tile.type === MiningTileType.LADDER
+    );
   };
 
   // Queue for lateral diffusion BFS

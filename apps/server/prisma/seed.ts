@@ -185,6 +185,34 @@ async function main() {
   }
   console.log('✅ Cities and materials seeded.');
 
+  // 5. Seed Mining Blocks
+  const blocksPath = path.join(dataPath, 'blocks.json');
+  if (fs.existsSync(blocksPath)) {
+    const blocks = JSON.parse(fs.readFileSync(blocksPath, 'utf-8'));
+    for (const blockData of blocks) {
+      await prisma.miningBlock.upsert({
+        where: { typeKey: blockData.typeKey },
+        update: {
+          name: blockData.name,
+          description: blockData.description,
+          textureUrl: blockData.textureUrl,
+          mineTimeMs: blockData.mineTimeMs,
+          staminaCost: blockData.staminaCost,
+        },
+        create: {
+          id: blockData.id,
+          typeKey: blockData.typeKey,
+          name: blockData.name,
+          description: blockData.description,
+          textureUrl: blockData.textureUrl,
+          mineTimeMs: blockData.mineTimeMs,
+          staminaCost: blockData.staminaCost,
+        },
+      });
+    }
+    console.log('✅ Mining blocks seeded.');
+  }
+
   console.log('🎉 Seed completed successfully!');
 }
 

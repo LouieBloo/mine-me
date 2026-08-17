@@ -19,6 +19,7 @@ export default function Layout() {
           <NavLink to="/map-editor" className={navLinkClass}>Map Editor</NavLink>
           <NavLink to="/inventory-items" className={navLinkClass}>Inventory Editor</NavLink>
           <NavLink to="/items" className={navLinkClass}>Items Editor</NavLink>
+          <NavLink to="/blocks" className={navLinkClass}>Blocks Editor</NavLink>
           <NavLink to="/effects" className={navLinkClass}>Effects Editor</NavLink>
           <NavLink to="/mobs" className={navLinkClass}>Mobs Editor</NavLink>
           <NavLink to="/character-viewer" className={navLinkClass}>Character Viewer</NavLink>

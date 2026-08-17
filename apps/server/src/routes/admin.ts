@@ -9,6 +9,7 @@ import * as InventoryController from '../controllers/admin/inventory.controller'
 import * as CharacterController from '../controllers/admin/character.controller';
 import * as CharacterLevelController from '../controllers/admin/character-level.controller';
 import * as EffectController from '../controllers/admin/effect.controller';
+import * as BlockController from '../controllers/admin/block.controller';
 import * as AdminValidation from '../validations/admin.validation';
 
 const adminRouter = express.Router();
@@ -77,5 +78,11 @@ adminRouter.get('/effects/:id', EffectController.getEffect);
 adminRouter.post('/effects', runValidation(AdminValidation.effectValidation), EffectController.createEffect);
 adminRouter.put('/effects/:id', runValidation(AdminValidation.effectValidation), EffectController.updateEffect);
 adminRouter.delete('/effects/:id', EffectController.deleteEffect);
+
+// MINING BLOCKS
+adminRouter.get('/blocks', BlockController.getBlocks);
+adminRouter.get('/blocks/:id', BlockController.getBlock);
+adminRouter.put('/blocks/:id', BlockController.updateBlock);
+adminRouter.post('/blocks/:id/texture', BlockController.blockTextureUpload, BlockController.uploadBlockTexture);
 
 export { adminRouter };

@@ -185,6 +185,97 @@ describe('MiningPhysicsBody & Subclasses (Gravity & Collision)', () => {
       expect(player.isGrounded).toBe(true);
       expect(player.position.y).toBeCloseTo(expectedRestingY, 1);
     });
+
+    it('climbs up and down on ladder tiles', () => {
+      // Create vertical ladder shaft at x=5, from y=2 to y=6
+      for (let y = 2; y <= 6; y++) {
+        grid[y][5] = { type: MiningTileType.LADDER, revealed: true };
+      }
+
+      // Player centered on ladder at (5.5, 4.5)
+      const player = new MiningPlayerBody({ x: 5.5, y: 4.5 });
+      expect(player.checkIsOnLadder(grid)).toBe(true);
+
+      // 1. Climb Up
+      player.processInputs(
+        { left: false, right: false, up: true, down: false, jump: false, miningKey: false, sequence: 1 },
+        grid
+      );
+      expect(player.isOnLadder).toBe(true);
+      expect(player.velocity.y).toBeCloseTo(-MINING_CONFIG.CLIMB_SPEED);
+      expect(player.hasGravity).toBe(false);
+
+      player.update(0.1, grid);
+      expect(player.position.y).toBeLessThan(4.5);
+
+      // 2. Climb Down
+      player.processInputs(
+        { left: false, right: false, up: false, down: true, jump: false, miningKey: false, sequence: 2 },
+        grid
+      );
+      expect(player.velocity.y).toBeCloseTo(MINING_CONFIG.CLIMB_SPEED);
+      expect(player.hasGravity).toBe(false);
+
+      player.update(0.2, grid);
+      expect(player.position.y).toBeGreaterThan(4.5 - 0.35);
+
+      // 3. Stationary Hold on Ladder (no vertical input)
+      player.processInputs(
+        { left: false, right: false, up: false, down: false, jump: false, miningKey: false, sequence: 3 },
+        grid
+      );
+      expect(player.velocity.y).toBe(0);
+      expect(player.hasGravity).toBe(false);
+
+      const holdY = player.position.y;
+      player.update(0.1, grid);
+      expect(player.position.y).toBeCloseTo(holdY, 4);
+    });
+
+    it('allows jumping off a ladder in mid-air', () => {
+      // Ladder at (5, 4)
+      grid[4][5] = { type: MiningTileType.LADDER, revealed: true };
+      const player = new MiningPlayerBody({ x: 5.5, y: 4.5 });
+
+      player.processInputs(
+        { left: false, right: false, up: false, down: false, jump: true, miningKey: false, sequence: 1 },
+        grid
+      );
+
+      // Jumping off ladder should give immediate upward jump force
+      expect(player.velocity.y).toBeCloseTo(-MINING_CONFIG.JUMP_FORCE);
+      expect(player.hasGravity).toBe(true);
+      expect(player.isGrounded).toBe(false);
+    });
+
+    it('falls when walking off a ladder into empty space', () => {
+      // Ladder at (5, 4)
+      grid[4][5] = { type: MiningTileType.LADDER, revealed: true };
+      const player = new MiningPlayerBody({ x: 5.5, y: 4.5 });
+
+      // Hold on ladder first
+      player.processInputs(
+        { left: false, right: false, up: false, down: false, jump: false, miningKey: false, sequence: 1 },
+        grid
+      );
+      expect(player.isOnLadder).toBe(true);
+      expect(player.hasGravity).toBe(false);
+
+      // Walk far to the right away from ladder (x > 5.5 + LADDER_GRAB_WIDTH)
+      player.position.x = 7.0; // 2 tiles away from ladder
+      player.processInputs(
+        { left: false, right: true, up: false, down: false, jump: false, miningKey: false, sequence: 2 },
+        grid
+      );
+
+      expect(player.isOnLadder).toBe(false);
+      expect(player.hasGravity).toBe(true);
+
+      // Simulate tick - player should fall downward under gravity
+      player.update(0.1, grid);
+      expect(player.velocity.y).toBeGreaterThan(0);
+      expect(player.position.y).toBeGreaterThan(4.5);
+    });
   });
 
   describe('MiningRockEntity', () => {

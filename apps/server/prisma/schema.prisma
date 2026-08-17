@@ -262,3 +262,18 @@ model ObjectEffects {
 
   @@unique([itemId, effectId])
 }
+
+// ----------------------------------------------------------------------------
+// MINING BLOCKS CONFIG
+// ----------------------------------------------------------------------------
+model MiningBlock {
+  id          String   @id @default(cuid())
+  typeKey     String   @unique // 'DIRT', 'ROCK', 'MINERAL', 'CHEST', 'ENTRANCE'
+  name        String
+  description String?
+  textureUrl  String?
+  mineTimeMs  Int      @default(500)
+  staminaCost Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

@@ -1,0 +1,68 @@
+[
+  {
+    "id": "block_chest",
+    "typeKey": "CHEST",
+    "name": "Treasure Chest",
+    "description": "Ancient subterranean chest containing rare spoils.",
+    "textureUrl": null,
+    "mineTimeMs": 1000,
+    "staminaCost": 1,
+    "createdAt": "2026-08-17T03:27:35.321Z",
+    "updatedAt": "2026-08-17T03:27:35.321Z"
+  },
+  {
+    "id": "block_dirt",
+    "typeKey": "DIRT",
+    "name": "Dirt",
+    "description": "Standard earthen ground. Easy to mine.",
+    "textureUrl": "/assets/mining/block_dirt-block.png",
+    "mineTimeMs": 500,
+    "staminaCost": 1,
+    "createdAt": "2026-08-17T03:27:35.305Z",
+    "updatedAt": "2026-08-17T03:37:24.822Z"
+  },
+  {
+    "id": "block_entrance",
+    "typeKey": "ENTRANCE",
+    "name": "Mine Entrance",
+    "description": "The ladder leading back to the surface.",
+    "textureUrl": "/assets/mining/block_entrance-block.png",
+    "mineTimeMs": 0,
+    "staminaCost": 0,
+    "createdAt": "2026-08-17T03:27:35.325Z",
+    "updatedAt": "2026-08-17T03:46:26.273Z"
+  },
+  {
+    "id": "block_mineral",
+    "typeKey": "MINERAL",
+    "name": "Mineral Vein",
+    "description": "Rock embedding valuable ore and crystals.",
+    "textureUrl": "/assets/mining/block_mineral-block.png",
+    "mineTimeMs": 1500,
+    "staminaCost": 1,
+    "createdAt": "2026-08-17T03:27:35.316Z",
+    "updatedAt": "2026-08-17T03:37:11.059Z"
+  },
+  {
+    "id": "block_rock",
+    "typeKey": "ROCK",
+    "name": "Rock",
+    "description": "Dense, solid rock. Can fall when unsupported.",
+    "textureUrl": null,
+    "mineTimeMs": 0,
+    "staminaCost": 0,
+    "createdAt": "2026-08-17T03:27:35.310Z",
+    "updatedAt": "2026-08-17T03:27:35.310Z"
+  },
+  {
+    "id": "block_ladder",
+    "typeKey": "LADDER",
+    "name": "Ladder",
+    "description": "A sturdy wooden ladder for ascending and descending vertical mine shafts.",
+    "textureUrl": "/assets/mining/block_entrance-block.png",
+    "mineTimeMs": 0,
+    "staminaCost": 0,
+    "createdAt": "2026-08-17T03:55:00.000Z",
+    "updatedAt": "2026-08-17T03:55:00.000Z"
+  }
+]

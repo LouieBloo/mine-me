@@ -50,7 +50,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const playerContainerRef = useRef<Container | null>(null);
   const tileGraphicsMap = useRef<Map<string, Graphics>>(new Map());
   const tileSpritesMap = useRef<Map<string, Sprite>>(new Map());
-  const dirtTextureRef = useRef<Texture | null>(null);
+  const blockTexturesRef = useRef<Map<number, Texture>>(new Map());
   const droppedSpritesMap = useRef<Map<string, Sprite | Graphics>>(new Map());
   const fallingRockGraphicsMap = useRef<Map<string, Graphics>>(new Map());
   const playerSpriteRef = useRef<ModularCharacterSprite | null>(null);
@@ -191,6 +191,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       } else if (key === 't' && isKeyDown) {
         // Toggle Debug Collision & Reach Shapes ON/OFF
         showDebugRef.current = !showDebugRef.current;
+      } else if (key === 'l' && isKeyDown) {
+        // Place ladder hotkey (for testing/building)
+        sendGameEvent({ type: 'mining_place_ladder' }).catch(() => {});
       }
 
       if (changed) {
@@ -397,16 +400,55 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           console.warn('[MiningGrid] Could not load underground dirt background texture:', err);
         });
 
-      const dirtTileUrl = getAssetUrl('/assets/mining/dirt-block.jpg');
-      const dirtTilePromise = Assets.load(dirtTileUrl)
-        .then((texture) => {
-          dirtTextureRef.current = texture;
-          // Force re-rendering of existing tile sprites if any
-          setTileTextureLoaded((prev) => prev + 1);
-        })
-        .catch((err) => {
-          console.warn('[MiningGrid] Could not load dirt block texture:', err);
-        });
+      // Fetch Mining Block configs and load custom textures
+      const blockPromises: Promise<any>[] = [];
+      try {
+        const res = await fetch(getAssetUrl('/api/public/blocks'));
+        if (res.ok) {
+          const blocks = await res.json();
+          for (const blk of blocks) {
+            if (blk.textureUrl) {
+              const tileType = MiningTileType[blk.typeKey as keyof typeof MiningTileType];
+              if (tileType !== undefined) {
+                const p = Assets.load(getAssetUrl(blk.textureUrl))
+                  .then((tex) => {
+                    blockTexturesRef.current.set(tileType, tex);
+                    setTileTextureLoaded((prev) => prev + 1);
+                  })
+                  .catch((err) => {
+                    console.warn(`[MiningGrid] Could not load texture for block ${blk.typeKey}:`, err);
+                  });
+                blockPromises.push(p);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[MiningGrid] Could not fetch public blocks, falling back to default textures:', err);
+        // Fallback for default dirt texture
+        const dirtTileUrl = getAssetUrl('/assets/mining/dirt-block.jpg');
+        const fallbackPromise = Assets.load(dirtTileUrl)
+          .then((texture) => {
+            blockTexturesRef.current.set(MiningTileType.DIRT, texture);
+            setTileTextureLoaded((prev) => prev + 1);
+          })
+          .catch((e) => {
+            console.warn('[MiningGrid] Could not load default dirt texture:', e);
+          });
+        blockPromises.push(fallbackPromise);
+
+        // Fallback for ladder texture
+        const ladderTileUrl = getAssetUrl('/assets/mining/block_entrance-block.png');
+        const ladderFallbackPromise = Assets.load(ladderTileUrl)
+          .then((texture) => {
+            blockTexturesRef.current.set(MiningTileType.LADDER, texture);
+            setTileTextureLoaded((prev) => prev + 1);
+          })
+          .catch((e) => {
+            console.warn('[MiningGrid] Could not load default ladder texture:', e);
+          });
+        blockPromises.push(ladderFallbackPromise);
+      }
 
       // Create Modular Character Sprite (initially hidden)
       const sprite = new ModularCharacterSprite(playerContainer);
@@ -446,7 +488,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         }
       })();
 
-      await Promise.allSettled([bgPromise, dirtTilePromise, spritePromise]);
+      await Promise.allSettled([bgPromise, spritePromise, ...blockPromises]);
       if (gridContainerRef.current) {
         onAssetsLoadedRef.current?.();
       }
@@ -499,12 +541,12 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           tileGraphicsMap.current.set(key, graphics);
         }
 
-        const dirtTexture = dirtTextureRef.current;
+        const blockTexture = tile.revealed ? blockTexturesRef.current.get(tile.type) : undefined;
         let tileSprite = tileSpritesMap.current.get(key);
 
-        if (tile.revealed && tile.type === MiningTileType.DIRT && dirtTexture) {
+        if (tile.revealed && blockTexture) {
           if (!tileSprite) {
-            tileSprite = new Sprite(dirtTexture);
+            tileSprite = new Sprite(blockTexture);
             tileSprite.x = x * TILE_SIZE;
             tileSprite.y = y * TILE_SIZE;
             tileSprite.width = TILE_SIZE;
@@ -513,7 +555,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
             tilesContainer.addChildAt(tileSprite, Math.max(0, tilesContainer.getChildIndex(graphics)));
             tileSpritesMap.current.set(key, tileSprite);
           } else {
-            tileSprite.texture = dirtTexture;
+            tileSprite.texture = blockTexture;
             tileSprite.visible = true;
           }
         } else if (tileSprite) {
@@ -525,43 +567,60 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
           graphics.fill(0x000000);
         } else {
-          switch (tile.type) {
-            case MiningTileType.EMPTY:
-              // Empty space shows background
-              break;
-            case MiningTileType.DIRT:
-              if (!dirtTexture) {
+          if (!blockTexture) {
+            switch (tile.type) {
+              case MiningTileType.EMPTY:
+                // Empty space shows background
+                break;
+              case MiningTileType.DIRT:
                 graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
                 graphics.fill(0x451a03);
                 graphics.circle(16, 20, 2);
                 graphics.circle(48, 12, 1.5);
                 graphics.circle(32, 44, 2);
                 graphics.fill(0x78350f);
-              }
-              break;
-            case MiningTileType.ROCK:
-              graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
-              graphics.fill(0x334155);
-              break;
-            case MiningTileType.MINERAL:
-              graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
-              graphics.fill(0x312e81);
-              graphics.circle(20, 20, 3);
-              graphics.circle(44, 24, 4);
-              graphics.fill(0xf59e0b);
-              break;
-            case MiningTileType.CHEST:
-              graphics.rect(4, 4, TILE_SIZE - 8, TILE_SIZE - 8);
-              graphics.fill(0xd97706);
-              break;
-            case MiningTileType.ENTRANCE:
-              graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
-              graphics.fill(0x064e3b);
-              break;
+                break;
+              case MiningTileType.ROCK:
+                graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
+                graphics.fill(0x334155);
+                break;
+              case MiningTileType.MINERAL:
+                graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
+                graphics.fill(0x312e81);
+                graphics.circle(20, 20, 3);
+                graphics.circle(44, 24, 4);
+                graphics.fill(0xf59e0b);
+                break;
+              case MiningTileType.CHEST:
+                graphics.rect(4, 4, TILE_SIZE - 8, TILE_SIZE - 8);
+                graphics.fill(0xd97706);
+                break;
+              case MiningTileType.ENTRANCE:
+                graphics.rect(0, 0, TILE_SIZE, TILE_SIZE);
+                graphics.fill(0x064e3b);
+                break;
+              case MiningTileType.LADDER:
+                // Wooden side rails
+                graphics.rect(14, 0, 6, TILE_SIZE);
+                graphics.rect(TILE_SIZE - 20, 0, 6, TILE_SIZE);
+                graphics.fill(0x78350f);
+                // Wooden rungs
+                for (let ry = 8; ry < TILE_SIZE; ry += 14) {
+                  graphics.rect(14, ry, TILE_SIZE - 28, 4);
+                }
+                graphics.fill(0xb45309);
+                break;
+            }
           }
 
-          // Render crack overlay if block is partially mined
-          if (tile.damageStage && tile.damageStage > 0 && tile.type !== MiningTileType.EMPTY) {
+          // Render crack overlay if block is partially mined (exclude non-mineable tiles: EMPTY, ENTRANCE, LADDER)
+          if (
+            tile.damageStage &&
+            tile.damageStage > 0 &&
+            tile.type !== MiningTileType.EMPTY &&
+            tile.type !== MiningTileType.ENTRANCE &&
+            tile.type !== MiningTileType.LADDER
+          ) {
             const c = TILE_SIZE / 2;
             const darkColor = 0x000000;
             if (tile.damageStage >= 1) {

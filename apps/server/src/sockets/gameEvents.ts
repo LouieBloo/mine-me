@@ -6,6 +6,7 @@ import {
   handleMiningStart,
   handleMiningInput,
   handleMiningInteract,
+  handleMiningPlaceLadder,
   handleMiningExit,
   handleMiningCancel,
 } from './miningEvents';
@@ -525,6 +526,7 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   mining_start: handleMiningStart,
   mining_input: handleMiningInput,
   mining_interact: handleMiningInteract,
+  mining_place_ladder: handleMiningPlaceLadder,
   mining_exit: handleMiningExit,
   mining_cancel: handleMiningCancel,
   equip_item: handleEquipItem,

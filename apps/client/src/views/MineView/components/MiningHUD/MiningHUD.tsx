@@ -244,6 +244,11 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
             </span>
             <span className="text-slate-700">|</span>
             <span className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">L</kbd>
+              <span className="text-amber-400">Place Ladder</span>
+            </span>
+            <span className="text-slate-700">|</span>
+            <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">T</kbd>
               <span>Debug</span>
             </span>

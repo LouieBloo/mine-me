@@ -79,6 +79,24 @@ describe('SunlightCalculator', () => {
     expect(sunlight[1][0]).toBe(0);
   });
 
+  it('should propagate sunlight through LADDER and ENTRANCE tiles', () => {
+    // 5x5 grid with LADDER at y=0,1,2 in column 2, blocked at y=3 by DIRT
+    const grid: MiningClientTile[][] = Array.from({ length: 5 }, (_, y) =>
+      Array.from({ length: 5 }, (_, x) => ({
+        type: x === 2 && y <= 2 ? MiningTileType.LADDER : MiningTileType.DIRT,
+        revealed: true,
+      }))
+    );
+
+    const sunlight = calculateSunlightMap(grid, 5, 0.4);
+
+    expect(sunlight[0][2]).toBeGreaterThan(0.8);
+    expect(sunlight[1][2]).toBeGreaterThan(0.5);
+    expect(sunlight[2][2]).toBeGreaterThan(0.3);
+    // Blocked from y=3
+    expect(sunlight[3][2]).toBe(0);
+  });
+
   it('should handle empty or degenerate grids safely', () => {
     expect(calculateSunlightMap([])).toEqual([]);
     expect(calculateSunlightMap([[]])).toEqual([]);

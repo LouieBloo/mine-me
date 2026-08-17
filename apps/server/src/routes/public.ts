@@ -30,3 +30,14 @@ publicRouter.get('/levels', async (req: Request, res: Response): Promise<any> =>
     return res.status(500).json({ error: err.message });
   }
 });
+
+publicRouter.get('/blocks', async (req: Request, res: Response): Promise<any> => {
+  try {
+    const blocks = await prisma.miningBlock.findMany({
+      orderBy: { typeKey: 'asc' }
+    });
+    return res.json(blocks);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});

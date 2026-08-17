@@ -118,6 +118,27 @@ export const handleMiningInteract = async (
 };
 
 /**
+ * Handler: mining_place_ladder
+ * Places a ladder at target position or player's current tile for testing/building.
+ */
+export const handleMiningPlaceLadder = async (
+  io: Server,
+  socket: Socket,
+  payload: { target?: { x: number; y: number } },
+): Promise<GameEventResult> => {
+  const characterId = socket.data.characterId;
+  if (!characterId) return { success: false, error: 'No character selected.' };
+
+  const engine = miningSessionManager.getSession(characterId);
+  if (!engine) return { success: false, error: 'No active mining session.' };
+
+  const placed = engine.placeLadder(payload.target);
+  if (!placed) return { success: false, error: 'Cannot place ladder here.' };
+
+  return { success: true };
+};
+
+/**
  * Handler: mining_exit
  * Extracts from the mine. Saves temporary loot to PostgreSQL inventory.
  */

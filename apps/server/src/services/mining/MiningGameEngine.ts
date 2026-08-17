@@ -155,11 +155,16 @@ export class MiningGameEngine {
    */
   public startMining(target: MiningPosition): boolean {
     if (this.isMining) return false;
-    if (!this.playerBody.isGrounded) return false;
+    // Allow mining if player is on ground OR on a ladder
+    if (!this.playerBody.isGrounded && !this.playerBody.isOnLadder) return false;
     if (!isInBounds(target.x, target.y)) return false;
 
     const tile = this.grid[target.y][target.x];
-    if (tile.type === MiningTileType.EMPTY || tile.type === MiningTileType.ENTRANCE) {
+    if (
+      tile.type === MiningTileType.EMPTY ||
+      tile.type === MiningTileType.ENTRANCE ||
+      tile.type === MiningTileType.LADDER
+    ) {
       return false;
     }
 
@@ -196,6 +201,32 @@ export class MiningGameEngine {
   }
 
   /**
+   * Place a ladder tile at the specified position or player's current grid position.
+   */
+  public placeLadder(target?: MiningPosition): boolean {
+    const x = target ? target.x : Math.floor(this.playerBody.position.x);
+    const y = target ? target.y : Math.floor(this.playerBody.position.y);
+
+    if (!isInBounds(x, y)) return false;
+
+    const tile = this.grid[y][x];
+    // Can place ladder on EMPTY or replace existing non-bedrock tiles
+    if (tile.type === MiningTileType.ENTRANCE) return false;
+
+    tile.type = MiningTileType.LADDER;
+    tile.revealed = true;
+    tile.damageMs = 0;
+
+    this.pendingRevealedTiles.push({
+      x,
+      y,
+      type: MiningTileType.LADDER,
+    });
+
+    return true;
+  }
+
+  /**
    * Main 30 Hz simulation tick execution.
    */
   private tick(dt: number): void {
@@ -209,8 +240,8 @@ export class MiningGameEngine {
       return;
     }
 
-    // 1. Process player input velocity
-    this.playerBody.processInputs(this.inputs);
+    // 1. Process player input velocity & ladder climbing
+    this.playerBody.processInputs(this.inputs, this.grid);
 
     // 2. Physics & Collision Handling for Player
     this.playerBody.update(dt, this.grid);
@@ -237,8 +268,10 @@ export class MiningGameEngine {
     const desiredTargetX = playerTileX + this.playerBody.facing.x;
     const desiredTargetY = playerTileY + this.playerBody.facing.y;
 
+    const canMineStance = this.playerBody.isGrounded || this.playerBody.isOnLadder;
+
     if (this.isMining && this.miningTarget) {
-      // If player released input, faces a different target, moves out of range, or becomes airborne (jumping/falling), stop mining
+      // If player released input, faces a different target, moves out of range, or is airborne (not grounded and not on ladder), stop mining
       const isFacingCurrentTarget = hasDirectionInput && this.miningTarget.x === desiredTargetX && this.miningTarget.y === desiredTargetY;
       const isDiagonalTarget = this.miningTarget.x !== playerTileX && this.miningTarget.y !== playerTileY;
       const maxAllowedDist = isDiagonalTarget ? 1.85 : 1.35;
@@ -246,13 +279,13 @@ export class MiningGameEngine {
       const tileCenterY = this.miningTarget.y + 0.5;
       const dist = Math.hypot(this.playerBody.position.x - tileCenterX, this.playerBody.position.y - tileCenterY);
 
-      if (!isFacingCurrentTarget || dist > maxAllowedDist || !this.playerBody.isGrounded) {
+      if (!isFacingCurrentTarget || dist > maxAllowedDist || !canMineStance) {
         this.stopMining();
       }
     }
 
-    // If not currently mining, player has direction input, and player is grounded, check if we should start mining the target block
-    if (!this.isMining && hasDirectionInput && this.playerBody.isGrounded) {
+    // If not currently mining, player has direction input, and player can mine (grounded or on ladder), check if we should start mining the target block
+    if (!this.isMining && hasDirectionInput && canMineStance) {
       if (isInBounds(desiredTargetX, desiredTargetY)) {
         const tile = this.grid[desiredTargetY][desiredTargetX];
         if (

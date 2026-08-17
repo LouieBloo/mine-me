@@ -17,6 +17,8 @@ import CharacterLevel from './pages/CharacterLevel/CharacterLevel';
 import CharacterViewer from './pages/CharacterViewer/CharacterViewer';
 import Effects from './pages/Effects/Effects';
 import EffectDetail from './pages/Effects/EffectDetail';
+import Blocks from './pages/Blocks/Blocks';
+import BlockDetail from './pages/Blocks/BlockDetail/BlockDetail';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -58,6 +60,14 @@ const router = createBrowserRouter([
       {
         path: "effects/:id",
         element: <EffectDetail />
+      },
+      {
+        path: "blocks",
+        element: <Blocks />
+      },
+      {
+        path: "blocks/:id",
+        element: <BlockDetail />
       },
       {
         path: "mobs",
