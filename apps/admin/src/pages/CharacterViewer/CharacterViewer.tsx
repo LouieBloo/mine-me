@@ -23,10 +23,18 @@ export default function CharacterViewer() {
     items,
     isSaving,
     partOverrides,
+    handJointOverride,
+    toolSocketOverride,
     skeletonUrl,
     currentUpdatedManifest,
     handlePartValueChange,
     stepPartValue,
+    handleHandJointChange,
+    stepHandJointValue,
+    resetHandJointToInitial,
+    handleToolSocketChange,
+    stepToolSocketValue,
+    resetToolSocketToInitial,
     resetPartToInitial,
     resetAllOverrides,
     handleSaveChanges,
@@ -157,6 +165,8 @@ export default function CharacterViewer() {
               hiddenParts={hiddenParts}
               highlightedPart={highlightedPart}
               selectedGear={gearDescriptors}
+              handJointOverride={handJointOverride}
+              toolSocketOverride={toolSocketOverride}
               partOverrides={partOverrides}
               rootOffsetY={rootOffsetY}
               width={420}
@@ -237,6 +247,14 @@ export default function CharacterViewer() {
               onResetPart={resetPartToInitial}
               onChangePartValue={handlePartValueChange}
               onStepPartValue={stepPartValue}
+              handJointOverride={handJointOverride}
+              onChangeHandJoint={handleHandJointChange}
+              onStepHandJoint={stepHandJointValue}
+              onResetHandJoint={resetHandJointToInitial}
+              toolSocketOverride={toolSocketOverride}
+              onChangeToolSocket={handleToolSocketChange}
+              onStepToolSocket={stepToolSocketValue}
+              onResetToolSocket={resetToolSocketToInitial}
             />
           )}
 
@@ -247,6 +265,10 @@ export default function CharacterViewer() {
               selectedGear={selectedGear}
               setSelectedGear={setSelectedGear}
               activeGearCount={gearDescriptors.length}
+              toolSocketOverride={toolSocketOverride}
+              onChangeToolSocket={handleToolSocketChange}
+              onStepToolSocket={stepToolSocketValue}
+              onResetToolSocket={resetToolSocketToInitial}
             />
           )}
 

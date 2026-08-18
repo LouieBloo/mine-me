@@ -1,10 +1,26 @@
 import type { GearSubType } from '@mine-me/shared';
 import type { CharacterAnimationState } from './animation/ModularAnimationEngine';
-import { useModularCanvasScene, type SkeletonManifest, type SkeletonPartDef } from './hooks/useModularCanvasScene';
+import {
+  useModularCanvasScene,
+  type SkeletonManifest,
+  type SkeletonPartDef,
+  type SkeletonHandJointDef,
+  type SkeletonToolSocketDef,
+  type HandJointOverride,
+  type ToolSocketOverride,
+} from './hooks/useModularCanvasScene';
 import { useModularGear } from './hooks/useModularGear';
 import './ModularCharacterCanvas.css';
 
-export type { SkeletonManifest, SkeletonPartDef, CharacterAnimationState };
+export type {
+  SkeletonManifest,
+  SkeletonPartDef,
+  SkeletonHandJointDef,
+  SkeletonToolSocketDef,
+  HandJointOverride,
+  ToolSocketOverride,
+  CharacterAnimationState,
+};
 
 export interface ModularCharacterCanvasProps {
   manifestUrl?: string;
@@ -19,6 +35,8 @@ export interface ModularCharacterCanvasProps {
   hiddenParts?: string[];
   highlightedPart?: string | null;
   selectedGear?: Array<{ url: string; subType: GearSubType }>;
+  handJointOverride?: HandJointOverride;
+  toolSocketOverride?: ToolSocketOverride;
   partOverrides?: Record<
     string,
     {
@@ -49,6 +67,8 @@ export default function ModularCharacterCanvas({
   hiddenParts = [],
   highlightedPart = null,
   selectedGear = [],
+  handJointOverride,
+  toolSocketOverride,
   partOverrides = {},
   rootOffsetY = 0,
   width = 460,
@@ -67,6 +87,8 @@ export default function ModularCharacterCanvas({
     showDebugBbox,
     hiddenParts,
     highlightedPart,
+    handJointOverride,
+    toolSocketOverride,
     partOverrides,
     rootOffsetY,
     width,

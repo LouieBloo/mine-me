@@ -16,11 +16,35 @@ export interface SkeletonPartDef {
   slot: string;
 }
 
+export interface SkeletonHandJointDef {
+  offset: [number, number];
+}
+
+export interface SkeletonToolSocketDef {
+  offset: [number, number];
+  scale?: number;
+  rotation?: number;
+}
+
 export interface SkeletonManifest {
   version: string;
   canvas_size: [number, number];
   pelvis_origin: [number, number];
+  hand_joint?: SkeletonHandJointDef;
+  tool_socket?: SkeletonToolSocketDef;
   parts: Record<string, SkeletonPartDef>;
+}
+
+export interface HandJointOverride {
+  offsetX: number;
+  offsetY: number;
+}
+
+export interface ToolSocketOverride {
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+  rotation: number;
 }
 
 export interface UseModularCanvasSceneOptions {
@@ -35,6 +59,8 @@ export interface UseModularCanvasSceneOptions {
   showDebugBbox?: boolean;
   hiddenParts?: string[];
   highlightedPart?: string | null;
+  handJointOverride?: HandJointOverride;
+  toolSocketOverride?: ToolSocketOverride;
   partOverrides?: Record<
     string,
     {
@@ -64,6 +90,8 @@ export function useModularCanvasScene({
   hiddenParts = [],
   highlightedPart = null,
   partOverrides = {},
+  handJointOverride,
+  toolSocketOverride,
   rootOffsetY = 0,
   width = 460,
   height = 520,
@@ -81,6 +109,7 @@ export function useModularCanvasScene({
     head: null,
     armFront: null,
     armBack: null,
+    handFront: null,
     legFront: null,
     legBack: null,
     toolSocket: null,
@@ -103,6 +132,8 @@ export function useModularCanvasScene({
     hiddenParts,
     highlightedPart,
     partOverrides,
+    handJointOverride,
+    toolSocketOverride,
     rootOffsetY,
     width,
     height,
@@ -121,6 +152,8 @@ export function useModularCanvasScene({
       hiddenParts,
       highlightedPart,
       partOverrides,
+      handJointOverride,
+      toolSocketOverride,
       rootOffsetY,
       width,
       height,
@@ -137,6 +170,8 @@ export function useModularCanvasScene({
     hiddenParts,
     highlightedPart,
     partOverrides,
+    handJointOverride,
+    toolSocketOverride,
     rootOffsetY,
     width,
     height,
@@ -201,17 +236,19 @@ export function useModularCanvasScene({
         const headNode = new Container();
         const armFrontNode = new Container();
         const armBackNode = new Container();
+        const handFrontNode = new Container();
         const legFrontNode = new Container();
         const legBackNode = new Container();
         const toolSocket = new Container();
         const debugLayer = new Graphics();
 
         // Joint hierarchy
+        handFrontNode.addChild(toolSocket);
+        armFrontNode.addChild(handFrontNode);
         torsoNode.addChild(armBackNode);
         torsoNode.addChild(torsoBodyNode);
         torsoNode.addChild(headNode);
         torsoNode.addChild(armFrontNode);
-        armFrontNode.addChild(toolSocket);
 
         pelvisNode.addChild(legBackNode);
         pelvisNode.addChild(torsoNode);
@@ -228,14 +265,23 @@ export function useModularCanvasScene({
           head: headNode,
           armFront: armFrontNode,
           armBack: armBackNode,
+          handFront: handFrontNode,
           legFront: legFrontNode,
           legBack: legBackNode,
           toolSocket,
           debugLayer,
         };
 
-        toolSocket.x = -10;
-        toolSocket.y = 120;
+        if (manifest.hand_joint) {
+          handFrontNode.x = manifest.hand_joint.offset[0];
+          handFrontNode.y = manifest.hand_joint.offset[1];
+        } else {
+          handFrontNode.x = 210;
+          handFrontNode.y = 100;
+        }
+
+        toolSocket.x = 0;
+        toolSocket.y = 0;
 
         // Load and attach part sprites
         partSpritesRef.current.clear();
@@ -327,6 +373,44 @@ export function useModularCanvasScene({
               }
             }
           });
+
+          // Apply hand joint live override or manifest config
+          if (nodes.handFront) {
+            const handOv = statePropsRef.current.handJointOverride;
+            if (handOv) {
+              nodes.handFront.x = handOv.offsetX;
+              nodes.handFront.y = handOv.offsetY;
+            } else if (manifest.hand_joint) {
+              nodes.handFront.x = manifest.hand_joint.offset[0];
+              nodes.handFront.y = manifest.hand_joint.offset[1];
+            } else {
+              nodes.handFront.x = 210;
+              nodes.handFront.y = 100;
+            }
+          }
+
+          // Apply tool socket live override or manifest config
+          const socketOv = statePropsRef.current.toolSocketOverride;
+          if (socketOv) {
+            nodes.toolSocket.x = socketOv.offsetX;
+            nodes.toolSocket.y = socketOv.offsetY;
+            nodes.toolSocket.scale.set(socketOv.scale);
+            nodes.toolSocket.rotation = socketOv.rotation;
+          } else if (manifest.tool_socket) {
+            nodes.toolSocket.x = manifest.tool_socket.offset[0];
+            nodes.toolSocket.y = manifest.tool_socket.offset[1];
+            if (manifest.tool_socket.scale !== undefined) {
+              nodes.toolSocket.scale.set(manifest.tool_socket.scale);
+            }
+            if (manifest.tool_socket.rotation !== undefined) {
+              nodes.toolSocket.rotation = manifest.tool_socket.rotation;
+            }
+          } else {
+            nodes.toolSocket.x = 0;
+            nodes.toolSocket.y = 0;
+            nodes.toolSocket.scale.set(1);
+            nodes.toolSocket.rotation = 0;
+          }
 
           // Procedural animation update
           const dt = (ticker.deltaTime || 1) / 60;

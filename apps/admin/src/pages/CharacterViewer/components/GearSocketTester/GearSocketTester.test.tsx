@@ -27,4 +27,38 @@ describe('GearSocketTester', () => {
     fireEvent.click(clearButton);
     expect(setSelectedGear).toHaveBeenCalledWith({});
   });
+
+  it('renders tool socket controls and responds to tuning step clicks', () => {
+    const onStep = vi.fn();
+    const onChange = vi.fn();
+    const onReset = vi.fn();
+
+    render(
+      <GearSocketTester
+        items={mockItems}
+        selectedGear={{ WEAPON: 'sword_1' }}
+        setSelectedGear={vi.fn()}
+        activeGearCount={1}
+        toolSocketOverride={{
+          offsetX: -10,
+          offsetY: 120,
+          scale: 1,
+          rotation: 0,
+        }}
+        onChangeToolSocket={onChange}
+        onStepToolSocket={onStep}
+        onResetToolSocket={onReset}
+      />
+    );
+
+    expect(screen.getByText(/Weapon Socket Tuning/i)).toBeDefined();
+    const plusButtons = screen.getAllByText('+');
+    expect(plusButtons.length).toBeGreaterThan(0);
+    fireEvent.click(plusButtons[0]);
+    expect(onStep).toHaveBeenCalled();
+
+    const resetButton = screen.getByText('Reset Socket');
+    fireEvent.click(resetButton);
+    expect(onReset).toHaveBeenCalled();
+  });
 });

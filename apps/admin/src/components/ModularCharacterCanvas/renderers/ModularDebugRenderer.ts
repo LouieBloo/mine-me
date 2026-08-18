@@ -21,6 +21,9 @@ export class ModularDebugRenderer {
 
     const { showBones, showJoints, showBbox, baseScaleRatio } = options;
 
+    const handX = nodes.handFront ? nodes.handFront.x : 210;
+    const handY = nodes.handFront ? nodes.handFront.y : 100;
+
     if (showBones) {
       // Draw skeleton connection lines
       g.moveTo(0, 0); // Pelvis
@@ -35,9 +38,14 @@ export class ModularDebugRenderer {
 
       // Torso -> Arms
       g.moveTo(nodes.torso.x, nodes.torso.y);
-      g.lineTo(nodes.torso.x + nodes.armFront.x, nodes.torso.y + nodes.armFront.y);
-      g.moveTo(nodes.torso.x, nodes.torso.y);
       g.lineTo(nodes.torso.x + nodes.armBack.x, nodes.torso.y + nodes.armBack.y);
+
+      // Torso -> Front Shoulder -> Hand
+      const shoulderX = nodes.torso.x + nodes.armFront.x;
+      const shoulderY = nodes.torso.y + nodes.armFront.y;
+      g.moveTo(nodes.torso.x, nodes.torso.y);
+      g.lineTo(shoulderX, shoulderY);
+      g.lineTo(shoulderX + handX, shoulderY + handY);
 
       g.stroke({ width: 3, color: 0x38bdf8, alpha: 0.8 }); // sky-400
     }
@@ -52,10 +60,16 @@ export class ModularDebugRenderer {
       g.fill(0xfacc15);
 
       // Shoulder Front & Back (Orange)
-      g.circle(nodes.torso.x + nodes.armFront.x, nodes.torso.y + nodes.armFront.y, 6);
+      const shoulderX = nodes.torso.x + nodes.armFront.x;
+      const shoulderY = nodes.torso.y + nodes.armFront.y;
+      g.circle(shoulderX, shoulderY, 6);
       g.fill(0xf97316);
       g.circle(nodes.torso.x + nodes.armBack.x, nodes.torso.y + nodes.armBack.y, 5);
       g.fill(0xf97316);
+
+      // Hand / Wrist joint (Cyan #06b6d4)
+      g.circle(shoulderX + handX, shoulderY + handY, 6);
+      g.fill(0x06b6d4);
 
       // Hip joints (Purple)
       g.circle(nodes.legFront.x, nodes.legFront.y, 6);
@@ -65,9 +79,9 @@ export class ModularDebugRenderer {
 
       // Tool socket (Red)
       g.circle(
-        nodes.torso.x + nodes.armFront.x + nodes.toolSocket.x,
-        nodes.torso.y + nodes.armFront.y + nodes.toolSocket.y,
-        6
+        shoulderX + handX + nodes.toolSocket.x,
+        shoulderY + handY + nodes.toolSocket.y,
+        5
       );
       g.fill(0xef4444);
     }

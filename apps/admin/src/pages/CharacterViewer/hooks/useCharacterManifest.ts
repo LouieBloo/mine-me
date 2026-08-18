@@ -13,6 +13,18 @@ export type PartOverride = {
   pivotY: number;
 };
 
+export type HandJointOverride = {
+  offsetX: number;
+  offsetY: number;
+};
+
+export type ToolSocketOverride = {
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+  rotation: number;
+};
+
 export type PartOverridesMap = Record<string, PartOverride>;
 
 export function useCharacterManifest() {
@@ -25,6 +37,16 @@ export function useCharacterManifest() {
   const [items, setItems] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [partOverrides, setPartOverrides] = useState<PartOverridesMap>({});
+  const [handJointOverride, setHandJointOverride] = useState<HandJointOverride>({
+    offsetX: 210,
+    offsetY: 100,
+  });
+  const [toolSocketOverride, setToolSocketOverride] = useState<ToolSocketOverride>({
+    offsetX: 0,
+    offsetY: 0,
+    scale: 1,
+    rotation: 0,
+  });
 
   const skeletonUrl = getAssetUrl(MINER_SKELETON_PATH);
 
@@ -61,6 +83,25 @@ export function useCharacterManifest() {
           }
         }
         setPartOverrides(initialOverrides);
+
+        // Initialize handJointOverride
+        if (manifestData?.hand_joint) {
+          setHandJointOverride({
+            offsetX: manifestData.hand_joint.offset[0] ?? 210,
+            offsetY: manifestData.hand_joint.offset[1] ?? 100,
+          });
+        }
+
+        // Initialize toolSocketOverride
+        if (manifestData?.tool_socket) {
+          setToolSocketOverride({
+            offsetX: manifestData.tool_socket.offset[0] ?? 0,
+            offsetY: manifestData.tool_socket.offset[1] ?? 0,
+            scale: manifestData.tool_socket.scale ?? 1,
+            rotation: manifestData.tool_socket.rotation ?? 0,
+          });
+        }
+
         setItems(Array.isArray(itemsData) ? itemsData : []);
         setLoading(false);
       })
@@ -148,6 +189,80 @@ export function useCharacterManifest() {
     toast.info(`Reset ${partName} to saved defaults`);
   };
 
+  // Handle hand joint changes
+  const handleHandJointChange = (field: keyof HandJointOverride, value: number) => {
+    setHandJointOverride((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const stepHandJointValue = (field: keyof HandJointOverride, delta: number) => {
+    setHandJointOverride((prev) => ({
+      ...prev,
+      [field]: Math.round(prev[field] + delta),
+    }));
+  };
+
+  const resetHandJointToInitial = () => {
+    if (initialManifest?.hand_joint) {
+      setHandJointOverride({
+        offsetX: initialManifest.hand_joint.offset[0] ?? 210,
+        offsetY: initialManifest.hand_joint.offset[1] ?? 100,
+      });
+    } else {
+      setHandJointOverride({
+        offsetX: 210,
+        offsetY: 100,
+      });
+    }
+    toast.info('Reset hand joint to saved defaults');
+  };
+
+  // Handle tool socket changes
+  const handleToolSocketChange = (field: keyof ToolSocketOverride, value: number) => {
+    setToolSocketOverride((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const stepToolSocketValue = (
+    field: keyof ToolSocketOverride,
+    delta: number,
+    isFloat = false
+  ) => {
+    setToolSocketOverride((prev) => {
+      const currentVal = prev[field];
+      const newVal = isFloat
+        ? Math.round((currentVal + delta) * 100) / 100
+        : Math.round(currentVal + delta);
+      return {
+        ...prev,
+        [field]: newVal,
+      };
+    });
+  };
+
+  const resetToolSocketToInitial = () => {
+    if (initialManifest?.tool_socket) {
+      setToolSocketOverride({
+        offsetX: initialManifest.tool_socket.offset[0] ?? 0,
+        offsetY: initialManifest.tool_socket.offset[1] ?? 0,
+        scale: initialManifest.tool_socket.scale ?? 1,
+        rotation: initialManifest.tool_socket.rotation ?? 0,
+      });
+    } else {
+      setToolSocketOverride({
+        offsetX: 0,
+        offsetY: 0,
+        scale: 1,
+        rotation: 0,
+      });
+    }
+    toast.info('Reset weapon tool socket to saved defaults');
+  };
+
   // Reset all overrides to initial manifest
   const resetAllOverrides = () => {
     if (initialManifest?.parts) {
@@ -164,6 +279,8 @@ export function useCharacterManifest() {
       }
       setPartOverrides(initOv);
     }
+    resetHandJointToInitial();
+    resetToolSocketToInitial();
   };
 
   // Build current manifest snapshot with overrides applied
@@ -178,8 +295,20 @@ export function useCharacterManifest() {
         updated.parts[pName].pivot_anchor = [ov.pivotX, ov.pivotY];
       }
     }
+    if (handJointOverride) {
+      updated.hand_joint = {
+        offset: [handJointOverride.offsetX, handJointOverride.offsetY],
+      };
+    }
+    if (toolSocketOverride) {
+      updated.tool_socket = {
+        offset: [toolSocketOverride.offsetX, toolSocketOverride.offsetY],
+        scale: toolSocketOverride.scale,
+        rotation: toolSocketOverride.rotation,
+      };
+    }
     return updated;
-  }, [manifest, partOverrides]);
+  }, [manifest, partOverrides, handJointOverride, toolSocketOverride]);
 
   // Save changes back to server
   const handleSaveChanges = async () => {
@@ -216,10 +345,18 @@ export function useCharacterManifest() {
     items,
     isSaving,
     partOverrides,
+    handJointOverride,
+    toolSocketOverride,
     skeletonUrl,
     currentUpdatedManifest,
     handlePartValueChange,
     stepPartValue,
+    handleHandJointChange,
+    stepHandJointValue,
+    resetHandJointToInitial,
+    handleToolSocketChange,
+    stepToolSocketValue,
+    resetToolSocketToInitial,
     resetPartToInitial,
     resetAllOverrides,
     handleSaveChanges,

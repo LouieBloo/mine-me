@@ -21,6 +21,7 @@ describe('ModularAnimationEngine', () => {
       head: new Container(),
       armFront: new Container(),
       armBack: new Container(),
+      handFront: new Container(),
       legFront: new Container(),
       legBack: new Container(),
       toolSocket: new Container(),

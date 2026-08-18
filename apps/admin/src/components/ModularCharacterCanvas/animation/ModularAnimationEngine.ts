@@ -9,6 +9,7 @@ export interface CharacterJointNodes {
   head: Container | null;
   armFront: Container | null;
   armBack: Container | null;
+  handFront: Container | null;
   legFront: Container | null;
   legBack: Container | null;
   toolSocket: Container | null;

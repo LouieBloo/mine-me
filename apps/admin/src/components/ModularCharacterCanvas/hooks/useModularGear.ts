@@ -38,6 +38,16 @@ export function useModularGear({ nodesRef, selectedGear }: UseModularGearOptions
           const sprite = new Sprite(texture);
           sprite.anchor.set(0.5);
 
+          // Normalize weapons/tools so they scale proportionally to character body parts
+          if (gear.subType === 'WEAPON') {
+            const targetToolDimension = 280;
+            const maxDim = Math.max(texture.width, texture.height);
+            if (maxDim > targetToolDimension) {
+              const toolScale = targetToolDimension / maxDim;
+              sprite.scale.set(toolScale);
+            }
+          }
+
           const slotNodeName = MODULAR_GEAR_SLOTS[gear.subType] || 'torso';
           let targetNode: Container | null = null;
           if (slotNodeName === 'headNode') targetNode = nodes.head;

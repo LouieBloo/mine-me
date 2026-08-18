@@ -22,10 +22,22 @@ export interface SkeletonPartDef {
   slot: string;
 }
 
+export interface SkeletonHandJointDef {
+  offset: [number, number];
+}
+
+export interface SkeletonToolSocketDef {
+  offset: [number, number];
+  scale?: number;
+  rotation?: number;
+}
+
 export interface SkeletonManifest {
   version: string;
   canvas_size: [number, number];
   pelvis_origin: [number, number];
+  hand_joint?: SkeletonHandJointDef;
+  tool_socket?: SkeletonToolSocketDef;
   parts: Record<string, SkeletonPartDef>;
 }
 
@@ -52,6 +64,7 @@ export class ModularCharacterSprite extends BaseSprite {
   private headNode: Container;
   private armFrontNode: Container;
   private armBackNode: Container;
+  private handFrontNode: Container;
   private legFrontNode: Container;
   private legBackNode: Container;
   private toolSocket: Container;
@@ -79,6 +92,7 @@ export class ModularCharacterSprite extends BaseSprite {
     this.headNode = new Container();
     this.armFrontNode = new Container();
     this.armBackNode = new Container();
+    this.handFrontNode = new Container();
     this.legFrontNode = new Container();
     this.legBackNode = new Container();
     this.toolSocket = new Container();
@@ -91,14 +105,16 @@ export class ModularCharacterSprite extends BaseSprite {
     //              |     |-- torsoBodyNode (body trunk, z: 20)
     //              |     |-- headNode (head, z: 30)
     //              |     \-- armFrontNode (near arm, z: 40)
-    //              |           \-- toolSocket (hand attachment)
+    //              |           \-- handFrontNode (wrist / hand joint)
+    //              |                 \-- toolSocket (hand attachment)
     //              \-- legFrontNode (near leg, z: 25)
 
+    this.handFrontNode.addChild(this.toolSocket);
+    this.armFrontNode.addChild(this.handFrontNode);
     this.torsoNode.addChild(this.armBackNode);
     this.torsoNode.addChild(this.torsoBodyNode);
     this.torsoNode.addChild(this.headNode);
     this.torsoNode.addChild(this.armFrontNode);
-    this.armFrontNode.addChild(this.toolSocket);
 
     this.pelvisNode.addChild(this.legBackNode);
     this.pelvisNode.addChild(this.torsoNode);
@@ -179,10 +195,32 @@ export class ModularCharacterSprite extends BaseSprite {
 
     if (this.destroyed || this.wrapper?.destroyed) return;
 
-    // Hand/tool socket default position on arm_front
+    // Position hand joint on arm_front
+    if (this.handFrontNode && !this.handFrontNode.destroyed) {
+      if (this.manifest?.hand_joint) {
+        this.handFrontNode.x = this.manifest.hand_joint.offset[0];
+        this.handFrontNode.y = this.manifest.hand_joint.offset[1];
+      } else {
+        this.handFrontNode.x = 210;
+        this.handFrontNode.y = 100;
+      }
+    }
+
+    // Tool socket attached to handFrontNode
     if (this.toolSocket && !this.toolSocket.destroyed) {
-      this.toolSocket.x = -10;
-      this.toolSocket.y = 120;
+      if (this.manifest?.tool_socket) {
+        this.toolSocket.x = this.manifest.tool_socket.offset[0];
+        this.toolSocket.y = this.manifest.tool_socket.offset[1];
+        if (this.manifest.tool_socket.scale !== undefined) {
+          this.toolSocket.scale.set(this.manifest.tool_socket.scale);
+        }
+        if (this.manifest.tool_socket.rotation !== undefined) {
+          this.toolSocket.rotation = this.manifest.tool_socket.rotation;
+        }
+      } else {
+        this.toolSocket.x = 0;
+        this.toolSocket.y = 0;
+      }
     }
   }
 
@@ -332,9 +370,29 @@ export class ModularCharacterSprite extends BaseSprite {
         const sprite = new Sprite(texture);
         sprite.anchor.set(0.5);
 
+        // Normalize weapons/tools so they scale proportionally to character body parts
+        if (layer.subType === 'WEAPON') {
+          // If weapon raw texture is oversized (e.g. 1024x1024 canvas), scale to reference arm/weapon proportion (~280px tall)
+          const targetToolDimension = 280;
+          const maxDim = Math.max(texture.width, texture.height);
+          if (maxDim > targetToolDimension) {
+            const toolScale = targetToolDimension / maxDim;
+            sprite.scale.set(toolScale);
+          }
+        }
+
         // Determine which joint node this gear slot attaches to
         const slotNodeName = MODULAR_GEAR_SLOTS[layer.subType] || 'torsoNode';
-        const targetNode = (this as any)[slotNodeName] as Container | undefined;
+        let targetNode: Container | null = null;
+        if (slotNodeName === 'toolSocket') targetNode = this.toolSocket;
+        else if (slotNodeName === 'headNode') targetNode = this.headNode;
+        else if (slotNodeName === 'torsoNode') targetNode = this.torsoBodyNode;
+        else if (slotNodeName === 'armFrontNode') targetNode = this.armFrontNode;
+        else if (slotNodeName === 'armBackNode') targetNode = this.armBackNode;
+        else if (slotNodeName === 'legFrontNode') targetNode = this.legFrontNode;
+        else if (slotNodeName === 'legBackNode') targetNode = this.legBackNode;
+        else if (slotNodeName === 'pelvisNode') targetNode = this.pelvisNode;
+        else targetNode = this.torsoBodyNode;
 
         if (targetNode && !targetNode.destroyed) {
           targetNode.addChild(sprite);

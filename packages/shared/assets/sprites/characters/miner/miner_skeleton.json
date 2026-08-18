@@ -8,6 +8,20 @@
     512,
     590
   ],
+  "hand_joint": {
+    "offset": [
+      210,
+      100
+    ]
+  },
+  "tool_socket": {
+    "offset": [
+      30,
+      -105
+    ],
+    "scale": 1,
+    "rotation": 0.4
+  },
   "parts": {
     "head": {
       "file": "head.png",
