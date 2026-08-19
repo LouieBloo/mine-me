@@ -114,14 +114,19 @@ export function generateMiningMap(options: MapGeneratorOptions): ServerMiningGri
     grid.push(row);
   }
 
-  // 2. Place entrance
-  grid[ENTRANCE_Y][ENTRANCE_X] = { type: MiningTileType.ENTRANCE, revealed: true };
+  // 2. Place ladder at entrance / start position
+  grid[ENTRANCE_Y][ENTRANCE_X] = { type: MiningTileType.LADDER, revealed: true };
 
   // Clear tiles around the entrance so the player can start moving
   // Make a small 3-wide opening at the top
   for (let dx = -1; dx <= 1; dx++) {
     const nx = ENTRANCE_X + dx;
-    if (nx >= 0 && nx < GRID_WIDTH && grid[ENTRANCE_Y][nx].type !== MiningTileType.ENTRANCE) {
+    if (
+      nx >= 0 &&
+      nx < GRID_WIDTH &&
+      grid[ENTRANCE_Y][nx].type !== MiningTileType.LADDER &&
+      grid[ENTRANCE_Y][nx].type !== MiningTileType.ENTRANCE
+    ) {
       grid[ENTRANCE_Y][nx] = { type: MiningTileType.EMPTY, revealed: true };
     }
   }
@@ -163,6 +168,7 @@ export function generateMiningMap(options: MapGeneratorOptions): ServerMiningGri
   let mineralsPlaced = 0;
   while (mineralsPlaced < mineralTarget && posIndex < eligiblePositions.length) {
     const pos = eligiblePositions[posIndex++];
+    if (pos.y === 1 && Math.abs(pos.x - ENTRANCE_X) <= 1) continue;
     if (grid[pos.y][pos.x].type !== MiningTileType.DIRT) continue;
 
     grid[pos.y][pos.x] = { type: MiningTileType.MINERAL, revealed: false };

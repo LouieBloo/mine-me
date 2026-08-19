@@ -246,7 +246,7 @@ describe('MiningGameEngine', () => {
       socket: mockSocket,
     });
     engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
-    engine.playerBody.isGrounded = true;
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X] = { type: MiningTileType.EMPTY, revealed: true };
     engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
 
     // Move right into it to start mining while grounded

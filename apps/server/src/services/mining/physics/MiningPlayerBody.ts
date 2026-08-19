@@ -34,7 +34,7 @@ export class MiningPlayerBody extends MiningPhysicsBody {
           continue;
         }
         const tile = grid[ty][tx];
-        if (tile && tile.type === MiningTileType.LADDER) {
+        if (tile && (tile.type === MiningTileType.LADDER)) {
           // Check horizontal distance to the ladder center
           const ladderCenterX = tx + 0.5;
           const distToCenter = Math.abs(this.position.x - ladderCenterX);
