@@ -11,7 +11,9 @@ interface Props {
 export const CharacterPanel = ({ player }: Props) => {
   const levelInfo = useLevelProgress(player?.attributes.experience ?? 0);
 
-  const mods = player ? CharacterModEngine.getModifications(player.inventory?.items ?? []) : { combatScore: 0, defenseScore: 0 };
+  const mods = player
+    ? CharacterModEngine.getModifications(player.inventory?.items ?? [])
+    : { combatScore: 0, defenseScore: 0, miningSpeed: 0 };
   const totalCombatScore = player ? player.attributes.combatScore + mods.combatScore : 0;
   const totalDefenseScore = player ? player.attributes.defenseScore + mods.defenseScore : 0;
 
@@ -177,6 +179,36 @@ export const CharacterPanel = ({ player }: Props) => {
             <div className="flex justify-between items-center py-1.5 px-2 rounded hover:bg-slate-700/30 transition-colors cursor-help">
               <span className="text-slate-300 text-sm">Defense Score</span>
               <span className="font-mono text-md font-bold text-white">{totalDefenseScore}</span>
+            </div>
+          </HoverTooltip>
+
+          <HoverTooltip
+            content={
+              <div className="p-2 text-xs font-semibold text-slate-300 space-y-1">
+                <p className="font-bold text-white mb-1">Mining Speed Calculation</p>
+                <div className="flex justify-between gap-8">
+                  <span>Base Speed:</span>
+                  <span className="font-mono text-white">0</span>
+                </div>
+                <div className="flex justify-between gap-8 text-amber-400">
+                  <span>Item Bonus:</span>
+                  <span className="font-mono">{mods.miningSpeed >= 0 ? `+${mods.miningSpeed}` : mods.miningSpeed}</span>
+                </div>
+                <div className="border-t border-slate-700 pt-1 flex justify-between gap-8 font-bold text-white">
+                  <span>Total:</span>
+                  <span className="font-mono">{mods.miningSpeed}</span>
+                </div>
+                <p className="text-[10px] text-slate-500 italic mt-1 font-normal border-t border-slate-800/80 pt-1">
+                  {mods.miningSpeed <= 0 ? 'Cannot mine without mining speed gear (pickaxe)' : `${mods.miningSpeed}% base mining efficiency`}
+                </p>
+              </div>
+            }
+          >
+            <div className="flex justify-between items-center py-1.5 px-2 rounded hover:bg-slate-700/30 transition-colors cursor-help">
+              <span className="text-slate-300 text-sm">Mining Speed</span>
+              <span className={`font-mono text-md font-bold ${mods.miningSpeed > 0 ? 'text-amber-400' : 'text-slate-500'}`}>
+                {mods.miningSpeed}
+              </span>
             </div>
           </HoverTooltip>
 

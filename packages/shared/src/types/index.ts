@@ -84,7 +84,7 @@ export type ItemType = 'GEAR' | 'MATERIAL' | 'CONSUMABLE';
 
 export type GearSubType = 'HEAD' | 'SHOULDERS' | 'CHEST' | 'GAUNTLETS' | 'LEGGINGS' | 'BOOTS' | 'WEAPON';
 export type MaterialSubType = 'LUMBER' | 'MINERAL' | 'AGRICULTURE' | 'HERB';
-export type ConsumableSubType = 'POTION' | 'FOOD' | 'OTHER';
+export type ConsumableSubType = 'POTION' | 'FOOD' | 'TORCH' | 'LADDER' | 'OTHER';
 
 export type ItemSubType = GearSubType | MaterialSubType | ConsumableSubType;
 
@@ -93,7 +93,7 @@ export const ITEM_TYPES: ItemType[] = ['GEAR', 'MATERIAL', 'CONSUMABLE'];
 export const ITEM_SUBTYPES: Record<ItemType, string[]> = {
   GEAR: ['HEAD', 'SHOULDERS', 'CHEST', 'GAUNTLETS', 'LEGGINGS', 'BOOTS', 'WEAPON'],
   MATERIAL: ['LUMBER', 'MINERAL', 'AGRICULTURE', 'HERB'],
-  CONSUMABLE: ['POTION', 'FOOD', 'OTHER'],
+  CONSUMABLE: ['POTION', 'FOOD', 'TORCH', 'LADDER', 'OTHER'],
 };
 
 export const ITEM_RARITIES: ItemRarity[] = ['LOW', 'MEDIUM', 'RARE', 'VERY_RARE'];
@@ -185,6 +185,8 @@ export interface GameCity {
   updatedAt?: Date;
 }
 
+import type { SkeletonManifest } from './modularRig';
+
 export interface Mob {
   id: string;
   name: string;
@@ -193,7 +195,7 @@ export interface Mob {
   attack: number;
   defense: number;
   dropTable?: DropTable;
-  animations?: MobAtlas;
+  animations?: SkeletonManifest | MobAtlas | null;
 }
 
 
@@ -212,6 +214,7 @@ export interface Effect {
   description: string;
   healthGain: boolean;
   staminaGain: boolean;
+  miningSpeedModifier?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -230,3 +233,4 @@ export * from './professions';
 export * from './trade';
 export * from './gameEvents';
 export * from './mining';
+export * from './modularRig';

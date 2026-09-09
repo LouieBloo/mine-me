@@ -43,6 +43,7 @@ export function useMiningScene({
   const fallingRocksContainerRef = useRef<Container | null>(null);
   const droppedItemsContainerRef = useRef<Container | null>(null);
   const playerContainerRef = useRef<Container | null>(null);
+  const reticleGraphicsRef = useRef<Graphics | null>(null);
   const debugGraphicsRef = useRef<Graphics | null>(null);
 
   const tileGraphicsMap = useRef<Map<string, Graphics>>(new Map());
@@ -97,6 +98,11 @@ export function useMiningScene({
 
     backgroundContainer.addChild(bgGraphics);
 
+    const reticleContainer = new Container();
+    const reticleGraphics = new Graphics();
+    reticleContainer.addChild(reticleGraphics);
+    reticleGraphicsRef.current = reticleGraphics;
+
     const debugGraphics = new Graphics();
     debugContainer.addChild(debugGraphics);
     debugGraphicsRef.current = debugGraphics;
@@ -105,6 +111,7 @@ export function useMiningScene({
     gridContainer.addChild(tilesContainer);
     gridContainer.addChild(fallingRocksContainer);
     gridContainer.addChild(droppedItemsContainer);
+    gridContainer.addChild(reticleContainer);
     gridContainer.addChild(playerContainer);
     gridContainer.addChild(debugContainer);
     app.stage.addChild(gridContainer);
@@ -321,6 +328,7 @@ export function useMiningScene({
     fallingRocksContainerRef,
     droppedItemsContainerRef,
     playerContainerRef,
+    reticleGraphicsRef,
     debugGraphicsRef,
     tileGraphicsMap,
     tileSpritesMap,

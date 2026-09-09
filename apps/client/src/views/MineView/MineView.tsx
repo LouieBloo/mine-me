@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
 import { useSocket } from '../../contexts/SocketContext';
+import { useQuickAccess } from '../../contexts/QuickAccessContext';
 import { PixiStageProvider } from '../../components/game/PixiStageContext/PixiStageContext';
 import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
@@ -53,6 +54,26 @@ export const MineView: React.FC = () => {
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const [summaryLoot, setSummaryLoot] = useState<MiningBackpackItem[]>([]);
 
+  // Torch and Ladder Placement Mode State from QuickAccessContext
+  const { isPlacingTorch, isPlacingLadder, selectSlot } = useQuickAccess();
+
+  // Auto-select slot 1 only once when first entering the mine
+  const initialSelectRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (!initialSelectRef.current) {
+      initialSelectRef.current = true;
+      selectSlot(0).catch(() => {});
+    }
+  }, [selectSlot]);
+
+  const handleTorchPlaced = useCallback(() => {
+    // Placement mode stays active until the player runs out of torches; no toast needed
+  }, []);
+
+  const handleLadderPlaced = useCallback(() => {
+    // Placement mode stays active until the player runs out of ladders; no toast needed
+  }, []);
+
   // Track whether session has already been extracted/cleaned up so unmount doesn't double-cancel
   const isCleanedUpRef = useRef<boolean>(false);
 
@@ -100,6 +121,7 @@ export const MineView: React.FC = () => {
 
         if (result.success && result.data?.sessionState) {
           setMiningSession(result.data.sessionState);
+          selectSlot(0).catch(() => {});
         } else {
           isCleanedUpRef.current = true;
           notificationService.error('Mining Error', result.error || 'Failed to start mining session');
@@ -180,6 +202,7 @@ export const MineView: React.FC = () => {
         setSessionKey((prev) => prev + 1);
         setHasMovedOffEntrance(false);
         setShowExitConfirmation(false);
+        selectSlot(0).catch(() => {});
         notificationService.success('New Mine Generated', 'Started a fresh mining expedition.');
       } else {
         notificationService.error('Mining Error', result.error || 'Failed to start a new mining session');
@@ -250,6 +273,10 @@ export const MineView: React.FC = () => {
             onAssetsLoaded={handleAssetsLoaded}
             zoom={zoom}
             onZoomChange={handleZoomChange}
+            isPlacingTorch={isPlacingTorch}
+            onTorchPlaced={handleTorchPlaced}
+            isPlacingLadder={isPlacingLadder}
+            onLadderPlaced={handleLadderPlaced}
           />
         </PixiStageProvider>
       )}

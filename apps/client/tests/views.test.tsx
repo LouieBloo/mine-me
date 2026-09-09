@@ -57,6 +57,7 @@ import { InGameLayout } from '../src/components/InGameLayout/InGameLayout';
 import { GameProvider } from '../src/contexts/GameContext';
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { ChatProvider } from '../src/contexts/ChatContext';
+import { QuickAccessProvider } from '../src/contexts/QuickAccessContext';
 
 // Stub ResizeObserver — not available in jsdom
 (global as any).ResizeObserver = class ResizeObserver {
@@ -109,11 +110,13 @@ describe('Client UI Components', () => {
         <AuthProvider>
           <GameProvider>
             <ChatProvider>
-              <Routes>
-                <Route element={<InGameLayout />}>
-                  <Route path="/home" element={<HomeView />} />
-                </Route>
-              </Routes>
+              <QuickAccessProvider>
+                <Routes>
+                  <Route element={<InGameLayout />}>
+                    <Route path="/home" element={<HomeView />} />
+                  </Route>
+                </Routes>
+              </QuickAccessProvider>
             </ChatProvider>
           </GameProvider>
         </AuthProvider>

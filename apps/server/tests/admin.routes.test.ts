@@ -104,6 +104,25 @@ describe('Admin API Routes', () => {
        expect(res.body.dropTable.create.items.create[0].itemId).toBe('item_1');
     });
 
+    it('saves skeleton configuration via PUT /admin/mobs/:id/skeleton', async () => {
+      const manifest = {
+        version: '2.0',
+        parts: {
+          head: { file: 'head.png', width: 100, height: 100 }
+        }
+      };
+      const res = await request(app).put('/admin/mobs/mob_1/skeleton').send({ manifest });
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('id', 'updated_id');
+      expect(res.body.animations).toEqual(manifest);
+    });
+
+    it('allows partial mob update without requiring all fields on PUT /admin/mobs/:id', async () => {
+      const res = await request(app).put('/admin/mobs/mob_1').send({ level: 5 });
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('id', 'updated_id');
+      expect(res.body.level).toBe(5);
+    });
   });
 
   describe('City Material Assignments', () => {

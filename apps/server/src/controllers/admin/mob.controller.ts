@@ -55,12 +55,13 @@ export const createMob = async (req: Request, res: Response) => {
 
 export const updateMob = async (req: Request, res: Response) => {
   const { dropTable, drops, ...mobData } = req.body;
+  const dataToUpdate: any = { ...mobData };
+  if (dropTable !== undefined) {
+    dataToUpdate.dropTable = buildDropTableUpsert(dropTable);
+  }
   const mob = await prisma.mob.update({ 
     where: { id: req.params.id }, 
-    data: {
-      ...mobData,
-      dropTable: buildDropTableUpsert(dropTable)
-    } 
+    data: dataToUpdate
   });
   const allMobs = await prisma.mob.findMany({ include: { dropTable: { include: { items: true } } }});
   syncJson('mobs.json', allMobs);
@@ -135,5 +136,39 @@ export const uploadMobSpriteAtlas = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to upload sprite atlas' });
+  }
+};
+
+export const updateMobSkeleton = async (req: Request, res: Response) => {
+  try {
+    const mobId = req.params.id;
+    const { manifest } = req.body;
+    const skeletonManifest = manifest || req.body.animations;
+
+    if (!skeletonManifest || !skeletonManifest.parts) {
+      res.status(400).json({ error: 'Invalid skeleton manifest payload' });
+      return;
+    }
+
+    const mob = await prisma.mob.update({
+      where: { id: mobId },
+      data: { animations: skeletonManifest }
+    });
+
+    const allMobs = await prisma.mob.findMany({
+      include: {
+        dropTable: {
+          include: {
+            items: true
+          }
+        }
+      }
+    });
+    await syncJson('mobs.json', allMobs);
+
+    res.json(mob);
+  } catch (error: any) {
+    console.error('[Admin] Failed to update mob skeleton:', error);
+    res.status(500).json({ error: error.message || 'Failed to update mob skeleton' });
   }
 };

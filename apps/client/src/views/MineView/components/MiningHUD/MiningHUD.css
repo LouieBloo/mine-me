@@ -5,7 +5,3 @@
   pointer-events: none;
   z-index: 10;
 }
-
-.mining-hud-overlay * {
-  pointer-events: auto;
-}

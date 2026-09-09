@@ -1,0 +1,13 @@
+/* QuickAccessBar.css - Scoped styling for Quick Access Hotbar */
+.quick-access-bar {
+  user-select: none;
+}
+
+.quick-access-slot {
+  position: relative;
+  aspect-ratio: 1 / 1;
+}
+
+.quick-access-slot-selected {
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.45);
+}

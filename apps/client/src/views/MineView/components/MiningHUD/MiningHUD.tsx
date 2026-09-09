@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { type MiningSessionClientState, type PlayerState, MINING_CONFIG } from '@mine-me/shared';
-import { getAssetUrl } from '@mine-me/shared';
 import { ZoomControl } from '../ZoomControl/ZoomControl';
 import './MiningHUD.css';
 
@@ -32,22 +31,6 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
   const maxStamina = playerState.attributes?.maxStamina ?? 100;
   const health = playerState.attributes?.health ?? 0;
   const maxHealth = playerState.attributes?.maxHealth ?? 100;
-
-  // Group temporary backpack items by itemId
-  const groupedBackpack = React.useMemo(() => {
-    const groupedMap: Record<string, typeof sessionState.temporaryBackpack[number]> = {};
-    for (const item of sessionState.temporaryBackpack) {
-      if (groupedMap[item.itemId]) {
-        groupedMap[item.itemId] = {
-          ...groupedMap[item.itemId],
-          quantity: groupedMap[item.itemId].quantity + item.quantity
-        };
-      } else {
-        groupedMap[item.itemId] = { ...item };
-      }
-    }
-    return Object.values(groupedMap);
-  }, [sessionState.temporaryBackpack]);
 
   // Local state loop for mining progress bar
   useEffect(() => {
@@ -89,7 +72,7 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
       {/* Top HUD Row */}
       <div className="flex justify-between items-start w-full">
         {/* Top Left: Location/Title & Zoom Control */}
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2.5 pointer-events-auto">
           <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 shadow-2xl backdrop-blur-md flex flex-col gap-1 w-64">
             <h2 className="text-lg font-black text-amber-500 tracking-widest uppercase">Subterranean Mine</h2>
             <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
@@ -110,7 +93,7 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
         </div>
 
         {/* Top Right: Refresh Button & Health/Stamina Panel */}
-        <div className="flex flex-col items-end gap-2.5">
+        <div className="flex flex-col items-end gap-2.5 pointer-events-auto">
           {/* Refresh New Game Button */}
           <button
             onClick={onRestart}
@@ -157,49 +140,8 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
         </div>
       </div>
 
-      {/* Middle HUD Row (Temporary Loot Backpack on left side) */}
-      <div className="flex flex-1 items-center justify-between my-4 w-full">
-        {/* Temporary Backpack */}
-        <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 shadow-2xl backdrop-blur-md flex flex-col w-64 max-h-[300px]">
-          <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest border-b border-slate-800 pb-2 mb-2">
-            🎒 Loot Sack (Temp)
-          </h3>
-          <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2">
-            {groupedBackpack.length === 0 ? (
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider text-center py-4">
-                Loot sack is empty.<br />Mine minerals or open chests!
-              </p>
-            ) : (
-              groupedBackpack.map((item) => (
-                <div
-                  key={item.itemId}
-                  className="flex items-center gap-3 bg-slate-950/60 border border-slate-800 rounded-lg p-2 hover:border-amber-500/30 transition-all"
-                >
-                  <div className="w-8 h-8 rounded bg-slate-900 border border-slate-800 flex items-center justify-center relative overflow-hidden shrink-0">
-                    {item.iconUrl ? (
-                      <img
-                        src={getAssetUrl(item.iconUrl)}
-                        alt={item.itemName}
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <span className="text-[10px] text-amber-400 font-bold">✨</span>
-                    )}
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] font-bold text-slate-200 truncate uppercase tracking-wide">
-                      {item.itemName}
-                    </span>
-                    <span className="text-[9px] font-black text-amber-400/80 uppercase">
-                      Qty: {item.quantity}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Spacer to push controls to bottom */}
+      <div className="flex-1 w-full pointer-events-none" />
 
       {/* Bottom HUD Row */}
       <div className="flex flex-col items-center gap-4 w-full">
@@ -222,15 +164,20 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
         )}
 
         {/* Buttons and Legend row */}
-        <div className="flex justify-between items-center w-full">
+        <div className="flex justify-between items-center w-full pointer-events-none">
           {/* Keyboard Controls Guide */}
-          <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 shadow-2xl backdrop-blur-md flex items-center gap-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+          <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 shadow-2xl backdrop-blur-md flex items-center gap-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider pointer-events-auto">
             <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">W</kbd>
               <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">A</kbd>
               <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">S</kbd>
               <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">D</kbd>
-              <span>Move / Mine</span>
+              <span>Move</span>
+            </span>
+            <span className="text-slate-700">|</span>
+            <span className="flex items-center gap-1.5">
+              <span className="text-amber-400">Left Click</span>
+              <span>Mine</span>
             </span>
             <span className="text-slate-700">|</span>
             <span className="flex items-center gap-1.5">
@@ -239,18 +186,13 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
             </span>
             <span className="text-slate-700">|</span>
             <span className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">1-4</kbd>
+              <span className="text-amber-400">Quick Slots</span>
+            </span>
+            <span className="text-slate-700">|</span>
+            <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">F</kbd>
               <span>Flashlight</span>
-            </span>
-            <span className="text-slate-700">|</span>
-            <span className="flex items-center gap-1.5">
-              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">L</kbd>
-              <span className="text-amber-400">Place Ladder</span>
-            </span>
-            <span className="text-slate-700">|</span>
-            <span className="flex items-center gap-1.5">
-              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">T</kbd>
-              <span>Debug</span>
             </span>
             <span className="text-slate-700">|</span>
             <span>Exit at ({MINING_CONFIG.ENTRANCE_X}, {MINING_CONFIG.ENTRANCE_Y})</span>
@@ -259,7 +201,7 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
           {/* Leave/Extract Button */}
           <button
             onClick={handleExitClick}
-            className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest border transition-all active:scale-95 cursor-pointer shadow-2xl ${
+            className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest border transition-all active:scale-95 cursor-pointer shadow-2xl pointer-events-auto ${
               sessionState.canExtract
                 ? 'bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-400 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)] animate-pulse'
                 : 'bg-red-950/40 hover:bg-red-900/60 text-red-400 border-red-900/50 hover:border-red-500/50'

@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { GameProvider } from './contexts/GameContext';
 import { SocketProvider } from './contexts/SocketContext';
 import { ChatProvider } from './contexts/ChatContext';
+import { QuickAccessProvider } from './contexts/QuickAccessContext';
 import { Auth } from './views/Auth/Auth';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
 import { CharacterSelection } from './views/CharacterSelection/CharacterSelection';
@@ -24,7 +25,8 @@ function App() {
       <GameProvider>
         <SocketProvider>
           <ChatProvider>
-            <BrowserRouter>
+            <QuickAccessProvider>
+              <BrowserRouter>
               <Toaster position="top-center" visibleToasts={9} expand={true} richColors closeButton />
               <Routes>
                 <Route path="/auth" element={<Auth />} />
@@ -49,6 +51,7 @@ function App() {
                 </Route>
               </Routes>
             </BrowserRouter>
+            </QuickAccessProvider>
           </ChatProvider>
         </SocketProvider>
       </GameProvider>

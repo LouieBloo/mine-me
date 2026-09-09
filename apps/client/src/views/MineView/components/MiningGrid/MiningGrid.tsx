@@ -7,9 +7,12 @@ import type {
   MiningStateTickPayload,
   Vector2D,
 } from '@mine-me/shared';
-import { MiningTileType, getAssetUrl } from '@mine-me/shared';
+import { MiningTileType, MINING_CONFIG, getAssetUrl } from '@mine-me/shared';
 import { PointLight } from '../../../../components/game/lighting/PointLight';
 import { useSocket } from '../../../../contexts/SocketContext';
+import { notificationService } from '../../../../services/notificationService';
+import { MiningMouseController } from './input/MiningMouseController';
+import { TorchPlacementAction, LadderPlacementAction } from './input/MouseAction';
 import { useMiningInput } from './hooks/useMiningInput';
 import { useMiningScene } from './hooks/useMiningScene';
 import { useMiningTicker } from './hooks/useMiningTicker';
@@ -24,6 +27,10 @@ interface MiningGridProps {
   onAssetsLoaded?: () => void;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
+  isPlacingTorch?: boolean;
+  onTorchPlaced?: () => void;
+  isPlacingLadder?: boolean;
+  onLadderPlaced?: () => void;
 }
 
 export const MiningGrid: React.FC<MiningGridProps> = ({
@@ -32,11 +39,18 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onAssetsLoaded,
   zoom = 1.5,
   onZoomChange,
+  isPlacingTorch = false,
+  onTorchPlaced,
+  isPlacingLadder = false,
+  onLadderPlaced,
 }) => {
   const { app } = usePixiStage();
   const { onEvent, sendGameEvent } = useSocket();
 
   const [sessionState, setSessionState] = useState<MiningSessionClientState>(initialSessionState);
+
+  // Object-Oriented Mouse Controller Ref
+  const mouseControllerRef = useRef<MiningMouseController>(new MiningMouseController({ tileSize: TILE_SIZE }));
 
   // Direction and Debug state references
   const isFacingLeftRef = useRef<boolean>(false);
@@ -75,6 +89,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     fallingRocksContainerRef,
     droppedItemsContainerRef,
     playerContainerRef,
+    reticleGraphicsRef,
     debugGraphicsRef,
     tileGraphicsMap,
     tileSpritesMap,
@@ -94,6 +109,74 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     onAssetsLoaded,
   });
 
+  // Attach canvas to MouseController and sync camera
+  useEffect(() => {
+    if (!app?.canvas) return;
+    const mouseController = mouseControllerRef.current;
+    mouseController.attach(app.canvas);
+    mouseController.setCamera(cameraRef.current);
+    app.canvas.style.cursor = 'crosshair';
+    return () => {
+      mouseController.detach();
+    };
+  }, [app?.canvas, cameraRef]);
+
+  // Sync grid with MouseController
+  useEffect(() => {
+    mouseControllerRef.current.setGrid(sessionState.grid);
+  }, [sessionState.grid]);
+
+  // Configure Active Mouse Action (Torch or Ladder Placement)
+  useEffect(() => {
+    const mouseController = mouseControllerRef.current;
+    console.log('[MiningGrid] placement states changed:', { isPlacingTorch, isPlacingLadder });
+    if (isPlacingTorch) {
+      mouseController.setActiveAction(
+        new TorchPlacementAction(async (target) => {
+          console.log('[MiningGrid] Dispatching mining_place_torch event to server for target:', target);
+          try {
+            const res = await sendGameEvent({ type: 'mining_place_torch', target });
+            console.log('[MiningGrid] mining_place_torch response from server:', res);
+            if (res.success) {
+              onTorchPlaced?.();
+              return true;
+            } else {
+              notificationService.error('Cannot Place Torch', res.error || 'Invalid placement position.');
+              return false;
+            }
+          } catch (err: any) {
+            console.error('[MiningGrid] mining_place_torch error:', err);
+            notificationService.error('Error', err.message || 'Failed to place torch.');
+            return false;
+          }
+        })
+      );
+    } else if (isPlacingLadder) {
+      mouseController.setActiveAction(
+        new LadderPlacementAction(async (target) => {
+          console.log('[MiningGrid] Dispatching mining_place_ladder event to server for target:', target);
+          try {
+            const res = await sendGameEvent({ type: 'mining_place_ladder', target });
+            console.log('[MiningGrid] mining_place_ladder response from server:', res);
+            if (res.success) {
+              onLadderPlaced?.();
+              return true;
+            } else {
+              notificationService.error('Cannot Place Ladder', res.error || 'Invalid placement position.');
+              return false;
+            }
+          } catch (err: any) {
+            console.error('[MiningGrid] mining_place_ladder error:', err);
+            notificationService.error('Error', err.message || 'Failed to place ladder.');
+            return false;
+          }
+        })
+      );
+    } else {
+      mouseController.setActiveAction(null);
+    }
+  }, [isPlacingTorch, isPlacingLadder, sendGameEvent, onTorchPlaced, onLadderPlaced]);
+
   // Real-time Input Controls Hook
   useMiningInput({
     sendGameEvent,
@@ -102,6 +185,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     showDebugRef,
     playerFacingDirRef,
     isFacingLeftRef,
+    mouseControllerRef,
     zoom,
     onZoomChange,
   });
@@ -206,6 +290,30 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           } else {
             lightingEngine.removeLight(chestLightId);
           }
+
+          // Dynamic 360-degree warm flickering torchlight
+          const torchLightId = `torch_${x}_${y}`;
+          if (tile.revealed && tile.type === MiningTileType.TORCH) {
+            if (!lightingEngine.getLight(torchLightId)) {
+              lightingEngine.addLight(
+                new PointLight(
+                  torchLightId,
+                  { x: x + 0.5, y: y + 0.75 },
+                  0xf59e0b,
+                  1.2,
+                  MINING_CONFIG.TORCH_RADIUS,
+                  {
+                    flicker: {
+                      speed: MINING_CONFIG.TORCH_FLICKER_SPEED,
+                      amount: MINING_CONFIG.TORCH_FLICKER_AMOUNT,
+                    },
+                  }
+                )
+              );
+            }
+          } else {
+            lightingEngine.removeLight(torchLightId);
+          }
         });
       });
     }
@@ -237,6 +345,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     playerSpriteRef,
     activeFallingRocksRef,
     fallingRockGraphicsMap,
+    reticleGraphicsRef,
+    mouseControllerRef,
     debugGraphicsRef,
     showDebugRef,
     flashlightRef,

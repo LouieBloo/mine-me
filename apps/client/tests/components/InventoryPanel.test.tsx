@@ -9,6 +9,10 @@ vi.mock('../../src/components/ItemListIcon/ItemListIcon', () => ({
   ItemListIcon: ({ entry }: any) => <div data-testid="item-icon">{entry.item.name}</div>,
 }));
 
+vi.mock('../../src/components/QuickAccessBar/QuickAccessBar', () => ({
+  QuickAccessBar: () => <div data-testid="quick-access-bar">QuickAccessBar</div>,
+}));
+
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
 }));

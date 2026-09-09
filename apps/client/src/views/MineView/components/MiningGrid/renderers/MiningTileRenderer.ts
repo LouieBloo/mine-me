@@ -69,17 +69,74 @@ export class MiningTileRenderer {
         graphics.fill(0x064e3b);
         break;
       case MiningTileType.LADDER:
-        // Wooden side rails
-        graphics.rect(14, 0, 6, tileSize);
-        graphics.rect(tileSize - 20, 0, 6, tileSize);
-        graphics.fill(0x78350f);
-        // Wooden rungs
-        for (let ry = 8; ry < tileSize; ry += 14) {
-          graphics.rect(14, ry, tileSize - 28, 4);
-        }
-        graphics.fill(0xb45309);
+        MiningTileRenderer.drawLadder(graphics, tileSize);
+        break;
+      case MiningTileType.TORCH:
+        MiningTileRenderer.drawTorch(graphics, tileSize);
         break;
     }
+  }
+
+  public static drawLadder(
+    graphics: Graphics,
+    tileSize: number = TILE_SIZE,
+    alpha: number = 1.0,
+    offsetX: number = 0,
+    offsetY: number = 0
+  ): void {
+    // Wooden side rails
+    graphics.rect(offsetX + 14, offsetY + 0, 6, tileSize);
+    graphics.rect(offsetX + tileSize - 20, offsetY + 0, 6, tileSize);
+    graphics.fill({ color: 0x78350f, alpha });
+    // Wooden rungs
+    for (let ry = 8; ry < tileSize; ry += 14) {
+      graphics.rect(offsetX + 14, offsetY + ry, tileSize - 28, 4);
+    }
+    graphics.fill({ color: 0xb45309, alpha });
+  }
+
+  public static drawTorch(
+    graphics: Graphics,
+    tileSize: number = TILE_SIZE,
+    alpha: number = 1.0,
+    offsetX: number = 0,
+    offsetY: number = 0
+  ): void {
+    const cx = offsetX + tileSize / 2;
+    const cy = offsetY + tileSize * 0.75; // Sits 3/4 up the tile
+
+    // 1. Wall Mount Bracket (Dark Iron fixture)
+    graphics.rect(cx - 5, cy + 6, 10, 4);
+    graphics.rect(cx - 2, cy + 10, 4, 4);
+    graphics.fill({ color: 0x1e293b, alpha });
+
+    // 2. Wooden Torch Shaft (angled wooden post)
+    graphics.moveTo(cx - 3, cy + 6);
+    graphics.lineTo(cx + 3, cy + 6);
+    graphics.lineTo(cx + 4, cy - 14);
+    graphics.lineTo(cx - 4, cy - 14);
+    graphics.closePath();
+    graphics.fill({ color: 0x78350f, alpha });
+
+    // Wooden shaft highlight
+    graphics.rect(cx - 1, cy - 12, 2, 16);
+    graphics.fill({ color: 0x92400e, alpha });
+
+    // 3. Metal Head Band / Sconce
+    graphics.rect(cx - 5, cy - 16, 10, 4);
+    graphics.fill({ color: 0x475569, alpha });
+
+    // 4. Outer Flame / Glow (Vibrant Orange)
+    graphics.ellipse(cx, cy - 22, 6, 9);
+    graphics.fill({ color: 0xf97316, alpha: alpha * 0.9 });
+
+    // 5. Inner Hot Core Flame (Bright Golden Yellow)
+    graphics.ellipse(cx, cy - 21, 3.5, 5.5);
+    graphics.fill({ color: 0xfef08a, alpha: alpha * 0.95 });
+
+    // 6. Floating micro-ember spark
+    graphics.circle(cx + 1, cy - 31, 1.2);
+    graphics.fill({ color: 0xfbbf24, alpha: alpha * 0.8 });
   }
 
   public static renderGrid(

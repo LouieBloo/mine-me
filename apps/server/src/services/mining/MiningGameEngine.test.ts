@@ -111,6 +111,7 @@ describe('MiningGameEngine', () => {
       characterId: 'char-1',
       cityId: 'city-1',
       seed: 12345,
+      miningSpeed: 100,
       socket: mockSocket,
     });
     engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
@@ -119,7 +120,7 @@ describe('MiningGameEngine', () => {
     // Make tile directly to the right a dirt block
     engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
 
-    // Move right into it to start mining
+    // Does NOT automatically mine when moving in a direction with miningKey: false
     engine.handleInput({
       up: false,
       down: false,
@@ -130,17 +131,33 @@ describe('MiningGameEngine', () => {
     });
 
     (engine as any).tick(0.033);
+    expect(engine.isMining).toBe(false);
+    expect(engine.miningTarget).toBeNull();
+
+    // Start mining with left-click (miningKey: true on target)
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      miningKey: true,
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      sequence: 2,
+    });
+
+    (engine as any).tick(0.033);
     expect(engine.isMining).toBe(true);
     expect(engine.miningTarget).toEqual({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
 
-    // Release all movement inputs
+    // Release mouse button (miningKey: false)
     engine.handleInput({
       up: false,
       down: false,
       left: false,
       right: false,
       miningKey: false,
-      sequence: 2,
+      miningTarget: null,
+      sequence: 3,
     });
 
     (engine as any).tick(0.033);
@@ -148,11 +165,12 @@ describe('MiningGameEngine', () => {
     expect(engine.miningTarget).toBeNull();
   });
 
-  it('stops mining the first block and switches to the new block when input direction changes', () => {
+  it('stops mining the first block and switches to the new block when targeted tile changes', () => {
     const engine = new MiningGameEngine({
       characterId: 'char-1',
       cityId: 'city-1',
       seed: 12345,
+      miningSpeed: 100,
       socket: mockSocket,
     });
     engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
@@ -167,8 +185,9 @@ describe('MiningGameEngine', () => {
       up: false,
       down: false,
       left: false,
-      right: true,
-      miningKey: false,
+      right: false,
+      miningKey: true,
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
       sequence: 1,
     });
 
@@ -176,13 +195,14 @@ describe('MiningGameEngine', () => {
     expect(engine.isMining).toBe(true);
     expect(engine.miningTarget).toEqual({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
 
-    // Switch input direction to left
+    // Switch targeted tile to left while keeping mouse pressed
     engine.handleInput({
       up: false,
       down: false,
-      left: true,
+      left: false,
       right: false,
-      miningKey: false,
+      miningKey: true,
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X - 1, y: 0 },
       sequence: 2,
     });
 
@@ -243,19 +263,21 @@ describe('MiningGameEngine', () => {
       characterId: 'char-1',
       cityId: 'city-1',
       seed: 12345,
+      miningSpeed: 100,
       socket: mockSocket,
     });
     engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
     engine.grid[0][MINING_CONFIG.ENTRANCE_X] = { type: MiningTileType.EMPTY, revealed: true };
     engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
 
-    // Move right into it to start mining while grounded
+    // Target right tile with left-click to start mining while grounded
     engine.handleInput({
       up: false,
       down: false,
       left: false,
-      right: true,
-      miningKey: false,
+      right: false,
+      miningKey: true,
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
       sequence: 1,
     });
 
@@ -267,9 +289,10 @@ describe('MiningGameEngine', () => {
       up: false,
       down: false,
       left: false,
-      right: true,
+      right: false,
       jump: true,
-      miningKey: false,
+      miningKey: true,
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
       sequence: 2,
     });
 
@@ -285,6 +308,7 @@ describe('MiningGameEngine', () => {
       characterId: 'char-1',
       cityId: 'city-1',
       seed: 12345,
+      miningSpeed: 100,
       socket: mockSocket,
     });
     engine.playerBody.position = { x: 10.5, y: 1.0 - engine.playerBody.halfHeight };
@@ -294,13 +318,14 @@ describe('MiningGameEngine', () => {
     engine.grid[1][11] = { type: MiningTileType.DIRT, revealed: true };
     engine.grid[1][9] = { type: MiningTileType.DIRT, revealed: true };
 
-    // Mine South-East (down + right)
+    // Mine South-East (down + right diagonal)
     engine.handleInput({
       up: false,
-      down: true,
+      down: false,
       left: false,
-      right: true,
-      miningKey: false,
+      right: false,
+      miningKey: true,
+      miningTarget: { x: 11, y: 1 },
       sequence: 1,
     });
 
@@ -308,13 +333,14 @@ describe('MiningGameEngine', () => {
     expect(engine.isMining).toBe(true);
     expect(engine.miningTarget).toEqual({ x: 11, y: 1 });
 
-    // Switch to South-West (down + left)
+    // Switch to South-West (down + left diagonal)
     engine.handleInput({
       up: false,
-      down: true,
-      left: true,
+      down: false,
+      left: false,
       right: false,
-      miningKey: false,
+      miningKey: true,
+      miningTarget: { x: 9, y: 1 },
       sequence: 2,
     });
 
@@ -350,6 +376,7 @@ describe('MiningGameEngine', () => {
       characterId: 'char-1',
       cityId: 'city-1',
       seed: 12345,
+      miningSpeed: 100,
       socket: mockSocket,
     });
 
@@ -362,13 +389,14 @@ describe('MiningGameEngine', () => {
     engine.playerBody.isGrounded = false;
     engine.playerBody.isOnLadder = true;
 
-    // Face right towards the dirt block while on ladder
+    // Mine right towards the dirt block while on ladder
     engine.handleInput({
       up: false,
       down: false,
       left: false,
-      right: true,
-      miningKey: false,
+      right: false,
+      miningKey: true,
+      miningTarget: { x: 11, y: 5 },
       sequence: 1,
     });
 
@@ -395,5 +423,202 @@ describe('MiningGameEngine', () => {
     const started = engine.startMining({ x: 10, y: 4 });
     expect(started).toBe(false);
     expect(engine.isMining).toBe(false);
+  });
+
+  it('prevents mining if miningSpeed is 0', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      miningSpeed: 0,
+      socket: mockSocket,
+    });
+
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
+    const started = engine.startMining({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
+    expect(started).toBe(false);
+    expect(engine.isMining).toBe(false);
+  });
+
+  it('mines at normal rate with miningSpeed 100 and completes dirt block in 500ms', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      miningSpeed: 100,
+      socket: mockSocket,
+    });
+    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
+    engine.playerBody.isGrounded = true;
+
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      miningKey: true,
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      sequence: 1,
+    });
+
+    const started = engine.startMining({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
+    expect(started).toBe(true);
+    expect(engine.isMining).toBe(true);
+
+    // Run 250ms of ticks (0.25s)
+    (engine as any).tick(0.25);
+    expect(engine.miningProgressMs).toBeCloseTo(250, 0);
+    expect(engine.isMining).toBe(true);
+
+    // Run another 260ms of ticks (total > 500ms)
+    (engine as any).tick(0.26);
+    // Block should now be mined and turned into EMPTY
+    expect(engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1].type).toBe(MiningTileType.EMPTY);
+    expect(engine.isMining).toBe(false);
+  });
+
+  it('mines at 2x speed with miningSpeed 200 and completes dirt block in 250ms', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      miningSpeed: 200,
+      socket: mockSocket,
+    });
+    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
+    engine.playerBody.isGrounded = true;
+
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      miningKey: true,
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      sequence: 1,
+    });
+
+    const started = engine.startMining({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
+    expect(started).toBe(true);
+
+    // At 2x speed (200%), 0.13s (130ms) -> 260ms damage
+    (engine as any).tick(0.13);
+    expect(engine.miningProgressMs).toBeCloseTo(260, 0);
+
+    // Another 0.13s -> 260ms damage (total 520ms > 500ms dirt mine time)
+    (engine as any).tick(0.13);
+    expect(engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1].type).toBe(MiningTileType.EMPTY);
+    expect(engine.isMining).toBe(false);
+  });
+
+  it('dynamically updates mining speed and stops mining if speed reduced to 0', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      miningSpeed: 100,
+      socket: mockSocket,
+    });
+    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
+    engine.playerBody.isGrounded = true;
+
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
+    engine.startMining({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
+    expect(engine.isMining).toBe(true);
+
+    // Unequip item -> speed set to 0
+    engine.setMiningSpeed(0);
+    expect(engine.isMining).toBe(false);
+    expect(engine.miningTarget).toBeNull();
+  });
+
+  it('places a torch tile within 1 tile distance and verifies non-solid collision', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+
+    engine.grid[5][10] = { type: MiningTileType.EMPTY, revealed: true };
+    engine.grid[6][10] = { type: MiningTileType.DIRT, revealed: true };
+    engine.grid[6][11] = { type: MiningTileType.DIRT, revealed: true };
+    engine.playerBody.position = { x: 10.5, y: 5.5 };
+    engine.playerBody.isGrounded = true;
+
+    // Place torch at adjacent tile (11, 5)
+    engine.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
+    const placed = engine.placeTorch({ x: 11, y: 5 });
+    expect(placed).toBe(true);
+    expect(engine.grid[5][11].type).toBe(MiningTileType.TORCH);
+    expect(engine.grid[5][11].revealed).toBe(true);
+
+    // Player should walk right through the torch tile without collision blocking
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: true,
+      miningKey: false,
+      sequence: 1,
+    });
+    (engine as any).tick(0.1);
+    expect(engine.position.x).toBeGreaterThan(10.5);
+  });
+
+  it('rejects torch placement if target is more than 1 tile away from player', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+
+    engine.playerBody.position = { x: 10.5, y: 5.5 };
+
+    // Target 2 tiles away (13, 5)
+    engine.grid[5][13] = { type: MiningTileType.EMPTY, revealed: true };
+    const placedTooFar = engine.placeTorch({ x: 13, y: 5 });
+    expect(placedTooFar).toBe(false);
+    expect(engine.grid[5][13].type).toBe(MiningTileType.EMPTY);
+  });
+
+  it('allows torch placement when player is on the edge of a block to reach adjacent block', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+
+    // Player standing on the far right edge of tile 10 (x = 10.8, y = 5.5)
+    engine.playerBody.position = { x: 10.8, y: 5.5 };
+    engine.grid[5][9] = { type: MiningTileType.EMPTY, revealed: true };
+
+    // Placing on tile 9 (immediately to the left of tile 10)
+    const placed = engine.placeTorch({ x: 9, y: 5 });
+    expect(placed).toBe(true);
+    expect(engine.grid[5][9].type).toBe(MiningTileType.TORCH);
+  });
+
+  it('rejects torch placement on unrevealed or entrance tiles', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+
+    engine.playerBody.position = { x: 10.5, y: 5.5 };
+
+    // Unrevealed tile
+    engine.grid[5][11] = { type: MiningTileType.EMPTY, revealed: false };
+    expect(engine.placeTorch({ x: 11, y: 5 })).toBe(false);
+
+    // Entrance tile
+    engine.grid[5][10] = { type: MiningTileType.ENTRANCE, revealed: true };
+    expect(engine.placeTorch({ x: 10, y: 5 })).toBe(false);
   });
 });

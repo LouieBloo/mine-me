@@ -17,13 +17,14 @@ export const getEffect = async (req: Request, res: Response) => {
 
 export const createEffect = async (req: Request, res: Response) => {
   try {
-    const { name, description, healthGain, staminaGain } = req.body;
+    const { name, description, healthGain, staminaGain, miningSpeedModifier } = req.body;
     const effect = await prisma.effect.create({
       data: {
         name,
         description,
         healthGain: healthGain === true || healthGain === 'true',
-        staminaGain: staminaGain === true || staminaGain === 'true'
+        staminaGain: staminaGain === true || staminaGain === 'true',
+        miningSpeedModifier: miningSpeedModifier === true || miningSpeedModifier === 'true',
       }
     });
 
@@ -38,14 +39,15 @@ export const createEffect = async (req: Request, res: Response) => {
 
 export const updateEffect = async (req: Request, res: Response) => {
   try {
-    const { name, description, healthGain, staminaGain } = req.body;
+    const { name, description, healthGain, staminaGain, miningSpeedModifier } = req.body;
     const effect = await prisma.effect.update({
       where: { id: req.params.id },
       data: {
         name,
         description,
         healthGain: healthGain === true || healthGain === 'true',
-        staminaGain: staminaGain === true || staminaGain === 'true'
+        staminaGain: staminaGain === true || staminaGain === 'true',
+        miningSpeedModifier: miningSpeedModifier === true || miningSpeedModifier === 'true',
       }
     });
 

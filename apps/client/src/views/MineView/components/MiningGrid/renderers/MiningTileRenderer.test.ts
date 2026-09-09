@@ -41,6 +41,9 @@ describe('MiningTileRenderer', () => {
 
     MiningTileRenderer.drawFallbackTile(graphics, MiningTileType.MINERAL, 64);
     expect(rectSpy).toHaveBeenCalled();
+
+    MiningTileRenderer.drawFallbackTile(graphics, MiningTileType.TORCH, 64);
+    expect(rectSpy).toHaveBeenCalled();
   });
 
   it('renders a grid of tiles into container and maintains graphics map', () => {
@@ -67,5 +70,15 @@ describe('MiningTileRenderer', () => {
     expect(tileGraphicsMap.has('0,1')).toBe(true);
     expect(tileGraphicsMap.has('1,1')).toBe(true);
     expect(container.children.length).toBe(4);
+  });
+
+  it('draws ladder with offsets and alpha', () => {
+    const graphics = new Graphics();
+    const rectSpy = vi.spyOn(graphics, 'rect');
+    const fillSpy = vi.spyOn(graphics, 'fill');
+
+    MiningTileRenderer.drawLadder(graphics, 64, 0.8, 10, 20);
+    expect(rectSpy).toHaveBeenCalled();
+    expect(fillSpy).toHaveBeenCalled();
   });
 });

@@ -41,6 +41,11 @@ export default function Effects() {
       field: 'staminaGain', 
       headerName: 'Stamina Gain',
       cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
+    },
+    { 
+      field: 'miningSpeedModifier', 
+      headerName: 'Mining Speed',
+      cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
     }
   ];
 

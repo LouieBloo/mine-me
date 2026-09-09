@@ -1,55 +1,39 @@
 import { useEffect, useRef, useState } from 'react';
 import { Application, Assets, Sprite, Texture, Container, Graphics } from 'pixi.js';
+import type {
+  SkeletonManifest,
+  SkeletonPartDef,
+  SkeletonHandJointDef,
+  SkeletonToolSocketDef,
+  HandJointOverride,
+  ToolSocketOverride,
+  PartOverride,
+  PartOverridesMap,
+  ModularAnimationState,
+} from '@mine-me/shared';
 import { getAssetUrl, MINER_SKELETON_PATH } from '@mine-me/shared';
 import type { CharacterJointNodes } from '../animation/ModularAnimationEngine';
 import { ModularAnimationEngine, type CharacterAnimationState } from '../animation/ModularAnimationEngine';
 import { ModularDebugRenderer } from '../renderers/ModularDebugRenderer';
 
-export interface SkeletonPartDef {
-  file: string;
-  width: number;
-  height: number;
-  bbox: [number, number, number, number];
-  pivot_anchor: [number, number];
-  offset_from_pelvis: [number, number];
-  z_index: number;
-  slot: string;
-}
-
-export interface SkeletonHandJointDef {
-  offset: [number, number];
-}
-
-export interface SkeletonToolSocketDef {
-  offset: [number, number];
-  scale?: number;
-  rotation?: number;
-}
-
-export interface SkeletonManifest {
-  version: string;
-  canvas_size: [number, number];
-  pelvis_origin: [number, number];
-  hand_joint?: SkeletonHandJointDef;
-  tool_socket?: SkeletonToolSocketDef;
-  parts: Record<string, SkeletonPartDef>;
-}
-
-export interface HandJointOverride {
-  offsetX: number;
-  offsetY: number;
-}
-
-export interface ToolSocketOverride {
-  offsetX: number;
-  offsetY: number;
-  scale: number;
-  rotation: number;
-}
+export type {
+  SkeletonManifest,
+  SkeletonPartDef,
+  SkeletonHandJointDef,
+  SkeletonToolSocketDef,
+  HandJointOverride,
+  ToolSocketOverride,
+  PartOverride,
+  PartOverridesMap,
+  ModularAnimationState,
+  CharacterAnimationState,
+};
 
 export interface UseModularCanvasSceneOptions {
   manifestUrl?: string;
-  animationState?: CharacterAnimationState;
+  manifestData?: SkeletonManifest | null;
+  baseAssetPath?: string;
+  animationState?: ModularAnimationState;
   speedMultiplier?: number;
   isPlaying?: boolean;
   isFlipped?: boolean;
@@ -79,6 +63,8 @@ export interface UseModularCanvasSceneOptions {
 
 export function useModularCanvasScene({
   manifestUrl,
+  manifestData,
+  baseAssetPath,
   animationState = 'idle',
   speedMultiplier = 1.0,
   isPlaying = true,
@@ -210,20 +196,31 @@ export function useModularCanvasScene({
           containerRef.current.appendChild(app.canvas);
         }
 
-        const targetManifestUrl = manifestUrl || getAssetUrl(MINER_SKELETON_PATH);
-        const resp = await fetch(targetManifestUrl);
-        if (!resp.ok) throw new Error(`Failed to load skeleton manifest (${resp.statusText})`);
-        const manifest: SkeletonManifest = await resp.json();
+        let manifest: SkeletonManifest | null = manifestData ? JSON.parse(JSON.stringify(manifestData)) : null;
+        let baseDir = baseAssetPath || '';
 
-        if (destroyed) {
+        if (!manifest) {
+          const targetManifestUrl = manifestUrl || getAssetUrl(MINER_SKELETON_PATH);
+          const resp = await fetch(targetManifestUrl);
+          if (!resp.ok) throw new Error(`Failed to load skeleton manifest (${resp.statusText})`);
+          manifest = await resp.json();
+
+          if (!baseDir) {
+            const lastSlash = targetManifestUrl.lastIndexOf('/');
+            baseDir = lastSlash !== -1 ? targetManifestUrl.substring(0, lastSlash + 1) : '';
+          }
+        }
+
+        if (!baseDir) {
+          baseDir = getAssetUrl('/assets/sprites/characters/miner/');
+        }
+
+        if (destroyed || !manifest) {
           if (app.renderer) {
             app.destroy({ removeView: true });
           }
           return;
         }
-
-        const lastSlash = targetManifestUrl.lastIndexOf('/');
-        const baseDir = lastSlash !== -1 ? targetManifestUrl.substring(0, lastSlash + 1) : '';
 
         // Root container centered in canvas
         const rootContainer = new Container();
@@ -287,33 +284,38 @@ export function useModularCanvasScene({
         partSpritesRef.current.clear();
         baseOffsetsRef.current = {};
 
-        for (const [partName, partDef] of Object.entries(manifest.parts)) {
-          if (destroyed) return;
+        if (manifest.parts) {
+          for (const [partName, partDef] of Object.entries(manifest.parts)) {
+            if (destroyed) return;
 
-          const partUrl = `${baseDir}${partDef.file}`;
-          const cacheKey = `admin_part_${partUrl}_${Date.now()}`;
-          const texture: Texture = await Assets.load({ src: partUrl, alias: cacheKey });
-          if (destroyed) return;
+            const partUrl = partDef.file.startsWith('/') || partDef.file.startsWith('http')
+              ? partDef.file
+              : `${baseDir}${partDef.file}`;
 
-          const sprite = new Sprite(texture);
-          sprite.anchor.set(partDef.pivot_anchor[0], partDef.pivot_anchor[1]);
-          partSpritesRef.current.set(partName, sprite);
+            const cacheKey = `admin_part_${partUrl}_${Date.now()}`;
+            const texture: Texture = await Assets.load({ src: partUrl, alias: cacheKey });
+            if (destroyed) return;
 
-          let targetNode: Container | null = null;
-          switch (partName) {
-            case 'head': targetNode = headNode; break;
-            case 'torso': targetNode = torsoBodyNode; break;
-            case 'arm_front': targetNode = armFrontNode; break;
-            case 'arm_back': targetNode = armBackNode; break;
-            case 'leg_front': targetNode = legFrontNode; break;
-            case 'leg_back': targetNode = legBackNode; break;
-          }
+            const sprite = new Sprite(texture);
+            sprite.anchor.set(partDef.pivot_anchor[0], partDef.pivot_anchor[1]);
+            partSpritesRef.current.set(partName, sprite);
 
-          if (targetNode) {
-            targetNode.x = partDef.offset_from_pelvis[0];
-            targetNode.y = partDef.offset_from_pelvis[1];
-            baseOffsetsRef.current[partName] = { x: targetNode.x, y: targetNode.y };
-            targetNode.addChild(sprite);
+            let targetNode: Container | null = null;
+            switch (partName) {
+              case 'head': targetNode = headNode; break;
+              case 'torso': targetNode = torsoBodyNode; break;
+              case 'arm_front': targetNode = armFrontNode; break;
+              case 'arm_back': targetNode = armBackNode; break;
+              case 'leg_front': targetNode = legFrontNode; break;
+              case 'leg_back': targetNode = legBackNode; break;
+            }
+
+            if (targetNode) {
+              targetNode.x = partDef.offset_from_pelvis[0];
+              targetNode.y = partDef.offset_from_pelvis[1];
+              baseOffsetsRef.current[partName] = { x: targetNode.x, y: targetNode.y };
+              targetNode.addChild(sprite);
+            }
           }
         }
 
@@ -356,7 +358,7 @@ export function useModularCanvasScene({
           nodes.root.y = height / 2 + (currentRootOffsetY !== undefined ? currentRootOffsetY : 20);
 
           // Part visibility, size & highlighting
-          partSpritesRef.current.forEach((sprite, partName) => {
+          partSpritesRef.current.forEach((sprite: Sprite, partName: string) => {
             sprite.visible = !currentHidden.includes(partName);
             sprite.tint = currentHighlight === partName ? 0xfde047 : 0xffffff;
 
@@ -380,7 +382,7 @@ export function useModularCanvasScene({
             if (handOv) {
               nodes.handFront.x = handOv.offsetX;
               nodes.handFront.y = handOv.offsetY;
-            } else if (manifest.hand_joint) {
+            } else if (manifest?.hand_joint) {
               nodes.handFront.x = manifest.hand_joint.offset[0];
               nodes.handFront.y = manifest.hand_joint.offset[1];
             } else {
@@ -396,7 +398,7 @@ export function useModularCanvasScene({
             nodes.toolSocket.y = socketOv.offsetY;
             nodes.toolSocket.scale.set(socketOv.scale);
             nodes.toolSocket.rotation = socketOv.rotation;
-          } else if (manifest.tool_socket) {
+          } else if (manifest?.tool_socket) {
             nodes.toolSocket.x = manifest.tool_socket.offset[0];
             nodes.toolSocket.y = manifest.tool_socket.offset[1];
             if (manifest.tool_socket.scale !== undefined) {
@@ -473,7 +475,7 @@ export function useModularCanvasScene({
       }
       appRef.current = null;
     };
-  }, [manifestUrl, width, height]);
+  }, [manifestUrl, manifestData, baseAssetPath, width, height]);
 
   return {
     containerRef,

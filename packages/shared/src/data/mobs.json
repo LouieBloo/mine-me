@@ -20,12 +20,9 @@
       "solMax": 10,
       "experience": 10,
       "mobId": "cmn1zb9op0000ihw4mgknuvlr",
-      "dungeonId": null,
-      "dungeonLevelId": null,
-      "dungeonLevelMobId": null,
       "characterLevelId": null,
-      "createdAt": "2026-04-16T23:57:04.167Z",
-      "updatedAt": "2026-06-06T00:06:18.428Z",
+      "createdAt": "2026-06-22T00:13:19.086Z",
+      "updatedAt": "2026-08-17T04:06:41.128Z",
       "items": [
         {
           "id": "cmq1lerzw0009q7ocoeo29j4r",
@@ -34,8 +31,8 @@
           "chance": 75,
           "minQuantity": 1,
           "maxQuantity": 1,
-          "createdAt": "2026-06-06T00:06:18.428Z",
-          "updatedAt": "2026-06-06T00:06:18.428Z"
+          "createdAt": "2026-06-22T00:13:19.102Z",
+          "updatedAt": "2026-08-17T04:06:41.132Z"
         },
         {
           "id": "cmq1lerzw000aq7oce69fyvsp",
@@ -44,8 +41,8 @@
           "chance": 100,
           "minQuantity": 1,
           "maxQuantity": 1,
-          "createdAt": "2026-06-06T00:06:18.428Z",
-          "updatedAt": "2026-06-06T00:06:18.428Z"
+          "createdAt": "2026-06-22T00:13:19.124Z",
+          "updatedAt": "2026-08-17T04:06:41.137Z"
         },
         {
           "id": "cmq1lerzw000bq7ocy6t8mssb",
@@ -54,8 +51,8 @@
           "chance": 75,
           "minQuantity": 1,
           "maxQuantity": 1,
-          "createdAt": "2026-06-06T00:06:18.428Z",
-          "updatedAt": "2026-06-06T00:06:18.428Z"
+          "createdAt": "2026-06-22T00:13:19.137Z",
+          "updatedAt": "2026-08-17T04:06:41.140Z"
         }
       ]
     }
@@ -70,11 +67,160 @@
     "attackPercentage": 90,
     "defendPercentage": 10,
     "animations": {
-      "url": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_sprite.png",
-      "atlasUrl": "/assets/sprites/mobs/cmn1zl1bk0001ihw48b0c492z_atlas.json"
+      "parts": {
+        "head": {
+          "bbox": [
+            0,
+            0,
+            219,
+            260
+          ],
+          "file": "head.png",
+          "slot": "HEAD",
+          "width": 199,
+          "height": 240,
+          "z_index": 30,
+          "pivot_anchor": [
+            0.46,
+            0.94
+          ],
+          "offset_from_pelvis": [
+            -58,
+            -225
+          ]
+        },
+        "torso": {
+          "bbox": [
+            0,
+            0,
+            303,
+            310
+          ],
+          "file": "torso.png",
+          "slot": "CHEST",
+          "width": 303,
+          "height": 310,
+          "z_index": 20,
+          "pivot_anchor": [
+            0.5,
+            0.94
+          ],
+          "offset_from_pelvis": [
+            -25,
+            15
+          ]
+        },
+        "arm_back": {
+          "bbox": [
+            0,
+            0,
+            88,
+            260
+          ],
+          "file": "arm_back.png",
+          "slot": "GAUNTLETS",
+          "width": 88,
+          "height": 260,
+          "z_index": 5,
+          "pivot_anchor": [
+            0.52,
+            0.12
+          ],
+          "offset_from_pelvis": [
+            90,
+            -180
+          ]
+        },
+        "leg_back": {
+          "bbox": [
+            0,
+            0,
+            150,
+            380
+          ],
+          "file": "leg_back.png",
+          "slot": "BOOTS",
+          "width": 150,
+          "height": 380,
+          "z_index": 10,
+          "pivot_anchor": [
+            0.48,
+            0.05
+          ],
+          "offset_from_pelvis": [
+            35,
+            30
+          ]
+        },
+        "arm_front": {
+          "bbox": [
+            0,
+            0,
+            331,
+            210
+          ],
+          "file": "arm_front.png",
+          "slot": "WEAPON",
+          "width": 271,
+          "height": 150,
+          "z_index": 40,
+          "pivot_anchor": [
+            0.08,
+            0.18
+          ],
+          "offset_from_pelvis": [
+            -153,
+            -95
+          ]
+        },
+        "leg_front": {
+          "bbox": [
+            0,
+            0,
+            177,
+            380
+          ],
+          "file": "leg_front.png",
+          "slot": "BOOTS",
+          "width": 177,
+          "height": 380,
+          "z_index": 15,
+          "pivot_anchor": [
+            0.52,
+            0.05
+          ],
+          "offset_from_pelvis": [
+            -20,
+            60
+          ]
+        }
+      },
+      "version": "2.0",
+      "hand_joint": {
+        "offset": [
+          210,
+          100
+        ]
+      },
+      "canvas_size": [
+        1024,
+        1024
+      ],
+      "tool_socket": {
+        "scale": 1,
+        "offset": [
+          30,
+          -105
+        ],
+        "rotation": 0.4
+      },
+      "pelvis_origin": [
+        512,
+        590
+      ]
     },
     "createdAt": "2026-04-06T21:51:48.684Z",
-    "updatedAt": "2026-04-06T21:51:48.684Z",
+    "updatedAt": "2026-08-19T02:49:17.707Z",
     "dropTable": null
   }
 ]

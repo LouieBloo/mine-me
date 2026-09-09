@@ -22,7 +22,13 @@ export class MiningSessionManager {
    * Create or retrieve an active real-time mining session.
    * If forceNew is true, any existing session for the character is stopped and replaced with a new map.
    */
-  public createSession(characterId: string, cityId: string, socket: Socket, forceNew = false): MiningGameEngine {
+  public createSession(
+    characterId: string,
+    cityId: string,
+    socket: Socket,
+    forceNew = false,
+    miningSpeed = 0,
+  ): MiningGameEngine {
     let engine = this.activeSessions.get(characterId);
     if (engine && forceNew) {
       engine.stop();
@@ -32,11 +38,13 @@ export class MiningSessionManager {
 
     if (engine) {
       engine.setSocket(socket);
+      engine.setMiningSpeed(miningSpeed);
     } else {
       engine = new MiningGameEngine({
         characterId,
         cityId,
         socket,
+        miningSpeed,
         onTimeout: (charId) => {
           this.activeSessions.delete(charId);
         },

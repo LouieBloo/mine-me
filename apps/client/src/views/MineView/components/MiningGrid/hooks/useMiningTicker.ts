@@ -6,7 +6,9 @@ import type { SpotLight } from '../../../../../components/game/lighting/SpotLigh
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import { MINING_CONFIG, type Vector2D, type MiningSessionClientState } from '@mine-me/shared';
 import { MiningEntityRenderer, type ActiveFallingRock } from '../renderers/MiningEntityRenderer';
-import { TILE_SIZE } from '../renderers/MiningTileRenderer';
+import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
+
+import type { MiningMouseController } from '../input/MiningMouseController';
 
 export interface UseMiningTickerOptions {
   app: Application | null;
@@ -20,6 +22,8 @@ export interface UseMiningTickerOptions {
   playerSpriteRef: React.RefObject<ModularCharacterSprite | null>;
   activeFallingRocksRef: React.MutableRefObject<ActiveFallingRock[]>;
   fallingRockGraphicsMap: React.MutableRefObject<Map<string, Graphics>>;
+  reticleGraphicsRef?: React.RefObject<Graphics | null>;
+  mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
   debugGraphicsRef: React.RefObject<Graphics | null>;
   showDebugRef: React.MutableRefObject<boolean>;
   flashlightRef: React.RefObject<SpotLight | null>;
@@ -40,6 +44,8 @@ export function useMiningTicker({
   playerSpriteRef,
   activeFallingRocksRef,
   fallingRockGraphicsMap,
+  reticleGraphicsRef,
+  mouseControllerRef,
   debugGraphicsRef,
   showDebugRef,
   flashlightRef,
@@ -64,7 +70,53 @@ export function useMiningTicker({
       const smoothFactor = Math.min(1.0, 1 - Math.exp(-32 * dt));
 
       const dx = targetPos.x - currentPos.x;
-      if (Math.abs(dx) > 0.005) {
+      currentPos.x += dx * smoothFactor;
+      currentPos.y += (targetPos.y - currentPos.y) * smoothFactor;
+
+      // Position player sprite in pixel world space
+      playerContainer.x = currentPos.x * TILE_SIZE;
+      playerContainer.y = currentPos.y * TILE_SIZE;
+
+      // Update camera viewport tracking & zoom FIRST so coordinate queries are 100% synchronized
+      if (cameraRef.current) {
+        cameraRef.current.setScreenSize(app.screen.width, app.screen.height);
+        cameraRef.current.update({ x: playerContainer.x, y: playerContainer.y }, dt);
+      } else {
+        const screenWidth = app.screen.width;
+        const screenHeight = app.screen.height;
+        gridContainer.x = screenWidth / 2 - playerContainer.x;
+        gridContainer.y = screenHeight / 2 - playerContainer.y;
+      }
+
+      // Mouse Aiming, Continuous Hover Retargeting & Character Facing direction
+      const mouseController = mouseControllerRef?.current;
+      if (mouseController) {
+        mouseController.setPlayerPosition(currentPos);
+        if (cameraRef?.current) {
+          mouseController.setCamera(cameraRef.current);
+        }
+        // Always re-evaluate what is hovered under the cursor so moving the character immediately retargets
+        mouseController.update();
+      }
+
+      const mouseWorld = mouseController?.getWorldMousePosition();
+      if (mouseWorld) {
+        // Aim headlamp and sprite facing towards the mouse cursor
+        const aimDx = mouseWorld.x - playerContainer.x;
+        const aimDy = mouseWorld.y - playerContainer.y;
+        const aimLen = Math.hypot(aimDx, aimDy);
+        if (aimLen > 1) {
+          playerFacingDirRef.current = { x: aimDx / aimLen, y: aimDy / aimLen };
+          const aimFacingLeft = aimDx < 0;
+          if (isFacingLeftRef.current !== aimFacingLeft) {
+            isFacingLeftRef.current = aimFacingLeft;
+            if (playerSpriteRef.current) {
+              playerSpriteRef.current.setFlipped(aimFacingLeft);
+            }
+          }
+        }
+      } else if (Math.abs(dx) > 0.005) {
+        // Fallback to movement direction if mouse is not on screen
         const isMovingLeft = dx < 0;
         if (isFacingLeftRef.current !== isMovingLeft) {
           isFacingLeftRef.current = isMovingLeft;
@@ -73,9 +125,6 @@ export function useMiningTicker({
           }
         }
       }
-
-      currentPos.x += dx * smoothFactor;
-      currentPos.y += (targetPos.y - currentPos.y) * smoothFactor;
 
       // Update modular sprite animation
       if (playerSpriteRef.current) {
@@ -87,10 +136,6 @@ export function useMiningTicker({
         playerSpriteRef.current.update(dt);
       }
 
-      // Position player sprite in pixel world space
-      playerContainer.x = currentPos.x * TILE_SIZE;
-      playerContainer.y = currentPos.y * TILE_SIZE;
-
       // Render active falling rocks in continuous space
       if (fallingRocksContainer) {
         MiningEntityRenderer.updateFallingRocks(
@@ -101,7 +146,44 @@ export function useMiningTicker({
         );
       }
 
-      // Render debug shapes for player collision box and mining reach (when enabled via T)
+      // Render Reticle Hover / Placement highlight
+      const reticleGraphics = reticleGraphicsRef?.current;
+      if (reticleGraphics && mouseController) {
+        reticleGraphics.clear();
+        reticleGraphics.position.set(0, 0);
+        const reticleState = mouseController.getReticleState();
+        if (reticleState.active && reticleState.target && reticleState.style) {
+          const rx = reticleState.target.x * TILE_SIZE;
+          const ry = reticleState.target.y * TILE_SIZE;
+          reticleGraphics.rect(rx, ry, TILE_SIZE, TILE_SIZE);
+          reticleGraphics.fill({ color: reticleState.style.color, alpha: reticleState.style.alpha });
+          reticleGraphics.stroke({ width: 2, color: reticleState.style.strokeColor, alpha: 0.9 });
+
+          // If actively mining this target block, draw an inner pulsing damage frame
+          const isMiningThis =
+            sessionState.isMining &&
+            sessionState.miningTarget &&
+            sessionState.miningTarget.x === reticleState.target.x &&
+            sessionState.miningTarget.y === reticleState.target.y;
+
+          if (isMiningThis) {
+            const pulse = 0.5 + Math.sin(Date.now() * 0.015) * 0.5;
+            reticleGraphics.rect(rx + 3, ry + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+            reticleGraphics.stroke({ width: 1.5, color: 0xf59e0b, alpha: 0.4 + pulse * 0.5 });
+          }
+
+          if (reticleState.style.showPreview) {
+            const previewGlow = 0.7 + Math.sin(Date.now() * 0.008) * 0.2;
+            if (reticleState.style.previewType === 'LADDER') {
+              MiningTileRenderer.drawLadder(reticleGraphics, TILE_SIZE, previewGlow, rx, ry);
+            } else {
+              MiningTileRenderer.drawTorch(reticleGraphics, TILE_SIZE, previewGlow, rx, ry);
+            }
+          }
+        }
+      }
+
+      // Render debug shapes for player collision box and mining reach (when enabled via B)
       const debugGraphics = debugGraphicsRef.current;
       if (debugGraphics) {
         debugGraphics.clear();
@@ -122,7 +204,7 @@ export function useMiningTicker({
           debugGraphics.stroke({ width: 2, color: 0x22c55e, alpha: 0.9 });
 
           // 2. Mining Reach Radius (Yellow circle for block excavation reach)
-          const reachPixelRadius = (MINING_CONFIG.PLAYER_MINING_REACH ?? 1.15) * TILE_SIZE;
+          const reachPixelRadius = (MINING_CONFIG.PLAYER_MINING_REACH ?? 1.85) * TILE_SIZE;
           debugGraphics.circle(playerPixelX, playerPixelY, reachPixelRadius);
           debugGraphics.stroke({ width: 1.5, color: 0xeab308, alpha: 0.5 });
 
@@ -145,17 +227,6 @@ export function useMiningTicker({
 
       // Update and re-render lighting engine lightmap
       lightingEngineRef.current?.update(dt, currentPos, playerFacingDirRef.current);
-
-      // Update camera viewport tracking & zoom
-      if (cameraRef.current) {
-        cameraRef.current.setScreenSize(app.screen.width, app.screen.height);
-        cameraRef.current.update({ x: playerContainer.x, y: playerContainer.y }, dt);
-      } else {
-        const screenWidth = app.screen.width;
-        const screenHeight = app.screen.height;
-        gridContainer.x = screenWidth / 2 - playerContainer.x;
-        gridContainer.y = screenHeight / 2 - playerContainer.y;
-      }
     };
 
     app.ticker.add(tickerCallback);

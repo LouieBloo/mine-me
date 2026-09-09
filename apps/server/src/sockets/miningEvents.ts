@@ -6,6 +6,7 @@ import {
   type GameEventResult,
   type MiningInputPayload,
   type MiningInteractPayload,
+  CharacterModEngine,
 } from '@mine-me/shared';
 import { miningSessionManager } from '../services/mining/MiningSessionManager';
 
@@ -31,6 +32,21 @@ export const handleMiningStart = async (
 
   const character = await prisma.character.findUnique({
     where: { id: characterId },
+    include: {
+      inventory: {
+        include: {
+          item: {
+            include: {
+              itemEffects: {
+                include: {
+                  effect: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!character || character.userId !== userId) {
@@ -42,16 +58,23 @@ export const handleMiningStart = async (
   }
 
   try {
+    const clientInventory = InventoryService.mapCharacterInventory(character);
+    const mods = CharacterModEngine.getModifications(clientInventory.items);
+
+    // Ensure client has latest authoritative inventory upon entering mine
+    broadcastStatUpdate(characterId, { inventory: clientInventory });
+
     const engine = miningSessionManager.createSession(
       characterId,
       character.cityId,
       socket,
       payload?.forceNew,
+      mods.miningSpeed,
     );
     const sessionState = miningSessionManager.buildClientState(engine);
 
     console.log(
-      `[Mining] ${character.name} entered real-time mine simulation in city ${character.cityId}${
+      `[Mining] ${character.name} entered real-time mine simulation in city ${character.cityId} with speed ${mods.miningSpeed}${
         payload?.forceNew ? ' (fresh session)' : ''
       }`,
     );
@@ -132,8 +155,143 @@ export const handleMiningPlaceLadder = async (
   const engine = miningSessionManager.getSession(characterId);
   if (!engine) return { success: false, error: 'No active mining session.' };
 
+  // 1. Check if user has a ladder in character inventory
+  const characterInventoryLadder = await prisma.inventoryItem.findFirst({
+    where: {
+      characterId,
+      quantity: { gt: 0 },
+      item: {
+        OR: [
+          { subType: { equals: 'LADDER', mode: 'insensitive' } },
+          { name: { contains: 'ladder', mode: 'insensitive' } },
+        ],
+      },
+    },
+    include: { item: true },
+  });
+
+  if (!characterInventoryLadder) {
+    return { success: false, error: 'You do not have a ladder to place.' };
+  }
+
+  // 2. Validate and place in engine
   const placed = engine.placeLadder(payload.target);
   if (!placed) return { success: false, error: 'Cannot place ladder here.' };
+
+  // 3. Deduct ladder from inventory
+  if (characterInventoryLadder.quantity <= 1) {
+    await prisma.inventoryItem.delete({
+      where: { id: characterInventoryLadder.id },
+    });
+  } else {
+    await prisma.inventoryItem.update({
+      where: { id: characterInventoryLadder.id },
+      data: { quantity: { decrement: 1 } },
+    });
+  }
+
+  const updatedChar = await prisma.character.findUnique({
+    where: { id: characterId },
+    include: {
+      inventory: {
+        include: {
+          item: {
+            include: {
+              itemEffects: {
+                include: {
+                  effect: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (updatedChar) {
+    const mappedInventory = InventoryService.mapCharacterInventory(updatedChar);
+    broadcastStatUpdate(characterId, { inventory: mappedInventory });
+  }
+
+  return { success: true };
+};
+
+/**
+ * Handler: mining_place_torch
+ * Places a torch at target position if player has a torch in inventory or temp backpack,
+ * and target is within 1 tile of player.
+ */
+export const handleMiningPlaceTorch = async (
+  io: Server,
+  socket: Socket,
+  payload: { target: { x: number; y: number } },
+): Promise<GameEventResult> => {
+  const characterId = socket.data.characterId;
+  if (!characterId) return { success: false, error: 'No character selected.' };
+
+  const engine = miningSessionManager.getSession(characterId);
+  if (!engine) return { success: false, error: 'No active mining session.' };
+
+  if (!payload?.target) {
+    return { success: false, error: 'Target position is required.' };
+  }
+
+  // 1. Check if user has a torch in character inventory
+  const characterInventoryTorch = await prisma.inventoryItem.findFirst({
+    where: {
+      characterId,
+      quantity: { gt: 0 },
+      item: { subType: { equals: 'TORCH', mode: 'insensitive' } },
+    },
+    include: { item: true },
+  });
+
+  if (!characterInventoryTorch) {
+    return { success: false, error: 'You do not have a torch to place.' };
+  }
+
+  // 2. Validate and place in engine (checks bounds, revealed, <= 1 tile distance)
+  const placed = engine.placeTorch(payload.target);
+  if (!placed) {
+    return { success: false, error: 'Cannot place torch here (must be within 1 tile on an empty revealed space).' };
+  }
+
+  // 3. Deduct torch from inventory
+  if (characterInventoryTorch.quantity <= 1) {
+    await prisma.inventoryItem.delete({
+      where: { id: characterInventoryTorch.id },
+    });
+  } else {
+    await prisma.inventoryItem.update({
+      where: { id: characterInventoryTorch.id },
+      data: { quantity: { decrement: 1 } },
+    });
+  }
+
+  const updatedChar = await prisma.character.findUnique({
+    where: { id: characterId },
+    include: {
+      inventory: {
+        include: {
+          item: {
+            include: {
+              itemEffects: {
+                include: {
+                  effect: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (updatedChar) {
+    const mappedInventory = InventoryService.mapCharacterInventory(updatedChar);
+    broadcastStatUpdate(characterId, { inventory: mappedInventory });
+  }
 
   return { success: true };
 };

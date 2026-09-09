@@ -43,7 +43,8 @@ adminRouter.post('/items/:id/gear-image', ItemController.itemGearImageUpload, It
 adminRouter.get('/mobs', MobController.getMobs);
 adminRouter.get('/mobs/:id', MobController.getMob);
 adminRouter.post('/mobs', runValidation(AdminValidation.mobValidation), MobController.createMob);
-adminRouter.put('/mobs/:id', runValidation(AdminValidation.mobValidation), MobController.updateMob);
+adminRouter.put('/mobs/:id', runValidation(AdminValidation.mobUpdateValidation), MobController.updateMob);
+adminRouter.put('/mobs/:id/skeleton', MobController.updateMobSkeleton);
 adminRouter.post('/mobs/:id/sprite-atlas', MobController.mobSpriteUpload, MobController.uploadMobSpriteAtlas);
 
 // USERS

@@ -25,6 +25,7 @@ export interface MiningEngineOptions {
   cityId: string;
   socket: Socket;
   seed?: number;
+  miningSpeed?: number | (() => number);
   maxDurationSeconds?: number;
   onTimeout?: (characterId: string) => void;
 }
@@ -34,11 +35,20 @@ export class MiningGameEngine {
   public readonly cityId: string;
   public readonly seed: number;
   private socket: Socket;
+  private miningSpeedResolver?: () => number;
+  private explicitMiningSpeed?: number;
 
   public grid: ServerMiningGrid;
   public playerBody: MiningPlayerBody;
   public activeRocks: MiningRockEntity[] = [];
   private rockCounter = 0;
+
+  public get miningSpeed(): number {
+    if (this.miningSpeedResolver) {
+      return this.miningSpeedResolver();
+    }
+    return this.explicitMiningSpeed ?? 0;
+  }
 
   public get position(): Vector2D {
     return this.playerBody.position;
@@ -97,6 +107,11 @@ export class MiningGameEngine {
     this.cityId = options.cityId;
     this.socket = options.socket;
     this.seed = options.seed ?? Math.floor(Math.random() * 2147483647);
+    if (typeof options.miningSpeed === 'function') {
+      this.miningSpeedResolver = options.miningSpeed;
+    } else {
+      this.explicitMiningSpeed = options.miningSpeed ?? 0;
+    }
     this.maxDurationSeconds = options.maxDurationSeconds ?? MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
     this.onTimeout = options.onTimeout;
 
@@ -112,6 +127,23 @@ export class MiningGameEngine {
 
     // Reveal starting area
     revealTiles(this.grid, { x: MINING_CONFIG.ENTRANCE_X, y: MINING_CONFIG.ENTRANCE_Y }, this.visionRange);
+  }
+
+  /**
+   * Set the player's mining speed dynamically (e.g. when gear changes mid-session).
+   */
+  public setMiningSpeed(speed: number | (() => number)): void {
+    if (typeof speed === 'function') {
+      this.miningSpeedResolver = speed;
+      this.explicitMiningSpeed = undefined;
+    } else {
+      this.explicitMiningSpeed = speed;
+      this.miningSpeedResolver = undefined;
+    }
+
+    if (this.miningSpeed <= 0 && this.isMining) {
+      this.stopMining();
+    }
   }
 
   /**
@@ -147,6 +179,7 @@ export class MiningGameEngine {
    * Receive new input state from client.
    */
   public handleInput(input: MiningInputState): void {
+    if (input.sequence < this.inputs.sequence) return;
     this.inputs = input;
   }
 
@@ -155,6 +188,8 @@ export class MiningGameEngine {
    */
   public startMining(target: MiningPosition): boolean {
     if (this.isMining) return false;
+    // Cannot mine if character has no mining speed (e.g. no pickaxe equipped)
+    if (this.miningSpeed <= 0) return false;
     // Allow mining if player is on ground OR on a ladder
     if (!this.playerBody.isGrounded && !this.playerBody.isOnLadder) return false;
     if (!isInBounds(target.x, target.y)) return false;
@@ -163,21 +198,18 @@ export class MiningGameEngine {
     if (
       tile.type === MiningTileType.EMPTY ||
       tile.type === MiningTileType.ENTRANCE ||
-      tile.type === MiningTileType.LADDER
+      tile.type === MiningTileType.LADDER ||
+      tile.type === MiningTileType.TORCH
     ) {
       return false;
     }
 
     // Distance check to target tile center (supports cardinal & diagonal targets)
-    const playerTileX = Math.floor(this.playerBody.position.x);
-    const playerTileY = Math.floor(this.playerBody.position.y);
-    const isDiagonal = target.x !== playerTileX && target.y !== playerTileY;
-    const maxReach = isDiagonal ? 1.75 : 1.25;
-
     const tileCenterX = target.x + 0.5;
     const tileCenterY = target.y + 0.5;
-    const dist = Math.hypot(this.playerBody.position.x - tileCenterX, this.playerBody.position.y - tileCenterY);
-    if (dist > maxReach) return false;
+    const dx = Math.abs(tileCenterX - this.playerBody.position.x);
+    const dy = Math.abs(tileCenterY - this.playerBody.position.y);
+    if (dx > MINING_CONFIG.PLAYER_MINING_REACH || dy > MINING_CONFIG.PLAYER_MINING_REACH) return false;
 
     let timeMs: number = MINING_CONFIG.DIRT_MINE_TIME_MS;
     if (tile.type === MiningTileType.MINERAL) timeMs = MINING_CONFIG.MINERAL_MINE_TIME_MS;
@@ -209,9 +241,20 @@ export class MiningGameEngine {
 
     if (!isInBounds(x, y)) return false;
 
+    if (target) {
+      const tileCenterX = target.x + 0.5;
+      const tileCenterY = target.y + 0.5;
+      const dx = Math.abs(tileCenterX - this.playerBody.position.x);
+      const dy = Math.abs(tileCenterY - this.playerBody.position.y);
+
+      if (dx > MINING_CONFIG.TORCH_PLACEMENT_REACH || dy > MINING_CONFIG.TORCH_PLACEMENT_REACH) {
+        return false;
+      }
+    }
+
     const tile = this.grid[y][x];
-    // Can place ladder on EMPTY or replace existing non-bedrock tiles
-    if (tile.type === MiningTileType.ENTRANCE) return false;
+    // Cannot place ladder on ENTRANCE or replace an existing LADDER
+    if (tile.type === MiningTileType.ENTRANCE || tile.type === MiningTileType.LADDER) return false;
 
     tile.type = MiningTileType.LADDER;
     tile.revealed = true;
@@ -221,6 +264,40 @@ export class MiningGameEngine {
       x,
       y,
       type: MiningTileType.LADDER,
+    });
+
+    return true;
+  }
+
+  /**
+   * Place a torch tile at the specified position.
+   * Target must be within max 1 tile away from the player (Chebyshev distance <= 1).
+   * Tile must be revealed, non-entrance, and non-torch.
+   */
+  public placeTorch(target: MiningPosition): boolean {
+    if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return false;
+    if (!isInBounds(target.x, target.y)) return false;
+
+    // Check reach: maximum 1 tile away from continuous player body position
+    const tileCenterX = target.x + 0.5;
+    const tileCenterY = target.y + 0.5;
+    const dx = Math.abs(tileCenterX - this.playerBody.position.x);
+    const dy = Math.abs(tileCenterY - this.playerBody.position.y);
+
+    if (dx > MINING_CONFIG.TORCH_PLACEMENT_REACH || dy > MINING_CONFIG.TORCH_PLACEMENT_REACH) return false;
+
+    const tile = this.grid[target.y][target.x];
+    if (!tile.revealed) return false;
+    if (tile.type === MiningTileType.ENTRANCE || tile.type === MiningTileType.TORCH) return false;
+
+    tile.type = MiningTileType.TORCH;
+    tile.revealed = true;
+    tile.damageMs = 0;
+
+    this.pendingRevealedTiles.push({
+      x: target.x,
+      y: target.y,
+      type: MiningTileType.TORCH,
     });
 
     return true;
@@ -259,41 +336,35 @@ export class MiningGameEngine {
     // 5. Item Pickup check
     this.checkItemPickups();
 
-    // 6. Mining logic & Auto-mine:
-    // Direction input and grounded stance are required to mine.
-    const hasDirectionInput = this.inputs.left || this.inputs.right || this.inputs.up || this.inputs.down;
-
-    const playerTileX = Math.floor(this.playerBody.position.x);
-    const playerTileY = Math.floor(this.playerBody.position.y);
-    const desiredTargetX = playerTileX + this.playerBody.facing.x;
-    const desiredTargetY = playerTileY + this.playerBody.facing.y;
-
+    // 6. Mining logic (Mouse-aimed and Left-Click triggered)
     const canMineStance = this.playerBody.isGrounded || this.playerBody.isOnLadder;
+    const isTargeting = Boolean(this.inputs.miningKey && this.inputs.miningTarget);
+    const target = this.inputs.miningTarget;
 
     if (this.isMining && this.miningTarget) {
-      // If player released input, faces a different target, moves out of range, or is airborne (not grounded and not on ladder), stop mining
-      const isFacingCurrentTarget = hasDirectionInput && this.miningTarget.x === desiredTargetX && this.miningTarget.y === desiredTargetY;
-      const isDiagonalTarget = this.miningTarget.x !== playerTileX && this.miningTarget.y !== playerTileY;
-      const maxAllowedDist = isDiagonalTarget ? 1.85 : 1.35;
+      // If player released mouse button, switched target, moved out of reach, or became airborne
+      const isSameTarget = target ? (this.miningTarget.x === target.x && this.miningTarget.y === target.y) : false;
       const tileCenterX = this.miningTarget.x + 0.5;
       const tileCenterY = this.miningTarget.y + 0.5;
-      const dist = Math.hypot(this.playerBody.position.x - tileCenterX, this.playerBody.position.y - tileCenterY);
+      const dx = Math.abs(tileCenterX - this.playerBody.position.x);
+      const dy = Math.abs(tileCenterY - this.playerBody.position.y);
+      const inReach = dx <= MINING_CONFIG.PLAYER_MINING_REACH && dy <= MINING_CONFIG.PLAYER_MINING_REACH;
 
-      if (!isFacingCurrentTarget || dist > maxAllowedDist || !canMineStance) {
+      if (!isTargeting || !isSameTarget || !canMineStance || !inReach) {
         this.stopMining();
       }
     }
 
-    // If not currently mining, player has direction input, and player can mine (grounded or on ladder), check if we should start mining the target block
-    if (!this.isMining && hasDirectionInput && canMineStance) {
-      if (isInBounds(desiredTargetX, desiredTargetY)) {
-        const tile = this.grid[desiredTargetY][desiredTargetX];
+    // If not currently mining, player is holding mining button on a target block, and stance allows mining
+    if (!this.isMining && isTargeting && target && canMineStance && this.miningSpeed > 0) {
+      if (isInBounds(target.x, target.y)) {
+        const tile = this.grid[target.y][target.x];
         if (
           tile.type === MiningTileType.DIRT ||
           tile.type === MiningTileType.MINERAL ||
           tile.type === MiningTileType.CHEST
         ) {
-          this.startMining({ x: desiredTargetX, y: desiredTargetY });
+          this.startMining({ x: target.x, y: target.y });
         }
       }
     }
@@ -302,7 +373,8 @@ export class MiningGameEngine {
     if (this.isMining && this.miningTarget) {
       const tile = this.grid[this.miningTarget.y][this.miningTarget.x];
       const prevStage = getDamageStage(tile);
-      tile.damageMs = (tile.damageMs || 0) + dt * 1000;
+      const speedMultiplier = this.miningSpeed / 100;
+      tile.damageMs = (tile.damageMs || 0) + dt * 1000 * speedMultiplier;
       this.miningProgressMs = tile.damageMs;
 
       const newStage = getDamageStage(tile);

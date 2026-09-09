@@ -76,4 +76,21 @@ describe('MiningHUD', () => {
     expect(refreshButton).toBeDefined();
     expect((refreshButton as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it('renders controls guide with 1-4 Quick Slots and Left Click Mine', () => {
+    render(
+      <MiningHUD
+        sessionState={mockSessionState}
+        playerState={mockPlayerState}
+        onExit={vi.fn()}
+        onAbandon={vi.fn()}
+        onRestart={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/1-4/i)).toBeDefined();
+    expect(screen.getByText(/Quick Slots/i)).toBeDefined();
+    expect(screen.getByText(/Left Click/i)).toBeDefined();
+    expect(screen.getAllByText(/Mine/i).length).toBeGreaterThan(0);
+  });
 });

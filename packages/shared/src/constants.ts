@@ -82,9 +82,17 @@ export const SUBTYPE_LABEL: Record<string, string> = {
   STAMINA: 'Stamina',
 };
 
+export const MODULAR_ANIMATION_STATES = [
+  'idle',
+  'walk',
+  'mine',
+  'attack',
+  'damage',
+  'death',
+] as const;
+
 /**
  * Whitelisted mob animation keys used across client, admin, and server.
- * These match the capitalized keys found in the sprite atlas JSON files.
  */
 export const MOB_ANIMATION_KEYS = [
   'Idle',

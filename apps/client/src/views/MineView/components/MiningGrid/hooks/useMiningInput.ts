@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import type { MiningInputState, Vector2D } from '@mine-me/shared';
+import type { MiningInputState, MiningPosition, Vector2D } from '@mine-me/shared';
 import type { ModularCharacterSprite } from '../../../../../components/game/sprites';
 import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
+import type { MiningMouseController } from '../input/MiningMouseController';
 
 export interface UseMiningInputOptions {
   sendGameEvent: (event: any) => Promise<any> | void;
@@ -10,6 +11,7 @@ export interface UseMiningInputOptions {
   showDebugRef: React.MutableRefObject<boolean>;
   playerFacingDirRef: React.MutableRefObject<Vector2D>;
   isFacingLeftRef: React.MutableRefObject<boolean>;
+  mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
   zoom: number;
   onZoomChange?: (zoom: number) => void;
 }
@@ -21,6 +23,7 @@ export function useMiningInput({
   showDebugRef,
   playerFacingDirRef,
   isFacingLeftRef,
+  mouseControllerRef,
   zoom,
   onZoomChange,
 }: UseMiningInputOptions) {
@@ -31,6 +34,7 @@ export function useMiningInput({
     right: boolean;
     jump: boolean;
     miningKey: boolean;
+    miningTarget: MiningPosition | null;
     sequence: number;
   }>({
     up: false,
@@ -39,6 +43,7 @@ export function useMiningInput({
     right: false,
     jump: false,
     miningKey: false,
+    miningTarget: null,
     sequence: 0,
   });
 
@@ -51,6 +56,30 @@ export function useMiningInput({
   useEffect(() => {
     onZoomChangeRef.current = onZoomChange;
   }, [onZoomChange]);
+
+  // Subscribe to mouse-driven mining button and target changes
+  useEffect(() => {
+    const mouseController = mouseControllerRef?.current;
+    if (!mouseController) return;
+
+    const unsubscribe = mouseController.onMiningStateChange((isMining, target) => {
+      const current = keysPressedRef.current;
+      const changed =
+        current.miningKey !== isMining ||
+        current.miningTarget?.x !== target?.x ||
+        current.miningTarget?.y !== target?.y;
+
+      if (changed) {
+        current.miningKey = isMining;
+        current.miningTarget = target ? { ...target } : null;
+        current.sequence++;
+        const payloadInput: MiningInputState = { ...current };
+        sendGameEvent({ type: 'mining_input', input: payloadInput });
+      }
+    });
+
+    return unsubscribe;
+  }, [mouseControllerRef, sendGameEvent]);
 
   useEffect(() => {
     const updateInputState = (e: KeyboardEvent, isKeyDown: boolean) => {
@@ -94,12 +123,9 @@ export function useMiningInput({
         if (flashlightRef.current) {
           flashlightRef.current.enabled = !flashlightRef.current.enabled;
         }
-      } else if (key === 't' && isKeyDown) {
+      } else if (key === 'b' && isKeyDown) {
         // Toggle Debug Collision & Reach Shapes ON/OFF
         showDebugRef.current = !showDebugRef.current;
-      } else if (key === 'l' && isKeyDown) {
-        // Place ladder hotkey (for testing/building)
-        sendGameEvent({ type: 'mining_place_ladder' })?.catch?.(() => {});
       }
 
       if (changed) {
@@ -112,13 +138,17 @@ export function useMiningInput({
 
         if (fx !== 0 || fy !== 0) {
           const len = Math.hypot(fx, fy);
-          playerFacingDirRef.current = { x: fx / len, y: fy / len };
-          if (fx < 0) {
-            isFacingLeftRef.current = true;
-            playerSpriteRef.current?.setFlipped(true);
-          } else if (fx > 0) {
-            isFacingLeftRef.current = false;
-            playerSpriteRef.current?.setFlipped(false);
+          // Only update facing from movement if mouse is not currently aiming on screen
+          const mouseController = mouseControllerRef?.current;
+          if (!mouseController?.getScreenMousePosition()) {
+            playerFacingDirRef.current = { x: fx / len, y: fy / len };
+            if (fx < 0) {
+              isFacingLeftRef.current = true;
+              playerSpriteRef.current?.setFlipped(true);
+            } else if (fx > 0) {
+              isFacingLeftRef.current = false;
+              playerSpriteRef.current?.setFlipped(false);
+            }
           }
         }
 
@@ -132,13 +162,22 @@ export function useMiningInput({
     const handleKeyUp = (e: KeyboardEvent) => updateInputState(e, false);
     const handleBlur = () => {
       const current = keysPressedRef.current;
-      if (current.up || current.down || current.left || current.right || current.jump || current.miningKey) {
+      if (
+        current.up ||
+        current.down ||
+        current.left ||
+        current.right ||
+        current.jump ||
+        current.miningKey ||
+        current.miningTarget
+      ) {
         current.up = false;
         current.down = false;
         current.left = false;
         current.right = false;
         current.jump = false;
         current.miningKey = false;
+        current.miningTarget = null;
         current.sequence++;
         sendGameEvent({ type: 'mining_input', input: { ...current } });
       }
@@ -164,7 +203,7 @@ export function useMiningInput({
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('wheel', handleWheel);
     };
-  }, [sendGameEvent, playerSpriteRef, flashlightRef, showDebugRef, playerFacingDirRef, isFacingLeftRef]);
+  }, [sendGameEvent, playerSpriteRef, flashlightRef, showDebugRef, playerFacingDirRef, isFacingLeftRef, mouseControllerRef]);
 
   return { keysPressedRef };
 }

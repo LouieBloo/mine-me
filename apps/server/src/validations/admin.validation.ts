@@ -43,6 +43,14 @@ export const mobValidation = [
   body('defense').isInt({ min: 0 }).withMessage('Defense must be >= 0')
 ];
 
+export const mobUpdateValidation = [
+  body('name').optional().trim().notEmpty().withMessage('Mob Name cannot be empty'),
+  body('level').optional().isInt({ min: 1 }).withMessage('Level must be >= 1'),
+  body('health').optional().isInt({ min: 1 }).withMessage('Health must be >= 1'),
+  body('attack').optional().isInt({ min: 0 }).withMessage('Attack must be >= 0'),
+  body('defense').optional().isInt({ min: 0 }).withMessage('Defense must be >= 0')
+];
+
 export const userValidation = [
   body('phoneNumber').trim().notEmpty().withMessage('Phone Number is required'),
   body('familyName').trim().notEmpty().withMessage('Family Name is required')
@@ -63,5 +71,6 @@ export const effectValidation = [
   body('name').trim().notEmpty().withMessage('Effect name is required'),
   body('description').trim().notEmpty().withMessage('Description is required'),
   body('healthGain').optional().isBoolean().withMessage('healthGain must be a boolean'),
-  body('staminaGain').optional().isBoolean().withMessage('staminaGain must be a boolean')
+  body('staminaGain').optional().isBoolean().withMessage('staminaGain must be a boolean'),
+  body('miningSpeedModifier').optional().isBoolean().withMessage('miningSpeedModifier must be a boolean')
 ];

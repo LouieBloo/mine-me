@@ -24,6 +24,8 @@ export type {
 
 export interface ModularCharacterCanvasProps {
   manifestUrl?: string;
+  manifestData?: SkeletonManifest | null;
+  baseAssetPath?: string;
   animationState?: CharacterAnimationState;
   speedMultiplier?: number;
   isPlaying?: boolean;
@@ -56,6 +58,8 @@ export interface ModularCharacterCanvasProps {
 
 export default function ModularCharacterCanvas({
   manifestUrl,
+  manifestData,
+  baseAssetPath,
   animationState = 'idle',
   speedMultiplier = 1.0,
   isPlaying = true,
@@ -77,6 +81,8 @@ export default function ModularCharacterCanvas({
 }: ModularCharacterCanvasProps) {
   const { containerRef, nodesRef, loading, error } = useModularCanvasScene({
     manifestUrl,
+    manifestData,
+    baseAssetPath,
     animationState,
     speedMultiplier,
     isPlaying,

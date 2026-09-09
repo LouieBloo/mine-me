@@ -1,6 +1,7 @@
 import { prisma } from '../index';
 import { CharacterService } from './character.service';
 import { LootResult } from './loot.service';
+import { CharacterModEngine } from '@mine-me/shared';
 
 export class InventoryService {
   /**
@@ -89,6 +90,7 @@ export class InventoryService {
           description: ie.effect.description,
           healthGain: ie.effect.healthGain,
           staminaGain: ie.effect.staminaGain,
+          miningSpeedModifier: ie.effect.miningSpeedModifier,
         } : undefined
       })),
     };
@@ -135,5 +137,33 @@ export class InventoryService {
       boots: getEquippedItem('BOOTS') as any,
       weapon: getEquippedItem('WEAPON') as any,
     };
+  }
+
+  /**
+   * Calculates the current effective mining speed of a character from database in real-time.
+   */
+  public static async getCharacterMiningSpeed(characterId: string): Promise<number> {
+    const inventory = await prisma.inventoryItem.findMany({
+      where: {
+        characterId,
+        equipped: true,
+        item: { type: 'GEAR' }
+      },
+      include: {
+        item: {
+          include: {
+            itemEffects: {
+              include: {
+                effect: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const mappedEntries = inventory.map(inv => InventoryService.mapInventoryEntry(inv)!);
+    const mods = CharacterModEngine.getModifications(mappedEntries);
+    return mods.miningSpeed;
   }
 }

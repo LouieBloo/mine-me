@@ -127,7 +127,8 @@ export abstract class MiningPhysicsBody {
           tile &&
           tile.type !== MiningTileType.EMPTY &&
           tile.type !== MiningTileType.ENTRANCE &&
-          tile.type !== MiningTileType.LADDER
+          tile.type !== MiningTileType.LADDER &&
+          tile.type !== MiningTileType.TORCH
         ) {
           return true;
         }

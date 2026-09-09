@@ -47,7 +47,7 @@ export const MINING_CONFIG = {
   PLAYER_RADIUS: 12,
   PLAYER_COLLIDER_WIDTH: 20, // Fall & movement rectangle collider width in pixels (~0.625 tiles)
   PLAYER_COLLIDER_HEIGHT: 28, // Fall & movement rectangle collider height in pixels (~0.875 tiles)
-  PLAYER_MINING_REACH: 1.15, // Mining interaction reach radius in tiles
+  PLAYER_MINING_REACH: 1.85, // Mining interaction reach radius in tiles (allows adjacent tiles regardless of player sub-tile position)
   MOVE_SPEED: 4.5, // Grid tiles per second
   GRAVITY: 28.0, // Grid tiles per second squared (snappy natural 2D gravity)
   TERMINAL_FALL_SPEED: 20.0, // Maximum downward velocity in tiles per second
@@ -63,6 +63,7 @@ export const MINING_CONFIG = {
   TORCH_RADIUS: 3.8, // tiles
   TORCH_FLICKER_SPEED: 4.0, // Hz
   TORCH_FLICKER_AMOUNT: 0.15, // intensity variation
+  TORCH_PLACEMENT_REACH: 1.85, // max center-to-center tile reach distance (allows adjacent tiles regardless of player sub-tile position)
 
   CLIMB_SPEED: 3.5, // Grid tiles per second while ascending or descending ladders
   LADDER_GRAB_WIDTH: 0.55, // Horizontal distance in tiles from ladder center within which player grips ladder
@@ -83,11 +84,12 @@ export const MiningTileType = {
   CHEST: 4,
   ENTRANCE: 5,
   LADDER: 6,
+  TORCH: 7,
 } as const;
 
 export type MiningTileType = (typeof MiningTileType)[keyof typeof MiningTileType];
 
-export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE' | 'LADDER';
+export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE' | 'LADDER' | 'TORCH';
 
 export interface MiningBlockConfig {
   id: string;
@@ -215,6 +217,7 @@ export interface MiningInputState {
   right: boolean;
   jump?: boolean;
   miningKey: boolean;
+  miningTarget?: MiningPosition | null;
   sequence: number;
 }
 

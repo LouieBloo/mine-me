@@ -7,11 +7,21 @@ import {
   handleMiningInput,
   handleMiningInteract,
   handleMiningPlaceLadder,
+  handleMiningPlaceTorch,
   handleMiningExit,
   handleMiningCancel,
 } from './miningEvents';
+import { miningSessionManager } from '../services/mining/MiningSessionManager';
 import { InventoryService } from '../services/inventory.service';
-import { type GameEventPayload, type GameEventResult, type ChangeCityPayload, type RestPayload, calculateTravelDays, getStaminaRecoveryPerDay } from '@mine-me/shared';
+import {
+  type GameEventPayload,
+  type GameEventResult,
+  type ChangeCityPayload,
+  type RestPayload,
+  calculateTravelDays,
+  getStaminaRecoveryPerDay,
+  CharacterModEngine,
+} from '@mine-me/shared';
 
 // ============================================================================
 // Game Event Handler Registry
@@ -296,6 +306,12 @@ const handleEquipItem: GameEventHandler<any> = async (io, socket, payload) => {
 
   const clientInventory = InventoryService.mapCharacterInventory(character);
   const clientGear = InventoryService.mapCharacterGear(character.inventory);
+  const mods = CharacterModEngine.getModifications(clientInventory.items);
+
+  const activeEngine = miningSessionManager.getSession(characterId);
+  if (activeEngine) {
+    activeEngine.setMiningSpeed(mods.miningSpeed);
+  }
 
   broadcastStatUpdate(characterId, {
     inventory: clientInventory,
@@ -361,6 +377,12 @@ const handleUnequipItem: GameEventHandler<any> = async (io, socket, payload) => 
 
   const clientInventory = InventoryService.mapCharacterInventory(character);
   const clientGear = InventoryService.mapCharacterGear(character.inventory);
+  const mods = CharacterModEngine.getModifications(clientInventory.items);
+
+  const activeEngine = miningSessionManager.getSession(characterId);
+  if (activeEngine) {
+    activeEngine.setMiningSpeed(mods.miningSpeed);
+  }
 
   broadcastStatUpdate(characterId, {
     inventory: clientInventory,
@@ -527,6 +549,7 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   mining_input: handleMiningInput,
   mining_interact: handleMiningInteract,
   mining_place_ladder: handleMiningPlaceLadder,
+  mining_place_torch: handleMiningPlaceTorch,
   mining_exit: handleMiningExit,
   mining_cancel: handleMiningCancel,
   equip_item: handleEquipItem,

@@ -1,6 +1,7 @@
 import type { Container } from 'pixi.js';
+import type { ModularAnimationState } from '@mine-me/shared';
 
-export type CharacterAnimationState = 'idle' | 'walk' | 'mine';
+export type CharacterAnimationState = ModularAnimationState;
 
 export interface CharacterJointNodes {
   root: Container | null;
@@ -27,7 +28,7 @@ export interface JointBaseOffsets {
 export class ModularAnimationEngine {
   public static updateJoints(
     nodes: CharacterJointNodes,
-    state: CharacterAnimationState,
+    state: ModularAnimationState,
     animTime: number,
     baseOffsets: JointBaseOffsets
   ): void {
@@ -105,6 +106,47 @@ export class ModularAnimationEngine {
       nodes.legBack.y = baseOffsets.legBack.y;
       nodes.legFront.rotation = 0.1;
       nodes.legBack.rotation = -0.15;
+    } else if (state === 'attack') {
+      const attackFreq = 7.5;
+      const progress = (animTime * attackFreq) % (Math.PI * 2);
+      const swing = Math.sin(progress);
+
+      nodes.armFront.y = baseOffsets.armFront.y;
+      nodes.armBack.y = baseOffsets.armBack.y;
+      nodes.armFront.rotation = -0.8 + swing * 1.5;
+      nodes.armBack.rotation = 0.4 - swing * 0.6;
+      nodes.torso.rotation = swing > 0 ? 0.18 : -0.08;
+      nodes.torso.y = baseOffsets.torso.y + (swing > 0 ? 8 : -3);
+      nodes.head.y = baseOffsets.head.y;
+      nodes.head.rotation = swing * 0.15;
+
+      nodes.legFront.y = baseOffsets.legFront.y;
+      nodes.legBack.y = baseOffsets.legBack.y;
+      nodes.legFront.rotation = 0.15;
+      nodes.legBack.rotation = -0.2;
+    } else if (state === 'damage') {
+      const wobble = Math.sin(animTime * 18.0) * Math.exp(-animTime * 2);
+      nodes.torso.rotation = -0.15 + wobble * 0.1;
+      nodes.torso.y = baseOffsets.torso.y + 4;
+      nodes.head.rotation = -0.2 + wobble * 0.15;
+      nodes.head.y = baseOffsets.head.y - 2;
+
+      nodes.armFront.rotation = -0.4 + wobble * 0.2;
+      nodes.armBack.rotation = 0.3 + wobble * 0.2;
+      nodes.legFront.rotation = -0.1;
+      nodes.legBack.rotation = 0.1;
+    } else if (state === 'death') {
+      // Slump and fall
+      nodes.torso.rotation = -0.6;
+      nodes.torso.y = baseOffsets.torso.y + 16;
+      nodes.head.rotation = -0.4;
+      nodes.head.y = baseOffsets.head.y + 12;
+
+      nodes.armFront.rotation = 0.8;
+      nodes.armBack.rotation = 0.6;
+      nodes.legFront.rotation = 0.4;
+      nodes.legBack.rotation = 0.7;
     }
   }
 }
+

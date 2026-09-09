@@ -71,13 +71,26 @@ export const ItemListIcon = ({ entry }: ItemListIconProps) => {
     }
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({
+        itemDefinitionId: entry.item.id,
+        inventoryItemId: entry.id,
+      })
+    );
+    e.dataTransfer.effectAllowed = 'copyMove';
+  };
+
   return (
     <HoverTooltip content={<ItemTooltip entry={entry} />}>
       <div
+        draggable={!loading && !showMenu}
+        onDragStart={handleDragStart}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onMouseLeave={() => setShowMenu(false)}
-        className={`relative w-full aspect-square bg-slate-900 rounded-lg flex items-center justify-center overflow-hidden transition-all cursor-pointer group ${
+        className={`relative w-full aspect-square bg-slate-900 rounded-lg flex items-center justify-center overflow-hidden transition-all cursor-pointer active:cursor-grabbing group ${
           entry.equipped
             ? 'border-2 border-emerald-500 ring-2 ring-emerald-500/20'
             : 'border border-slate-700 hover:border-slate-500 hover:ring-2 hover:ring-slate-700'

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import type { PlayerInventory, InventoryEntry } from '@mine-me/shared';
 import { ItemListIcon } from '../ItemListIcon/ItemListIcon';
+import { QuickAccessBar } from '../QuickAccessBar/QuickAccessBar';
 import './InventoryPanel.css';
 
 interface Props {
@@ -104,7 +105,7 @@ export const InventoryPanel = ({ inventory }: Props) => {
       </div>
 
       {/* Header */}
-      <div className="p-4 border-b border-slate-700 bg-slate-800/50 flex flex-col gap-3 shrink-0">
+      <div className="p-4 border-b border-slate-700 bg-slate-800/50 flex flex-col gap-3.5 shrink-0">
         <div className="flex justify-between items-center">
           <h2 className="text-md font-black tracking-widest text-slate-300 uppercase">
             Backpack
@@ -113,6 +114,9 @@ export const InventoryPanel = ({ inventory }: Props) => {
             {totalItems} / {inventory.slots}
           </span>
         </div>
+
+        {/* 4 Quick Access Slots */}
+        <QuickAccessBar />
 
         {/* Sort Controls */}
         <div className="flex gap-1.5 items-center">

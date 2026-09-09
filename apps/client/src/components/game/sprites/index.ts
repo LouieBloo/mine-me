@@ -1,5 +1,7 @@
 export { BaseSprite } from './BaseSprite';
 export { AnimatedEntitySprite } from './AnimatedEntitySprite';
+export { ModularEntitySprite } from './ModularEntitySprite';
+export type { ModularEntitySpriteOptions } from './ModularEntitySprite';
 export { ModularCharacterSprite } from './ModularCharacterSprite';
 export type { GearLayerDescriptor, CharacterAnimationState, SkeletonManifest, SkeletonPartDef } from './ModularCharacterSprite';
 export { FloatingText } from './FloatingText';

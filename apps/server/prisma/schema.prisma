@@ -7,9 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ----------------------------------------------------------------------------
-// ACCOUNT & PLAYER
-// ----------------------------------------------------------------------------
 model User {
   id          String      @id @default(cuid())
   phoneNumber String      @unique
@@ -21,37 +18,193 @@ model User {
 }
 
 model Character {
-  id             String    @id @default(cuid())
-  userId         String
-  user           User      @relation(fields: [userId], references: [id])
-  
-  name           String
-  class          String    // 'Warrior', 'Mage', 'Rogue'
-  profession     String?   // 'Mining', 'Herbalism', etc.
-  status         CharacterStatus @default(ACTIVE)
-  
-  combatScore    Int       @default(10)
-  defenseScore   Int       @default(10)
-  health         Int       @default(100)
-  maxHealth      Int       @default(100)
-  stamina        Int       @default(100)
-  maxStamina     Int       @default(100)
-  maxInventorySlots Int    @default(25)
-  ageInDays      Int       @default(6570) // ~18 years in days (18 * 365)
-  experience     Int       @default(0)
-  
-  sol            Int       @default(0)
-  lear           Int       @default(0)
-  
-  cityId         String
-  city           City      @relation(fields: [cityId], references: [id])
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  
-  // Relationships
-  inventory      InventoryItem[]
-  accomplishments Accomplishment[]
+  id                String           @id @default(cuid())
+  userId            String
+  name              String
+  class             String
+  profession        String?
+  status            CharacterStatus  @default(ACTIVE)
+  combatScore       Int              @default(10)
+  defenseScore      Int              @default(10)
+  health            Int              @default(100)
+  maxHealth         Int              @default(100)
+  stamina           Int              @default(100)
+  maxStamina        Int              @default(100)
+  maxInventorySlots Int              @default(25)
+  ageInDays         Int              @default(6570)
+  experience        Int              @default(0)
+  sol               Int              @default(0)
+  lear              Int              @default(0)
+  cityId            String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  accomplishments   Accomplishment[]
+  city              City             @relation(fields: [cityId], references: [id])
+  user              User             @relation(fields: [userId], references: [id])
+  inventory         InventoryItem[]
+}
+
+model City {
+  id                 String         @id @default(cuid())
+  name               String         @unique
+  description        String
+  backgroundImageUrl String?
+  mapIconUrl         String?
+  worldPositionX     Int            @default(0)
+  worldPositionY     Int            @default(0)
+  objectCoordinates  Json?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  characters         Character[]
+  cityMaterials      CityMaterial[]
+}
+
+model CityMaterial {
+  id        String   @id @default(cuid())
+  cityId    String
+  itemId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  city      City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([cityId, itemId])
+}
+
+model Item {
+  id              String          @id @default(cuid())
+  name            String
+  description     String
+  type            ItemType
+  subType         String          @default("")
+  vendorBuyPrice  Int             @default(0)
+  vendorSellPrice Int             @default(0)
+  userSellPrice   Int             @default(0)
+  userBuyPrice    Int             @default(0)
+  rarity          ItemRarity      @default(LOW)
+  iconUrl         String?
+  gearImageUrl    String?
+  isStartingPiece Boolean         @default(false)
+  experience      Int             @default(0)
+  combatScore     Int             @default(0)
+  defenseScore    Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  cityMaterials   CityMaterial[]
+  dropTableItems  DropTableItem[]
+  inventoryItems  InventoryItem[]
+  itemEffects     ObjectEffects[]
+}
+
+model DropTable {
+  id               String          @id @default(cuid())
+  solMin           Int             @default(0)
+  solMax           Int             @default(0)
+  experience       Int             @default(0)
+  mobId            String?         @unique
+  characterLevelId String?         @unique
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  characterLevel   CharacterLevel? @relation("CharacterLevelDrops", fields: [characterLevelId], references: [id], onDelete: Cascade)
+  mob              Mob?            @relation("MobDrops", fields: [mobId], references: [id], onDelete: Cascade)
+  items            DropTableItem[]
+}
+
+model DropTableItem {
+  id          String    @id @default(cuid())
+  dropTableId String
+  itemId      String
+  chance      Float
+  minQuantity Int       @default(1)
+  maxQuantity Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  dropTable   DropTable @relation(fields: [dropTableId], references: [id], onDelete: Cascade)
+  item        Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+}
+
+model InventoryItem {
+  id          String    @id @default(cuid())
+  characterId String
+  itemId      String
+  quantity    Int       @default(1)
+  equipped    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  character   Character @relation(fields: [characterId], references: [id])
+  item        Item      @relation(fields: [itemId], references: [id])
+}
+
+model Mob {
+  id               String     @id @default(cuid())
+  name             String
+  level            Int
+  health           Int
+  attack           Int
+  defense          Int
+  attackPercentage Int        @default(50)
+  defendPercentage Int        @default(50)
+  animations       Json?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  dropTable        DropTable? @relation("MobDrops")
+}
+
+model Accomplishment {
+  id          String             @id @default(cuid())
+  characterId String
+  type        AccomplishmentType
+  referenceId String
+  createdAt   DateTime           @default(now())
+  character   Character          @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([characterId, type, referenceId])
+}
+
+model CharacterLevel {
+  id         String     @id @default(cuid())
+  level      Int        @unique
+  xpRequired Int
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  dropTable  DropTable? @relation("CharacterLevelDrops")
+}
+
+model Effect {
+  id                  String          @id @default(cuid())
+  name                String          @unique
+  description         String
+  healthGain          Boolean         @default(false)
+  staminaGain         Boolean         @default(false)
+  miningSpeedModifier Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  objectEffects       ObjectEffects[]
+}
+
+model ObjectEffects {
+  id        String   @id @default(cuid())
+  itemId    String?
+  effectId  String
+  value     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  effect    Effect   @relation(fields: [effectId], references: [id], onDelete: Cascade)
+  item      Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, effectId])
+}
+
+model MiningBlock {
+  id          String   @id @default(cuid())
+  typeKey     String   @unique
+  name        String
+  description String?
+  textureUrl  String?
+  mineTimeMs  Int      @default(500)
+  staminaCost Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum CharacterStatus {
@@ -60,41 +213,6 @@ enum CharacterStatus {
   RETIRED
 }
 
-// ----------------------------------------------------------------------------
-// WORLD
-// ----------------------------------------------------------------------------
-model City {
-  id             String          @id @default(cuid())
-  name           String          @unique
-  description    String
-  characters     Character[]
-  cityMaterials  CityMaterial[]
-  backgroundImageUrl String?
-  mapIconUrl     String?
-  worldPositionX Int     @default(0)
-  worldPositionY Int     @default(0)
-  objectCoordinates Json?
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-model CityMaterial {
-  id     String @id @default(cuid())
-  cityId String
-  city   City   @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  itemId String
-  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
-
-  @@unique([cityId, itemId])
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-// ----------------------------------------------------------------------------
-// ITEMS & INVENTORY
-// ----------------------------------------------------------------------------
 enum ItemType {
   GEAR
   MATERIAL
@@ -108,172 +226,7 @@ enum ItemRarity {
   VERY_RARE
 }
 
-model Item {
-  id             String      @id @default(cuid())
-  name           String
-  description    String
-  type           ItemType
-  subType        String      @default("")
-  vendorBuyPrice Int         @default(0)
-  vendorSellPrice Int        @default(0)
-  userSellPrice  Int         @default(0)
-  userBuyPrice   Int         @default(0)
-  rarity         ItemRarity  @default(LOW)
-  iconUrl        String?
-  gearImageUrl   String?
-  isStartingPiece Boolean    @default(false)
-  experience     Int         @default(0)
-  combatScore    Int         @default(0)
-  defenseScore   Int         @default(0)
-  
-  dropTableItems DropTableItem[]
-  cityMaterials  CityMaterial[]
-  inventoryItems InventoryItem[]
-  itemEffects    ObjectEffects[]
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-// ----------------------------------------------------------------------------
-// DROPS
-// ----------------------------------------------------------------------------
-model DropTable {
-  id              String @id @default(cuid())
-  solMin          Int    @default(0)
-  solMax          Int    @default(0)
-  experience      Int    @default(0)
-  items           DropTableItem[]
-
-  mobId                 String? @unique
-  mob                   Mob?    @relation("MobDrops", fields: [mobId], references: [id], onDelete: Cascade)
-  
-  characterLevelId      String? @unique
-  characterLevel        CharacterLevel? @relation("CharacterLevelDrops", fields: [characterLevelId], references: [id], onDelete: Cascade)
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-model DropTableItem {
-  id            String    @id @default(cuid())
-  dropTableId   String
-  dropTable     DropTable @relation(fields: [dropTableId], references: [id], onDelete: Cascade)
-  itemId        String
-  item          Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  
-  chance        Float     // 0 to 100
-  minQuantity   Int       @default(1)
-  maxQuantity   Int       @default(1)
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-model InventoryItem {
-  id             String    @id @default(cuid())
-  characterId    String
-  character      Character @relation(fields: [characterId], references: [id])
-  
-  itemId         String
-  item           Item      @relation(fields: [itemId], references: [id])
-  quantity       Int       @default(1)
-  equipped       Boolean   @default(false)
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-// ----------------------------------------------------------------------------
-// MOBS
-// ----------------------------------------------------------------------------
-model Mob {
-  id             String      @id @default(cuid())
-  name           String
-  level          Int
-  health         Int
-  attack         Int
-  defense        Int
-  
-  attackPercentage Int @default(50)
-  defendPercentage Int @default(50)
-  
-  dropTable      DropTable?  @relation("MobDrops")
-  
-  animations     Json?       // e.g., { idle: { url: '...', frameWidth: 64, frameHeight: 64 } }
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-// ----------------------------------------------------------------------------
-// ACCOMPLISHMENTS
-// ----------------------------------------------------------------------------
 enum AccomplishmentType {
   DUNGEON_LEVEL_CLEARED
   DUNGEON_CLEARED
-}
-
-model Accomplishment {
-  id           String             @id @default(cuid())
-  characterId  String
-  character    Character          @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  type         AccomplishmentType
-  referenceId  String             // e.g. dungeonLevelId for DUNGEON_LEVEL_CLEARED
-  createdAt    DateTime           @default(now())
-
-  @@unique([characterId, type, referenceId])
-}
-
-model CharacterLevel {
-  id           String     @id @default(cuid())
-  level        Int        @unique
-  xpRequired   Int
-  
-  dropTable    DropTable? @relation("CharacterLevelDrops")
-  
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-}
-
-// ----------------------------------------------------------------------------
-// EFFECTS SYSTEM
-// ----------------------------------------------------------------------------
-model Effect {
-  id           String          @id @default(cuid())
-  name         String          @unique
-  description  String
-  healthGain   Boolean         @default(false)
-  staminaGain  Boolean         @default(false)
-  objectEffects ObjectEffects[]
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-}
-
-model ObjectEffects {
-  id        String   @id @default(cuid())
-  itemId    String?
-  item      Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  effectId  String
-  effect    Effect   @relation(fields: [effectId], references: [id], onDelete: Cascade)
-  value     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([itemId, effectId])
-}
-
-// ----------------------------------------------------------------------------
-// MINING BLOCKS CONFIG
-// ----------------------------------------------------------------------------
-model MiningBlock {
-  id          String   @id @default(cuid())
-  typeKey     String   @unique // 'DIRT', 'ROCK', 'MINERAL', 'CHEST', 'ENTRANCE'
-  name        String
-  description String?
-  textureUrl  String?
-  mineTimeMs  Int      @default(500)
-  staminaCost Int      @default(1)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 }
