@@ -17,6 +17,7 @@ export function calculateSunlightMap(
 
   const height = grid.length;
   const width = grid[0].length;
+  const effectiveMaxDepth = Math.min(height - 1, Math.ceil(maxDepth));
 
   // Initialize sunlight matrix with 0
   const sunlight: number[][] = Array.from({ length: height }, () =>
@@ -34,14 +35,15 @@ export function calculateSunlightMap(
 
   // 1. Direct Vertical Sunlight Shafts
   for (let x = 0; x < width; x++) {
-    for (let y = 0; y < height; y++) {
+    for (let y = 0; y <= effectiveMaxDepth; y++) {
       if (!isAirTile(x, y)) {
         // Blocked by solid block (dirt, rock, mineral, chest)
         break;
       }
 
-      // Vertical attenuation from surface: linear falloff to maxDepth
-      const depthIntensity = Math.max(0, 1.0 - y / maxDepth);
+      // Vertical attenuation from surface: smooth cosine curve rather than harsh linear falloff
+      const depthRatio = Math.min(1.0, y / maxDepth);
+      const depthIntensity = Math.max(0, 0.5 + 0.5 * Math.cos(depthRatio * Math.PI));
       if (depthIntensity <= 0.01) {
         break;
       }
@@ -53,6 +55,7 @@ export function calculateSunlightMap(
 
   // 2. Lateral & Diagonal Ambient Bleed Diffusion
   let head = 0;
+  const maxDiffusionDepth = Math.min(height - 1, effectiveMaxDepth + 2);
   while (head < queue.length) {
     const { x, y, light } = queue[head++];
     if (light <= 0.05) continue;
@@ -65,7 +68,7 @@ export function calculateSunlightMap(
     ];
 
     for (const { nx, ny, factor } of neighbors) {
-      if (isAirTile(nx, ny)) {
+      if (ny <= maxDiffusionDepth && isAirTile(nx, ny)) {
         const nextLight = light * factor;
         if (nextLight > sunlight[ny][nx] + 0.02) {
           sunlight[ny][nx] = nextLight;

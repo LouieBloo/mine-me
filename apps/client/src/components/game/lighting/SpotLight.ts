@@ -1,15 +1,20 @@
-import { Graphics, Container } from 'pixi.js';
+import { Graphics, Container, Sprite } from 'pixi.js';
 import type { Vector2D } from '@mine-me/shared';
 import { LightSource } from './LightSource';
+import { LightTextureFactory } from './LightTextureFactory';
 
 /**
  * Directional flashlight / spotlight with a forward cone beam and a 360-degree body aura.
+ * Uses cached textures and persistent sprites for high-performance zero-geometry-allocation rendering.
  */
 export class SpotLight extends LightSource {
   public direction: Vector2D;
   public coneAngleDeg: number;
   public innerAuraRadius: number; // in tile units
   public penumbraRatio: number;
+
+  private beamSprite?: Sprite;
+  private auraSprite?: Sprite;
 
   constructor(
     id: string,
@@ -42,8 +47,12 @@ export class SpotLight extends LightSource {
     this.currentIntensity = this.baseIntensity;
   }
 
-  public render(_container: Container, graphics: Graphics, tileSize: number): void {
-    if (!this.enabled || this.currentIntensity <= 0.001 || this.radius <= 0) return;
+  public render(container: Container, _graphics: Graphics, tileSize: number): void {
+    if (!this.enabled || this.currentIntensity <= 0.001 || this.radius <= 0) {
+      if (this.beamSprite) this.beamSprite.visible = false;
+      if (this.auraSprite) this.auraSprite.visible = false;
+      return;
+    }
 
     const centerX = this.position.x * tileSize;
     const centerY = this.position.y * tileSize;
@@ -51,50 +60,66 @@ export class SpotLight extends LightSource {
 
     // 1. Render 360-degree ambient body aura (so player can see immediately around themselves)
     if (this.innerAuraRadius > 0) {
-      const auraPixelRadius = this.innerAuraRadius * tileSize;
-      const numAuraRings = 7; // Increased rings for smoother blur
-      for (let i = numAuraRings; i >= 1; i--) {
-        const fraction = i / numAuraRings;
-        const r = auraPixelRadius * fraction;
-        const falloff = Math.pow(1 - fraction * fraction, 1.5);
-        const alpha = Math.min(1.0, falloff * intensity * 0.35);
-        if (alpha > 0.005) {
-          graphics.circle(centerX, centerY, r);
-          graphics.fill({ color: this.color, alpha });
+      if (!this.auraSprite) {
+        const auraTex = LightTextureFactory.getRadialTexture(128);
+        if (auraTex) {
+          this.auraSprite = new Sprite(auraTex);
+          this.auraSprite.anchor.set(0.5);
+          this.auraSprite.blendMode = 'add';
+          container.addChild(this.auraSprite);
         }
       }
+
+      if (this.auraSprite) {
+        this.auraSprite.visible = true;
+        this.auraSprite.x = centerX;
+        this.auraSprite.y = centerY;
+        const auraPixelRadius = this.innerAuraRadius * tileSize;
+        this.auraSprite.width = auraPixelRadius * 2;
+        this.auraSprite.height = auraPixelRadius * 2;
+        this.auraSprite.tint = this.color;
+        this.auraSprite.alpha = Math.min(1.0, intensity * 0.4);
+      }
+    } else if (this.auraSprite) {
+      this.auraSprite.visible = false;
     }
 
     // 2. Render forward directional cone beam
-    const centerAngle = Math.atan2(this.direction.y, this.direction.x);
-    const halfAngleRad = ((this.coneAngleDeg / 2) * Math.PI) / 180;
-    const maxPixelRadius = this.radius * tileSize;
-
-    const numBeamRings = 14; // Increased rings from 7 to 14 for much smoother beam
-    for (let i = numBeamRings; i >= 1; i--) {
-      const fraction = i / numBeamRings;
-      const r = maxPixelRadius * fraction;
-      // Smooth falloff along distance
-      const distanceFalloff = Math.pow(1 - fraction * fraction, 1.6);
-      const ringAlpha = Math.min(1.0, distanceFalloff * intensity * 0.45);
-
-      if (ringAlpha > 0.005) {
-        const startAngle = centerAngle - halfAngleRad;
-        const endAngle = centerAngle + halfAngleRad;
-
-        graphics.moveTo(centerX, centerY);
-        graphics.arc(centerX, centerY, r, startAngle, endAngle);
-        graphics.closePath();
-        graphics.fill({ color: this.color, alpha: ringAlpha });
+    if (!this.beamSprite) {
+      const coneTex = LightTextureFactory.getConeTexture(256, this.coneAngleDeg);
+      if (coneTex) {
+        this.beamSprite = new Sprite(coneTex);
+        this.beamSprite.anchor.set(0.0, 0.5);
+        this.beamSprite.blendMode = 'add';
+        container.addChild(this.beamSprite);
       }
     }
 
-    // Hot central forward core
-    const coreRadius = maxPixelRadius * 0.4;
-    const coreHalfAngle = halfAngleRad * 0.5;
-    graphics.moveTo(centerX, centerY);
-    graphics.arc(centerX, centerY, coreRadius, centerAngle - coreHalfAngle, centerAngle + coreHalfAngle);
-    graphics.closePath();
-    graphics.fill({ color: this.color, alpha: Math.min(1.0, intensity * 0.6) });
+    if (this.beamSprite) {
+      this.beamSprite.visible = true;
+      this.beamSprite.x = centerX;
+      this.beamSprite.y = centerY;
+      const angle = Math.atan2(this.direction.y, this.direction.x);
+      this.beamSprite.rotation = angle;
+
+      const maxPixelRadius = this.radius * tileSize;
+      const halfAngleRad = ((this.coneAngleDeg / 2) * Math.PI) / 180;
+      this.beamSprite.width = maxPixelRadius;
+      this.beamSprite.height = Math.max(1, maxPixelRadius * Math.tan(halfAngleRad) * 2);
+      this.beamSprite.tint = this.color;
+      this.beamSprite.alpha = Math.min(1.0, intensity * 0.85);
+    }
+  }
+
+  public destroy(): void {
+    super.destroy();
+    if (this.beamSprite) {
+      this.beamSprite.destroy();
+      this.beamSprite = undefined;
+    }
+    if (this.auraSprite) {
+      this.auraSprite.destroy();
+      this.auraSprite = undefined;
+    }
   }
 }

@@ -111,5 +111,54 @@ describe('MiningTileRenderer', () => {
 
     drawCracksSpy.mockRestore();
   });
+
+  it('incrementally updates only specified revealed tiles without full grid traversal', () => {
+    const grid: MiningClientTile[][] = [
+      [
+        { type: MiningTileType.DIRT, revealed: false, damageStage: 0 },
+        { type: MiningTileType.ROCK, revealed: false, damageStage: 0 },
+      ],
+      [
+        { type: MiningTileType.LADDER, revealed: false, damageStage: 0 },
+        { type: MiningTileType.EMPTY, revealed: false, damageStage: 0 },
+      ],
+    ];
+
+    const blockTextures = new Map<number, Texture>();
+    const tileGraphicsMap = new Map<string, Graphics>();
+    const tileSpritesMap = new Map<string, Sprite>();
+
+    // Initial render: all 4 are unrevealed
+    MiningTileRenderer.renderGrid(container, grid, blockTextures, tileGraphicsMap, tileSpritesMap, 64);
+    expect(tileGraphicsMap.size).toBe(4);
+
+    const renderSingleSpy = vi.spyOn(MiningTileRenderer, 'renderSingleTile');
+
+    // Reveal only tile (1, 0)
+    grid[0][1].revealed = true;
+    MiningTileRenderer.updateRevealedTiles(
+      container,
+      [{ x: 1, y: 0, type: MiningTileType.ROCK }],
+      grid,
+      blockTextures,
+      tileGraphicsMap,
+      tileSpritesMap,
+      64
+    );
+
+    expect(renderSingleSpy).toHaveBeenCalledTimes(1);
+    expect(renderSingleSpy).toHaveBeenCalledWith(
+      container,
+      1,
+      0,
+      grid[0][1],
+      blockTextures,
+      tileGraphicsMap,
+      tileSpritesMap,
+      64
+    );
+
+    renderSingleSpy.mockRestore();
+  });
 });
 

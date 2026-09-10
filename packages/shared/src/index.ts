@@ -6,3 +6,5 @@ export * from './utils/city';
 export * from './utils/experience';
 export * from './utils/stamina';
 export * from './utils/url';
+export * from './physics/MiningPhysicsBody';
+export * from './physics/MiningPlayerBody';

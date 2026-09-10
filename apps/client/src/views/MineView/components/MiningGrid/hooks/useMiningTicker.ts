@@ -1,13 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Application, Container, Graphics } from 'pixi.js';
 import type { ModularCharacterSprite } from '../../../../../components/game/sprites';
 import type { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
-import { MINING_CONFIG, type Vector2D, type MiningSessionClientState } from '@mine-me/shared';
+import { MINING_CONFIG, type Vector2D, type MiningSessionClientState, type MiningClientTile, type MiningInputState, type MiningPosition, MiningPlayerBody } from '@mine-me/shared';
 import { MiningEntityRenderer, type ActiveFallingRock } from '../renderers/MiningEntityRenderer';
 import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
+import { miningProfiler } from '../utils/MiningProfiler';
 
 import type { MiningMouseController } from '../input/MiningMouseController';
 
@@ -31,7 +32,12 @@ export interface UseMiningTickerOptions {
   flashlightRef: React.RefObject<SpotLight | null>;
   lightingEngineRef: React.RefObject<LightingEngine | null>;
   cameraRef: React.RefObject<Camera2D | null>;
-  sessionState: MiningSessionClientState;
+  playerBodyRef?: React.MutableRefObject<MiningPlayerBody | null>;
+  gridRef?: React.MutableRefObject<MiningClientTile[][]>;
+  keysPressedRef?: React.MutableRefObject<MiningInputState>;
+  isMiningRef?: React.MutableRefObject<boolean>;
+  miningTargetRef?: React.MutableRefObject<MiningPosition | null>;
+  sessionState?: MiningSessionClientState;
 }
 
 export function useMiningTicker({
@@ -54,32 +60,142 @@ export function useMiningTicker({
   flashlightRef,
   lightingEngineRef,
   cameraRef,
+  playerBodyRef,
+  gridRef,
+  keysPressedRef,
+  isMiningRef,
+  miningTargetRef,
   sessionState,
 }: UseMiningTickerOptions) {
+  const animTimeRef = useRef<number>(0);
+
   useEffect(() => {
     if (!app) return;
 
+    // Instrument renderer.render to accurately measure offscreen lightmap and main stage rendering
+    const renderer = app.renderer;
+    let originalRender: any = null;
+    if (renderer && typeof renderer.render === 'function') {
+      originalRender = renderer.render.bind(renderer);
+      renderer.render = (opts: any) => {
+        const isOffscreen = !!opts?.target;
+        const sectionName = isOffscreen ? 'Lightmap FBO Render' : 'Pixi Stage Render';
+        miningProfiler.startSection(sectionName);
+        const res = originalRender(opts);
+        miningProfiler.endSection();
+        if (!isOffscreen) {
+          // Main stage draw complete — marks true end of frame CPU work
+          miningProfiler.endFrame();
+        }
+        return res;
+      };
+    }
+
     const tickerCallback = () => {
+      miningProfiler.beginFrame();
       const playerContainer = playerContainerRef.current;
       const gridContainer = gridContainerRef.current;
       const fallingRocksContainer = fallingRocksContainerRef.current;
       if (!playerContainer || !gridContainer) return;
 
+      const playerBody = playerBodyRef?.current;
+      const grid = gridRef?.current;
+      const dt = Math.min(0.05, app.ticker.deltaMS / 1000);
+      animTimeRef.current += dt;
+      const animTime = animTimeRef.current;
       const currentPos = currentRenderPosRef.current;
       const targetPos = targetServerPosRef.current;
+      const isMining = isMiningRef?.current ?? sessionState?.isMining ?? false;
+      const miningTarget = miningTargetRef?.current ?? sessionState?.miningTarget ?? null;
 
-      // Linear interpolation (lerp) towards target server position
-      const dt = app.ticker.deltaMS / 1000;
-      const smoothFactor = Math.min(1.0, 1 - Math.exp(-32 * dt));
+      if (playerBody && grid) {
+        miningProfiler.startSection('Physics');
+        // 1. Client-Side Prediction: step physics immediately on client frame with active inputs
+        const inputs = keysPressedRef?.current ?? {
+          up: false,
+          down: false,
+          left: false,
+          right: false,
+          jump: false,
+          miningKey: false,
+          sequence: 0,
+        };
+        playerBody.processInputs(inputs, grid);
+        playerBody.update(dt, grid);
 
-      const dx = targetPos.x - currentPos.x;
-      currentPos.x += dx * smoothFactor;
-      currentPos.y += (targetPos.y - currentPos.y) * smoothFactor;
+        miningProfiler.startSection('Reconciliation');
+        // 2. Server Reconciliation: gently nudge predicted position towards authoritative server position
+        const errX = targetPos.x - playerBody.position.x;
+        const errY = targetPos.y - playerBody.position.y;
+        const distErr = Math.hypot(errX, errY);
 
-      // Position player sprite in pixel world space
-      playerContainer.x = currentPos.x * TILE_SIZE;
-      playerContainer.y = currentPos.y * TILE_SIZE;
+        if (distErr > 1.2) {
+          // Large mismatch (e.g. server collision snap or teleport): snap to server position
+          playerBody.position.x = targetPos.x;
+          playerBody.position.y = targetPos.y;
+        } else {
+          let reconcileX = errX;
+          let reconcileY = errY;
 
+          // When the player is colliding with a wall horizontally, the client is already flush against the wall surface.
+          // Do NOT allow delayed server packets (which are trailing behind) to pull the player away from the wall.
+          if (playerBody.collisionX) {
+            if (inputs.right && errX < 0) {
+              reconcileX = 0;
+            } else if (inputs.left && errX > 0) {
+              reconcileX = 0;
+            }
+          } else if ((inputs.left || inputs.right) && distErr < 0.8) {
+            // While actively walking in open space, allow local prediction to lead without trailing server drag
+            if (inputs.right && errX < 0) {
+              reconcileX = 0;
+            } else if (inputs.left && errX > 0) {
+              reconcileX = 0;
+            }
+          }
+
+          if (playerBody.isGrounded) {
+            // When grounded, clamp small vertical drift to prevent sub-pixel floor fighting
+            if (Math.abs(errY) < 0.05) {
+              reconcileY = 0;
+            }
+          } else if (!playerBody.isOnLadder && Math.abs(errY) < 0.8) {
+            // AIRBORNE (jumping or falling): suppress vertical reconciliation.
+            // Client and server run identical deterministic physics — the only source of
+            // errY is the 30Hz server tick trailing behind the high-frequency client prediction.
+            // Allowing reconcileY here causes the camera to oscillate/spasm during jumps
+            // and dampens apparent gravity during falls.
+            // Errors > 0.8 tiles while airborne indicate genuine desync — allow soft correction.
+            reconcileY = 0;
+          }
+
+          const reconcileFactor = Math.min(1.0, 1 - Math.exp(-12 * dt));
+          if (Math.abs(reconcileX) > 0.001) {
+            playerBody.position.x += reconcileX * reconcileFactor;
+          }
+          if (Math.abs(reconcileY) > 0.001) {
+            playerBody.position.y += reconcileY * reconcileFactor;
+          }
+        }
+
+        currentPos.x = playerBody.position.x;
+        currentPos.y = playerBody.position.y;
+
+        // Position player sprite in pixel world space
+        playerContainer.x = playerBody.position.x * TILE_SIZE;
+        playerContainer.y = playerBody.position.y * TILE_SIZE;
+      } else {
+        // Fallback smooth factor if playerBody not yet initialized
+        const smoothFactor = Math.min(1.0, 1 - Math.exp(-32 * dt));
+        const dx = targetPos.x - currentPos.x;
+        currentPos.x += dx * smoothFactor;
+        currentPos.y += (targetPos.y - currentPos.y) * smoothFactor;
+
+        playerContainer.x = currentPos.x * TILE_SIZE;
+        playerContainer.y = currentPos.y * TILE_SIZE;
+      }
+
+      miningProfiler.startSection('Camera');
       // Update camera viewport tracking & zoom FIRST so coordinate queries are 100% synchronized
       if (cameraRef.current) {
         cameraRef.current.setScreenSize(app.screen.width, app.screen.height);
@@ -91,6 +207,7 @@ export function useMiningTicker({
         gridContainer.y = screenHeight / 2 - playerContainer.y;
       }
 
+      miningProfiler.startSection('Mouse & Aiming');
       // Mouse Aiming, Continuous Hover Retargeting & Character Facing direction
       const mouseController = mouseControllerRef?.current;
       if (mouseController) {
@@ -118,9 +235,9 @@ export function useMiningTicker({
             }
           }
         }
-      } else if (Math.abs(dx) > 0.005) {
+      } else if (playerBody && Math.abs(playerBody.velocity.x) > 0.01) {
         // Fallback to movement direction if mouse is not on screen
-        const isMovingLeft = dx < 0;
+        const isMovingLeft = playerBody.velocity.x < 0;
         if (isFacingLeftRef.current !== isMovingLeft) {
           isFacingLeftRef.current = isMovingLeft;
           if (playerSpriteRef.current) {
@@ -129,21 +246,29 @@ export function useMiningTicker({
         }
       }
 
-      // Update modular sprite animation
+      miningProfiler.startSection('Sprites & Anim');
+      // Update modular sprite animation with predicted velocities
       if (playerSpriteRef.current) {
-        if (sessionState.isMining) {
+        if (isMining) {
           playerSpriteRef.current.setState('mine');
-        } else {
-          playerSpriteRef.current.setMoveVelocity(dx, targetPos.y - currentPos.y);
+        } else if (playerBody) {
+          // Horizontal movement drives the walking animation stride.
+          // Vertical movement while falling/jumping does NOT trigger walking leg strides;
+          // ladder climbing uses vertical velocity.
+          const moveVx = playerBody.velocity.x;
+          const moveVy = playerBody.isOnLadder ? playerBody.velocity.y : 0;
+          playerSpriteRef.current.setMoveVelocity(moveVx, moveVy);
         }
         playerSpriteRef.current.update(dt);
       }
 
+      miningProfiler.startSection('Remote Players');
       // Update and interpolate remote players in multiplayer session
       if (remotePlayerRendererRef?.current) {
         remotePlayerRendererRef.current.tick(dt);
       }
 
+      miningProfiler.startSection('Falling Rocks');
       // Render active falling rocks in continuous space
       if (fallingRocksContainer) {
         MiningEntityRenderer.updateFallingRocks(
@@ -154,6 +279,7 @@ export function useMiningTicker({
         );
       }
 
+      miningProfiler.startSection('Reticle');
       // Render Reticle Hover / Placement highlight
       const reticleGraphics = reticleGraphicsRef?.current;
       if (reticleGraphics && mouseController) {
@@ -169,19 +295,19 @@ export function useMiningTicker({
 
           // If actively mining this target block, draw an inner pulsing damage frame
           const isMiningThis =
-            sessionState.isMining &&
-            sessionState.miningTarget &&
-            sessionState.miningTarget.x === reticleState.target.x &&
-            sessionState.miningTarget.y === reticleState.target.y;
+            isMining &&
+            miningTarget &&
+            miningTarget.x === reticleState.target.x &&
+            miningTarget.y === reticleState.target.y;
 
           if (isMiningThis) {
-            const pulse = 0.5 + Math.sin(Date.now() * 0.015) * 0.5;
+            const pulse = 0.5 + Math.sin(animTime * 15) * 0.5;
             reticleGraphics.rect(rx + 3, ry + 3, TILE_SIZE - 6, TILE_SIZE - 6);
             reticleGraphics.stroke({ width: 1.5, color: 0xf59e0b, alpha: 0.4 + pulse * 0.5 });
           }
 
           if (reticleState.style.showPreview) {
-            const previewGlow = 0.7 + Math.sin(Date.now() * 0.008) * 0.2;
+            const previewGlow = 0.7 + Math.sin(animTime * 8) * 0.2;
             if (reticleState.style.previewType === 'LADDER') {
               MiningTileRenderer.drawLadder(reticleGraphics, TILE_SIZE, previewGlow, rx, ry);
             } else {
@@ -191,6 +317,7 @@ export function useMiningTicker({
         }
       }
 
+      miningProfiler.startSection('Debug Graphics');
       // Render debug shapes for player collision box and mining reach (when enabled via B)
       const debugGraphics = debugGraphicsRef.current;
       if (debugGraphics) {
@@ -233,15 +360,16 @@ export function useMiningTicker({
           debugGraphics.stroke({ width: 1.5, color: 0xeab308, alpha: 0.5 });
 
           // 6. Highlight currently mining target block if active
-          if (sessionState.isMining && sessionState.miningTarget) {
-            const targetX = sessionState.miningTarget.x * TILE_SIZE;
-            const targetY = sessionState.miningTarget.y * TILE_SIZE;
+          if (isMining && miningTarget) {
+            const targetX = miningTarget.x * TILE_SIZE;
+            const targetY = miningTarget.y * TILE_SIZE;
             debugGraphics.rect(targetX, targetY, TILE_SIZE, TILE_SIZE);
             debugGraphics.stroke({ width: 2.5, color: 0xef4444, alpha: 0.9 });
           }
         }
       }
 
+      miningProfiler.startSection('Lighting Engine');
       // Update dynamic player flashlight position and beam direction (positioned at forehead / headlamp)
       const flashlight = flashlightRef.current;
       if (flashlight) {
@@ -251,11 +379,17 @@ export function useMiningTicker({
 
       // Update and re-render lighting engine lightmap
       lightingEngineRef.current?.update(dt, currentPos, playerFacingDirRef.current);
+      if (!renderer || !originalRender) {
+        miningProfiler.endFrame();
+      }
     };
 
     app.ticker.add(tickerCallback);
     return () => {
       app.ticker.remove(tickerCallback);
+      if (renderer && originalRender) {
+        renderer.render = originalRender;
+      }
     };
-  }, [app, sessionState.isMining, sessionState.miningTarget]);
+  }, [app]);
 }

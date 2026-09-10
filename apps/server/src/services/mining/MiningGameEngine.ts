@@ -44,6 +44,8 @@ export interface MiningPlayerSession {
   aimDirection: Vector2D;
   flashlightOn: boolean;
   animationState: 'idle' | 'walk' | 'mine' | 'jump' | 'climb';
+  lastRevealGridPos?: MiningPosition | null;
+  backpackDirty?: boolean;
 }
 
 export interface MiningEngineOptions {
@@ -86,6 +88,7 @@ export class MiningGameEngine {
   private intervalId: NodeJS.Timeout | null = null;
   private isStopped = false;
   private pendingRevealedTiles: { x: number; y: number; type: MiningTileType; damageStage?: number }[] = [];
+  private droppedItemsDirty: boolean = true;
 
   constructor(options: MiningEngineOptions) {
     this.roomId = options.roomId ?? (options.characterId ? `solo_${options.characterId}` : `room_${Math.random().toString(36).substring(2, 9)}`);
@@ -162,6 +165,8 @@ export class MiningGameEngine {
       aimDirection: { x: 1, y: 0 },
       flashlightOn: false,
       animationState: 'idle',
+      lastRevealGridPos: null,
+      backpackDirty: true,
     };
 
     this.players.set(options.characterId, session);
@@ -528,12 +533,19 @@ export class MiningGameEngine {
         session.animationState = 'idle';
       }
 
-      // FoW reveal
+      // FoW reveal (skip diamond scan if player has not moved to a new tile)
       const currentGridPos = {
         x: Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.round(session.playerBody.position.x))),
         y: Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.round(session.playerBody.position.y))),
       };
-      this.revealAndTrackTiles(currentGridPos, session.visionRange);
+      if (
+        !session.lastRevealGridPos ||
+        session.lastRevealGridPos.x !== currentGridPos.x ||
+        session.lastRevealGridPos.y !== currentGridPos.y
+      ) {
+        session.lastRevealGridPos = { ...currentGridPos };
+        this.revealAndTrackTiles(currentGridPos, session.visionRange);
+      }
 
       // Item pickups
       this.checkItemPickupsForPlayer(session);
@@ -697,6 +709,11 @@ export class MiningGameEngine {
     this.grid[target.y][target.x] = { type: MiningTileType.EMPTY, revealed: true };
     this.pendingRevealedTiles.push({ x: target.x, y: target.y, type: MiningTileType.EMPTY, damageStage: 0 });
 
+    // Invalidate last reveal positions so line-of-sight updates immediately
+    for (const p of this.players.values()) {
+      p.lastRevealGridPos = null;
+    }
+
     // Spawn items if Mineral or Chest
     if (tile.type === MiningTileType.MINERAL) {
       this.droppedItems.push({
@@ -706,6 +723,7 @@ export class MiningGameEngine {
         iconUrl: '/assets/items/copper_ore.png',
         quantity: 1,
       });
+      this.droppedItemsDirty = true;
     } else if (tile.type === MiningTileType.CHEST) {
       this.droppedItems.push({
         position: target,
@@ -714,6 +732,7 @@ export class MiningGameEngine {
         iconUrl: '/assets/items/gold_coin.png',
         quantity: 50,
       });
+      this.droppedItemsDirty = true;
     }
 
     // Trigger dynamic falling rock gravity for rocks directly above
@@ -748,6 +767,8 @@ export class MiningGameEngine {
             quantity: item.quantity,
           });
         }
+        session.backpackDirty = true;
+        this.droppedItemsDirty = true;
         return false;
       }
       return true;
@@ -816,17 +837,19 @@ export class MiningGameEngine {
         isMining: session.isMining,
         miningTarget: session.miningTarget || undefined,
         miningProgressMs: session.isMining ? session.miningProgressMs : undefined,
-        temporaryBackpack: session.temporaryBackpack,
-        droppedItems: this.droppedItems,
+        temporaryBackpack: session.backpackDirty ? session.temporaryBackpack : undefined,
+        droppedItems: this.droppedItemsDirty ? this.droppedItems : undefined,
         fallingRocks: fallingRocksPayload,
         revealedTiles: revealedToSend,
         otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
       };
 
+      session.backpackDirty = false;
       session.socket.emit('mining_state_tick', payload);
     }
 
-    // Clear pending tiles after emitting to all sockets
+    // Clear broadcast dirty flags after emitting to all sockets
+    this.droppedItemsDirty = false;
     this.pendingRevealedTiles = [];
   }
 

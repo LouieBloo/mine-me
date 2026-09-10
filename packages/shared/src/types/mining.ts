@@ -393,8 +393,8 @@ export interface MiningStateTickPayload {
   isMining: boolean;
   miningTarget?: MiningPosition;
   miningProgressMs?: number;
-  temporaryBackpack: MiningBackpackItem[];
-  droppedItems: MiningDroppedItem[];
+  temporaryBackpack?: MiningBackpackItem[];
+  droppedItems?: MiningDroppedItem[];
   fallingRocks?: MiningFallingRock[];
   revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
   /** Other players in the shared room during multiplayer sessions. */

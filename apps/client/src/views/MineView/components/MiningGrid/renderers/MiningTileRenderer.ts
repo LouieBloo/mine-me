@@ -139,6 +139,66 @@ export class MiningTileRenderer {
     graphics.fill({ color: 0xfbbf24, alpha: alpha * 0.8 });
   }
 
+  public static renderSingleTile(
+    tilesContainer: Container,
+    x: number,
+    y: number,
+    tile: MiningClientTile,
+    blockTextures: Map<number, Texture>,
+    tileGraphicsMap: Map<string, Graphics>,
+    tileSpritesMap: Map<string, Sprite>,
+    tileSize: number = TILE_SIZE
+  ): void {
+    const key = `${x},${y}`;
+    let graphics = tileGraphicsMap.get(key);
+
+    if (!graphics) {
+      graphics = new Graphics();
+      graphics.x = x * tileSize;
+      graphics.y = y * tileSize;
+      graphics.cullable = true;
+      tilesContainer.addChild(graphics);
+      tileGraphicsMap.set(key, graphics);
+    }
+
+    const blockTexture = tile.revealed ? blockTextures.get(tile.type) : undefined;
+    let tileSprite = tileSpritesMap.get(key);
+
+    if (tile.revealed && blockTexture) {
+      if (!tileSprite) {
+        tileSprite = new Sprite(blockTexture);
+        tileSprite.x = x * tileSize;
+        tileSprite.y = y * tileSize;
+        tileSprite.width = tileSize;
+        tileSprite.height = tileSize;
+        tileSprite.cullable = true;
+        // Add below graphics overlay (cracks)
+        tilesContainer.addChildAt(tileSprite, Math.max(0, tilesContainer.getChildIndex(graphics)));
+        tileSpritesMap.set(key, tileSprite);
+      } else {
+        tileSprite.texture = blockTexture;
+        tileSprite.visible = true;
+      }
+    } else if (tileSprite) {
+      tileSprite.visible = false;
+    }
+
+    graphics.clear();
+    if (!tile.revealed) {
+      graphics.rect(0, 0, tileSize, tileSize);
+      graphics.fill(0x000000);
+    } else {
+      if (!blockTexture) {
+        this.drawFallbackTile(graphics, tile.type, tileSize);
+      }
+
+      // Render crack overlay if block is partially mined and tile can be damaged
+      if (tile.damageStage && tile.damageStage > 0 && canTileBeDamaged(tile.type)) {
+        this.drawDamageCracks(graphics, tile.damageStage, tileSize);
+      }
+    }
+  }
+
   public static renderGrid(
     tilesContainer: Container,
     grid: MiningClientTile[][],
@@ -147,55 +207,46 @@ export class MiningTileRenderer {
     tileSpritesMap: Map<string, Sprite>,
     tileSize: number = TILE_SIZE
   ): void {
+    tilesContainer.cullableChildren = true;
     grid.forEach((row, y) => {
       row.forEach((tile, x) => {
-        const key = `${x},${y}`;
-        let graphics = tileGraphicsMap.get(key);
-
-        if (!graphics) {
-          graphics = new Graphics();
-          graphics.x = x * tileSize;
-          graphics.y = y * tileSize;
-          tilesContainer.addChild(graphics);
-          tileGraphicsMap.set(key, graphics);
-        }
-
-        const blockTexture = tile.revealed ? blockTextures.get(tile.type) : undefined;
-        let tileSprite = tileSpritesMap.get(key);
-
-        if (tile.revealed && blockTexture) {
-          if (!tileSprite) {
-            tileSprite = new Sprite(blockTexture);
-            tileSprite.x = x * tileSize;
-            tileSprite.y = y * tileSize;
-            tileSprite.width = tileSize;
-            tileSprite.height = tileSize;
-            // Add below graphics overlay (cracks)
-            tilesContainer.addChildAt(tileSprite, Math.max(0, tilesContainer.getChildIndex(graphics)));
-            tileSpritesMap.set(key, tileSprite);
-          } else {
-            tileSprite.texture = blockTexture;
-            tileSprite.visible = true;
-          }
-        } else if (tileSprite) {
-          tileSprite.visible = false;
-        }
-
-        graphics.clear();
-        if (!tile.revealed) {
-          graphics.rect(0, 0, tileSize, tileSize);
-          graphics.fill(0x000000);
-        } else {
-          if (!blockTexture) {
-            this.drawFallbackTile(graphics, tile.type, tileSize);
-          }
-
-          // Render crack overlay if block is partially mined and tile can be damaged
-          if (tile.damageStage && tile.damageStage > 0 && canTileBeDamaged(tile.type)) {
-            this.drawDamageCracks(graphics, tile.damageStage, tileSize);
-          }
-        }
+        this.renderSingleTile(
+          tilesContainer,
+          x,
+          y,
+          tile,
+          blockTextures,
+          tileGraphicsMap,
+          tileSpritesMap,
+          tileSize
+        );
       });
     });
+  }
+
+  public static updateRevealedTiles(
+    tilesContainer: Container,
+    revealedTiles: { x: number; y: number; type: number; damageStage?: number }[],
+    grid: MiningClientTile[][],
+    blockTextures: Map<number, Texture>,
+    tileGraphicsMap: Map<string, Graphics>,
+    tileSpritesMap: Map<string, Sprite>,
+    tileSize: number = TILE_SIZE
+  ): void {
+    for (const rt of revealedTiles) {
+      const tile = grid[rt.y]?.[rt.x];
+      if (tile) {
+        this.renderSingleTile(
+          tilesContainer,
+          rt.x,
+          rt.y,
+          tile,
+          blockTextures,
+          tileGraphicsMap,
+          tileSpritesMap,
+          tileSize
+        );
+      }
+    }
   }
 }

@@ -168,20 +168,41 @@ describe('SpotLight', () => {
     expect(spot.direction.y).toBeCloseTo(-1.0, 4);
   });
 
-  it('should render cone arc and body aura', () => {
+  it('should render cone beam sprite and body aura sprite to container', () => {
+    vi.spyOn(LightTextureFactory, 'getRadialTexture').mockReturnValue({} as any);
+    vi.spyOn(LightTextureFactory, 'getConeTexture').mockReturnValue({} as any);
+
     const spot = new SpotLight('flashlight', { x: 2, y: 3 }, { x: 1, y: 0 });
+    const mockContainer = {
+      addChild: vi.fn(),
+    } as any;
     const mockGraphics = {
       circle: vi.fn(),
-      moveTo: vi.fn(),
       arc: vi.fn(),
-      closePath: vi.fn(),
       fill: vi.fn(),
     } as any;
 
-    spot.render({} as any, mockGraphics, 64);
-    expect(mockGraphics.circle).toHaveBeenCalled(); // 360 aura
-    expect(mockGraphics.arc).toHaveBeenCalled(); // directional cone
-    expect(mockGraphics.fill).toHaveBeenCalled();
+    spot.render(mockContainer, mockGraphics, 64);
+    // Should attach beamSprite and auraSprite to the container without touching procedural graphics
+    expect(mockContainer.addChild).toHaveBeenCalledTimes(2);
+    expect(mockGraphics.circle).not.toHaveBeenCalled();
+    expect(mockGraphics.arc).not.toHaveBeenCalled();
+    expect(mockGraphics.fill).not.toHaveBeenCalled();
+
+    // Destroy should clean up without error
+    spot.destroy();
+    vi.restoreAllMocks();
+  });
+});
+
+describe('LightTextureFactory', () => {
+  it('should generate and cache cone textures', () => {
+    const tex1 = LightTextureFactory.getConeTexture(64, 75);
+    const tex2 = LightTextureFactory.getConeTexture(64, 75);
+    if (tex1) {
+      expect(tex1).toBe(tex2);
+    }
+    LightTextureFactory.clear();
   });
 });
 
@@ -217,7 +238,7 @@ describe('LightingEngine', () => {
     engine.destroy();
   });
 
-  it('should update sunlight map when grid updates', () => {
+  it('should update sunlight map immediately when immediate=true', () => {
     const engine = new LightingEngine(mockApp, mockContainer, 10, 10, 64);
     const grid: MiningClientTile[][] = Array.from({ length: 5 }, () =>
       Array.from({ length: 5 }, () => ({
@@ -226,9 +247,70 @@ describe('LightingEngine', () => {
       }))
     );
 
-    engine.updateGrid(grid);
+    engine.updateGrid(grid, true);
     // Should run frame update smoothly
     engine.update(0.016, { x: 2, y: 2 }, { x: 1, y: 0 });
+    engine.destroy();
+  });
+
+  it('should support deferred markSunlightDirty update on next tick', () => {
+    const engine = new LightingEngine(mockApp, mockContainer, 10, 10, 64);
+    const grid: MiningClientTile[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, () => ({
+        type: MiningTileType.EMPTY,
+        revealed: true,
+      }))
+    );
+
+    engine.markSunlightDirty(grid);
+    // update() should process dirty sunlight
+    engine.update(0.016, { x: 2, y: 2 }, { x: 1, y: 0 });
+    engine.destroy();
+  });
+
+  it('should create downscaled lightmap without BlurFilter overhead', () => {
+    const engine = new LightingEngine(mockApp, mockContainer, 45, 45, 64);
+    const engineAny = engine as any;
+
+    // Total world dimensions: (45 * 64) + 1200 = 4080w, (45 * 64) + 1400 = 4280h
+    // Downscaled lightmap at scale 0.25 should be ~1020w x 1070h (instead of 4096 x 4096)
+    if (engineAny.lightmapRT) {
+      expect(engineAny.lightmapRT.width).toBeLessThan(2048);
+      expect(engineAny.lightmapRT.height).toBeLessThan(2048);
+      expect(engineAny.lightmapRT.width).toBeCloseTo(4080 * 0.25, -1);
+    }
+
+    // Overlay sprite must stretch to full world dimensions
+    if (engineAny.lightmapSprite) {
+      expect(engineAny.lightmapSprite.width).toBe(45 * 64 + 600 * 2);
+      expect(engineAny.lightmapSprite.blendMode).toBe('multiply');
+    }
+
+    // lightsContainer must NOT have BlurFilter attached (eliminating multi-pass blur overhead)
+    expect(engineAny.lightsContainer.filters).toBeFalsy();
+    expect(engineAny.lightsContainer.scale.x).toBe(0.25);
+    expect(engineAny.lightsContainer.scale.y).toBe(0.25);
+
+    engine.destroy();
+  });
+
+  it('should hide flashlight sprites when disabled and re-render lightmap', () => {
+    const engine = new LightingEngine(mockApp, mockContainer, 20, 20, 64);
+    const spot = new SpotLight('player_flashlight', { x: 5, y: 5 });
+    spot.enabled = true;
+    engine.addLight(spot);
+
+    // Update with flashlight enabled
+    engine.update(0.016, { x: 5, y: 5 }, { x: 1, y: 0 });
+    const spotAny = spot as any;
+    expect(spotAny.beamSprite?.visible).toBe(true);
+
+    // Disable flashlight
+    spot.enabled = false;
+    engine.update(0.016, { x: 5, y: 5 }, { x: 1, y: 0 });
+    expect(spotAny.beamSprite?.visible).toBe(false);
+    expect(spotAny.auraSprite?.visible).toBe(false);
+
     engine.destroy();
   });
 });

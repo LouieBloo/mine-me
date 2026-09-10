@@ -89,8 +89,8 @@ export function useMiningScene({
     const bgGraphics = new Graphics();
     const bgWidth = MINING_CONFIG.GRID_WIDTH * TILE_SIZE;
     const bgHeight = MINING_CONFIG.GRID_HEIGHT * TILE_SIZE;
-    const skyHeight = 2000;
-    const extraMargin = 2000;
+    const skyHeight = 800;
+    const extraMargin = 600;
 
     // Sky above ground (nice vibrant blue)
     bgGraphics.rect(-extraMargin, -skyHeight, bgWidth + extraMargin * 2, skyHeight);
@@ -197,12 +197,13 @@ export function useMiningScene({
           if (!gridContainerRef.current) return;
           const dirtTilingSprite = new TilingSprite({
             texture,
-            width: bgWidth + extraMargin * 2,
-            height: bgHeight + extraMargin * 2,
+            width: bgWidth,
+            height: bgHeight,
           });
-          dirtTilingSprite.x = -extraMargin;
+          dirtTilingSprite.x = 0;
           dirtTilingSprite.y = 0;
-          dirtTilingSprite.tileScale.set(0.125); // Dense fine-grain repeat
+          dirtTilingSprite.tileScale.set(0.5); // Rich natural underground dirt repeat
+          dirtTilingSprite.cullable = true;
           backgroundContainer.addChild(dirtTilingSprite);
         })
         .catch((err) => {

@@ -621,4 +621,73 @@ describe('MiningGameEngine', () => {
     engine.grid[5][10] = { type: MiningTileType.ENTRANCE, revealed: true };
     expect(engine.placeTorch({ x: 10, y: 5 })).toBe(false);
   });
+
+  it('skips redundant FoW diamond scans when player is stationary', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: mockSocket,
+    });
+
+    const session = engine.getPlayer('char-1')!;
+    // Run first tick: FoW runs and records lastRevealGridPos
+    (engine as any).tick(0.033);
+    const firstRevealPos = { ...session.lastRevealGridPos! };
+    expect(firstRevealPos).toBeDefined();
+
+    // Spy on revealAndTrackTiles
+    const revealSpy = vi.spyOn(engine as any, 'revealAndTrackTiles');
+
+    // Second tick without moving: should skip revealAndTrackTiles
+    (engine as any).tick(0.033);
+    expect(revealSpy).not.toHaveBeenCalled();
+
+    // Move player to a new tile
+    session.playerBody.position.x += 1.5;
+    (engine as any).tick(0.033);
+    expect(revealSpy).toHaveBeenCalledTimes(1);
+
+    revealSpy.mockRestore();
+  });
+
+  it('only includes temporaryBackpack and droppedItems in tick payload when dirty', () => {
+    const emittedPayloads: any[] = [];
+    const testSocket = {
+      ...mockSocket,
+      emit: vi.fn((event: string, payload: any) => {
+        if (event === 'mining_state_tick') {
+          emittedPayloads.push(payload);
+        }
+      }),
+    } as any;
+
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      socket: testSocket,
+    });
+
+    // First tick: initial join should send backpack and droppedItems
+    (engine as any).tick(0.033);
+    expect(emittedPayloads).toHaveLength(1);
+    expect(emittedPayloads[0].temporaryBackpack).toBeDefined();
+    expect(emittedPayloads[0].droppedItems).toBeDefined();
+
+    // Second tick without pickups or drops: temporaryBackpack and droppedItems should be undefined
+    (engine as any).tick(0.033);
+    expect(emittedPayloads).toHaveLength(2);
+    expect(emittedPayloads[1].temporaryBackpack).toBeUndefined();
+    expect(emittedPayloads[1].droppedItems).toBeUndefined();
+
+    // Now drop an item (simulate mining a mineral block)
+    engine.grid[5][10] = { type: MiningTileType.MINERAL, revealed: true };
+    (engine as any).completeMiningBlock({ x: 10, y: 5 });
+
+    (engine as any).tick(0.033);
+    expect(emittedPayloads).toHaveLength(3);
+    expect(emittedPayloads[2].droppedItems).toBeDefined();
+    expect(emittedPayloads[2].droppedItems.length).toBeGreaterThan(0);
+  });
 });

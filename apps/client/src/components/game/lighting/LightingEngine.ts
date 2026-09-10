@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, RenderTexture, Sprite, BlurFilter } from 'pixi.js';
+import { Application, Container, Graphics, RenderTexture, Sprite } from 'pixi.js';
 import type { Vector2D, MiningClientTile } from '@mine-me/shared';
 import { LightSource } from './LightSource';
 import { calculateSunlightMap } from './SunlightCalculator';
@@ -10,7 +10,7 @@ import { calculateSunlightMap } from './SunlightCalculator';
  * - Depth-graded ambient underground darkness
  * - Real-time sunlight propagation down excavated shafts
  * - Dynamic player flashlight, flickering torches, and mineral/chest glows
- * - Offscreen rendering to a RenderTexture lightmap overlay with 'multiply' blend mode
+ * - Offscreen rendering to a downscaled RenderTexture lightmap overlay with 'multiply' blend mode
  */
 export class LightingEngine {
   private app: Application;
@@ -28,11 +28,24 @@ export class LightingEngine {
 
   private lights: Map<string, LightSource> = new Map();
   private sunlightMap: number[][] | null = null;
+  private sunlightDirty: boolean = false;
+  private cachedGrid: MiningClientTile[][] | null = null;
   private isDestroyed: boolean = false;
+
+  // Dirty tracking for offscreen lightmap re-rendering
+  private isLightmapDirty: boolean = true;
+  private lastFlashlightPos: Vector2D = { x: -999, y: -999 };
+  private lastFlashlightDir: Vector2D = { x: -999, y: -999 };
+  private lastFlashlightEnabled: boolean = false;
+  private lightThrottleTimer: number = 0;
 
   // Margin above and around grid (in pixels)
   private readonly skyMargin: number = 800;
   private readonly sideMargin: number = 600;
+
+  // Downscale factor for the offscreen lightmap render texture (0.25 = 1/4 resolution, ~1024x1024)
+  // Low-resolution lightmap smoothly scales up via GPU bilinear filtering, providing natural soft diffusion with zero blur filter overhead.
+  private readonly lightmapScale: number = 0.25;
 
   constructor(
     app: Application,
@@ -57,15 +70,10 @@ export class LightingEngine {
     this.lightsContainer.addChild(this.sunlightGraphics);
     this.lightsContainer.addChild(this.lightsGraphics);
 
-    // Apply Blur Filter to soften ambient depth bands, sunlight columns, and flashlight cones
-    try {
-      const blurFilter = new BlurFilter({ strength: 16, quality: 3 });
-      this.lightsContainer.filters = [blurFilter];
-    } catch (err) {
-      console.warn('[LightingEngine] Failed to create BlurFilter (headless/test env?):', err);
-    }
+    this.lightsContainer.scale.set(this.lightmapScale);
 
     this.initLightmap();
+    this.renderAmbient();
   }
 
   /**
@@ -75,15 +83,20 @@ export class LightingEngine {
     const totalPixelWidth = this.gridWidth * this.tileSize + this.sideMargin * 2;
     const totalPixelHeight = this.gridHeight * this.tileSize + this.skyMargin + this.sideMargin;
 
+    const rtWidth = Math.max(64, Math.round(totalPixelWidth * this.lightmapScale));
+    const rtHeight = Math.max(64, Math.round(totalPixelHeight * this.lightmapScale));
+
     try {
       this.lightmapRT = RenderTexture.create({
-        width: Math.max(256, Math.min(4096, totalPixelWidth)),
-        height: Math.max(256, Math.min(4096, totalPixelHeight)),
+        width: Math.min(2048, rtWidth),
+        height: Math.min(2048, rtHeight),
       });
 
       this.lightmapSprite = new Sprite(this.lightmapRT);
       this.lightmapSprite.x = -this.sideMargin;
       this.lightmapSprite.y = -this.skyMargin;
+      this.lightmapSprite.width = totalPixelWidth;
+      this.lightmapSprite.height = totalPixelHeight;
       this.lightmapSprite.blendMode = 'multiply';
 
       this.parentContainer.addChild(this.lightmapSprite);
@@ -97,6 +110,7 @@ export class LightingEngine {
    */
   public addLight(light: LightSource): void {
     this.lights.set(light.id, light);
+    this.isLightmapDirty = true;
   }
 
   /**
@@ -107,6 +121,7 @@ export class LightingEngine {
     if (light) {
       light.destroy();
       this.lights.delete(id);
+      this.isLightmapDirty = true;
     }
   }
 
@@ -119,38 +134,92 @@ export class LightingEngine {
 
   /**
    * Recalculate sunlight map when grid tiles change (e.g. blocks excavated or revealed).
+   * @param immediate If true, recalculates and re-renders sunlight synchronously (e.g. on level start).
    */
-  public updateGrid(grid: MiningClientTile[][]): void {
+  public updateGrid(grid: MiningClientTile[][], immediate: boolean = false): void {
     if (!grid || grid.length === 0) return;
-    this.sunlightMap = calculateSunlightMap(grid);
+    this.cachedGrid = grid;
+    if (immediate) {
+      this.sunlightDirty = false;
+      this.sunlightMap = calculateSunlightMap(grid);
+      this.renderSunlight();
+      this.isLightmapDirty = true;
+    } else {
+      this.sunlightDirty = true;
+    }
+  }
+
+  /**
+   * Mark sunlight dirty to be recalculated on the next frame ticker update.
+   */
+  public markSunlightDirty(grid?: MiningClientTile[][]): void {
+    if (grid) {
+      this.cachedGrid = grid;
+    }
+    this.sunlightDirty = true;
   }
 
   /**
    * Frame update called from the Pixi ticker.
-   * Updates light animations and re-renders the lightmap.
+   * Updates light animations and re-renders the lightmap ONLY when dirty.
    */
-  public update(dt: number, _playerPos?: Vector2D, _playerFacing?: Vector2D): void {
+  public update(dt: number, playerPos?: Vector2D, playerFacing?: Vector2D): void {
     if (this.isDestroyed || !this.lightmapRT || !this.app.renderer) return;
 
-    // 1. Update all dynamic lights (flicker, pulse, movement)
-    this.lights.forEach((light) => {
-      if (light.enabled) {
-        light.update(dt);
+    // 0. Recalculate sunlight if marked dirty by tile reveals or block digging
+    if (this.sunlightDirty && this.cachedGrid) {
+      this.sunlightDirty = false;
+      this.sunlightMap = calculateSunlightMap(this.cachedGrid);
+      this.renderSunlight();
+      this.isLightmapDirty = true;
+    }
+
+    // 1. Check flashlight state and movement
+    const flashlight = this.lights.get('player_flashlight');
+    const flashlightEnabled = flashlight?.enabled ?? false;
+    if (flashlightEnabled !== this.lastFlashlightEnabled) {
+      this.lastFlashlightEnabled = flashlightEnabled;
+      this.isLightmapDirty = true;
+    }
+    if (flashlightEnabled && playerPos && playerFacing) {
+      const dx = playerPos.x - this.lastFlashlightPos.x;
+      const dy = playerPos.y - this.lastFlashlightPos.y;
+      const dDirX = playerFacing.x - this.lastFlashlightDir.x;
+      const dDirY = playerFacing.y - this.lastFlashlightDir.y;
+      if (Math.hypot(dx, dy) > 0.02 || Math.hypot(dDirX, dDirY) > 0.02) {
+        this.lastFlashlightPos = { x: playerPos.x, y: playerPos.y };
+        this.lastFlashlightDir = { x: playerFacing.x, y: playerFacing.y };
+        this.isLightmapDirty = true;
       }
-    });
+    }
 
-    // 2. Render ambient depth darkness
-    this.renderAmbient();
+    // 2. Throttle dynamic torch / gem flickers to ~20Hz (every 50ms) to prevent 60 FPS FBO thrashing
+    this.lightThrottleTimer += dt;
+    if (this.lightThrottleTimer >= 0.05) {
+      this.lightThrottleTimer = 0;
+      let anyAnimatedLight = false;
+      this.lights.forEach((light) => {
+        if (light.enabled && light.id !== 'player_flashlight') {
+          light.update(dt);
+          anyAnimatedLight = true;
+        }
+      });
+      if (anyAnimatedLight) {
+        this.isLightmapDirty = true;
+      }
+    }
 
-    // 3. Render sunlight propagation shafts
-    this.renderSunlight();
+    // 3. Skip offscreen render pass entirely if lightmap hasn't changed
+    if (!this.isLightmapDirty) return;
+    this.isLightmapDirty = false;
 
-    // 4. Render all active light sources
+    // 4. Render active dynamic light sources (torches, headlamp)
     this.renderLights();
 
-    // 5. Position lights container relative to lightmap origin (-sideMargin, -skyMargin)
-    this.lightsContainer.x = this.sideMargin;
-    this.lightsContainer.y = this.skyMargin;
+    // 5. Position and scale lights container relative to downscaled lightmap origin (-sideMargin, -skyMargin)
+    this.lightsContainer.scale.set(this.lightmapScale);
+    this.lightsContainer.x = this.sideMargin * this.lightmapScale;
+    this.lightsContainer.y = this.skyMargin * this.lightmapScale;
 
     // 6. Render lightsContainer into lightmap RenderTexture
     try {
@@ -223,6 +292,8 @@ export class LightingEngine {
 
   /**
    * Render sunlight columns and diffused patches.
+   * Uses continuous vertical slice blending and neighbor-aware wall insets
+   * to eliminate blocky steps and prevent light bleeding onto solid cave walls.
    */
   private renderSunlight(): void {
     const g = this.sunlightGraphics;
@@ -230,7 +301,8 @@ export class LightingEngine {
 
     if (!this.sunlightMap || this.sunlightMap.length === 0) return;
 
-    for (let y = 0; y < this.sunlightMap.length; y++) {
+    const maxRenderY = Math.min(this.sunlightMap.length, 12);
+    for (let y = 0; y < maxRenderY; y++) {
       const row = this.sunlightMap[y];
       for (let x = 0; x < row.length; x++) {
         const sun = row[x];
@@ -239,28 +311,51 @@ export class LightingEngine {
         const tilePxX = x * this.tileSize;
         const tilePxY = y * this.tileSize;
 
-        // Render soft sunlight tile patch
-        // Sunlight color: Warm golden sunlight (0xfffbeb)
-        const alpha = Math.min(1.0, sun * 0.95);
-        g.rect(tilePxX - 2, tilePxY - 2, this.tileSize + 4, this.tileSize + 4);
-        g.fill({ color: 0xfffbeb, alpha });
+        // Check solid neighbors to prevent light bleeding into solid blocks on the sides
+        const isLeftSolid = x === 0 || (this.sunlightMap[y]?.[x - 1] ?? 0) <= 0.001;
+        const isRightSolid = x === row.length - 1 || (this.sunlightMap[y]?.[x + 1] ?? 0) <= 0.001;
+        const isBottomSolid = y === maxRenderY - 1 || (this.sunlightMap[y + 1]?.[x] ?? 0) <= 0.001;
+
+        // Inset by 2px on solid boundaries so bilinear filtering stays inside the air opening
+        const leftInset = isLeftSolid ? 2 : 0;
+        const rightInset = isRightSolid ? 2 : 0;
+        const bottomInset = isBottomSolid ? 2 : 0;
+
+        const rectX = tilePxX + leftInset;
+        const rectW = this.tileSize - leftInset - rightInset;
+
+        // Soft vertical gradient interpolation between this tile and the tile below
+        const sunTop = sun;
+        const sunNext = y < maxRenderY - 1 ? (this.sunlightMap[y + 1]?.[x] ?? 0) : 0;
+        const sunBottom = sunNext > 0.01 ? sunNext : sun * 0.4;
+
+        const subSteps = 3;
+        const sliceH = (this.tileSize - bottomInset) / subSteps;
+        for (let s = 0; s < subSteps; s++) {
+          const t = (s + 0.5) / subSteps;
+          // Smooth cosine curve interpolation down the tile height
+          const blendT = 0.5 - 0.5 * Math.cos(t * Math.PI);
+          const currentSun = sunTop + (sunBottom - sunTop) * blendT;
+          const alpha = Math.min(1.0, currentSun * 0.95);
+          if (alpha <= 0.01) continue;
+
+          g.rect(rectX, tilePxY + s * sliceH, rectW, sliceH + 0.5);
+          g.fill({ color: 0xfffbeb, alpha });
+        }
       }
     }
   }
 
   /**
    * Render all active point lights, flashlights, and glows.
+   * Also ensures disabled lights have their sprites hidden.
    */
   private renderLights(): void {
     const g = this.lightsGraphics;
     g.clear();
 
     this.lights.forEach((light) => {
-      if (light.enabled) {
-        light.render(this.lightsContainer, g, this.tileSize);
-      } else if ('sprite' in light && (light as any).sprite) {
-        (light as any).sprite.visible = false;
-      }
+      light.render(this.lightsContainer, g, this.tileSize);
     });
   }
 
