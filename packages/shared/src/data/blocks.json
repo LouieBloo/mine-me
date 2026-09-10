@@ -33,17 +33,6 @@
     "updatedAt": "2026-08-17T04:06:41.178Z"
   },
   {
-    "id": "block_ladder",
-    "typeKey": "LADDER",
-    "name": "Ladder",
-    "description": "A sturdy wooden ladder for ascending and descending vertical mine shafts.",
-    "textureUrl": "/assets/mining/block_entrance-block.png",
-    "mineTimeMs": 0,
-    "staminaCost": 0,
-    "createdAt": "2026-08-17T04:06:41.188Z",
-    "updatedAt": "2026-08-17T04:06:41.188Z"
-  },
-  {
     "id": "block_mineral",
     "typeKey": "MINERAL",
     "name": "Mineral Vein",

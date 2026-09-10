@@ -11,6 +11,7 @@ import { notificationService } from '../../services/notificationService';
 import { type MiningBackpackItem, MINING_CONFIG } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
 import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
+import { ExpeditionModeModal } from './components/ExpeditionModeModal/ExpeditionModeModal';
 import './MineView.css';
 
 export const MineView: React.FC = () => {
@@ -49,10 +50,17 @@ export const MineView: React.FC = () => {
   }, []);
 
   // Modal & Summary States
+  const [showModeModal, setShowModeModal] = useState<boolean>(!miningSession);
   const [hasMovedOffEntrance, setHasMovedOffEntrance] = useState<boolean>(false);
   const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const [summaryLoot, setSummaryLoot] = useState<MiningBackpackItem[]>([]);
+
+  // Debug hitboxes & reach mode state
+  const [showDebug, setShowDebug] = useState<boolean>(false);
+  const handleToggleDebug = useCallback(() => {
+    setShowDebug((prev) => !prev);
+  }, []);
 
   // Torch and Ladder Placement Mode State from QuickAccessContext
   const { isPlacingTorch, isPlacingLadder, selectSlot } = useQuickAccess();
@@ -94,33 +102,31 @@ export const MineView: React.FC = () => {
     };
   }, [onEvent, setMiningSession, navigate]);
 
-  // Clean up server session if player navigates away without extraction
+  // Clean up server session and local context if player navigates away without extraction
   useEffect(() => {
     return () => {
       if (!isCleanedUpRef.current) {
         sendGameEvent({ type: 'mining_cancel' }).catch(() => {});
       }
+      setMiningSession(null);
     };
-  }, [sendGameEvent]);
+  }, [sendGameEvent, setMiningSession]);
 
-  // Mount/Session Initialization
-  useEffect(() => {
-    if (!activeCharacter) {
-      navigate('/home');
-      return;
-    }
-
-    let isSubscribed = true;
-
-    const startSession = async () => {
+  // Start Expedition Session with chosen mode ('singleplayer' or 'multiplayer')
+  const handleStartExpedition = useCallback(
+    async (mode: 'singleplayer' | 'multiplayer', forceNew = false) => {
+      setShowModeModal(false);
       try {
         setLoading(true);
         setIsAssetsLoaded(false);
-        const result = await sendGameEvent({ type: 'mining_start' });
-        if (!isSubscribed) return;
+        const result = await sendGameEvent({ type: 'mining_start', mode, forceNew });
 
         if (result.success && result.data?.sessionState) {
+          isCleanedUpRef.current = false;
           setMiningSession(result.data.sessionState);
+          setSessionKey((prev) => prev + 1);
+          setHasMovedOffEntrance(false);
+          setShowExitConfirmation(false);
           selectSlot(0).catch(() => {});
         } else {
           isCleanedUpRef.current = true;
@@ -128,24 +134,28 @@ export const MineView: React.FC = () => {
           navigate('/home');
         }
       } catch (err: any) {
-        if (!isSubscribed) return;
         isCleanedUpRef.current = true;
         console.error('[MineView] Start session error:', err);
         notificationService.error('Error', err.message || 'Could not connect to mining server');
         navigate('/home');
       } finally {
-        if (isSubscribed) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
-    };
+    },
+    [sendGameEvent, setMiningSession, navigate, selectSlot]
+  );
 
-    startSession();
-
-    return () => {
-      isSubscribed = false;
-    };
-  }, [activeCharacter?.id, navigate, sendGameEvent, setMiningSession]);
+  // Mount/Session Initialization Check
+  useEffect(() => {
+    if (!activeCharacter) {
+      navigate('/home');
+      return;
+    }
+    if (!miningSession) {
+      setLoading(false);
+      setShowModeModal(true);
+    }
+  }, [activeCharacter?.id, navigate, miningSession]);
 
   // Track if player has moved off the entrance and then landed back on it to trigger modal
   useEffect(() => {
@@ -190,30 +200,10 @@ export const MineView: React.FC = () => {
   }, [sendGameEvent, setMiningSession, navigate]);
 
   // Restart / New Game Handler
-  const [isRestarting, setIsRestarting] = useState<boolean>(false);
-  const handleRestart = useCallback(async () => {
-    if (isRestarting) return;
-    try {
-      setIsRestarting(true);
-      setIsAssetsLoaded(false);
-      const result = await sendGameEvent({ type: 'mining_start', forceNew: true });
-      if (result.success && result.data?.sessionState) {
-        setMiningSession(result.data.sessionState);
-        setSessionKey((prev) => prev + 1);
-        setHasMovedOffEntrance(false);
-        setShowExitConfirmation(false);
-        selectSlot(0).catch(() => {});
-        notificationService.success('New Mine Generated', 'Started a fresh mining expedition.');
-      } else {
-        notificationService.error('Mining Error', result.error || 'Failed to start a new mining session');
-      }
-    } catch (err: any) {
-      console.error('[MineView] Restart session error:', err);
-      notificationService.error('Error', err.message || 'Could not restart mining session');
-    } finally {
-      setIsRestarting(false);
-    }
-  }, [isRestarting, sendGameEvent, setMiningSession]);
+  const handleRestart = useCallback(() => {
+    setShowExitConfirmation(false);
+    setShowModeModal(true);
+  }, []);
   const xpGained = summaryLoot.reduce((sum, item) => sum + item.quantity * 5, 0);
   const mappedLootItems = (() => {
     const groupedMap: Record<string, typeof summaryLoot[number]> = {};
@@ -277,6 +267,8 @@ export const MineView: React.FC = () => {
             onTorchPlaced={handleTorchPlaced}
             isPlacingLadder={isPlacingLadder}
             onLadderPlaced={handleLadderPlaced}
+            showDebug={showDebug}
+            onToggleDebug={handleToggleDebug}
           />
         </PixiStageProvider>
       )}
@@ -289,9 +281,11 @@ export const MineView: React.FC = () => {
           onExit={handleExit}
           onAbandon={handleAbandon}
           onRestart={handleRestart}
-          isRestarting={isRestarting}
+          isRestarting={loading}
           zoom={zoom}
           onZoomChange={handleZoomChange}
+          showDebug={showDebug}
+          onToggleDebug={handleToggleDebug}
         />
       )}
 
@@ -348,6 +342,16 @@ export const MineView: React.FC = () => {
         experience={xpGained}
         items={mappedLootItems}
         acceptButtonText="Accept Spoils"
+      />
+
+      {/* Choose Expedition Mode Modal (Solo vs Multiplayer) */}
+      <ExpeditionModeModal
+        isOpen={showModeModal}
+        onSelectMode={(mode) => handleStartExpedition(mode, mode === 'singleplayer')}
+        onCancel={() => {
+          setShowModeModal(false);
+          navigate('/home');
+        }}
       />
     </div>
   );

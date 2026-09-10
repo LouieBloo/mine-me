@@ -38,7 +38,19 @@ export default function Items() {
     { field: 'vendorSellPrice', headerName: 'V. Sell' },
     { field: 'userSellPrice', headerName: 'U. Sell' },
     { field: 'userBuyPrice', headerName: 'U. Buy' },
-    { field: 'rarity', headerName: 'Rarity' }
+    { field: 'rarity', headerName: 'Rarity' },
+    {
+      field: 'canBeDamaged',
+      headerName: 'Damageable',
+      valueFormatter: (params: any) => params.value ? 'Yes' : 'No',
+      minWidth: 120,
+    },
+    {
+      field: 'canBeClimbed',
+      headerName: 'Climbable',
+      valueFormatter: (params: any) => params.value ? 'Yes' : 'No',
+      minWidth: 120,
+    }
   ];
 
   return (

@@ -1,5 +1,5 @@
 import { Graphics, Sprite, Texture, type Container } from 'pixi.js';
-import { MiningTileType, type MiningClientTile } from '@mine-me/shared';
+import { MiningTileType, canTileBeDamaged, type MiningClientTile } from '@mine-me/shared';
 
 export const TILE_SIZE = 64;
 
@@ -190,14 +190,8 @@ export class MiningTileRenderer {
             this.drawFallbackTile(graphics, tile.type, tileSize);
           }
 
-          // Render crack overlay if block is partially mined (exclude non-mineable tiles: EMPTY, ENTRANCE, LADDER)
-          if (
-            tile.damageStage &&
-            tile.damageStage > 0 &&
-            tile.type !== MiningTileType.EMPTY &&
-            tile.type !== MiningTileType.ENTRANCE &&
-            tile.type !== MiningTileType.LADDER
-          ) {
+          // Render crack overlay if block is partially mined and tile can be damaged
+          if (tile.damageStage && tile.damageStage > 0 && canTileBeDamaged(tile.type)) {
             this.drawDamageCracks(graphics, tile.damageStage, tileSize);
           }
         }

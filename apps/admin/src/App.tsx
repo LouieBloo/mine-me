@@ -19,6 +19,7 @@ import Effects from './pages/Effects/Effects';
 import EffectDetail from './pages/Effects/EffectDetail';
 import Blocks from './pages/Blocks/Blocks';
 import BlockDetail from './pages/Blocks/BlockDetail/BlockDetail';
+import MiningConfig from './pages/MiningConfig/MiningConfig';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -68,6 +69,10 @@ const router = createBrowserRouter([
       {
         path: "blocks/:id",
         element: <BlockDetail />
+      },
+      {
+        path: "mining-config",
+        element: <MiningConfig />
       },
       {
         path: "mobs",

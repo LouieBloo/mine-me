@@ -93,4 +93,44 @@ describe('MiningHUD', () => {
     expect(screen.getByText(/Left Click/i)).toBeDefined();
     expect(screen.getAllByText(/Mine/i).length).toBeGreaterThan(0);
   });
+
+  it('renders Hitboxes toggle button and calls onToggleDebug when clicked', () => {
+    const onToggleDebugMock = vi.fn();
+
+    render(
+      <MiningHUD
+        sessionState={mockSessionState}
+        playerState={mockPlayerState}
+        onExit={vi.fn()}
+        onAbandon={vi.fn()}
+        onRestart={vi.fn()}
+        showDebug={false}
+        onToggleDebug={onToggleDebugMock}
+      />
+    );
+
+    const debugBtn = screen.getByRole('button', { name: /Hitboxes/i });
+    expect(debugBtn).toBeDefined();
+
+    fireEvent.click(debugBtn);
+    expect(onToggleDebugMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('displays active state and position/reach overlay when showDebug is true', () => {
+    render(
+      <MiningHUD
+        sessionState={mockSessionState}
+        playerState={mockPlayerState}
+        onExit={vi.fn()}
+        onAbandon={vi.fn()}
+        onRestart={vi.fn()}
+        showDebug={true}
+        onToggleDebug={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /Hitboxes ON/i })).toBeDefined();
+    expect(screen.getByText(/Pos: \(15, 0\)/i)).toBeDefined();
+    expect(screen.getByText(/Reach:/i)).toBeDefined();
+  });
 });

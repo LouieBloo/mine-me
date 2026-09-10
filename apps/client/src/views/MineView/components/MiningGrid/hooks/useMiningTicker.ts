@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { Application, Container, Graphics } from 'pixi.js';
 import type { ModularCharacterSprite } from '../../../../../components/game/sprites';
+import type { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
@@ -20,6 +21,7 @@ export interface UseMiningTickerOptions {
   isFacingLeftRef: React.MutableRefObject<boolean>;
   playerFacingDirRef: React.MutableRefObject<Vector2D>;
   playerSpriteRef: React.RefObject<ModularCharacterSprite | null>;
+  remotePlayerRendererRef?: React.RefObject<MiningRemotePlayerRenderer | null>;
   activeFallingRocksRef: React.MutableRefObject<ActiveFallingRock[]>;
   fallingRockGraphicsMap: React.MutableRefObject<Map<string, Graphics>>;
   reticleGraphicsRef?: React.RefObject<Graphics | null>;
@@ -42,6 +44,7 @@ export function useMiningTicker({
   isFacingLeftRef,
   playerFacingDirRef,
   playerSpriteRef,
+  remotePlayerRendererRef,
   activeFallingRocksRef,
   fallingRockGraphicsMap,
   reticleGraphicsRef,
@@ -136,6 +139,11 @@ export function useMiningTicker({
         playerSpriteRef.current.update(dt);
       }
 
+      // Update and interpolate remote players in multiplayer session
+      if (remotePlayerRendererRef?.current) {
+        remotePlayerRendererRef.current.tick(dt);
+      }
+
       // Render active falling rocks in continuous space
       if (fallingRocksContainer) {
         MiningEntityRenderer.updateFallingRocks(
@@ -194,7 +202,13 @@ export function useMiningTicker({
           const colliderPixelW = (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE) * TILE_SIZE;
           const colliderPixelH = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE) * TILE_SIZE;
 
-          // 1. Fall & Movement Collider (Green AABB rectangle encompassing character body)
+          // 1. Current Tile Grid Outline (Blue outline of occupied tile coordinate)
+          const tileX = Math.floor(currentPos.x) * TILE_SIZE;
+          const tileY = Math.floor(currentPos.y) * TILE_SIZE;
+          debugGraphics.rect(tileX, tileY, TILE_SIZE, TILE_SIZE);
+          debugGraphics.stroke({ width: 1, color: 0x38bdf8, alpha: 0.5 });
+
+          // 2. Fall & Movement Collider (Green AABB rectangle encompassing character body)
           debugGraphics.rect(
             playerPixelX - colliderPixelW / 2,
             playerPixelY - colliderPixelH / 2,
@@ -203,12 +217,22 @@ export function useMiningTicker({
           );
           debugGraphics.stroke({ width: 2, color: 0x22c55e, alpha: 0.9 });
 
-          // 2. Mining Reach Radius (Yellow circle for block excavation reach)
+          // 3. Ground / Floor Contact Line (Red line at bottom of player collider)
+          const feetY = playerPixelY + colliderPixelH / 2;
+          debugGraphics.moveTo(playerPixelX - colliderPixelW / 2, feetY);
+          debugGraphics.lineTo(playerPixelX + colliderPixelW / 2, feetY);
+          debugGraphics.stroke({ width: 2, color: 0xef4444, alpha: 0.9 });
+
+          // 4. Center Origin Point (Cyan dot at player center coordinate)
+          debugGraphics.circle(playerPixelX, playerPixelY, 3);
+          debugGraphics.fill({ color: 0x06b6d4, alpha: 0.95 });
+
+          // 5. Mining Reach Radius (Yellow circle for block excavation reach)
           const reachPixelRadius = (MINING_CONFIG.PLAYER_MINING_REACH ?? 1.85) * TILE_SIZE;
           debugGraphics.circle(playerPixelX, playerPixelY, reachPixelRadius);
           debugGraphics.stroke({ width: 1.5, color: 0xeab308, alpha: 0.5 });
 
-          // 3. Highlight currently mining target block if active
+          // 6. Highlight currently mining target block if active
           if (sessionState.isMining && sessionState.miningTarget) {
             const targetX = sessionState.miningTarget.x * TILE_SIZE;
             const targetY = sessionState.miningTarget.y * TILE_SIZE;

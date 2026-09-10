@@ -270,15 +270,24 @@ export class ModularEntitySprite extends BaseSprite {
   setMoveVelocity(vx: number, vy: number): void {
     const speed = Math.hypot(vx, vy);
     if (speed > 0.005) {
-      this.walkSpeedMultiplier = Math.min(2.5, Math.max(0.6, speed * 25));
+      this.walkSpeedMultiplier = 1.0;
       if (this.animState !== 'walk') {
         this.setState('walk');
       }
     } else {
+      this.walkSpeedMultiplier = 1.0;
       if (this.animState !== 'idle') {
         this.setState('idle');
       }
     }
+  }
+
+  setWalkSpeedMultiplier(multiplier: number): void {
+    this.walkSpeedMultiplier = multiplier;
+  }
+
+  getWalkSpeedMultiplier(): number {
+    return this.walkSpeedMultiplier;
   }
 
   /**

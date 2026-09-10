@@ -1,3 +1,5 @@
+import type { GearSubType } from './index';
+
 // ============================================================================
 // Mining Mini-Game Types & Constants
 //
@@ -89,7 +91,7 @@ export const MiningTileType = {
 
 export type MiningTileType = (typeof MiningTileType)[keyof typeof MiningTileType];
 
-export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE' | 'LADDER' | 'TORCH';
+export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE';
 
 export interface MiningBlockConfig {
   id: string;
@@ -102,6 +104,136 @@ export interface MiningBlockConfig {
   createdAt?: string | Date;
   updatedAt?: string | Date;
 }
+
+export interface MiningTileDefinition {
+  type: MiningTileType;
+  name: string;
+  /** Whether the tile can take damage and display crack overlays */
+  canBeDamaged: boolean;
+  /** Whether the tile can be mined with a pickaxe */
+  isMineable: boolean;
+  /** Whether the tile is solid terrain that blocks movement and physics colliders */
+  isSolid: boolean;
+  /** Whether the player can climb on this tile (ladder physics) */
+  isClimbable: boolean;
+  /** Whether light (sunlight and ambient) passes through this tile */
+  isTransparent: boolean;
+  /** Default duration in ms to mine this block (if mineable) */
+  defaultMineTimeMs?: number;
+}
+
+export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinition> = {
+  [MiningTileType.EMPTY]: {
+    type: MiningTileType.EMPTY,
+    name: 'Empty',
+    canBeDamaged: false,
+    isMineable: false,
+    isSolid: false,
+    isClimbable: false,
+    isTransparent: true,
+  },
+  [MiningTileType.DIRT]: {
+    type: MiningTileType.DIRT,
+    name: 'Dirt',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    defaultMineTimeMs: MINING_CONFIG.DIRT_MINE_TIME_MS,
+  },
+  [MiningTileType.ROCK]: {
+    type: MiningTileType.ROCK,
+    name: 'Rock',
+    canBeDamaged: false,
+    isMineable: false,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+  },
+  [MiningTileType.MINERAL]: {
+    type: MiningTileType.MINERAL,
+    name: 'Mineral',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    defaultMineTimeMs: MINING_CONFIG.MINERAL_MINE_TIME_MS,
+  },
+  [MiningTileType.CHEST]: {
+    type: MiningTileType.CHEST,
+    name: 'Chest',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    defaultMineTimeMs: MINING_CONFIG.CHEST_MINE_TIME_MS,
+  },
+  [MiningTileType.ENTRANCE]: {
+    type: MiningTileType.ENTRANCE,
+    name: 'Entrance',
+    canBeDamaged: false,
+    isMineable: false,
+    isSolid: false,
+    isClimbable: false,
+    isTransparent: true,
+  },
+  [MiningTileType.LADDER]: {
+    type: MiningTileType.LADDER,
+    name: 'Ladder',
+    canBeDamaged: false,
+    isMineable: false,
+    isSolid: false,
+    isClimbable: true,
+    isTransparent: true,
+  },
+  [MiningTileType.TORCH]: {
+    type: MiningTileType.TORCH,
+    name: 'Torch',
+    canBeDamaged: false,
+    isMineable: false,
+    isSolid: false,
+    isClimbable: false,
+    isTransparent: true,
+  },
+};
+
+export function getTileDefinition(type: MiningTileType): MiningTileDefinition {
+  return MINING_TILE_DEFINITIONS[type] ?? MINING_TILE_DEFINITIONS[MiningTileType.EMPTY];
+}
+
+export function canTileBeDamaged(type: MiningTileType): boolean {
+  return getTileDefinition(type).canBeDamaged;
+}
+
+export function isTileMineable(type: MiningTileType): boolean {
+  return getTileDefinition(type).isMineable;
+}
+
+export function isTileSolid(type: MiningTileType): boolean {
+  return getTileDefinition(type).isSolid;
+}
+
+export function isTileClimbable(type: MiningTileType): boolean {
+  return getTileDefinition(type).isClimbable;
+}
+
+export function isTileTransparent(type: MiningTileType): boolean {
+  return getTileDefinition(type).isTransparent;
+}
+
+export function getTileMineTime(type: MiningTileType): number {
+  return getTileDefinition(type).defaultMineTimeMs ?? MINING_CONFIG.DIRT_MINE_TIME_MS;
+}
+
+export function canPlaceBuildable(buildableType: MiningTileType, targetType: MiningTileType): boolean {
+  if (targetType === MiningTileType.ENTRANCE) return false;
+  if (targetType === buildableType) return false;
+  return true;
+}
+
 
 // ---------------------------------------------------------------------------
 // Shared Data Structures
@@ -161,6 +293,31 @@ export interface MiningFallingRock {
 }
 
 /**
+ * An equipped gear layer to be attached to the character's skeletal sprite.
+ */
+export interface MiningGearLayer {
+  url: string;
+  subType: GearSubType;
+}
+
+/**
+ * State of another player in the same mining session.
+ */
+export interface MiningRemotePlayer {
+  characterId: string;
+  characterName: string;
+  position: Vector2D;
+  velocity: Vector2D;
+  isMining: boolean;
+  miningTarget?: MiningPosition;
+  isFacingLeft: boolean;
+  aimDirection?: Vector2D;
+  flashlightOn?: boolean;
+  animationState: 'idle' | 'walk' | 'mine' | 'jump' | 'climb';
+  gearLayers?: MiningGearLayer[];
+}
+
+/**
  * The full mining session state as seen by the client.
  * Sent on session start and after each state-changing action.
  */
@@ -185,6 +342,10 @@ export interface MiningSessionClientState {
   miningTimeMs?: number;
   /** If mining, the server timestamp when mining started. */
   miningStartedAt?: number;
+  /** Current game mode ('singleplayer' or 'multiplayer'). */
+  gameMode?: 'singleplayer' | 'multiplayer';
+  /** Other players in the shared mining room (if multiplayer). */
+  otherPlayers?: MiningRemotePlayer[];
 }
 
 /**
@@ -218,6 +379,9 @@ export interface MiningInputState {
   jump?: boolean;
   miningKey: boolean;
   miningTarget?: MiningPosition | null;
+  aimDirection?: Vector2D;
+  isFacingLeft?: boolean;
+  flashlightOn?: boolean;
   sequence: number;
 }
 
@@ -233,5 +397,44 @@ export interface MiningStateTickPayload {
   droppedItems: MiningDroppedItem[];
   fallingRocks?: MiningFallingRock[];
   revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
+  /** Other players in the shared room during multiplayer sessions. */
+  otherPlayers?: MiningRemotePlayer[];
 }
+
+/**
+ * Configuration parameters for procedural mining map generation.
+ */
+export interface MiningMapConfigData {
+  id?: string;
+  name?: string;
+  gridWidth: number;
+  gridHeight: number;
+  cavernDensity: number;
+  cavernIterations: number;
+  cavernMinDepth: number;
+  tunnelCount: number;
+  tunnelMinLength: number;
+  tunnelMaxLength: number;
+  tunnelWidth: number;
+  tunnelMinDepth: number;
+  rockPercentage: number;
+  mineralPercentage: number;
+  chestCount: number;
+}
+
+export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
+  gridWidth: MINING_CONFIG.GRID_WIDTH,
+  gridHeight: MINING_CONFIG.GRID_HEIGHT,
+  cavernDensity: 42,
+  cavernIterations: 3,
+  cavernMinDepth: 4,
+  tunnelCount: 5,
+  tunnelMinLength: 15,
+  tunnelMaxLength: 30,
+  tunnelWidth: 1,
+  tunnelMinDepth: 2,
+  rockPercentage: MINING_CONFIG.ROCK_PERCENTAGE,
+  mineralPercentage: MINING_CONFIG.MINERAL_PERCENTAGE,
+  chestCount: MINING_CONFIG.TREASURE_CHEST_COUNT,
+};
 

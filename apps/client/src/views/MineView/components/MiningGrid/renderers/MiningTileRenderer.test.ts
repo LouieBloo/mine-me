@@ -81,4 +81,35 @@ describe('MiningTileRenderer', () => {
     expect(rectSpy).toHaveBeenCalled();
     expect(fillSpy).toHaveBeenCalled();
   });
+
+  it('does not render damage cracks for TORCH, LADDER, EMPTY, or ENTRANCE even if damageStage is > 0', () => {
+    const drawCracksSpy = vi.spyOn(MiningTileRenderer, 'drawDamageCracks');
+
+    const grid: MiningClientTile[][] = [
+      [
+        { type: MiningTileType.TORCH, revealed: true, damageStage: 3 },
+        { type: MiningTileType.LADDER, revealed: true, damageStage: 2 },
+      ],
+      [
+        { type: MiningTileType.EMPTY, revealed: true, damageStage: 1 },
+        { type: MiningTileType.ENTRANCE, revealed: true, damageStage: 4 },
+      ],
+      [
+        { type: MiningTileType.DIRT, revealed: true, damageStage: 2 },
+      ],
+    ];
+
+    const blockTextures = new Map<number, Texture>();
+    const tileGraphicsMap = new Map<string, Graphics>();
+    const tileSpritesMap = new Map<string, Sprite>();
+
+    MiningTileRenderer.renderGrid(container, grid, blockTextures, tileGraphicsMap, tileSpritesMap, 64);
+
+    // Should only be called once for DIRT (row 2, col 0)
+    expect(drawCracksSpy).toHaveBeenCalledTimes(1);
+    expect(drawCracksSpy).toHaveBeenCalledWith(expect.anything(), 2, 64);
+
+    drawCracksSpy.mockRestore();
+  });
 });
+

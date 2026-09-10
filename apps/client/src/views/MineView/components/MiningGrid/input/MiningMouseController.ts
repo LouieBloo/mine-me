@@ -1,4 +1,4 @@
-import { MINING_CONFIG, MiningTileType, type MiningClientTile, type MiningPosition, type Vector2D } from '@mine-me/shared';
+import { MINING_CONFIG, MiningTileType, isTileMineable, type MiningClientTile, type MiningPosition, type Vector2D } from '@mine-me/shared';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 import type { IMouseAction, ReticleStyle } from './MouseAction';
@@ -173,11 +173,7 @@ export class MiningMouseController {
         ? this.grid[this.hoveredTile.y][this.hoveredTile.x]
         : null;
 
-    const isMinable =
-      tile &&
-      (tile.type === MiningTileType.DIRT ||
-        tile.type === MiningTileType.MINERAL ||
-        tile.type === MiningTileType.CHEST);
+    const isMinable = tile ? isTileMineable(tile.type) : false;
     const isRock = tile && tile.type === MiningTileType.ROCK;
 
     if (isMinable) {

@@ -1,4 +1,4 @@
-import { MINING_CONFIG, MiningTileType, type MiningInputState, type Vector2D } from '@mine-me/shared';
+import { MINING_CONFIG, isTileClimbable, type MiningInputState, type Vector2D } from '@mine-me/shared';
 import type { ServerMiningGrid } from '../../miningMap.service';
 import { MiningPhysicsBody } from './MiningPhysicsBody';
 
@@ -34,7 +34,7 @@ export class MiningPlayerBody extends MiningPhysicsBody {
           continue;
         }
         const tile = grid[ty][tx];
-        if (tile && (tile.type === MiningTileType.LADDER)) {
+        if (tile && isTileClimbable(tile.type)) {
           // Check horizontal distance to the ladder center
           const ladderCenterX = tx + 0.5;
           const distToCenter = Math.abs(this.position.x - ladderCenterX);

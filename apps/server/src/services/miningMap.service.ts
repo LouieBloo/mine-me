@@ -1,10 +1,19 @@
-import { MiningTileType, MINING_CONFIG } from '@mine-me/shared';
+import {
+  MiningTileType,
+  MINING_CONFIG,
+  canTileBeDamaged,
+  getTileMineTime,
+  isTileSolid,
+  DEFAULT_MINING_MAP_CONFIG,
+  type MiningMapConfigData,
+} from '@mine-me/shared';
 
 // ============================================================================
 // Mining Map Generator
 //
-// Generates a seeded 30×30 mining grid. Uses a deterministic PRNG so maps
-// can be reproduced from the same seed (useful for debugging and validation).
+// Generates a seeded 45×45 mining grid with procedural caverns, tunnels,
+// mineral veins, and structural rock formations. Uses a deterministic PRNG so
+// maps can be reproduced identically from the same seed.
 // ============================================================================
 
 /**
@@ -23,19 +32,10 @@ export interface ServerTile {
  * Calculate damage stage (0-4) based on accumulated damage vs tile mining time.
  */
 export function getDamageStage(tile: ServerTile): number {
-  if (
-    !tile.damageMs ||
-    tile.damageMs <= 0 ||
-    tile.type === MiningTileType.EMPTY ||
-    tile.type === MiningTileType.ENTRANCE ||
-    tile.type === MiningTileType.LADDER ||
-    tile.type === MiningTileType.ROCK
-  ) {
+  if (!tile.damageMs || tile.damageMs <= 0 || !canTileBeDamaged(tile.type)) {
     return 0;
   }
-  let totalTimeMs: number = MINING_CONFIG.DIRT_MINE_TIME_MS;
-  if (tile.type === MiningTileType.MINERAL) totalTimeMs = MINING_CONFIG.MINERAL_MINE_TIME_MS;
-  if (tile.type === MiningTileType.CHEST) totalTimeMs = MINING_CONFIG.CHEST_MINE_TIME_MS;
+  const totalTimeMs = getTileMineTime(tile.type);
 
   const ratio = tile.damageMs / totalTimeMs;
   if (ratio >= 0.9) return 4;
@@ -68,130 +68,359 @@ export function createSeededRng(seed: number): () => number {
 }
 
 // ---------------------------------------------------------------------------
-// Map Generator
+// Map Generator Pipeline
 // ---------------------------------------------------------------------------
 
 export interface MapGeneratorOptions {
   seed: number;
-  /** Number of mineral tiles to place. Defaults to MINING_CONFIG percentage. */
+  config?: Partial<MiningMapConfigData>;
+  /** Number of mineral tiles to place. Overrides config percentage if provided. */
   mineralCount?: number;
-  /** Number of rock tiles to place. Defaults to MINING_CONFIG percentage. */
+  /** Number of rock tiles to place. Overrides config percentage if provided. */
   rockCount?: number;
-  /** Number of treasure chests. Defaults to MINING_CONFIG.TREASURE_CHEST_COUNT. */
+  /** Number of treasure chests. Overrides config count if provided. */
   chestCount?: number;
 }
 
+export class MiningMapGenerator {
+  private rng: () => number;
+  private config: MiningMapConfigData;
+  private width: number;
+  private height: number;
+  private grid: ServerMiningGrid = [];
+
+  constructor(options: MapGeneratorOptions) {
+    this.rng = createSeededRng(options.seed);
+    this.config = {
+      ...DEFAULT_MINING_MAP_CONFIG,
+      ...options.config,
+    };
+    if (options.chestCount !== undefined) {
+      this.config.chestCount = options.chestCount;
+    }
+    this.width = this.config.gridWidth;
+    this.height = this.config.gridHeight;
+  }
+
+  public generate(): ServerMiningGrid {
+    this.initializeSolidGrid();
+    this.carveCaverns();
+    this.carveTunnels();
+    this.protectSurfaceAndSpawn();
+    this.placeMinerals();
+    this.placeRocks();
+    this.placeChests();
+    return this.grid;
+  }
+
+  private initializeSolidGrid(): void {
+    this.grid = [];
+    for (let y = 0; y < this.height; y++) {
+      const row: ServerTile[] = [];
+      for (let x = 0; x < this.width; x++) {
+        row.push({ type: MiningTileType.DIRT, revealed: false });
+      }
+      this.grid.push(row);
+    }
+  }
+
+  private carveCaverns(): void {
+    if (this.config.cavernDensity <= 0) return;
+
+    const minDepth = Math.max(1, this.config.cavernMinDepth);
+    let openMap: boolean[][] = Array.from({ length: this.height }, () =>
+      Array.from({ length: this.width }, () => false)
+    );
+
+    const baseDensity = Math.min(100, Math.max(0, this.config.cavernDensity)) / 100;
+    // Map cavernDensity [0, 1] to cellular automata seed probability [0.38, 0.58]
+    const initialOpenProb = 0.38 + baseDensity * 0.20;
+
+    for (let y = minDepth; y < this.height; y++) {
+      const depthProgress = (y - minDepth) / Math.max(1, this.height - minDepth);
+      const depthScale = 0.85 + 0.15 * depthProgress;
+      const cellThreshold = initialOpenProb * depthScale;
+
+      for (let x = 0; x < this.width; x++) {
+        openMap[y][x] = this.rng() < cellThreshold;
+      }
+    }
+
+    // Cellular automata smoothing iterations (classic 4-5 rule)
+    const iterations = Math.max(1, Math.min(6, this.config.cavernIterations));
+    for (let it = 0; it < iterations; it++) {
+      const nextOpenMap: boolean[][] = Array.from({ length: this.height }, () =>
+        Array.from({ length: this.width }, () => false)
+      );
+
+      for (let y = minDepth; y < this.height; y++) {
+        for (let x = 0; x < this.width; x++) {
+          let solidNeighbors = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx < 0 || nx >= this.width || ny < minDepth || ny >= this.height) {
+                solidNeighbors++;
+              } else if (!openMap[ny][nx]) {
+                solidNeighbors++;
+              }
+            }
+          }
+
+          // Classic 4-5 rule:
+          // If solid neighbors >= 5 -> become solid
+          // If solid neighbors <= 3 -> become open
+          // If solid neighbors == 4 -> preserve current state
+          if (solidNeighbors >= 5) {
+            nextOpenMap[y][x] = false;
+          } else if (solidNeighbors <= 3) {
+            nextOpenMap[y][x] = true;
+          } else {
+            nextOpenMap[y][x] = openMap[y][x];
+          }
+        }
+      }
+      openMap = nextOpenMap;
+    }
+
+    // Apply carved caverns to grid
+    for (let y = minDepth; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        if (openMap[y][x]) {
+          this.grid[y][x] = { type: MiningTileType.EMPTY, revealed: false };
+        }
+      }
+    }
+  }
+
+  private carveTunnels(): void {
+    if (this.config.tunnelCount <= 0) return;
+
+    const minDepth = Math.max(1, this.config.tunnelMinDepth);
+    const wormCount = this.config.tunnelCount;
+    const minLength = Math.max(5, this.config.tunnelMinLength);
+    const maxLength = Math.max(minLength, this.config.tunnelMaxLength);
+    const tunnelWidth = Math.max(1, Math.min(2, this.config.tunnelWidth));
+
+    for (let i = 0; i < wormCount; i++) {
+      let curX = Math.floor(this.rng() * (this.width - 4)) + 2;
+      let curY = Math.floor(this.rng() * (this.height - minDepth - 2)) + minDepth;
+      const steps = Math.floor(this.rng() * (maxLength - minLength + 1)) + minLength;
+
+      let dx = this.rng() > 0.5 ? 1 : -1;
+      let dy = this.rng() > 0.4 ? 1 : 0;
+
+      for (let step = 0; step < steps; step++) {
+        if (curY >= 1 && curY < this.height && curX >= 0 && curX < this.width) {
+          this.grid[curY][curX] = { type: MiningTileType.EMPTY, revealed: false };
+          if (tunnelWidth > 1 && curX + 1 < this.width) {
+            this.grid[curY][curX + 1] = { type: MiningTileType.EMPTY, revealed: false };
+          }
+        }
+
+        // Steer direction occasionally
+        if (this.rng() < 0.35) {
+          dx = this.rng() < 0.5 ? -1 : (this.rng() < 0.5 ? 1 : 0);
+        }
+        if (this.rng() < 0.35) {
+          dy = this.rng() < 0.6 ? 1 : (this.rng() < 0.5 ? 0 : -1);
+        }
+
+        curX += dx;
+        curY += dy;
+
+        // Bounce back into bounds
+        if (curX < 1) { curX = 1; dx = 1; }
+        if (curX >= this.width - 1) { curX = this.width - 2; dx = -1; }
+        if (curY < minDepth) { curY = minDepth; dy = 1; }
+        if (curY >= this.height - 1) { curY = this.height - 2; dy = -1; }
+      }
+    }
+  }
+
+  private protectSurfaceAndSpawn(): void {
+    const { ENTRANCE_X } = MINING_CONFIG;
+
+    // Row 0 is surface: 100% solid DIRT
+    for (let x = 0; x < this.width; x++) {
+      this.grid[0][x] = { type: MiningTileType.DIRT, revealed: false };
+    }
+
+    // Keep ground directly under entrance solid dirt so player has footing at spawn
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = ENTRANCE_X + dx;
+      if (nx >= 0 && nx < this.width && this.height > 1) {
+        this.grid[1][nx] = { type: MiningTileType.DIRT, revealed: false };
+      }
+    }
+  }
+
+  private placeMinerals(): void {
+    const eligibleDirt: MiningPosition[] = [];
+    for (let y = 1; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        if (this.grid[y][x].type === MiningTileType.DIRT) {
+          eligibleDirt.push({ x, y });
+        }
+      }
+    }
+
+    if (eligibleDirt.length === 0) return;
+
+    const targetCount = Math.max(1, Math.floor((eligibleDirt.length * this.config.mineralPercentage) / 100));
+
+    // Fisher-Yates shuffle
+    for (let i = eligibleDirt.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [eligibleDirt[i], eligibleDirt[j]] = [eligibleDirt[j], eligibleDirt[i]];
+    }
+
+    let placed = 0;
+    let idx = 0;
+    while (placed < targetCount && idx < eligibleDirt.length) {
+      const seedPos = eligibleDirt[idx++];
+      if (this.grid[seedPos.y][seedPos.x].type !== MiningTileType.DIRT) continue;
+
+      // Avoid placing immediately below entrance
+      if (seedPos.y === 1 && Math.abs(seedPos.x - MINING_CONFIG.ENTRANCE_X) <= 1) continue;
+
+      this.grid[seedPos.y][seedPos.x] = { type: MiningTileType.MINERAL, revealed: false };
+      placed++;
+
+      // Vein clustering: expand to 1 or 2 adjacent dirt blocks
+      if (this.rng() < 0.5 && placed < targetCount) {
+        const neighbors = [
+          { x: seedPos.x + 1, y: seedPos.y },
+          { x: seedPos.x - 1, y: seedPos.y },
+          { x: seedPos.x, y: seedPos.y + 1 },
+          { x: seedPos.x, y: seedPos.y - 1 },
+        ];
+        for (const n of neighbors) {
+          if (
+            n.x >= 0 && n.x < this.width && n.y >= 2 && n.y < this.height &&
+            this.grid[n.y][n.x].type === MiningTileType.DIRT &&
+            placed < targetCount
+          ) {
+            this.grid[n.y][n.x] = { type: MiningTileType.MINERAL, revealed: false };
+            placed++;
+            if (this.rng() < 0.5) break;
+          }
+        }
+      }
+    }
+  }
+
+  private placeRocks(): void {
+    // Collect candidate positions: solid dirt tiles where y >= 1
+    // CRITICAL REQUIREMENT: A rock must NOT have an EMPTY tile directly beneath it at spawn
+    const candidateDirt: MiningPosition[] = [];
+    for (let y = 1; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        if (this.grid[y][x].type === MiningTileType.DIRT) {
+          const belowY = y + 1;
+          const isSupported = belowY >= this.height || isTileSolid(this.grid[belowY][x].type);
+          if (isSupported) {
+            candidateDirt.push({ x, y });
+          }
+        }
+      }
+    }
+
+    if (candidateDirt.length === 0) return;
+
+    let totalSolid = 0;
+    for (let y = 1; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        if (isTileSolid(this.grid[y][x].type)) totalSolid++;
+      }
+    }
+
+    const targetCount = Math.floor((totalSolid * this.config.rockPercentage) / 100);
+
+    for (let i = candidateDirt.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [candidateDirt[i], candidateDirt[j]] = [candidateDirt[j], candidateDirt[i]];
+    }
+
+    let placed = 0;
+    let idx = 0;
+    while (placed < targetCount && idx < candidateDirt.length) {
+      const pos = candidateDirt[idx++];
+      if (pos.y === 1 && Math.abs(pos.x - MINING_CONFIG.ENTRANCE_X) <= 1) continue;
+      if (this.grid[pos.y][pos.x].type !== MiningTileType.DIRT) continue;
+
+      // Re-verify support in case a neighbor/below changed
+      const belowY = pos.y + 1;
+      const isSupported = belowY >= this.height || isTileSolid(this.grid[belowY][pos.x].type);
+      if (!isSupported) continue;
+
+      this.grid[pos.y][pos.x] = { type: MiningTileType.ROCK, revealed: false };
+      placed++;
+    }
+  }
+
+  private placeChests(): void {
+    const targetCount = Math.max(0, this.config.chestCount);
+    if (targetCount === 0) return;
+
+    const midY = Math.floor(this.height / 2);
+
+    // Priority 1: Cavern floor positions (EMPTY space where below is solid, above is empty)
+    const cavernFloors: MiningPosition[] = [];
+    const deepDirt: MiningPosition[] = [];
+
+    for (let y = midY; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        if (this.grid[y][x].type === MiningTileType.EMPTY) {
+          const belowSolid = y + 1 >= this.height || isTileSolid(this.grid[y + 1][x].type);
+          const aboveAir = y - 1 >= 0 && !isTileSolid(this.grid[y - 1][x].type);
+          if (belowSolid && aboveAir) {
+            cavernFloors.push({ x, y });
+          }
+        } else if (this.grid[y][x].type === MiningTileType.DIRT) {
+          deepDirt.push({ x, y });
+        }
+      }
+    }
+
+    // Shuffle cavern floors
+    for (let i = cavernFloors.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [cavernFloors[i], cavernFloors[j]] = [cavernFloors[j], cavernFloors[i]];
+    }
+    // Shuffle deep dirt
+    for (let i = deepDirt.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [deepDirt[i], deepDirt[j]] = [deepDirt[j], deepDirt[i]];
+    }
+
+    let placed = 0;
+    // Try placing on cavern floors first
+    for (let i = 0; i < cavernFloors.length && placed < targetCount; i++) {
+      const pos = cavernFloors[i];
+      this.grid[pos.y][pos.x] = { type: MiningTileType.CHEST, revealed: false };
+      placed++;
+    }
+
+    // If more chests needed, place in deep dirt
+    for (let i = 0; i < deepDirt.length && placed < targetCount; i++) {
+      const pos = deepDirt[i];
+      if (this.grid[pos.y][pos.x].type === MiningTileType.DIRT) {
+        this.grid[pos.y][pos.x] = { type: MiningTileType.CHEST, revealed: false };
+        placed++;
+      }
+    }
+  }
+}
+
 /**
- * Generate a 30×30 mining grid.
- *
- * Layout:
- * - Row 0 is the surface. ENTRANCE is placed at (ENTRANCE_X, 0).
- * - Rocks, minerals, and chests are scattered throughout the grid.
- * - Chests are placed in the lower half (y >= GRID_HEIGHT / 2).
- * - Row 0 around the entrance is cleared (EMPTY) so the player can start.
+ * Generate a 45×45 mining grid with procedural caverns, tunnels, and resources.
  */
 export function generateMiningMap(options: MapGeneratorOptions): ServerMiningGrid {
-  const {
-    seed,
-    chestCount = MINING_CONFIG.TREASURE_CHEST_COUNT,
-  } = options;
-
-  const { GRID_WIDTH, GRID_HEIGHT, ENTRANCE_X, ENTRANCE_Y, ROCK_PERCENTAGE, MINERAL_PERCENTAGE } = MINING_CONFIG;
-
-  const rng = createSeededRng(seed);
-
-  const totalTiles = GRID_WIDTH * GRID_HEIGHT;
-  const rockTarget = options.rockCount ?? Math.floor((totalTiles * ROCK_PERCENTAGE) / 100);
-  const mineralTarget = options.mineralCount ?? Math.floor((totalTiles * MINERAL_PERCENTAGE) / 100);
-
-  // 1. Initialize grid with DIRT
-  const grid: ServerMiningGrid = [];
-  for (let y = 0; y < GRID_HEIGHT; y++) {
-    const row: ServerTile[] = [];
-    for (let x = 0; x < GRID_WIDTH; x++) {
-      row.push({ type: MiningTileType.DIRT, revealed: false });
-    }
-    grid.push(row);
-  }
-
-  // 2. Place ladder at entrance / start position
-  grid[ENTRANCE_Y][ENTRANCE_X] = { type: MiningTileType.LADDER, revealed: true };
-
-  // Clear tiles around the entrance so the player can start moving
-  // Make a small 3-wide opening at the top
-  for (let dx = -1; dx <= 1; dx++) {
-    const nx = ENTRANCE_X + dx;
-    if (
-      nx >= 0 &&
-      nx < GRID_WIDTH &&
-      grid[ENTRANCE_Y][nx].type !== MiningTileType.LADDER &&
-      grid[ENTRANCE_Y][nx].type !== MiningTileType.ENTRANCE
-    ) {
-      grid[ENTRANCE_Y][nx] = { type: MiningTileType.EMPTY, revealed: true };
-    }
-  }
-  // Also reveal the tile directly below entrance
-  if (ENTRANCE_Y + 1 < GRID_HEIGHT) {
-    grid[ENTRANCE_Y + 1][ENTRANCE_X].revealed = true;
-  }
-
-  // 3. Collect eligible positions (skip row 0 — that's the surface)
-  const eligiblePositions: MiningPosition[] = [];
-  for (let y = 1; y < GRID_HEIGHT; y++) {
-    for (let x = 0; x < GRID_WIDTH; x++) {
-      eligiblePositions.push({ x, y });
-    }
-  }
-
-  // Shuffle using Fisher-Yates
-  for (let i = eligiblePositions.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [eligiblePositions[i], eligiblePositions[j]] = [eligiblePositions[j], eligiblePositions[i]];
-  }
-
-  let posIndex = 0;
-
-  // 4. Place rocks
-  let rocksPlaced = 0;
-  while (rocksPlaced < rockTarget && posIndex < eligiblePositions.length) {
-    const pos = eligiblePositions[posIndex++];
-
-    // Don't place rocks directly below the entrance or on row 1 center
-    // to ensure the player can always start moving
-    if (pos.y === 1 && Math.abs(pos.x - ENTRANCE_X) <= 1) continue;
-
-    grid[pos.y][pos.x] = { type: MiningTileType.ROCK, revealed: false };
-    rocksPlaced++;
-  }
-
-  // 5. Place minerals
-  let mineralsPlaced = 0;
-  while (mineralsPlaced < mineralTarget && posIndex < eligiblePositions.length) {
-    const pos = eligiblePositions[posIndex++];
-    if (pos.y === 1 && Math.abs(pos.x - ENTRANCE_X) <= 1) continue;
-    if (grid[pos.y][pos.x].type !== MiningTileType.DIRT) continue;
-
-    grid[pos.y][pos.x] = { type: MiningTileType.MINERAL, revealed: false };
-    mineralsPlaced++;
-  }
-
-  // 6. Place treasure chests (lower half only, y >= GRID_HEIGHT / 2)
-  const lowerHalfPositions = eligiblePositions
-    .slice(posIndex)
-    .filter(p => p.y >= Math.floor(GRID_HEIGHT / 2) && grid[p.y][p.x].type === MiningTileType.DIRT);
-
-  // Shuffle again for randomness
-  for (let i = lowerHalfPositions.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [lowerHalfPositions[i], lowerHalfPositions[j]] = [lowerHalfPositions[j], lowerHalfPositions[i]];
-  }
-
-  for (let i = 0; i < Math.min(chestCount, lowerHalfPositions.length); i++) {
-    const pos = lowerHalfPositions[i];
-    grid[pos.y][pos.x] = { type: MiningTileType.CHEST, revealed: false };
-  }
-
-  return grid;
+  const generator = new MiningMapGenerator(options);
+  return generator.generate();
 }
 
 // ---------------------------------------------------------------------------
@@ -251,16 +480,15 @@ export function resolveGravity(
     for (let y = 0; y < MINING_CONFIG.GRID_HEIGHT - 1; y++) {
       if (grid[y][x].type !== MiningTileType.ROCK) continue;
 
-      // Check if tile below is empty
+      // Check if tile below is not solid (rock can fall through non-solid spaces)
       const belowY = y + 1;
-      if (grid[belowY][x].type !== MiningTileType.EMPTY &&
-          grid[belowY][x].type !== MiningTileType.ENTRANCE) continue;
+      if (isTileSolid(grid[belowY][x].type)) continue;
 
       // Rock needs to fall — find final resting position
       let finalY = belowY;
       while (finalY + 1 < MINING_CONFIG.GRID_HEIGHT) {
         const nextBelow = grid[finalY + 1][x];
-        if (nextBelow.type === MiningTileType.EMPTY || nextBelow.type === MiningTileType.ENTRANCE) {
+        if (!isTileSolid(nextBelow.type)) {
           finalY++;
         } else {
           break;

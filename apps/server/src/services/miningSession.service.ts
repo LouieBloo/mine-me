@@ -3,6 +3,9 @@ import { prisma } from '../index';
 import {
   MiningTileType,
   MINING_CONFIG,
+  getTileMineTime,
+  isTileMineable,
+  isTileSolid,
   type MiningPosition,
   type MiningBackpackItem,
   type MiningDroppedItem,
@@ -147,8 +150,8 @@ export async function processMove(
   let damageTaken = 0;
   let message: string | undefined;
 
-  // Can only move onto EMPTY, ENTRANCE, or tiles with dropped items
-  if (tile.type !== MiningTileType.EMPTY && tile.type !== MiningTileType.ENTRANCE) {
+  // Can only move onto non-solid tiles (e.g. empty, entrance, ladder, torch)
+  if (isTileSolid(tile.type)) {
     throw new Error('Cannot move to that tile — it is not empty.');
   }
 
@@ -212,7 +215,10 @@ export function startMining(
   const tile = session.grid[target.y][target.x];
 
   // Validate tile is minable
-  if (tile.type === MiningTileType.EMPTY || tile.type === MiningTileType.ENTRANCE) {
+  if (tile.type === MiningTileType.ROCK) {
+    throw new Error('Rocks cannot be mined by hand. Use dynamite!');
+  }
+  if (!isTileMineable(tile.type)) {
     throw new Error('Nothing to mine at that position.');
   }
 
@@ -223,23 +229,7 @@ export function startMining(
     throw new Error('Target must be adjacent to the player.');
   }
 
-  // Calculate mining time based on tile type
-  let miningTimeMs: number;
-  switch (tile.type) {
-    case MiningTileType.DIRT:
-      miningTimeMs = MINING_CONFIG.DIRT_MINE_TIME_MS;
-      break;
-    case MiningTileType.MINERAL:
-      miningTimeMs = MINING_CONFIG.MINERAL_MINE_TIME_MS;
-      break;
-    case MiningTileType.CHEST:
-      miningTimeMs = MINING_CONFIG.CHEST_MINE_TIME_MS;
-      break;
-    case MiningTileType.ROCK:
-      throw new Error('Rocks cannot be mined by hand. Use dynamite!');
-    default:
-      throw new Error('Invalid tile type for mining.');
-  }
+  const miningTimeMs: number = getTileMineTime(tile.type);
 
   session.pendingAction = {
     type: 'MINING',

@@ -1,0 +1,14 @@
+/* Scoped styles for MiningConfig page */
+.mining-config-page {
+  width: 100%;
+}
+
+.mining-config-canvas {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+.custom-slider {
+  accent-color: #3b82f6;
+}

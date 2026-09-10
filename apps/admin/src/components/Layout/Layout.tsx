@@ -3,7 +3,7 @@ import './Layout.css';
 
 export default function Layout() {
   const navLinkClass = ({ isActive }: { isActive: boolean }) => 
-    `block px-4 py-2 mt-2 text-sm font-semibold rounded-lg ${
+    `block px-4 py-2 text-sm font-semibold rounded-lg transition-colors cursor-pointer ${
       isActive ? 'bg-slate-200 text-slate-900' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
     }`;
 
@@ -13,18 +13,35 @@ export default function Layout() {
         <div className="flex items-center justify-center h-16 border-b border-slate-200">
           <h1 className="text-xl font-bold text-slate-800">NVG Admin</h1>
         </div>
-        <nav className="flex-grow flex flex-col p-4 gap-2">
+        <nav className="flex-grow flex flex-col p-4 gap-1 overflow-y-auto">
+          {/* Overview */}
           <NavLink to="/" className={navLinkClass}>Dashboard</NavLink>
+
+          {/* World & Maps */}
+          <div className="pt-3 pb-1 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            World & Maps
+          </div>
           <NavLink to="/cities" className={navLinkClass}>Cities Editor</NavLink>
           <NavLink to="/map-editor" className={navLinkClass}>Map Editor</NavLink>
-          <NavLink to="/inventory-items" className={navLinkClass}>Inventory Editor</NavLink>
-          <NavLink to="/items" className={navLinkClass}>Items Editor</NavLink>
+          <NavLink to="/mining-config" className={navLinkClass}>Mine Generator</NavLink>
+
+          {/* Items & Economy */}
+          <div className="pt-3 pb-1 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Items & Economy
+          </div>
           <NavLink to="/blocks" className={navLinkClass}>Blocks Editor</NavLink>
           <NavLink to="/effects" className={navLinkClass}>Effects Editor</NavLink>
-          <NavLink to="/mobs" className={navLinkClass}>Mobs Editor</NavLink>
-          <NavLink to="/character-viewer" className={navLinkClass}>Character Viewer</NavLink>
+          <NavLink to="/inventory-items" className={navLinkClass}>Inventory Editor</NavLink>
+          <NavLink to="/items" className={navLinkClass}>Items Editor</NavLink>
           <NavLink to="/rates" className={navLinkClass}>Rates Editor</NavLink>
+
+          {/* Characters & Entities */}
+          <div className="pt-3 pb-1 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Characters & Users
+          </div>
+          <NavLink to="/character-viewer" className={navLinkClass}>Character Viewer</NavLink>
           <NavLink to="/character-levels" className={navLinkClass}>Levels Config</NavLink>
+          <NavLink to="/mobs" className={navLinkClass}>Mobs Editor</NavLink>
           <NavLink to="/users" className={navLinkClass}>Users Editor</NavLink>
         </nav>
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Application, Container, Graphics, Sprite, TilingSprite, Assets, Texture } from 'pixi.js';
 import { ModularCharacterSprite, type GearLayerDescriptor } from '../../../../../components/game/sprites';
+import { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
 import { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
 import { SpotLight } from '../../../../../components/game/lighting/SpotLight';
@@ -53,6 +54,8 @@ export function useMiningScene({
   const fallingRockGraphicsMap = useRef<Map<string, Graphics>>(new Map());
 
   const playerSpriteRef = useRef<ModularCharacterSprite | null>(null);
+  const otherPlayersContainerRef = useRef<Container | null>(null);
+  const remotePlayerRendererRef = useRef<MiningRemotePlayerRenderer | null>(null);
   const lightingEngineRef = useRef<LightingEngine | null>(null);
   const flashlightRef = useRef<SpotLight | null>(null);
 
@@ -78,6 +81,7 @@ export function useMiningScene({
     const tilesContainer = new Container();
     const fallingRocksContainer = new Container();
     const droppedItemsContainer = new Container();
+    const otherPlayersContainer = new Container();
     const playerContainer = new Container();
     const debugContainer = new Container();
 
@@ -112,6 +116,7 @@ export function useMiningScene({
     gridContainer.addChild(fallingRocksContainer);
     gridContainer.addChild(droppedItemsContainer);
     gridContainer.addChild(reticleContainer);
+    gridContainer.addChild(otherPlayersContainer);
     gridContainer.addChild(playerContainer);
     gridContainer.addChild(debugContainer);
     app.stage.addChild(gridContainer);
@@ -121,7 +126,15 @@ export function useMiningScene({
     tilesContainerRef.current = tilesContainer;
     fallingRocksContainerRef.current = fallingRocksContainer;
     droppedItemsContainerRef.current = droppedItemsContainer;
+    otherPlayersContainerRef.current = otherPlayersContainer;
     playerContainerRef.current = playerContainer;
+
+    const remotePlayerRenderer = new MiningRemotePlayerRenderer(otherPlayersContainer);
+    remotePlayerRendererRef.current = remotePlayerRenderer;
+    if (initialSessionState.otherPlayers) {
+      remotePlayerRenderer.updatePlayers(initialSessionState.otherPlayers);
+    }
+
     setContainersReady(true);
 
     // Initialize Camera2D system
@@ -141,6 +154,7 @@ export function useMiningScene({
       MINING_CONFIG.GRID_HEIGHT,
       TILE_SIZE
     );
+    remotePlayerRenderer.setLightingEngine(lightingEngine);
 
     const flashlight = new SpotLight(
       'player_flashlight',
@@ -297,6 +311,10 @@ export function useMiningScene({
         cameraRef.current.destroy();
         cameraRef.current = null;
       }
+      if (remotePlayerRendererRef.current) {
+        remotePlayerRendererRef.current.destroy();
+        remotePlayerRendererRef.current = null;
+      }
       if (playerSpriteRef.current) {
         playerSpriteRef.current.destroy();
         playerSpriteRef.current = null;
@@ -327,6 +345,7 @@ export function useMiningScene({
     tilesContainerRef,
     fallingRocksContainerRef,
     droppedItemsContainerRef,
+    otherPlayersContainerRef,
     playerContainerRef,
     reticleGraphicsRef,
     debugGraphicsRef,
@@ -336,6 +355,7 @@ export function useMiningScene({
     droppedSpritesMap,
     fallingRockGraphicsMap,
     playerSpriteRef,
+    remotePlayerRendererRef,
     lightingEngineRef,
     flashlightRef,
   };

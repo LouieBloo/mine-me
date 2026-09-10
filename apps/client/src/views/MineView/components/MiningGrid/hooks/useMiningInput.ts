@@ -9,6 +9,7 @@ export interface UseMiningInputOptions {
   playerSpriteRef: React.RefObject<ModularCharacterSprite | null>;
   flashlightRef: React.RefObject<SpotLight | null>;
   showDebugRef: React.MutableRefObject<boolean>;
+  onToggleDebug?: () => void;
   playerFacingDirRef: React.MutableRefObject<Vector2D>;
   isFacingLeftRef: React.MutableRefObject<boolean>;
   mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
@@ -21,12 +22,15 @@ export function useMiningInput({
   playerSpriteRef,
   flashlightRef,
   showDebugRef,
+  onToggleDebug,
   playerFacingDirRef,
   isFacingLeftRef,
   mouseControllerRef,
   zoom,
   onZoomChange,
 }: UseMiningInputOptions) {
+  const onToggleDebugRef = useRef(onToggleDebug);
+  onToggleDebugRef.current = onToggleDebug;
   const keysPressedRef = useRef<{
     up: boolean;
     down: boolean;
@@ -35,6 +39,9 @@ export function useMiningInput({
     jump: boolean;
     miningKey: boolean;
     miningTarget: MiningPosition | null;
+    aimDirection?: Vector2D;
+    isFacingLeft?: boolean;
+    flashlightOn?: boolean;
     sequence: number;
   }>({
     up: false,
@@ -72,14 +79,54 @@ export function useMiningInput({
       if (changed) {
         current.miningKey = isMining;
         current.miningTarget = target ? { ...target } : null;
+        current.aimDirection = playerFacingDirRef.current ? { ...playerFacingDirRef.current } : undefined;
+        current.isFacingLeft = isFacingLeftRef.current;
+        current.flashlightOn = flashlightRef.current?.enabled ?? false;
         current.sequence++;
         const payloadInput: MiningInputState = { ...current };
-        sendGameEvent({ type: 'mining_input', input: payloadInput });
+        sendGameEvent({ type: 'mining_input', input: payloadInput })?.catch?.(() => {});
       }
     });
 
     return unsubscribe;
-  }, [mouseControllerRef, sendGameEvent]);
+  }, [mouseControllerRef, sendGameEvent, playerFacingDirRef, isFacingLeftRef, flashlightRef]);
+
+  // Periodic throttled aim direction & flashlight synchronization over WebSockets (~15 Hz)
+  useEffect(() => {
+    const lastSentAim = { x: 0, y: 0 };
+    let lastSentFacingLeft = isFacingLeftRef.current;
+    let lastSentFlashlight = flashlightRef.current?.enabled ?? false;
+
+    const interval = setInterval(() => {
+      const currentFacing = playerFacingDirRef.current;
+      const currentFacingLeft = isFacingLeftRef.current;
+      const currentFlashlight = flashlightRef.current?.enabled ?? false;
+
+      if (!currentFacing) return;
+
+      const aimDx = currentFacing.x - lastSentAim.x;
+      const aimDy = currentFacing.y - lastSentAim.y;
+      const aimChanged = Math.hypot(aimDx, aimDy) > 0.05;
+      const facingLeftChanged = currentFacingLeft !== lastSentFacingLeft;
+      const flashlightChanged = currentFlashlight !== lastSentFlashlight;
+
+      if (aimChanged || facingLeftChanged || flashlightChanged) {
+        lastSentAim.x = currentFacing.x;
+        lastSentAim.y = currentFacing.y;
+        lastSentFacingLeft = currentFacingLeft;
+        lastSentFlashlight = currentFlashlight;
+
+        const current = keysPressedRef.current;
+        current.aimDirection = { ...currentFacing };
+        current.isFacingLeft = currentFacingLeft;
+        current.flashlightOn = currentFlashlight;
+        current.sequence++;
+        sendGameEvent({ type: 'mining_input', input: { ...current } })?.catch?.(() => {});
+      }
+    }, 66);
+
+    return () => clearInterval(interval);
+  }, [sendGameEvent, playerFacingDirRef, isFacingLeftRef, flashlightRef]);
 
   useEffect(() => {
     const updateInputState = (e: KeyboardEvent, isKeyDown: boolean) => {
@@ -122,10 +169,13 @@ export function useMiningInput({
         // Toggle Flashlight ON/OFF
         if (flashlightRef.current) {
           flashlightRef.current.enabled = !flashlightRef.current.enabled;
+          current.flashlightOn = flashlightRef.current.enabled;
+          changed = true;
         }
       } else if (key === 'b' && isKeyDown) {
         // Toggle Debug Collision & Reach Shapes ON/OFF
         showDebugRef.current = !showDebugRef.current;
+        onToggleDebugRef.current?.();
       }
 
       if (changed) {
@@ -152,9 +202,12 @@ export function useMiningInput({
           }
         }
 
+        current.aimDirection = playerFacingDirRef.current ? { ...playerFacingDirRef.current } : undefined;
+        current.isFacingLeft = isFacingLeftRef.current;
+        current.flashlightOn = flashlightRef.current?.enabled ?? false;
         current.sequence++;
         const payloadInput: MiningInputState = { ...current };
-        sendGameEvent({ type: 'mining_input', input: payloadInput });
+        sendGameEvent({ type: 'mining_input', input: payloadInput })?.catch?.(() => {});
       }
     };
 
@@ -179,7 +232,7 @@ export function useMiningInput({
         current.miningKey = false;
         current.miningTarget = null;
         current.sequence++;
-        sendGameEvent({ type: 'mining_input', input: { ...current } });
+        sendGameEvent({ type: 'mining_input', input: { ...current } })?.catch?.(() => {});
       }
     };
 

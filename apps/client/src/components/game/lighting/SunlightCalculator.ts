@@ -1,5 +1,5 @@
 import type { MiningClientTile } from '@mine-me/shared';
-import { MiningTileType, MINING_CONFIG } from '@mine-me/shared';
+import { isTileTransparent, MINING_CONFIG } from '@mine-me/shared';
 
 /**
  * Calculates dynamic 2D sunlight penetration through excavated tunnels and shafts.
@@ -26,11 +26,7 @@ export function calculateSunlightMap(
   const isAirTile = (x: number, y: number): boolean => {
     if (x < 0 || x >= width || y < 0 || y >= height) return false;
     const tile = grid[y][x];
-    return (
-      tile.type === MiningTileType.EMPTY ||
-      tile.type === MiningTileType.ENTRANCE ||
-      tile.type === MiningTileType.LADDER
-    );
+    return isTileTransparent(tile.type);
   };
 
   // Queue for lateral diffusion BFS

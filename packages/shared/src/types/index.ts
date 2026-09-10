@@ -112,6 +112,8 @@ export interface GameItem {
   experience?: number;
   combatScore?: number;
   defenseScore?: number;
+  canBeDamaged?: boolean;
+  canBeClimbed?: boolean;
   itemEffects?: ObjectEffects[];
 }
 

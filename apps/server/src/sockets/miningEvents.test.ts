@@ -53,6 +53,45 @@ describe('MiningSessionManager', () => {
     // Subsequent calls are safe no-ops
     expect(() => miningSessionManager.cancelSession('char-test-cancel')).not.toThrow();
   });
+
+  it('closes multiplayer lobby session when all players leave, creating a fresh instance on next join', () => {
+    // Player 1 and Player 2 join multiplayer lobby
+    const sessionP1 = miningSessionManager.createSession('mp-p1', 'city-1', mockSocket, false, 0, 'multiplayer');
+    const sessionP2 = miningSessionManager.createSession('mp-p2', 'city-1', mockSocket, false, 0, 'multiplayer');
+    expect(sessionP1).toBe(sessionP2);
+    expect(sessionP1.playerCount).toBe(2);
+
+    // Player 1 leaves
+    miningSessionManager.cancelSession('mp-p1');
+    expect(sessionP1.playerCount).toBe(1);
+    expect(miningSessionManager.getSession('mp-p2')).toBe(sessionP1);
+
+    // Player 2 leaves -> room is now empty and should be cleaned up
+    miningSessionManager.cancelSession('mp-p2');
+    expect(sessionP1.playerCount).toBe(0);
+
+    // Player 3 joins multiplayer lobby -> gets a brand new engine instance
+    const sessionP3 = miningSessionManager.createSession('mp-p3', 'city-1', mockSocket, false, 0, 'multiplayer');
+    expect(sessionP3).not.toBe(sessionP1);
+    expect(sessionP3.playerCount).toBe(1);
+
+    // Cleanup
+    miningSessionManager.cancelSession('mp-p3');
+  });
+
+  it('joins existing multiplayer lobby even if forceNew is passed while another player is present', () => {
+    const sessionP1 = miningSessionManager.createSession('mp-active-1', 'city-1', mockSocket, false, 0, 'multiplayer');
+    expect(sessionP1.playerCount).toBe(1);
+
+    // Player 2 joins with forceNew=true (e.g. from UI)
+    const sessionP2 = miningSessionManager.createSession('mp-active-2', 'city-1', mockSocket, true, 0, 'multiplayer');
+    expect(sessionP2).toBe(sessionP1);
+    expect(sessionP1.playerCount).toBe(2);
+
+    // Cleanup
+    miningSessionManager.cancelSession('mp-active-1');
+    miningSessionManager.cancelSession('mp-active-2');
+  });
 });
 
 describe('handleMiningPlaceTorch', () => {

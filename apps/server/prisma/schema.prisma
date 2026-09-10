@@ -88,6 +88,8 @@ model Item {
   experience      Int             @default(0)
   combatScore     Int             @default(0)
   defenseScore    Int             @default(0)
+  canBeDamaged    Boolean         @default(false)
+  canBeClimbed    Boolean         @default(false)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   cityMaterials   CityMaterial[]
@@ -205,6 +207,27 @@ model MiningBlock {
   staminaCost Int      @default(1)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model MiningMapConfig {
+  id                String   @id @default(cuid())
+  name              String   @default("Default")
+  gridWidth         Int      @default(45)
+  gridHeight        Int      @default(45)
+  cavernDensity     Int      @default(42)
+  cavernIterations  Int      @default(3)
+  cavernMinDepth    Int      @default(4)
+  tunnelCount       Int      @default(5)
+  tunnelMinLength   Int      @default(15)
+  tunnelMaxLength   Int      @default(30)
+  tunnelWidth       Int      @default(1)
+  tunnelMinDepth    Int      @default(2)
+  rockPercentage    Int      @default(12)
+  mineralPercentage Int      @default(10)
+  chestCount        Int      @default(4)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 enum CharacterStatus {

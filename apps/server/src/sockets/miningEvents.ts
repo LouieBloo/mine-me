@@ -21,7 +21,7 @@ import { miningSessionManager } from '../services/mining/MiningSessionManager';
 export const handleMiningStart = async (
   io: Server,
   socket: Socket,
-  payload?: { forceNew?: boolean },
+  payload?: { forceNew?: boolean; mode?: 'singleplayer' | 'multiplayer' },
 ): Promise<GameEventResult> => {
   const userId = socket.data.userId;
   const characterId = socket.data.characterId;
@@ -61,20 +61,32 @@ export const handleMiningStart = async (
     const clientInventory = InventoryService.mapCharacterInventory(character);
     const mods = CharacterModEngine.getModifications(clientInventory.items);
 
+    // Extract equipped gear layers for remote rendering
+    const gearLayers = character.inventory
+      .filter((inv) => inv.item.type === 'GEAR' && inv.item.gearImageUrl && inv.equipped)
+      .map((inv) => ({
+        url: inv.item.gearImageUrl!,
+        subType: inv.item.subType as any,
+      }));
+
     // Ensure client has latest authoritative inventory upon entering mine
     broadcastStatUpdate(characterId, { inventory: clientInventory });
 
+    const mode = payload?.mode ?? 'singleplayer';
     const engine = miningSessionManager.createSession(
       characterId,
       character.cityId,
       socket,
       payload?.forceNew,
       mods.miningSpeed,
+      mode,
+      character.name,
+      gearLayers,
     );
-    const sessionState = miningSessionManager.buildClientState(engine);
+    const sessionState = miningSessionManager.buildClientState(engine, characterId);
 
     console.log(
-      `[Mining] ${character.name} entered real-time mine simulation in city ${character.cityId} with speed ${mods.miningSpeed}${
+      `[Mining] ${character.name} entered real-time mine (${mode}) in city ${character.cityId} with speed ${mods.miningSpeed}${
         payload?.forceNew ? ' (fresh session)' : ''
       }`,
     );
@@ -104,7 +116,7 @@ export const handleMiningInput = async (
   if (!engine) return { success: false, error: 'No active mining session.' };
 
   if (payload.input) {
-    engine.handleInput(payload.input);
+    engine.handleInput(characterId, payload.input);
   }
 
   return { success: true };
@@ -127,15 +139,17 @@ export const handleMiningInteract = async (
 
   if (!payload.target) return { success: false, error: 'Invalid target.' };
 
-  const started = engine.startMining(payload.target);
+  const started = engine.startMining(payload.target, characterId);
   if (!started) return { success: false, error: 'Cannot mine target block.' };
+
+  const session = engine.getPlayer(characterId);
 
   return {
     success: true,
     data: {
-      isMining: engine.isMining,
-      miningTarget: engine.miningTarget,
-      miningTimeMs: engine.miningTimeMs,
+      isMining: session?.isMining ?? engine.isMining,
+      miningTarget: session?.miningTarget ?? engine.miningTarget,
+      miningTimeMs: session?.miningTimeMs ?? engine.miningTimeMs,
     },
   };
 };
@@ -175,7 +189,7 @@ export const handleMiningPlaceLadder = async (
   }
 
   // 2. Validate and place in engine
-  const placed = engine.placeLadder(payload.target);
+  const placed = engine.placeLadder(payload.target, characterId);
   if (!placed) return { success: false, error: 'Cannot place ladder here.' };
 
   // 3. Deduct ladder from inventory
@@ -252,7 +266,7 @@ export const handleMiningPlaceTorch = async (
   }
 
   // 2. Validate and place in engine (checks bounds, revealed, <= 1 tile distance)
-  const placed = engine.placeTorch(payload.target);
+  const placed = engine.placeTorch(payload.target, characterId);
   if (!placed) {
     return { success: false, error: 'Cannot place torch here (must be within 1 tile on an empty revealed space).' };
   }

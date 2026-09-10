@@ -12,6 +12,8 @@ interface MiningHUDProps {
   isRestarting?: boolean;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
+  showDebug?: boolean;
+  onToggleDebug?: () => void;
 }
 
 export const MiningHUD: React.FC<MiningHUDProps> = ({
@@ -23,6 +25,8 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
   isRestarting = false,
   zoom = 1.0,
   onZoomChange,
+  showDebug = false,
+  onToggleDebug,
 }) => {
   const [miningProgress, setMiningProgress] = useState(0);
 
@@ -79,9 +83,26 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
               <span>City: {playerState.cityId}</span>
               <span>Vision: {sessionState.visionRange}</span>
             </div>
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mt-0.5">
+              <span className={`px-2 py-0.5 rounded ${
+                sessionState.gameMode === 'multiplayer'
+                  ? 'bg-cyan-950/80 border border-cyan-500/40 text-cyan-300'
+                  : 'bg-slate-800 text-slate-300'
+              }`}>
+                {sessionState.gameMode === 'multiplayer'
+                  ? `👥 Multiplayer (${(sessionState.otherPlayers?.length ?? 0) + 1} Miners)`
+                  : '⛏️ Solo Mine'}
+              </span>
+            </div>
             {sessionState.isMining && (
               <div className="text-[10px] text-amber-400 font-black animate-pulse uppercase tracking-wider mt-1">
                 ⛏️ Excavating block...
+              </div>
+            )}
+            {showDebug && (
+              <div className="flex items-center justify-between text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950/60 border border-emerald-500/40 rounded px-2 py-0.5 mt-1">
+                <span>Pos: ({sessionState.position.x}, {sessionState.position.y})</span>
+                <span>Reach: {MINING_CONFIG.PLAYER_MINING_REACH}</span>
               </div>
             )}
           </div>
@@ -92,20 +113,38 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
           )}
         </div>
 
-        {/* Top Right: Refresh Button & Health/Stamina Panel */}
+        {/* Top Right: Debug Button, Refresh Button & Health/Stamina Panel */}
         <div className="flex flex-col items-end gap-2.5 pointer-events-auto">
-          {/* Refresh New Game Button */}
-          <button
-            onClick={onRestart}
-            disabled={isRestarting}
-            className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-900/90 hover:bg-slate-800 border border-amber-500/50 hover:border-amber-400 text-amber-400 hover:text-amber-300 rounded-xl text-[11px] font-black uppercase tracking-widest cursor-pointer transition-all active:scale-95 shadow-xl backdrop-blur-md hover:shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed group"
-            title="Force reload into a brand new mining game"
-          >
-            <span className={`text-xs ${isRestarting ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-300'}`}>
-              🔄
-            </span>
-            <span>{isRestarting ? 'Generating...' : 'Refresh Mine'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Debug Mode Toggle Button */}
+            {onToggleDebug && (
+              <button
+                onClick={onToggleDebug}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest cursor-pointer transition-all active:scale-95 shadow-xl backdrop-blur-md border ${
+                  showDebug
+                    ? 'bg-emerald-950/90 border-emerald-500 text-emerald-400 hover:bg-emerald-900 shadow-emerald-500/20'
+                    : 'bg-slate-900/90 border-slate-700/80 text-slate-400 hover:text-slate-200 hover:border-slate-500 hover:bg-slate-800'
+                }`}
+                title="Toggle Debug Hitboxes & Reach Overlays (or press B)"
+              >
+                <span>{showDebug ? '🟢' : '⚪'}</span>
+                <span>{showDebug ? 'Hitboxes ON' : 'Hitboxes'}</span>
+              </button>
+            )}
+
+            {/* Refresh New Game Button */}
+            <button
+              onClick={onRestart}
+              disabled={isRestarting}
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-900/90 hover:bg-slate-800 border border-amber-500/50 hover:border-amber-400 text-amber-400 hover:text-amber-300 rounded-xl text-[11px] font-black uppercase tracking-widest cursor-pointer transition-all active:scale-95 shadow-xl backdrop-blur-md hover:shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed group"
+              title="Force reload into a brand new mining game"
+            >
+              <span className={`text-xs ${isRestarting ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-300'}`}>
+                🔄
+              </span>
+              <span>{isRestarting ? 'Generating...' : 'Refresh Mine'}</span>
+            </button>
+          </div>
 
           {/* Health & Stamina Panel */}
           <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 shadow-2xl backdrop-blur-md flex flex-col gap-3 w-72">
@@ -193,6 +232,11 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
             <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">F</kbd>
               <span>Flashlight</span>
+            </span>
+            <span className="text-slate-700">|</span>
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">B</kbd>
+              <span className={showDebug ? 'text-emerald-400 font-bold' : ''}>Hitboxes</span>
             </span>
             <span className="text-slate-700">|</span>
             <span>Exit at ({MINING_CONFIG.ENTRANCE_X}, {MINING_CONFIG.ENTRANCE_Y})</span>

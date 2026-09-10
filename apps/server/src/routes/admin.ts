@@ -10,6 +10,7 @@ import * as CharacterController from '../controllers/admin/character.controller'
 import * as CharacterLevelController from '../controllers/admin/character-level.controller';
 import * as EffectController from '../controllers/admin/effect.controller';
 import * as BlockController from '../controllers/admin/block.controller';
+import * as MiningConfigController from '../controllers/admin/miningConfig.controller';
 import * as AdminValidation from '../validations/admin.validation';
 
 const adminRouter = express.Router();
@@ -85,5 +86,11 @@ adminRouter.get('/blocks', BlockController.getBlocks);
 adminRouter.get('/blocks/:id', BlockController.getBlock);
 adminRouter.put('/blocks/:id', BlockController.updateBlock);
 adminRouter.post('/blocks/:id/texture', BlockController.blockTextureUpload, BlockController.uploadBlockTexture);
+
+// MINING CONFIG
+adminRouter.get('/mining-config', MiningConfigController.getMiningConfig);
+adminRouter.put('/mining-config', runValidation(AdminValidation.miningConfigValidation), MiningConfigController.updateMiningConfig);
+adminRouter.post('/mining-config/preview', MiningConfigController.generateMapPreview);
+adminRouter.post('/mining-config/reset', MiningConfigController.resetMiningConfig);
 
 export { adminRouter };

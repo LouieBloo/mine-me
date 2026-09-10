@@ -1,4 +1,4 @@
-import { MiningTileType, MINING_CONFIG, type MiningClientTile, type MiningPosition, type Vector2D } from '@mine-me/shared';
+import { MiningTileType, MINING_CONFIG, canPlaceBuildable, type MiningClientTile, type MiningPosition, type Vector2D } from '@mine-me/shared';
 
 export interface ReticleStyle {
   color: number;
@@ -39,13 +39,11 @@ export class TorchPlacementAction implements IMouseAction {
    */
   public canExecute(target: MiningPosition, playerPos: Vector2D, grid: MiningClientTile[][]): boolean {
     if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') {
-      console.log('[TorchPlacementAction] Invalid target coordinates:', target);
       return false;
     }
 
     // Check bounds
     if (target.y < 0 || target.y >= grid.length || target.x < 0 || target.x >= (grid[0]?.length || 0)) {
-      console.log('[TorchPlacementAction] Target out of grid bounds:', target);
       return false;
     }
 
@@ -56,33 +54,22 @@ export class TorchPlacementAction implements IMouseAction {
     const dy = Math.abs(tileCenterY - playerPos.y);
 
     if (dx > MINING_CONFIG.TORCH_PLACEMENT_REACH || dy > MINING_CONFIG.TORCH_PLACEMENT_REACH) {
-      console.log('[TorchPlacementAction] Target tile is out of reach (max reach allowed):', {
-        target,
-        playerPos,
-        dx,
-        dy,
-        maxReach: MINING_CONFIG.TORCH_PLACEMENT_REACH,
-      });
       return false;
     }
 
     const tile = grid[target.y][target.x];
     if (!tile || !tile.revealed) {
-      console.log('[TorchPlacementAction] Target tile is unrevealed or undefined:', tile);
       return false;
     }
 
-    if (tile.type === MiningTileType.ENTRANCE || tile.type === MiningTileType.TORCH) {
-      console.log('[TorchPlacementAction] Target tile type is invalid for placement:', tile.type);
+    if (!canPlaceBuildable(MiningTileType.TORCH, tile.type)) {
       return false;
     }
 
-    console.log('[TorchPlacementAction] Valid target tile for torch placement:', target);
     return true;
   }
 
   public async execute(target: MiningPosition, _playerPos?: Vector2D): Promise<boolean> {
-    console.log('[TorchPlacementAction] Executing torch placement on server event:', target);
     return this.onPlace(target);
   }
 
@@ -150,7 +137,7 @@ export class LadderPlacementAction implements IMouseAction {
       return false;
     }
 
-    if (tile.type === MiningTileType.ENTRANCE || tile.type === MiningTileType.LADDER) {
+    if (!canPlaceBuildable(MiningTileType.LADDER, tile.type)) {
       return false;
     }
 

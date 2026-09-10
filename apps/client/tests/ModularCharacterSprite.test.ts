@@ -176,14 +176,19 @@ describe('ModularCharacterSprite', () => {
     expect(sprite.getState()).toBe('idle');
   });
 
-  it('should automatically toggle walk state when moving velocity is applied', () => {
+  it('should automatically toggle walk state when moving velocity is applied with consistent stride multiplier', () => {
     const sprite = new ModularCharacterSprite(parentContainer);
 
     sprite.setMoveVelocity(1.5, 0);
     expect(sprite.getState()).toBe('walk');
+    expect(sprite.getWalkSpeedMultiplier()).toBe(1.0);
 
     sprite.setMoveVelocity(0, 0);
     expect(sprite.getState()).toBe('idle');
+    expect(sprite.getWalkSpeedMultiplier()).toBe(1.0);
+
+    sprite.setWalkSpeedMultiplier(1.2);
+    expect(sprite.getWalkSpeedMultiplier()).toBe(1.2);
   });
 
   it('should update joint transforms on update frame tick', async () => {

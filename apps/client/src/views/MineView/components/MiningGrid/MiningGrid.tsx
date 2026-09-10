@@ -7,7 +7,7 @@ import type {
   MiningStateTickPayload,
   Vector2D,
 } from '@mine-me/shared';
-import { MiningTileType, MINING_CONFIG, getAssetUrl } from '@mine-me/shared';
+import { MiningTileType, MINING_CONFIG, getAssetUrl, canTileBeDamaged } from '@mine-me/shared';
 import { PointLight } from '../../../../components/game/lighting/PointLight';
 import { useSocket } from '../../../../contexts/SocketContext';
 import { notificationService } from '../../../../services/notificationService';
@@ -31,6 +31,8 @@ interface MiningGridProps {
   onTorchPlaced?: () => void;
   isPlacingLadder?: boolean;
   onLadderPlaced?: () => void;
+  showDebug?: boolean;
+  onToggleDebug?: () => void;
 }
 
 export const MiningGrid: React.FC<MiningGridProps> = ({
@@ -43,6 +45,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onTorchPlaced,
   isPlacingLadder = false,
   onLadderPlaced,
+  showDebug,
+  onToggleDebug,
 }) => {
   const { app } = usePixiStage();
   const { onEvent, sendGameEvent } = useSocket();
@@ -55,7 +59,14 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   // Direction and Debug state references
   const isFacingLeftRef = useRef<boolean>(false);
   const playerFacingDirRef = useRef<Vector2D>({ x: 1, y: 0 });
-  const showDebugRef = useRef<boolean>(false);
+  const showDebugRef = useRef<boolean>(showDebug ?? false);
+
+  // Synchronize showDebug prop with internal ref
+  useEffect(() => {
+    if (showDebug !== undefined) {
+      showDebugRef.current = showDebug;
+    }
+  }, [showDebug]);
   const activeFallingRocksRef = useRef<{ id: string; x: number; y: number }[]>([]);
 
   // Smooth rendering lerp position references
@@ -97,6 +108,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     droppedSpritesMap,
     fallingRockGraphicsMap,
     playerSpriteRef,
+    remotePlayerRendererRef,
     lightingEngineRef,
     flashlightRef,
   } = useMiningScene({
@@ -129,14 +141,11 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   // Configure Active Mouse Action (Torch or Ladder Placement)
   useEffect(() => {
     const mouseController = mouseControllerRef.current;
-    console.log('[MiningGrid] placement states changed:', { isPlacingTorch, isPlacingLadder });
     if (isPlacingTorch) {
       mouseController.setActiveAction(
         new TorchPlacementAction(async (target) => {
-          console.log('[MiningGrid] Dispatching mining_place_torch event to server for target:', target);
           try {
             const res = await sendGameEvent({ type: 'mining_place_torch', target });
-            console.log('[MiningGrid] mining_place_torch response from server:', res);
             if (res.success) {
               onTorchPlaced?.();
               return true;
@@ -154,10 +163,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     } else if (isPlacingLadder) {
       mouseController.setActiveAction(
         new LadderPlacementAction(async (target) => {
-          console.log('[MiningGrid] Dispatching mining_place_ladder event to server for target:', target);
           try {
             const res = await sendGameEvent({ type: 'mining_place_ladder', target });
-            console.log('[MiningGrid] mining_place_ladder response from server:', res);
             if (res.success) {
               onLadderPlaced?.();
               return true;
@@ -183,6 +190,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     playerSpriteRef,
     flashlightRef,
     showDebugRef,
+    onToggleDebug,
     playerFacingDirRef,
     isFacingLeftRef,
     mouseControllerRef,
@@ -198,16 +206,22 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         ? payload.fallingRocks.map((r) => ({ id: r.id, x: r.position.x, y: r.position.y }))
         : [];
 
+      // Update remote players
+      if (remotePlayerRendererRef.current) {
+        remotePlayerRendererRef.current.updatePlayers(payload.otherPlayers);
+      }
+
       setSessionState((prev) => {
         let updatedGrid = prev.grid;
         if (payload.revealedTiles && payload.revealedTiles.length > 0) {
           updatedGrid = prev.grid.map((row) => row.map((tile) => ({ ...tile })));
           for (const rt of payload.revealedTiles) {
             if (updatedGrid[rt.y] && updatedGrid[rt.y][rt.x]) {
+              const canDamage = canTileBeDamaged(rt.type);
               updatedGrid[rt.y][rt.x] = {
                 type: rt.type,
                 revealed: true,
-                damageStage: rt.damageStage ?? updatedGrid[rt.y][rt.x].damageStage,
+                damageStage: canDamage ? (rt.damageStage ?? updatedGrid[rt.y][rt.x].damageStage ?? 0) : 0,
               };
             }
           }
@@ -225,6 +239,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           isMining: payload.isMining,
           miningTarget: payload.miningTarget,
           miningTimeMs: payload.miningProgressMs,
+          otherPlayers: payload.otherPlayers,
         };
       });
     });
@@ -233,6 +248,13 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       cleanup();
     };
   }, [onEvent]);
+
+  // Sync remote players when session state updates
+  useEffect(() => {
+    if (remotePlayerRendererRef.current && sessionState.otherPlayers) {
+      remotePlayerRendererRef.current.updatePlayers(sessionState.otherPlayers);
+    }
+  }, [sessionState.otherPlayers]);
 
   // Render Grid Tiles & Dynamic Tile Lighting
   useEffect(() => {
@@ -343,6 +365,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     isFacingLeftRef,
     playerFacingDirRef,
     playerSpriteRef,
+    remotePlayerRendererRef,
     activeFallingRocksRef,
     fallingRockGraphicsMap,
     reticleGraphicsRef,

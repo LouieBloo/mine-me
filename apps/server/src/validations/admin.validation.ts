@@ -30,6 +30,8 @@ export const itemValidation = [
   body('userSellPrice').isInt({ min: 0 }).withMessage('User Sell Price must be >= 0'),
   body('rarity').isIn(ITEM_RARITIES).withMessage(`Rarity must be one of: ${ITEM_RARITIES.join(', ')}`),
   body('isStartingPiece').optional().isBoolean().withMessage('isStartingPiece must be a boolean'),
+  body('canBeDamaged').optional().isBoolean().withMessage('canBeDamaged must be a boolean'),
+  body('canBeClimbed').optional().isBoolean().withMessage('canBeClimbed must be a boolean'),
   body('experience').optional().isInt({ min: 0 }).withMessage('Experience must be >= 0'),
   body('combatScore').optional().isInt({ min: 0 }).withMessage('Combat Score must be >= 0'),
   body('defenseScore').optional().isInt({ min: 0 }).withMessage('Defense Score must be >= 0')
@@ -73,4 +75,18 @@ export const effectValidation = [
   body('healthGain').optional().isBoolean().withMessage('healthGain must be a boolean'),
   body('staminaGain').optional().isBoolean().withMessage('staminaGain must be a boolean'),
   body('miningSpeedModifier').optional().isBoolean().withMessage('miningSpeedModifier must be a boolean')
+];
+
+export const miningConfigValidation = [
+  body('cavernDensity').optional().isInt({ min: 0, max: 100 }).withMessage('Cavern Density must be between 0 and 100'),
+  body('cavernIterations').optional().isInt({ min: 1, max: 6 }).withMessage('Cavern Iterations must be between 1 and 6'),
+  body('cavernMinDepth').optional().isInt({ min: 1, max: 20 }).withMessage('Cavern Min Depth must be between 1 and 20'),
+  body('tunnelCount').optional().isInt({ min: 0, max: 30 }).withMessage('Tunnel Count must be between 0 and 30'),
+  body('tunnelMinLength').optional().isInt({ min: 5, max: 100 }).withMessage('Tunnel Min Length must be between 5 and 100'),
+  body('tunnelMaxLength').optional().isInt({ min: 5, max: 150 }).withMessage('Tunnel Max Length must be between 5 and 150'),
+  body('tunnelWidth').optional().isInt({ min: 1, max: 3 }).withMessage('Tunnel Width must be between 1 and 3'),
+  body('tunnelMinDepth').optional().isInt({ min: 1, max: 20 }).withMessage('Tunnel Min Depth must be between 1 and 20'),
+  body('rockPercentage').optional().isInt({ min: 0, max: 50 }).withMessage('Rock Percentage must be between 0 and 50'),
+  body('mineralPercentage').optional().isInt({ min: 0, max: 50 }).withMessage('Mineral Percentage must be between 0 and 50'),
+  body('chestCount').optional().isInt({ min: 0, max: 20 }).withMessage('Chest Count must be between 0 and 20'),
 ];

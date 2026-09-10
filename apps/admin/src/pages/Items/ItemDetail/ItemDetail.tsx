@@ -21,7 +21,7 @@ export default function ItemDetail() {
 
   const [data, setData] = useState<any>(isNew ? {
     name: '', description: '', type: 'GEAR', subType: 'HEAD',
-    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', isStartingPiece: false, experience: 0,
+    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, experience: 0,
     combatScore: 0, defenseScore: 0, itemEffects: []
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
@@ -388,11 +388,49 @@ export default function ItemDetail() {
                   type="checkbox"
                   checked={data.isStartingPiece || false}
                   onChange={(e) => { setData({ ...data, isStartingPiece: e.target.checked }); if (errors.isStartingPiece) setErrors({ ...errors, isStartingPiece: '' }); }}
-                  className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
                 Is Starting Piece (Character Creator)
               </label>
               {errors.isStartingPiece && <p className="text-red-500 text-xs font-bold mt-1">{errors.isStartingPiece}</p>}
+            </div>
+
+            {/* World Interaction Toggles */}
+            <div className="space-y-3 md:col-span-2 pt-4 border-t border-slate-100">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">World & In-Game Properties</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="text-sm font-bold text-slate-700 cursor-pointer flex items-center bg-slate-50 hover:bg-slate-100/80 p-3.5 rounded-xl border border-slate-200 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={data.canBeDamaged || false}
+                    onChange={(e) => {
+                      setData({ ...data, canBeDamaged: e.target.checked });
+                      if (errors.canBeDamaged) setErrors({ ...errors, canBeDamaged: '' });
+                    }}
+                    className="w-5 h-5 mr-3 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                  />
+                  <div>
+                    <span className="block font-black text-xs uppercase tracking-wider text-slate-800">Can Be Damaged</span>
+                    <span className="block text-[11px] text-slate-500 font-normal">Shows crack overlays and breaks when damaged</span>
+                  </div>
+                </label>
+
+                <label className="text-sm font-bold text-slate-700 cursor-pointer flex items-center bg-slate-50 hover:bg-slate-100/80 p-3.5 rounded-xl border border-slate-200 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={data.canBeClimbed || false}
+                    onChange={(e) => {
+                      setData({ ...data, canBeClimbed: e.target.checked });
+                      if (errors.canBeClimbed) setErrors({ ...errors, canBeClimbed: '' });
+                    }}
+                    className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <div>
+                    <span className="block font-black text-xs uppercase tracking-wider text-slate-800">Can Be Climbed</span>
+                    <span className="block text-[11px] text-slate-500 font-normal">Allows player to climb vertically (like ladders)</span>
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
 

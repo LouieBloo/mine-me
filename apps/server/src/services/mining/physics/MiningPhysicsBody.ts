@@ -1,4 +1,4 @@
-import { MINING_CONFIG, MiningTileType, type Vector2D } from '@mine-me/shared';
+import { MINING_CONFIG, isTileSolid, type Vector2D } from '@mine-me/shared';
 import type { ServerMiningGrid } from '../../miningMap.service';
 import { isInBounds } from '../../miningMap.service';
 
@@ -75,14 +75,6 @@ export abstract class MiningPhysicsBody {
     targetX = Math.max(this.halfWidth, Math.min(MINING_CONFIG.GRID_WIDTH - this.halfWidth, targetX));
     targetY = Math.max(-50, Math.min(MINING_CONFIG.GRID_HEIGHT - this.halfHeight, targetY));
 
-    // Horizontal Movement test
-    if (!this.checkTileCollision(targetX, this.position.y, grid)) {
-      this.position.x = targetX;
-    } else {
-      this.onCollideX();
-      this.velocity.x = 0;
-    }
-
     // Vertical Movement test
     if (!this.checkTileCollision(this.position.x, targetY, grid)) {
       this.position.y = targetY;
@@ -101,6 +93,14 @@ export abstract class MiningPhysicsBody {
         this.onCeilingHit();
       }
       this.velocity.y = 0;
+    }
+
+    // Horizontal Movement test
+    if (!this.checkTileCollision(targetX, this.position.y, grid)) {
+      this.position.x = targetX;
+    } else {
+      this.onCollideX();
+      this.velocity.x = 0;
     }
   }
 
@@ -123,13 +123,7 @@ export abstract class MiningPhysicsBody {
         if (ty < 0) continue;
 
         const tile = grid[ty][tx];
-        if (
-          tile &&
-          tile.type !== MiningTileType.EMPTY &&
-          tile.type !== MiningTileType.ENTRANCE &&
-          tile.type !== MiningTileType.LADDER &&
-          tile.type !== MiningTileType.TORCH
-        ) {
+        if (tile && isTileSolid(tile.type)) {
           return true;
         }
       }
