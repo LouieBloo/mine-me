@@ -8,3 +8,4 @@ export * from './utils/stamina';
 export * from './utils/url';
 export * from './physics/MiningPhysicsBody';
 export * from './physics/MiningPlayerBody';
+export * from './utils/pixiParticlesConverter';

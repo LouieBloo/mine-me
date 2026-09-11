@@ -19,6 +19,8 @@ export interface ActiveParticle {
   gravityX: number;
   gravityY: number;
   friction: number;
+  turbulence: number;
+  phase: number;
   active: boolean;
 }
 
@@ -111,9 +113,22 @@ export class ParticleEngine {
         case 'circle':
           g.circle(8, 8, 7).fill(0xffffff);
           break;
+        case 'flame':
+          g.ellipse(8, 11, 6, 7).fill({ color: 0xffffff, alpha: 0.85 });
+          g.poly([
+            { x: 2, y: 11 },
+            { x: 8, y: 0 },
+            { x: 14, y: 11 },
+          ]).fill({ color: 0xffffff, alpha: 0.95 });
+          g.circle(8, 11, 3.5).fill({ color: 0xffffff, alpha: 1.0 });
+          break;
+        case 'crumb':
+          g.circle(4, 4, 3.2).fill({ color: 0xffffff, alpha: 0.95 });
+          g.circle(3, 3, 1.6).fill({ color: 0xffffff, alpha: 0.8 });
+          break;
         case 'square':
         case 'pixel':
-          g.rect(2, 2, 12, 12).fill(0xffffff);
+          g.rect(0, 0, 4, 4).fill(0xffffff);
           break;
         case 'spark':
           g.poly([
@@ -183,6 +198,8 @@ export class ParticleEngine {
         gravityX: 0,
         gravityY: 0,
         friction: 1.0,
+        turbulence: 0,
+        phase: 0,
         active: false,
       };
       this.pool.push(p);
@@ -190,7 +207,13 @@ export class ParticleEngine {
       p.sprite.texture = texture;
     }
 
-    // Compute spawn offset
+    // Blend Mode
+    p.sprite.blendMode = (config.blendMode as any) || 'normal';
+
+    // Compute spawn offset (including configured effect offset)
+    const baseOriginX = origin.x + (config.offset?.x || 0);
+    const baseOriginY = origin.y + (config.offset?.y || 0);
+
     let offsetX = 0;
     let offsetY = 0;
     if (config.spawnRadius && config.spawnRadius > 0) {
@@ -205,9 +228,11 @@ export class ParticleEngine {
       offsetY = (Math.random() - 0.5) * h;
     }
 
-    p.x = origin.x + offsetX;
-    p.y = origin.y + offsetY;
+    p.x = baseOriginX + offsetX;
+    p.y = baseOriginY + offsetY;
     p.life = 0;
+    p.turbulence = config.turbulence || 0;
+    p.phase = Math.random() * Math.PI * 2;
 
     const lifetimeMin = config.lifetime?.min ?? 0.5;
     const lifetimeMax = config.lifetime?.max ?? 1.0;
@@ -365,6 +390,10 @@ export class ParticleEngine {
 
       p.x += p.vx * deltaSec;
       p.y += p.vy * deltaSec;
+
+      if (p.turbulence !== 0) {
+        p.x += Math.sin(p.life * 14 + p.phase) * p.turbulence * deltaSec;
+      }
 
       p.sprite.x = p.x;
       p.sprite.y = p.y;

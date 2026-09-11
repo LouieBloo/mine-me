@@ -91,6 +91,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   }, [showDebug]);
 
   const activeFallingRocksRef = useRef<{ id: string; x: number; y: number }[]>([]);
+  const lastDamageParticleTimeRef = useRef<Map<string, number>>(new Map());
 
   // Smooth rendering lerp position references
   const currentRenderPosRef = useRef<Vector2D>({
@@ -283,9 +284,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
               lightingEngine.addLight(
                 new PointLight(
                   torchLightId,
-                  { x: x + 0.5, y: y + 0.75 },
+                  { x: x + 0.446, y: y + 0.35 },
                   0xf59e0b,
-                  1.2,
+                  1.25,
                   MINING_CONFIG.TORCH_RADIUS,
                   {
                     flicker: {
@@ -299,7 +300,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
             if (particleEngineRef.current && !torchEmittersRef.current.has(torchLightId)) {
               const emitter = particleEngineRef.current.addEmitter(
                 DEFAULT_PARTICLE_EFFECTS.torch_flame,
-                { x: (x + 0.5) * TILE_SIZE, y: (y + 0.65) * TILE_SIZE }
+                { x: (x + 0.446) * TILE_SIZE, y: (y + 0.28) * TILE_SIZE }
               );
               torchEmittersRef.current.set(torchLightId, emitter);
             }
@@ -328,18 +329,62 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       // Incremental Tile Updates
       if (payload.revealedTiles && payload.revealedTiles.length > 0) {
         const grid = gridRef.current;
+        const now = performance.now();
+
+        // Helper to locate hit position, prioritizing the user's cursor if targeted
+        const getHitPosition = (tileX: number, tileY: number) => {
+          const mouseController = mouseControllerRef.current;
+          if (mouseController) {
+            const worldMouse = mouseController.getWorldMousePosition();
+            const hoveredTile = mouseController.getHoveredTile();
+            const miningTarget = miningTargetRef.current;
+            const isTargetingThis =
+              (hoveredTile && hoveredTile.x === tileX && hoveredTile.y === tileY) ||
+              (miningTarget && miningTarget.x === tileX && miningTarget.y === tileY);
+
+            if (worldMouse && isTargetingThis) {
+              // Clamp tightly inside tile boundaries so particles originate exactly where cursor strikes
+              const minX = tileX * TILE_SIZE + 2;
+              const maxX = (tileX + 1) * TILE_SIZE - 2;
+              const minY = tileY * TILE_SIZE + 2;
+              const maxY = (tileY + 1) * TILE_SIZE - 2;
+              return {
+                x: Math.max(minX, Math.min(maxX, worldMouse.x)),
+                y: Math.max(minY, Math.min(maxY, worldMouse.y)),
+              };
+            }
+          }
+          return { x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
+        };
+
         for (const rt of payload.revealedTiles) {
           const prevTile = grid[rt.y]?.[rt.x];
           if (prevTile) {
-            // Trigger particle effects for block damage or block excavation
             const wasDamaged = rt.damageStage !== undefined && rt.damageStage > (prevTile.damageStage || 0);
             const wasDestroyed = prevTile.type !== MiningTileType.EMPTY && rt.type === MiningTileType.EMPTY;
-            if ((wasDamaged || wasDestroyed) && particleEngineRef.current) {
-              const hitPos = { x: (rt.x + 0.5) * TILE_SIZE, y: (rt.y + 0.5) * TILE_SIZE };
-              if (prevTile.type === MiningTileType.MINERAL) {
-                particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
-              } else {
-                particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_hit, hitPos);
+            const tileKey = `${rt.x},${rt.y}`;
+
+            if (particleEngineRef.current) {
+              const hitPos = getHitPosition(rt.x, rt.y);
+              if (wasDestroyed) {
+                // Block broke completely: trigger full break crumble
+                lastDamageParticleTimeRef.current.delete(tileKey);
+                if (prevTile.type === MiningTileType.MINERAL) {
+                  particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
+                } else {
+                  particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_hit, hitPos);
+                }
+              } else if (wasDamaged) {
+                // Block took damage: throttle intermediate chipping to avoid explosive multi-bursts (~4 Hz)
+                const lastTime = lastDamageParticleTimeRef.current.get(tileKey) || 0;
+                if (now - lastTime >= 240) {
+                  lastDamageParticleTimeRef.current.set(tileKey, now);
+                  if (prevTile.type === MiningTileType.MINERAL) {
+                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
+                  } else {
+                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_chip, hitPos);
+                  }
+                }
               }
             }
 
@@ -424,9 +469,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
                 lightingEngine.addLight(
                   new PointLight(
                     torchLightId,
-                    { x: x + 0.5, y: y + 0.75 },
+                    { x: x + 0.446, y: y + 0.35 },
                     0xf59e0b,
-                    1.2,
+                    1.25,
                     MINING_CONFIG.TORCH_RADIUS,
                     {
                       flicker: {
@@ -440,7 +485,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
               if (particleEngineRef.current && !torchEmittersRef.current.has(torchLightId)) {
                 const emitter = particleEngineRef.current.addEmitter(
                   DEFAULT_PARTICLE_EFFECTS.torch_flame,
-                  { x: (x + 0.5) * TILE_SIZE, y: (y + 0.65) * TILE_SIZE }
+                  { x: (x + 0.446) * TILE_SIZE, y: (y + 0.28) * TILE_SIZE }
                 );
                 torchEmittersRef.current.set(torchLightId, emitter);
               }

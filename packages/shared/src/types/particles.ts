@@ -1,6 +1,6 @@
 export type ParticleEmitterType = 'continuous' | 'burst';
 
-export type ParticleShape = 'circle' | 'square' | 'spark' | 'smoke' | 'pixel';
+export type ParticleShape = 'circle' | 'square' | 'spark' | 'smoke' | 'pixel' | 'flame' | 'crumb';
 
 export interface ParticleEffectConfig {
   emitterType: ParticleEmitterType;
@@ -29,6 +29,8 @@ export interface ParticleEffectConfig {
   blendMode?: 'normal' | 'add' | 'screen' | 'multiply';
   shape?: ParticleShape;
   textureUrl?: string; // Optional custom sprite texture
+  offset?: { x: number; y: number }; // Relative/pixel offset from anchor coordinate
+  turbulence?: number; // Horizontal organic flutter/wobble
   spawnRadius?: number; // Optional radial dispersion from emitter center
   spawnWidth?: number; // Optional rectangular dispersion width
   spawnHeight?: number; // Optional rectangular dispersion height

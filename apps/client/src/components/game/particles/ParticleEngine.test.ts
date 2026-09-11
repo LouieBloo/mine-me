@@ -147,6 +147,35 @@ describe('ParticleEngine', () => {
     expect(engine.getActiveParticleCount()).toBe(0);
   });
 
+  it('should retrieve shape textures including crumb and flame', () => {
+    const crumbTex = engine.getShapeTexture('crumb');
+    expect(crumbTex).toBeDefined();
+
+    const flameTex = engine.getShapeTexture('flame');
+    expect(flameTex).toBeDefined();
+
+    const pixelTex = engine.getShapeTexture('pixel');
+    expect(pixelTex).toBeDefined();
+  });
+
+  it('should spawn crumb burst with organic particles', () => {
+    const crumbConfig: ParticleEffectConfig = {
+      emitterType: 'burst',
+      shape: 'crumb',
+      burstCount: 6,
+      lifetime: { min: 0.3, max: 0.6 },
+      speed: { min: 20, max: 50 },
+      angle: { min: 200, max: 340 },
+      gravity: { x: 0, y: 150 },
+      scale: { start: 0.6, end: 0.1 },
+      color: { start: '#9a5823', end: '#3f1d0b' },
+      alpha: { start: 1, end: 0 },
+    };
+
+    engine.spawnBurst(crumbConfig, { x: 32, y: 64 });
+    expect(engine.getActiveParticleCount()).toBe(6);
+  });
+
   it('should destroy all sprites and textures cleanly', () => {
     engine.spawnBurst(burstConfig, { x: 0, y: 0 });
     engine.destroy();

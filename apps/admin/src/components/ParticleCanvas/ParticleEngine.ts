@@ -19,6 +19,8 @@ export interface ActiveParticle {
   gravityX: number;
   gravityY: number;
   friction: number;
+  turbulence: number;
+  phase: number;
   active: boolean;
 }
 
@@ -34,6 +36,7 @@ export interface EmitterHandle {
   destroy: () => void;
 }
 
+// Color parsing helper
 export function parseColor(c: string | number): { r: number; g: number; b: number } {
   if (typeof c === 'number') {
     return {
@@ -91,12 +94,16 @@ export class ParticleEngine {
     return this.emitters.size;
   }
 
+  /**
+   * Generates or retrieves a cached procedural texture for standard particle shapes.
+   */
   public getShapeTexture(shape: ParticleShape = 'circle'): Texture {
     if (this.textureCache.has(shape)) {
       return this.textureCache.get(shape)!;
     }
 
     if (!this.renderer) {
+      // Fallback to White Texture if no WebGL/WebGPU renderer available (e.g. testing)
       return Texture.WHITE;
     }
 
@@ -106,9 +113,22 @@ export class ParticleEngine {
         case 'circle':
           g.circle(8, 8, 7).fill(0xffffff);
           break;
+        case 'flame':
+          g.ellipse(8, 11, 6, 7).fill({ color: 0xffffff, alpha: 0.85 });
+          g.poly([
+            { x: 2, y: 11 },
+            { x: 8, y: 0 },
+            { x: 14, y: 11 },
+          ]).fill({ color: 0xffffff, alpha: 0.95 });
+          g.circle(8, 11, 3.5).fill({ color: 0xffffff, alpha: 1.0 });
+          break;
+        case 'crumb':
+          g.circle(4, 4, 3.2).fill({ color: 0xffffff, alpha: 0.95 });
+          g.circle(3, 3, 1.6).fill({ color: 0xffffff, alpha: 0.8 });
+          break;
         case 'square':
         case 'pixel':
-          g.rect(2, 2, 12, 12).fill(0xffffff);
+          g.rect(0, 0, 4, 4).fill(0xffffff);
           break;
         case 'spark':
           g.poly([
@@ -136,6 +156,9 @@ export class ParticleEngine {
     }
   }
 
+  /**
+   * Spawns a single particle instance from the pool.
+   */
   private spawnParticle(
     config: ParticleEffectConfig,
     origin: { x: number; y: number },
@@ -175,12 +198,21 @@ export class ParticleEngine {
         gravityX: 0,
         gravityY: 0,
         friction: 1.0,
+        turbulence: 0,
+        phase: 0,
         active: false,
       };
       this.pool.push(p);
     } else {
       p.sprite.texture = texture;
     }
+
+    // Blend Mode
+    p.sprite.blendMode = (config.blendMode as any) || 'normal';
+
+    // Compute spawn offset (including configured effect offset)
+    const baseOriginX = origin.x + (config.offset?.x || 0);
+    const baseOriginY = origin.y + (config.offset?.y || 0);
 
     let offsetX = 0;
     let offsetY = 0;
@@ -196,9 +228,11 @@ export class ParticleEngine {
       offsetY = (Math.random() - 0.5) * h;
     }
 
-    p.x = origin.x + offsetX;
-    p.y = origin.y + offsetY;
+    p.x = baseOriginX + offsetX;
+    p.y = baseOriginY + offsetY;
     p.life = 0;
+    p.turbulence = config.turbulence || 0;
+    p.phase = Math.random() * Math.PI * 2;
 
     const lifetimeMin = config.lifetime?.min ?? 0.5;
     const lifetimeMax = config.lifetime?.max ?? 1.0;
@@ -246,6 +280,9 @@ export class ParticleEngine {
     return p;
   }
 
+  /**
+   * Spawns an immediate one-shot burst of particles (e.g. block strike, explosion).
+   */
   public spawnBurst(config: ParticleEffectConfig, position: { x: number; y: number }): void {
     const count = config.burstCount || 12;
     const texture = this.getShapeTexture(config.shape);
@@ -254,6 +291,9 @@ export class ParticleEngine {
     }
   }
 
+  /**
+   * Registers a persistent emitter (e.g. torch flame, magic aura) that continuously spawns particles.
+   */
   public addEmitter(config: ParticleEffectConfig, initialPosition: { x: number; y: number }): EmitterHandle {
     const id = `emitter_${this.nextEmitterId++}`;
     const handle: EmitterHandle = {
@@ -280,6 +320,9 @@ export class ParticleEngine {
     return handle;
   }
 
+  /**
+   * Removes all active emitters and resets particles.
+   */
   public clear(): void {
     this.emitters.clear();
     for (const p of this.pool) {
@@ -289,6 +332,10 @@ export class ParticleEngine {
     this.activeCount = 0;
   }
 
+  /**
+   * Main per-frame update loop. Call this on each frame (ticker loop).
+   * @param deltaSec delta time in seconds (e.g. 1/60 ~ 0.0166)
+   */
   public update(deltaSec: number): void {
     // 1. Process active continuous emitters
     this.emitters.forEach((emitter, id) => {
@@ -332,6 +379,7 @@ export class ParticleEngine {
       activeTracker++;
       const progress = p.life / p.maxLife;
 
+      // Apply physics
       p.vx += p.gravityX * deltaSec;
       p.vy += p.gravityY * deltaSec;
       if (p.friction < 1.0) {
@@ -343,19 +391,27 @@ export class ParticleEngine {
       p.x += p.vx * deltaSec;
       p.y += p.vy * deltaSec;
 
+      if (p.turbulence !== 0) {
+        p.x += Math.sin(p.life * 14 + p.phase) * p.turbulence * deltaSec;
+      }
+
       p.sprite.x = p.x;
       p.sprite.y = p.y;
 
+      // Alpha fade
       p.sprite.alpha = lerp(p.startAlpha, p.endAlpha, progress);
 
+      // Scale transition
       const s = lerp(p.startScale, p.endScale, progress);
       p.sprite.scale.set(Math.max(0.01, s));
 
+      // Color lerp
       const r = lerp(p.startColor.r, p.endColor.r, progress);
       const g = lerp(p.startColor.g, p.endColor.g, progress);
       const b = lerp(p.startColor.b, p.endColor.b, progress);
       p.sprite.tint = rgbToHex(r, g, b);
 
+      // Rotation
       if (p.rotationSpeed !== 0) {
         p.sprite.rotation += p.rotationSpeed * deltaSec;
       }
@@ -364,6 +420,9 @@ export class ParticleEngine {
     this.activeCount = activeTracker;
   }
 
+  /**
+   * Cleans up all resources, textures, and sprites.
+   */
   public destroy(): void {
     this.clear();
     for (const p of this.pool) {
