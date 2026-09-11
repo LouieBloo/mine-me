@@ -1,0 +1,11 @@
+.particle-detail-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.particle-json-textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  tab-size: 2;
+}

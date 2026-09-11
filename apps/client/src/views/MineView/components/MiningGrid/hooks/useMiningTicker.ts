@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
-import type { Application, Container, Graphics } from 'pixi.js';
+import type { Application, Container, Graphics, Texture } from 'pixi.js';
 import type { ModularCharacterSprite } from '../../../../../components/game/sprites';
 import type { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
-import { MINING_CONFIG, type Vector2D, type MiningSessionClientState, type MiningClientTile, type MiningInputState, type MiningPosition, MiningPlayerBody } from '@mine-me/shared';
+import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
+import { MINING_CONFIG, type Vector2D, type MiningSessionClientState, type MiningClientTile, type MiningInputState, type MiningPosition, MiningPlayerBody, MiningTileType } from '@mine-me/shared';
 import { MiningEntityRenderer, type ActiveFallingRock } from '../renderers/MiningEntityRenderer';
 import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
 import { miningProfiler } from '../utils/MiningProfiler';
@@ -32,11 +33,13 @@ export interface UseMiningTickerOptions {
   flashlightRef: React.RefObject<SpotLight | null>;
   lightingEngineRef: React.RefObject<LightingEngine | null>;
   cameraRef: React.RefObject<Camera2D | null>;
+  particleEngineRef?: React.RefObject<ParticleEngine | null>;
   playerBodyRef?: React.MutableRefObject<MiningPlayerBody | null>;
   gridRef?: React.MutableRefObject<MiningClientTile[][]>;
   keysPressedRef?: React.MutableRefObject<MiningInputState>;
   isMiningRef?: React.MutableRefObject<boolean>;
   miningTargetRef?: React.MutableRefObject<MiningPosition | null>;
+  blockTexturesRef?: React.MutableRefObject<Map<number, Texture>>;
   sessionState?: MiningSessionClientState;
 }
 
@@ -60,11 +63,13 @@ export function useMiningTicker({
   flashlightRef,
   lightingEngineRef,
   cameraRef,
+  particleEngineRef,
   playerBodyRef,
   gridRef,
   keysPressedRef,
   isMiningRef,
   miningTargetRef,
+  blockTexturesRef,
   sessionState,
 }: UseMiningTickerOptions) {
   const animTimeRef = useRef<number>(0);
@@ -309,9 +314,11 @@ export function useMiningTicker({
           if (reticleState.style.showPreview) {
             const previewGlow = 0.7 + Math.sin(animTime * 8) * 0.2;
             if (reticleState.style.previewType === 'LADDER') {
-              MiningTileRenderer.drawLadder(reticleGraphics, TILE_SIZE, previewGlow, rx, ry);
+              const ladderTex = blockTexturesRef?.current?.get(MiningTileType.LADDER);
+              MiningTileRenderer.drawLadder(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, ladderTex);
             } else {
-              MiningTileRenderer.drawTorch(reticleGraphics, TILE_SIZE, previewGlow, rx, ry);
+              const torchTex = blockTexturesRef?.current?.get(MiningTileType.TORCH);
+              MiningTileRenderer.drawTorch(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, torchTex);
             }
           }
         }
@@ -379,6 +386,10 @@ export function useMiningTicker({
 
       // Update and re-render lighting engine lightmap
       lightingEngineRef.current?.update(dt, currentPos, playerFacingDirRef.current);
+
+      // Update active particles (torches, block damage, magic auras)
+      particleEngineRef?.current?.update(dt);
+
       if (!renderer || !originalRender) {
         miningProfiler.endFrame();
       }

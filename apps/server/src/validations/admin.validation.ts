@@ -34,7 +34,8 @@ export const itemValidation = [
   body('canBeClimbed').optional().isBoolean().withMessage('canBeClimbed must be a boolean'),
   body('experience').optional().isInt({ min: 0 }).withMessage('Experience must be >= 0'),
   body('combatScore').optional().isInt({ min: 0 }).withMessage('Combat Score must be >= 0'),
-  body('defenseScore').optional().isInt({ min: 0 }).withMessage('Defense Score must be >= 0')
+  body('defenseScore').optional().isInt({ min: 0 }).withMessage('Defense Score must be >= 0'),
+  body('particleEffectId').optional({ nullable: true }).isString().withMessage('particleEffectId must be a string')
 ];
 
 export const mobValidation = [
@@ -75,6 +76,12 @@ export const effectValidation = [
   body('healthGain').optional().isBoolean().withMessage('healthGain must be a boolean'),
   body('staminaGain').optional().isBoolean().withMessage('staminaGain must be a boolean'),
   body('miningSpeedModifier').optional().isBoolean().withMessage('miningSpeedModifier must be a boolean')
+];
+
+export const particleEffectValidation = [
+  body('name').trim().notEmpty().withMessage('Particle Effect name is required'),
+  body('type').isIn(['CONTINUOUS', 'BURST']).withMessage('Type must be CONTINUOUS or BURST'),
+  body('config').isObject().withMessage('Config must be a valid JSON object')
 ];
 
 export const miningConfigValidation = [

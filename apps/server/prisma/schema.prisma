@@ -90,6 +90,8 @@ model Item {
   defenseScore    Int             @default(0)
   canBeDamaged    Boolean         @default(false)
   canBeClimbed    Boolean         @default(false)
+  particleEffectId String?
+  particleEffect   ParticleEffect? @relation(fields: [particleEffectId], references: [id], onDelete: SetNull)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   cityMaterials   CityMaterial[]
@@ -228,6 +230,17 @@ model MiningMapConfig {
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model ParticleEffect {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  type        String   @default("CONTINUOUS")
+  config      Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  items       Item[]
 }
 
 enum CharacterStatus {

@@ -6,6 +6,7 @@ import { LightingEngine } from '../../../../../components/game/lighting/Lighting
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
 import { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import { Camera2D } from '../../../../../components/game/camera/Camera2D';
+import { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
 import {
   MiningTileType,
   MINING_CONFIG,
@@ -58,6 +59,8 @@ export function useMiningScene({
   const remotePlayerRendererRef = useRef<MiningRemotePlayerRenderer | null>(null);
   const lightingEngineRef = useRef<LightingEngine | null>(null);
   const flashlightRef = useRef<SpotLight | null>(null);
+  const particleEngineRef = useRef<ParticleEngine | null>(null);
+  const particlesContainerRef = useRef<Container | null>(null);
 
   const gearLayersRef = useRef<GearLayerDescriptor[]>(gearLayers);
   useEffect(() => {
@@ -83,6 +86,7 @@ export function useMiningScene({
     const droppedItemsContainer = new Container();
     const otherPlayersContainer = new Container();
     const playerContainer = new Container();
+    const particlesContainer = new Container();
     const debugContainer = new Container();
 
     // Render background: Sky above ground (y <= 0), rich underground dirt backdrop (y > 0)
@@ -118,6 +122,7 @@ export function useMiningScene({
     gridContainer.addChild(reticleContainer);
     gridContainer.addChild(otherPlayersContainer);
     gridContainer.addChild(playerContainer);
+    gridContainer.addChild(particlesContainer);
     gridContainer.addChild(debugContainer);
     app.stage.addChild(gridContainer);
 
@@ -128,6 +133,10 @@ export function useMiningScene({
     droppedItemsContainerRef.current = droppedItemsContainer;
     otherPlayersContainerRef.current = otherPlayersContainer;
     playerContainerRef.current = playerContainer;
+    particlesContainerRef.current = particlesContainer;
+
+    const particleEngine = new ParticleEngine(particlesContainer, app.renderer, 3000);
+    particleEngineRef.current = particleEngine;
 
     const remotePlayerRenderer = new MiningRemotePlayerRenderer(otherPlayersContainer);
     remotePlayerRendererRef.current = remotePlayerRenderer;
@@ -260,6 +269,29 @@ export function useMiningScene({
         blockPromises.push(ladderFallbackPromise);
       }
 
+      // Always load Torch and Ladder tile textures
+      const torchTileUrl = getAssetUrl('/assets/icons/items/cmt4m445e0000xx0vdu7ve6q0_icon.png');
+      const torchPromise = Assets.load(torchTileUrl)
+        .then((texture) => {
+          blockTexturesRef.current.set(MiningTileType.TORCH, texture);
+          setTileTextureLoaded((prev) => prev + 1);
+        })
+        .catch((e) => {
+          console.warn('[MiningGrid] Could not load torch texture:', e);
+        });
+      blockPromises.push(torchPromise);
+
+      const ladderAlwaysTileUrl = getAssetUrl('/assets/mining/block_entrance-block.png');
+      const ladderAlwaysPromise = Assets.load(ladderAlwaysTileUrl)
+        .then((texture) => {
+          blockTexturesRef.current.set(MiningTileType.LADDER, texture);
+          setTileTextureLoaded((prev) => prev + 1);
+        })
+        .catch((e) => {
+          console.warn('[MiningGrid] Could not load ladder texture:', e);
+        });
+      blockPromises.push(ladderAlwaysPromise);
+
       // Create Modular Character Sprite (initially hidden)
       const sprite = new ModularCharacterSprite(playerContainer);
       playerSpriteRef.current = sprite;
@@ -320,6 +352,10 @@ export function useMiningScene({
         playerSpriteRef.current.destroy();
         playerSpriteRef.current = null;
       }
+      if (particleEngineRef.current) {
+        particleEngineRef.current.destroy();
+        particleEngineRef.current = null;
+      }
       lightingEngine.destroy();
       lightingEngineRef.current = null;
       flashlightRef.current = null;
@@ -344,6 +380,7 @@ export function useMiningScene({
     gridContainerRef,
     backgroundContainerRef,
     tilesContainerRef,
+    particlesContainerRef,
     fallingRocksContainerRef,
     droppedItemsContainerRef,
     otherPlayersContainerRef,
@@ -359,5 +396,6 @@ export function useMiningScene({
     remotePlayerRendererRef,
     lightingEngineRef,
     flashlightRef,
+    particleEngineRef,
   };
 }

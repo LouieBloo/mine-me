@@ -17,6 +17,8 @@ import CharacterLevel from './pages/CharacterLevel/CharacterLevel';
 import CharacterViewer from './pages/CharacterViewer/CharacterViewer';
 import Effects from './pages/Effects/Effects';
 import EffectDetail from './pages/Effects/EffectDetail';
+import ParticleEffects from './pages/ParticleEffects/ParticleEffects';
+import ParticleEffectDetail from './pages/ParticleEffects/ParticleEffectDetail/ParticleEffectDetail';
 import Blocks from './pages/Blocks/Blocks';
 import BlockDetail from './pages/Blocks/BlockDetail/BlockDetail';
 import MiningConfig from './pages/MiningConfig/MiningConfig';
@@ -61,6 +63,14 @@ const router = createBrowserRouter([
       {
         path: "effects/:id",
         element: <EffectDetail />
+      },
+      {
+        path: "particle-effects",
+        element: <ParticleEffects />
+      },
+      {
+        path: "particle-effects/:id",
+        element: <ParticleEffectDetail />
       },
       {
         path: "blocks",

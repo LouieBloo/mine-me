@@ -11,11 +11,13 @@ import {
   MiningPlayerBody,
   MiningTileType,
   MINING_CONFIG,
+  DEFAULT_PARTICLE_EFFECTS,
   getAssetUrl,
   canTileBeDamaged,
   isTileTransparent,
 } from '@mine-me/shared';
 import { PointLight } from '../../../../components/game/lighting/PointLight';
+import type { EmitterHandle } from '../../../../components/game/particles/ParticleEngine';
 import { useSocket } from '../../../../contexts/SocketContext';
 import { notificationService } from '../../../../services/notificationService';
 import { MiningMouseController } from './input/MiningMouseController';
@@ -132,6 +134,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     remotePlayerRendererRef,
     lightingEngineRef,
     flashlightRef,
+    particleEngineRef,
   } = useMiningScene({
     app,
     initialSessionState,
@@ -141,6 +144,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     zoom,
     onAssetsLoaded,
   });
+
+  const torchEmittersRef = useRef<Map<string, EmitterHandle>>(new Map());
 
   // Attach canvas to MouseController and sync camera
   useEffect(() => {
@@ -291,6 +296,13 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
                 )
               );
             }
+            if (particleEngineRef.current && !torchEmittersRef.current.has(torchLightId)) {
+              const emitter = particleEngineRef.current.addEmitter(
+                DEFAULT_PARTICLE_EFFECTS.torch_flame,
+                { x: (x + 0.5) * TILE_SIZE, y: (y + 0.65) * TILE_SIZE }
+              );
+              torchEmittersRef.current.set(torchLightId, emitter);
+            }
           }
         });
       });
@@ -317,11 +329,24 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       if (payload.revealedTiles && payload.revealedTiles.length > 0) {
         const grid = gridRef.current;
         for (const rt of payload.revealedTiles) {
-          if (grid[rt.y] && grid[rt.y][rt.x]) {
+          const prevTile = grid[rt.y]?.[rt.x];
+          if (prevTile) {
+            // Trigger particle effects for block damage or block excavation
+            const wasDamaged = rt.damageStage !== undefined && rt.damageStage > (prevTile.damageStage || 0);
+            const wasDestroyed = prevTile.type !== MiningTileType.EMPTY && rt.type === MiningTileType.EMPTY;
+            if ((wasDamaged || wasDestroyed) && particleEngineRef.current) {
+              const hitPos = { x: (rt.x + 0.5) * TILE_SIZE, y: (rt.y + 0.5) * TILE_SIZE };
+              if (prevTile.type === MiningTileType.MINERAL) {
+                particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
+              } else {
+                particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_hit, hitPos);
+              }
+            }
+
             const canDamage = canTileBeDamaged(rt.type);
-            grid[rt.y][rt.x].type = rt.type;
-            grid[rt.y][rt.x].revealed = true;
-            grid[rt.y][rt.x].damageStage = canDamage ? (rt.damageStage ?? grid[rt.y][rt.x].damageStage ?? 0) : 0;
+            prevTile.type = rt.type;
+            prevTile.revealed = true;
+            prevTile.damageStage = canDamage ? (rt.damageStage ?? prevTile.damageStage ?? 0) : 0;
           }
         }
 
@@ -412,8 +437,19 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
                   )
                 );
               }
+              if (particleEngineRef.current && !torchEmittersRef.current.has(torchLightId)) {
+                const emitter = particleEngineRef.current.addEmitter(
+                  DEFAULT_PARTICLE_EFFECTS.torch_flame,
+                  { x: (x + 0.5) * TILE_SIZE, y: (y + 0.65) * TILE_SIZE }
+                );
+                torchEmittersRef.current.set(torchLightId, emitter);
+              }
             } else {
               lightingEngine.removeLight(torchLightId);
+              if (torchEmittersRef.current.has(torchLightId)) {
+                torchEmittersRef.current.get(torchLightId)?.destroy();
+                torchEmittersRef.current.delete(torchLightId);
+              }
             }
           }
         }
@@ -438,6 +474,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
     return () => {
       cleanup();
+      torchEmittersRef.current.forEach((emitter) => emitter.destroy());
+      torchEmittersRef.current.clear();
     };
   }, [onEvent, containersReady]);
 
@@ -462,11 +500,13 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     flashlightRef,
     lightingEngineRef,
     cameraRef,
+    particleEngineRef,
     playerBodyRef,
     gridRef,
     keysPressedRef,
     isMiningRef,
     miningTargetRef,
+    blockTexturesRef,
   });
 
   return <div className="mining-grid-container" />;

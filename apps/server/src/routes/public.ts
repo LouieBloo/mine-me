@@ -41,3 +41,14 @@ publicRouter.get('/blocks', async (req: Request, res: Response): Promise<any> =>
     return res.status(500).json({ error: err.message });
   }
 });
+
+publicRouter.get('/particle-effects', async (req: Request, res: Response): Promise<any> => {
+  try {
+    const particleEffects = await prisma.particleEffect.findMany({
+      orderBy: { name: 'asc' }
+    });
+    return res.json(particleEffects);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});

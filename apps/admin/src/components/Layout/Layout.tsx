@@ -31,6 +31,7 @@ export default function Layout() {
           </div>
           <NavLink to="/blocks" className={navLinkClass}>Blocks Editor</NavLink>
           <NavLink to="/effects" className={navLinkClass}>Effects Editor</NavLink>
+          <NavLink to="/particle-effects" className={navLinkClass}>Particle Effects</NavLink>
           <NavLink to="/inventory-items" className={navLinkClass}>Inventory Editor</NavLink>
           <NavLink to="/items" className={navLinkClass}>Items Editor</NavLink>
           <NavLink to="/rates" className={navLinkClass}>Rates Editor</NavLink>

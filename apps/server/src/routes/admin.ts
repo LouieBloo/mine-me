@@ -11,6 +11,7 @@ import * as CharacterLevelController from '../controllers/admin/character-level.
 import * as EffectController from '../controllers/admin/effect.controller';
 import * as BlockController from '../controllers/admin/block.controller';
 import * as MiningConfigController from '../controllers/admin/miningConfig.controller';
+import * as ParticleEffectController from '../controllers/admin/particleEffect.controller';
 import * as AdminValidation from '../validations/admin.validation';
 
 const adminRouter = express.Router();
@@ -92,5 +93,12 @@ adminRouter.get('/mining-config', MiningConfigController.getMiningConfig);
 adminRouter.put('/mining-config', runValidation(AdminValidation.miningConfigValidation), MiningConfigController.updateMiningConfig);
 adminRouter.post('/mining-config/preview', MiningConfigController.generateMapPreview);
 adminRouter.post('/mining-config/reset', MiningConfigController.resetMiningConfig);
+
+// PARTICLE EFFECTS
+adminRouter.get('/particle-effects', ParticleEffectController.getParticleEffects);
+adminRouter.get('/particle-effects/:id', ParticleEffectController.getParticleEffect);
+adminRouter.post('/particle-effects', runValidation(AdminValidation.particleEffectValidation), ParticleEffectController.createParticleEffect);
+adminRouter.put('/particle-effects/:id', runValidation(AdminValidation.particleEffectValidation), ParticleEffectController.updateParticleEffect);
+adminRouter.delete('/particle-effects/:id', ParticleEffectController.deleteParticleEffect);
 
 export { adminRouter };

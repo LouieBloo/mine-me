@@ -44,6 +44,7 @@ vi.mock('pixi.js', () => ({
   },
   Texture: {
     EMPTY: {},
+    WHITE: { destroy: vi.fn() },
     from: vi.fn().mockReturnValue({ destroy: vi.fn() }),
   },
   Sprite: class {
@@ -51,6 +52,10 @@ vi.mock('pixi.js', () => ({
     scale = { set: vi.fn() };
     x = 0;
     y = 0;
+    tint = 0xffffff;
+    rotation = 0;
+    visible = true;
+    alpha = 1;
     texture = { destroy: vi.fn() };
     destroy = vi.fn();
   },
@@ -61,7 +66,22 @@ vi.mock('pixi.js', () => ({
     y = 0;
     destroy = vi.fn();
   },
-  Container: class {},
+  Container: class {
+    children: any[] = [];
+    addChild = vi.fn((child: any) => {
+      this.children.push(child);
+      return child;
+    });
+    removeChild = vi.fn();
+    destroy = vi.fn();
+  },
+  Graphics: class {
+    circle = vi.fn().mockReturnThis();
+    rect = vi.fn().mockReturnThis();
+    poly = vi.fn().mockReturnThis();
+    fill = vi.fn().mockReturnThis();
+    destroy = vi.fn();
+  },
 }));
 
 // Mock HTMLMediaElement methods for JSDOM

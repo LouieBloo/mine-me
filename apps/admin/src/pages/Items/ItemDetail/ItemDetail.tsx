@@ -22,10 +22,11 @@ export default function ItemDetail() {
   const [data, setData] = useState<any>(isNew ? {
     name: '', description: '', type: 'GEAR', subType: 'HEAD',
     vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, experience: 0,
-    combatScore: 0, defenseScore: 0, itemEffects: []
+    combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
   const [effectsList, setEffectsList] = useState<any[]>([]);
+  const [particleEffectsList, setParticleEffectsList] = useState<any[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -36,11 +37,13 @@ export default function ItemDetail() {
   useEffect(() => {
     Promise.all([
       fetchWithAuth('/api/admin/item-enums').then(res => res.json()),
-      fetchWithAuth('/api/admin/effects').then(res => res.json())
+      fetchWithAuth('/api/admin/effects').then(res => res.json()),
+      fetchWithAuth('/api/admin/particle-effects').then(res => res.json())
     ])
-      .then(([enumsJson, effectsJson]) => {
+      .then(([enumsJson, effectsJson, particleEffectsJson]) => {
         setEnums(enumsJson);
         setEffectsList(effectsJson);
+        setParticleEffectsList(Array.isArray(particleEffectsJson) ? particleEffectsJson : []);
         if (isNew) setLoading(false);
       })
       .catch(err => {
@@ -190,6 +193,34 @@ export default function ItemDetail() {
                 {enums?.rarities.map(r => <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase().replace(/_/g, ' ')}</option>)}
               </select>
               {errors.rarity && <p className="text-red-500 text-xs font-bold mt-1">{errors.rarity}</p>}
+            </div>
+
+            {/* Particle Effect */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Particle Effect</label>
+                {data.particleEffectId && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/particle-effects/${data.particleEffectId}`)}
+                    className="cursor-pointer text-[10px] font-bold text-sky-600 hover:text-sky-800 underline"
+                  >
+                    View FX ↗
+                  </button>
+                )}
+              </div>
+              <select
+                value={data.particleEffectId || ''}
+                onChange={(e) => setData({ ...data, particleEffectId: e.target.value || null })}
+                className="item-detail-select"
+              >
+                <option value="">None (No Particle Effect)</option>
+                {particleEffectsList.map(pe => (
+                  <option key={pe.id} value={pe.id}>
+                    {pe.name} ({pe.config?.emitterType || pe.type})
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Experience */}

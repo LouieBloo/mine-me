@@ -63,7 +63,8 @@ export const getItems = async (req: Request, res: Response) => {
         include: {
           effect: true
         }
-      }
+      },
+      particleEffect: true
     }
   });
   res.json(items);
@@ -85,14 +86,15 @@ export const getItem = async (req: Request, res: Response) => {
         include: {
           effect: true
         }
-      }
+      },
+      particleEffect: true
     }
   });
   res.json(item);
 };
 
 export const createItem = async (req: Request, res: Response) => {
-  const { itemEffects, ...itemData } = req.body;
+  const { itemEffects, particleEffect, ...itemData } = req.body;
   const item = await prisma.item.create({
     data: {
       ...itemData,
@@ -108,7 +110,8 @@ export const createItem = async (req: Request, res: Response) => {
         include: {
           effect: true
         }
-      }
+      },
+      particleEffect: true
     }
   });
   const allItems = await prisma.item.findMany({
@@ -117,7 +120,8 @@ export const createItem = async (req: Request, res: Response) => {
         include: {
           effect: true
         }
-      }
+      },
+      particleEffect: true
     }
   });
   syncJson('items.json', allItems);
@@ -125,7 +129,7 @@ export const createItem = async (req: Request, res: Response) => {
 };
 
 export const updateItem = async (req: Request, res: Response) => {
-  const { itemEffects, ...itemData } = req.body;
+  const { itemEffects, particleEffect, ...itemData } = req.body;
   const item = await prisma.item.update({
     where: { id: req.params.id },
     data: {
@@ -143,7 +147,8 @@ export const updateItem = async (req: Request, res: Response) => {
         include: {
           effect: true
         }
-      }
+      },
+      particleEffect: true
     }
   });
   const allItems = await prisma.item.findMany({
@@ -152,7 +157,8 @@ export const updateItem = async (req: Request, res: Response) => {
         include: {
           effect: true
         }
-      }
+      },
+      particleEffect: true
     }
   });
   syncJson('items.json', allItems);

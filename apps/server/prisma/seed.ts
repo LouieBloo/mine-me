@@ -85,6 +85,31 @@ async function main() {
     console.log('✅ Effects seeded.');
   }
 
+  // 1.5. Seed Particle Effects
+  const particleEffectsPath = path.join(dataPath, 'particle_effects.json');
+  if (fs.existsSync(particleEffectsPath)) {
+    const particleEffects = JSON.parse(fs.readFileSync(particleEffectsPath, 'utf-8'));
+    for (const pe of particleEffects) {
+      await prisma.particleEffect.upsert({
+        where: { id: pe.id },
+        update: {
+          name: pe.name,
+          description: pe.description,
+          type: pe.type,
+          config: pe.config
+        },
+        create: {
+          id: pe.id,
+          name: pe.name,
+          description: pe.description,
+          type: pe.type,
+          config: pe.config
+        },
+      });
+    }
+    console.log('✅ Particle effects seeded.');
+  }
+
   // 2. Seed Items
   const items = JSON.parse(fs.readFileSync(path.join(dataPath, 'items.json'), 'utf-8'));
   for (const itemData of items) {

@@ -82,8 +82,15 @@ export class MiningTileRenderer {
     tileSize: number = TILE_SIZE,
     alpha: number = 1.0,
     offsetX: number = 0,
-    offsetY: number = 0
+    offsetY: number = 0,
+    texture?: Texture
   ): void {
+    if (texture) {
+      graphics.rect(offsetX, offsetY, tileSize, tileSize);
+      graphics.fill({ texture, alpha });
+      return;
+    }
+
     // Wooden side rails
     graphics.rect(offsetX + 14, offsetY + 0, 6, tileSize);
     graphics.rect(offsetX + tileSize - 20, offsetY + 0, 6, tileSize);
@@ -100,8 +107,15 @@ export class MiningTileRenderer {
     tileSize: number = TILE_SIZE,
     alpha: number = 1.0,
     offsetX: number = 0,
-    offsetY: number = 0
+    offsetY: number = 0,
+    texture?: Texture
   ): void {
+    if (texture) {
+      graphics.rect(offsetX, offsetY, tileSize, tileSize);
+      graphics.fill({ texture, alpha });
+      return;
+    }
+
     const cx = offsetX + tileSize / 2;
     const cy = offsetY + tileSize * 0.75; // Sits 3/4 up the tile
 

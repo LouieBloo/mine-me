@@ -1,3 +1,5 @@
+import type { ParticleEffect } from './particles';
+
 export type CharacterClass = 'Warrior' | 'Mage' | 'Rogue';
 export type Profession = 'Mining' | 'Herbalism' | 'Farming' | 'Lumberjack' | 'Chemistry' | 'Blacksmithing';
 
@@ -114,6 +116,8 @@ export interface GameItem {
   defenseScore?: number;
   canBeDamaged?: boolean;
   canBeClimbed?: boolean;
+  particleEffectId?: string | null;
+  particleEffect?: ParticleEffect | null;
   itemEffects?: ObjectEffects[];
 }
 
@@ -236,3 +240,4 @@ export * from './trade';
 export * from './gameEvents';
 export * from './mining';
 export * from './modularRig';
+export * from './particles';
