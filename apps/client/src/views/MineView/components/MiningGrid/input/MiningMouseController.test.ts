@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MiningMouseController } from './MiningMouseController';
-import { TorchPlacementAction, LadderPlacementAction } from './MouseAction';
+import { TorchPlacementAction, LadderPlacementAction, DynamiteThrowAction } from './MouseAction';
 import { MiningTileType, MouseActionTriggerMode, type MiningClientTile } from '@mine-me/shared';
 
 describe('MiningMouseController and MouseAction', () => {
@@ -503,6 +503,38 @@ describe('MiningMouseController and MouseAction', () => {
       expect(controller.getActiveAction()).toBe(ladderAction2);
 
       controller.detach();
+    });
+  });
+
+  describe('DynamiteThrowAction', () => {
+    it('defaults triggerMode to SINGLE', () => {
+      const onThrow = vi.fn();
+      const action = new DynamiteThrowAction(onThrow);
+      expect(action.triggerMode).toBe(MouseActionTriggerMode.SINGLE);
+      expect(action.name).toBe('throw_dynamite');
+    });
+
+    it('can execute towards any coordinates and provides a red reticle style', () => {
+      const onThrow = vi.fn().mockResolvedValue(true);
+      const action = new DynamiteThrowAction(onThrow);
+
+      const target = { x: 8, y: 3 };
+      expect(action.canExecute(target, { x: 5.5, y: 5.5 }, mockGrid)).toBe(true);
+
+      const style = action.getReticleStyle(target, { x: 5.5, y: 5.5 }, mockGrid);
+      expect(style.isValid).toBe(true);
+      expect(style.color).toBe(0xef4444);
+      expect(style.showPreview).toBe(false);
+    });
+
+    it('calls onThrow with targeted position on execute', async () => {
+      const onThrow = vi.fn().mockResolvedValue(true);
+      const action = new DynamiteThrowAction(onThrow);
+
+      const target = { x: 7, y: 2 };
+      const success = await action.execute(target);
+      expect(success).toBe(true);
+      expect(onThrow).toHaveBeenCalledWith(target);
     });
   });
 });

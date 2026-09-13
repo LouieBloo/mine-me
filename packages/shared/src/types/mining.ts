@@ -348,6 +348,16 @@ export interface MiningFallingRock {
 }
 
 /**
+ * A dynamic thrown dynamite stick with burning fuse rendered in continuous space.
+ */
+export interface MiningActiveDynamite {
+  id: string;
+  position: Vector2D;
+  velocity: Vector2D;
+  fuseRemainingSeconds: number;
+}
+
+/**
  * An equipped gear layer to be attached to the character's skeletal sprite.
  */
 export interface MiningGearLayer {
@@ -401,6 +411,8 @@ export interface MiningSessionClientState {
   gameMode?: 'singleplayer' | 'multiplayer';
   /** Other players in the shared mining room (if multiplayer). */
   otherPlayers?: MiningRemotePlayer[];
+  /** Active thrown dynamites in the cavern world. */
+  activeDynamites?: MiningActiveDynamite[];
 }
 
 /**
@@ -451,6 +463,7 @@ export interface MiningStateTickPayload {
   temporaryBackpack?: MiningBackpackItem[];
   droppedItems?: MiningDroppedItem[];
   fallingRocks?: MiningFallingRock[];
+  activeDynamites?: MiningActiveDynamite[];
   revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
   /** Other players in the shared room during multiplayer sessions. */
   otherPlayers?: MiningRemotePlayer[];

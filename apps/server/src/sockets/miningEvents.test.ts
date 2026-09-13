@@ -21,7 +21,7 @@ vi.mock('../services/characterBroadcast', () => ({
 }));
 
 import { miningSessionManager } from '../services/mining/MiningSessionManager';
-import { handleMiningPlaceTorch, handleMiningPlaceLadder } from './miningEvents';
+import { handleMiningPlaceTorch, handleMiningPlaceLadder, handleMiningThrowDynamite } from './miningEvents';
 import { prisma } from '../index';
 import { MiningTileType } from '@mine-me/shared';
 
@@ -216,6 +216,70 @@ describe('handleMiningPlaceLadder', () => {
       where: { id: 'inv-ladder-last' },
     });
     expect(session.grid[5][11].type).toBe(MiningTileType.LADDER);
+  });
+});
+
+describe('handleMiningThrowDynamite', () => {
+  const mockIo = {} as any;
+  const mockSocket = {
+    connected: true,
+    data: { characterId: 'char-dyn-1' },
+    emit: vi.fn(),
+  } as any;
+
+  it('fails if character does not have dynamite in inventory', async () => {
+    miningSessionManager.createSession('char-dyn-1', 'city-1', mockSocket);
+    (prisma.inventoryItem.findFirst as any).mockResolvedValue(null);
+
+    const res = await handleMiningThrowDynamite(mockIo, mockSocket, { target: { x: 15, y: 10 } });
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/do not have any dynamite/i);
+  });
+
+  it('throws dynamite and decrements inventory when quantity > 1', async () => {
+    const session = miningSessionManager.createSession('char-dyn-1', 'city-1', mockSocket);
+    (prisma.inventoryItem.findFirst as any).mockResolvedValue({
+      id: 'inv-dyn-1',
+      characterId: 'char-dyn-1',
+      quantity: 5,
+      item: { id: 'dyn-item-id', name: 'Dynamite', subType: 'DYNAMITE' },
+    });
+    (prisma.character.findUnique as any).mockResolvedValue({
+      id: 'char-dyn-1',
+      maxInventorySlots: 20,
+      inventory: [],
+    });
+
+    const res = await handleMiningThrowDynamite(mockIo, mockSocket, { target: { x: 12, y: 8 } });
+    expect(res.success).toBe(true);
+    expect(prisma.inventoryItem.update).toHaveBeenCalledWith({
+      where: { id: 'inv-dyn-1' },
+      data: { quantity: { decrement: 1 } },
+    });
+    expect(session.activeDynamites).toHaveLength(1);
+    expect(session.activeDynamites[0].fuseRemainingSeconds).toBe(4.0);
+  });
+
+  it('deletes inventory entry if remaining dynamite quantity is 1', async () => {
+    const session = miningSessionManager.createSession('char-dyn-1', 'city-1', mockSocket);
+    (prisma.inventoryItem.findFirst as any).mockResolvedValue({
+      id: 'inv-dyn-last',
+      characterId: 'char-dyn-1',
+      quantity: 1,
+      item: { id: 'dyn-item-id', name: 'Dynamite', subType: 'DYNAMITE' },
+    });
+    (prisma.character.findUnique as any).mockResolvedValue({
+      id: 'char-dyn-1',
+      maxInventorySlots: 20,
+      inventory: [],
+    });
+
+    const res = await handleMiningThrowDynamite(mockIo, mockSocket, { target: { x: 14, y: 6 } });
+    expect(res.success).toBe(true);
+    expect(prisma.inventoryItem.delete).toHaveBeenCalledWith({
+      where: { id: 'inv-dyn-last' },
+    });
+    expect(session.activeDynamites.length).toBeGreaterThanOrEqual(1);
   });
 });
 

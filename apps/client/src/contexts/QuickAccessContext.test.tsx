@@ -209,4 +209,58 @@ describe('QuickAccessContext', () => {
     // Now auto-disables placement mode
     expect(result.current.isPlacingLadder).toBe(false);
   });
+
+  it('toggles isThrowingDynamite when dynamite slot is selected', async () => {
+    mockPlayerState.inventory.items = [
+      {
+        id: 'inv-dyn-1',
+        characterId: 'char-1',
+        quantity: 3,
+        equipped: false,
+        item: {
+          id: 'item-dyn-def',
+          name: 'Dynamite',
+          type: 'CONSUMABLE',
+          subType: 'DYNAMITE',
+        },
+      },
+    ];
+
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QuickAccessProvider>{children}</QuickAccessProvider>
+    );
+
+    const { result, rerender } = renderHook(() => useQuickAccess(), { wrapper });
+
+    act(() => {
+      result.current.setSlotItem(0, 'item-dyn-def');
+    });
+
+    // Selecting slot 0 (dynamite) activates throw mode
+    await act(async () => {
+      await result.current.selectSlot(0);
+    });
+
+    expect(result.current.isThrowingDynamite).toBe(true);
+    expect(result.current.isPlacingTorch).toBe(false);
+    expect(result.current.isPlacingLadder).toBe(false);
+
+    // Selecting slot 0 again toggles throw mode off
+    await act(async () => {
+      await result.current.selectSlot(0);
+    });
+
+    expect(result.current.isThrowingDynamite).toBe(false);
+
+    // Turn back on
+    await act(async () => {
+      await result.current.selectSlot(0);
+    });
+    expect(result.current.isThrowingDynamite).toBe(true);
+
+    // When dynamite runs out (0 quantity)
+    mockPlayerState = { inventory: { items: [] } };
+    rerender();
+    expect(result.current.isThrowingDynamite).toBe(false);
+  });
 });

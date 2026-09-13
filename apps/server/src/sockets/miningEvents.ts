@@ -311,6 +311,86 @@ export const handleMiningPlaceTorch = async (
 };
 
 /**
+ * Handler: mining_throw_dynamite
+ * Throws a dynamite towards target position if player has dynamite in inventory.
+ * Authoritative: Deducts 1 dynamite, creates physics entity with 4s fuse,
+ * and starts countdown on server.
+ */
+export const handleMiningThrowDynamite = async (
+  io: Server,
+  socket: Socket,
+  payload: { target: { x: number; y: number } },
+): Promise<GameEventResult> => {
+  const characterId = socket.data.characterId;
+  if (!characterId) return { success: false, error: 'No character selected.' };
+
+  const engine = miningSessionManager.getSession(characterId);
+  if (!engine) return { success: false, error: 'No active mining session.' };
+
+  if (!payload?.target) {
+    return { success: false, error: 'Target position is required.' };
+  }
+
+  // 1. Check if user has dynamite in character inventory
+  const characterInventoryDynamite = await prisma.inventoryItem.findFirst({
+    where: {
+      characterId,
+      quantity: { gt: 0 },
+      item: { subType: { equals: 'DYNAMITE', mode: 'insensitive' } },
+    },
+    include: { item: true },
+  });
+
+  if (!characterInventoryDynamite) {
+    return { success: false, error: 'You do not have any dynamite to throw.' };
+  }
+
+  // 2. Launch dynamite in server engine (calculates throw trajectory & starts 4s fuse)
+  const thrown = engine.throwDynamite(characterId, payload.target);
+  if (!thrown) {
+    return { success: false, error: 'Failed to throw dynamite.' };
+  }
+
+  // 3. Deduct dynamite from character inventory
+  if (characterInventoryDynamite.quantity <= 1) {
+    await prisma.inventoryItem.delete({
+      where: { id: characterInventoryDynamite.id },
+    });
+  } else {
+    await prisma.inventoryItem.update({
+      where: { id: characterInventoryDynamite.id },
+      data: { quantity: { decrement: 1 } },
+    });
+  }
+
+  const updatedChar = await prisma.character.findUnique({
+    where: { id: characterId },
+    include: {
+      inventory: {
+        include: {
+          item: {
+            include: {
+              itemEffects: {
+                include: {
+                  effect: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (updatedChar) {
+    const mappedInventory = InventoryService.mapCharacterInventory(updatedChar);
+    broadcastStatUpdate(characterId, { inventory: mappedInventory });
+  }
+
+  return { success: true };
+};
+
+/**
  * Handler: mining_exit
  * Extracts from the mine. Saves temporary loot to PostgreSQL inventory.
  */

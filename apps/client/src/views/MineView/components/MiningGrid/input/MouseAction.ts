@@ -198,3 +198,48 @@ export class LadderPlacementAction extends BaseBuildablePlacementAction {
     });
   }
 }
+
+/**
+ * Action for throwing Dynamite towards the mouse cursor.
+ * Triggered on click (SINGLE mode) or configured item triggerMode.
+ */
+export class DynamiteThrowAction extends BaseMouseAction {
+  protected onThrow: (target: MiningPosition) => Promise<boolean> | boolean;
+
+  constructor(
+    onThrow: (target: MiningPosition) => Promise<boolean> | boolean,
+    triggerMode: MouseActionTriggerMode = MouseActionTriggerMode.SINGLE
+  ) {
+    super({
+      name: 'throw_dynamite',
+      triggerMode,
+    });
+    this.onThrow = onThrow;
+  }
+
+  public canExecute(
+    _target: MiningPosition,
+    _playerPos: Vector2D,
+    _grid: MiningClientTile[][]
+  ): boolean {
+    return true;
+  }
+
+  public async execute(target: MiningPosition, _playerPos?: Vector2D): Promise<boolean> {
+    return this.onThrow(target);
+  }
+
+  public getReticleStyle(
+    _target: MiningPosition,
+    _playerPos: Vector2D,
+    _grid: MiningClientTile[][]
+  ): ReticleStyle {
+    return {
+      color: 0xef4444,
+      alpha: 0.85,
+      strokeColor: 0xb91c1c,
+      isValid: true,
+      showPreview: false,
+    };
+  }
+}

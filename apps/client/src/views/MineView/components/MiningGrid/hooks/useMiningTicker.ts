@@ -7,7 +7,7 @@ import { PointLight } from '../../../../../components/game/lighting/PointLight';
 import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
-import { MINING_CONFIG, type Vector2D, type MiningSessionClientState, type MiningClientTile, type MiningInputState, type MiningPosition, MiningPlayerBody, MiningTileType } from '@mine-me/shared';
+import { MINING_CONFIG, type Vector2D, type MiningSessionClientState, type MiningClientTile, type MiningInputState, type MiningPosition, type MiningActiveDynamite, MiningPlayerBody, MiningTileType } from '@mine-me/shared';
 import { MiningEntityRenderer, type ActiveFallingRock } from '../renderers/MiningEntityRenderer';
 import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
 import { miningProfiler } from '../utils/MiningProfiler';
@@ -27,6 +27,10 @@ export interface UseMiningTickerOptions {
   remotePlayerRendererRef?: React.RefObject<MiningRemotePlayerRenderer | null>;
   activeFallingRocksRef: React.MutableRefObject<ActiveFallingRock[]>;
   fallingRockGraphicsMap: React.MutableRefObject<Map<string, Sprite | Graphics>>;
+  dynamitesContainerRef?: React.RefObject<Container | null>;
+  activeDynamitesRef?: React.MutableRefObject<MiningActiveDynamite[]>;
+  dynamiteGraphicsMap?: React.MutableRefObject<Map<string, Sprite | Graphics>>;
+  dynamiteTextureRef?: React.RefObject<Texture | null>;
   reticleGraphicsRef?: React.RefObject<Graphics | null>;
   mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
   debugGraphicsRef: React.RefObject<Graphics | null>;
@@ -57,6 +61,10 @@ export function useMiningTicker({
   remotePlayerRendererRef,
   activeFallingRocksRef,
   fallingRockGraphicsMap,
+  dynamitesContainerRef,
+  activeDynamitesRef,
+  dynamiteGraphicsMap,
+  dynamiteTextureRef,
   reticleGraphicsRef,
   mouseControllerRef,
   debugGraphicsRef,
@@ -284,6 +292,18 @@ export function useMiningTicker({
           fallingRockGraphicsMap.current,
           TILE_SIZE,
           rockTexture
+        );
+      }
+
+      miningProfiler.startSection('Dynamites');
+      const dynamitesContainer = dynamitesContainerRef?.current;
+      if (dynamitesContainer && activeDynamitesRef?.current && dynamiteGraphicsMap?.current) {
+        MiningEntityRenderer.updateActiveDynamites(
+          dynamitesContainer,
+          activeDynamitesRef.current,
+          dynamiteGraphicsMap.current,
+          TILE_SIZE,
+          dynamiteTextureRef?.current
         );
       }
 

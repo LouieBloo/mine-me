@@ -87,7 +87,7 @@ export type ItemType = 'GEAR' | 'MATERIAL' | 'CONSUMABLE';
 
 export type GearSubType = 'HEAD' | 'SHOULDERS' | 'CHEST' | 'GAUNTLETS' | 'LEGGINGS' | 'BOOTS' | 'WEAPON';
 export type MaterialSubType = 'LUMBER' | 'MINERAL' | 'AGRICULTURE' | 'HERB';
-export type ConsumableSubType = 'POTION' | 'FOOD' | 'TORCH' | 'LADDER' | 'OTHER';
+export type ConsumableSubType = 'POTION' | 'FOOD' | 'TORCH' | 'LADDER' | 'DYNAMITE' | 'OTHER';
 
 export type ItemSubType = GearSubType | MaterialSubType | ConsumableSubType;
 
@@ -96,7 +96,7 @@ export const ITEM_TYPES: ItemType[] = ['GEAR', 'MATERIAL', 'CONSUMABLE'];
 export const ITEM_SUBTYPES: Record<ItemType, string[]> = {
   GEAR: ['HEAD', 'SHOULDERS', 'CHEST', 'GAUNTLETS', 'LEGGINGS', 'BOOTS', 'WEAPON'],
   MATERIAL: ['LUMBER', 'MINERAL', 'AGRICULTURE', 'HERB'],
-  CONSUMABLE: ['POTION', 'FOOD', 'TORCH', 'LADDER', 'OTHER'],
+  CONSUMABLE: ['POTION', 'FOOD', 'TORCH', 'LADDER', 'DYNAMITE', 'OTHER'],
 };
 
 export const ITEM_RARITIES: ItemRarity[] = ['LOW', 'MEDIUM', 'RARE', 'VERY_RARE'];

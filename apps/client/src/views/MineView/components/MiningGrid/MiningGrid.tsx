@@ -14,13 +14,14 @@ import {
   DEFAULT_PARTICLE_EFFECTS,
   getAssetUrl,
   canTileBeDamaged,
+  type MiningActiveDynamite,
 } from '@mine-me/shared';
 import { PointLight } from '../../../../components/game/lighting/PointLight';
 import type { EmitterHandle } from '../../../../components/game/particles/ParticleEngine';
 import { useSocket } from '../../../../contexts/SocketContext';
 import { notificationService } from '../../../../services/notificationService';
 import { MiningMouseController } from './input/MiningMouseController';
-import { TorchPlacementAction, LadderPlacementAction } from './input/MouseAction';
+import { TorchPlacementAction, LadderPlacementAction, DynamiteThrowAction } from './input/MouseAction';
 import { useMiningInput } from './hooks/useMiningInput';
 import { useMiningScene } from './hooks/useMiningScene';
 import { useMiningTicker } from './hooks/useMiningTicker';
@@ -40,6 +41,8 @@ interface MiningGridProps {
   onTorchPlaced?: () => void;
   isPlacingLadder?: boolean;
   onLadderPlaced?: () => void;
+  isThrowingDynamite?: boolean;
+  onDynamiteThrown?: () => void;
   showDebug?: boolean;
   onToggleDebug?: () => void;
   onVisionChange?: (newVision: number) => void;
@@ -55,6 +58,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onTorchPlaced,
   isPlacingLadder = false,
   onLadderPlaced,
+  isThrowingDynamite = false,
+  onDynamiteThrown,
   showDebug,
   onToggleDebug,
   onVisionChange,
@@ -95,6 +100,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   }, [showDebug]);
 
   const activeFallingRocksRef = useRef<{ id: string; x: number; y: number }[]>([]);
+  const activeDynamitesRef = useRef<MiningActiveDynamite[]>([]);
   const lastDamageParticleTimeRef = useRef<Map<string, number>>(new Map());
 
   // Smooth rendering lerp position references
@@ -127,6 +133,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     tilesContainerRef,
     fallingRocksContainerRef,
     droppedItemsContainerRef,
+    dynamitesContainerRef,
     playerContainerRef,
     reticleGraphicsRef,
     debugGraphicsRef,
@@ -135,6 +142,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     blockTexturesRef,
     droppedSpritesMap,
     fallingRockGraphicsMap,
+    dynamiteGraphicsMap,
+    dynamiteTextureRef,
     playerSpriteRef,
     remotePlayerRendererRef,
     lightingEngineRef,
@@ -260,6 +269,31 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           }
         }, ladderItem?.triggerMode)
       );
+    } else if (isThrowingDynamite) {
+      const dynamiteItem = playerState?.inventory?.items?.find(
+        (inv: any) =>
+          inv.item?.subType?.toUpperCase() === 'DYNAMITE' ||
+          inv.item?.name?.toLowerCase().includes('dynamite')
+      )?.item;
+
+      mouseController.setActiveAction(
+        new DynamiteThrowAction(async (target) => {
+          try {
+            const res = await sendGameEvent({ type: 'mining_throw_dynamite', target });
+            if (res.success) {
+              onDynamiteThrown?.();
+              return true;
+            } else {
+              notificationService.error('Cannot Throw Dynamite', res.error || 'Failed to throw dynamite.');
+              return false;
+            }
+          } catch (err: any) {
+            console.error('[MiningGrid] mining_throw_dynamite error:', err);
+            notificationService.error('Error', err.message || 'Failed to throw dynamite.');
+            return false;
+          }
+        }, dynamiteItem?.triggerMode)
+      );
     } else {
       mouseController.setActiveAction(null);
       lightingEngineRef.current?.removeLight('torch_preview');
@@ -268,7 +302,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     return () => {
       lightingEngineRef.current?.removeLight('torch_preview');
     };
-  }, [isPlacingTorch, isPlacingLadder, sendGameEvent, onTorchPlaced, onLadderPlaced, containersReady, playerState?.inventory?.items]);
+  }, [isPlacingTorch, isPlacingLadder, isThrowingDynamite, sendGameEvent, onTorchPlaced, onLadderPlaced, onDynamiteThrown, containersReady, playerState?.inventory?.items]);
 
   // Real-time Input Controls Hook
   const { keysPressedRef } = useMiningInput({
@@ -384,6 +418,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       activeFallingRocksRef.current = payload.fallingRocks
         ? payload.fallingRocks.map((r) => ({ id: r.id, x: r.position.x, y: r.position.y }))
         : [];
+      activeDynamitesRef.current = payload.activeDynamites || [];
 
       // Update remote players
       if (remotePlayerRendererRef.current && payload.otherPlayers) {
@@ -617,6 +652,10 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     remotePlayerRendererRef,
     activeFallingRocksRef,
     fallingRockGraphicsMap,
+    dynamitesContainerRef,
+    activeDynamitesRef,
+    dynamiteGraphicsMap,
+    dynamiteTextureRef,
     reticleGraphicsRef,
     mouseControllerRef,
     debugGraphicsRef,

@@ -61,6 +61,9 @@ export function useMiningScene({
   );
   const droppedSpritesMap = useRef<Map<string, Sprite | Graphics>>(new Map());
   const fallingRockGraphicsMap = useRef<Map<string, Sprite | Graphics>>(new Map());
+  const dynamitesContainerRef = useRef<Container | null>(null);
+  const dynamiteGraphicsMap = useRef<Map<string, Sprite | Graphics>>(new Map());
+  const dynamiteTextureRef = useRef<Texture | null>(null);
 
   const playerSpriteRef = useRef<ModularCharacterSprite | null>(null);
   const otherPlayersContainerRef = useRef<Container | null>(null);
@@ -92,6 +95,7 @@ export function useMiningScene({
     const tilesContainer = new Container();
     const fallingRocksContainer = new Container();
     const droppedItemsContainer = new Container();
+    const dynamitesContainer = new Container();
     const otherPlayersContainer = new Container();
     const playerContainer = new Container();
     const particlesContainer = new Container();
@@ -127,6 +131,7 @@ export function useMiningScene({
     gridContainer.addChild(tilesContainer);
     gridContainer.addChild(fallingRocksContainer);
     gridContainer.addChild(droppedItemsContainer);
+    gridContainer.addChild(dynamitesContainer);
     gridContainer.addChild(reticleContainer);
     gridContainer.addChild(otherPlayersContainer);
     gridContainer.addChild(playerContainer);
@@ -139,6 +144,7 @@ export function useMiningScene({
     tilesContainerRef.current = tilesContainer;
     fallingRocksContainerRef.current = fallingRocksContainer;
     droppedItemsContainerRef.current = droppedItemsContainer;
+    dynamitesContainerRef.current = dynamitesContainer;
     otherPlayersContainerRef.current = otherPlayersContainer;
     playerContainerRef.current = playerContainer;
     particlesContainerRef.current = particlesContainer;
@@ -350,6 +356,14 @@ export function useMiningScene({
       const sprite = new ModularCharacterSprite(playerContainer);
       playerSpriteRef.current = sprite;
 
+      // Load dynamite icon texture for thrown dynamite rendering
+      const dynamiteIconUrl = getAssetUrl('/assets/icons/items/cmtz702uk0001nu7bn2tidnx0_icon.png');
+      Assets.load(dynamiteIconUrl)
+        .then((texture) => {
+          dynamiteTextureRef.current = texture;
+        })
+        .catch(() => {});
+
       const spritePromise = (async () => {
         try {
           await sprite.load();
@@ -437,6 +451,7 @@ export function useMiningScene({
     particlesContainerRef,
     fallingRocksContainerRef,
     droppedItemsContainerRef,
+    dynamitesContainerRef,
     otherPlayersContainerRef,
     playerContainerRef,
     reticleGraphicsRef,
@@ -446,6 +461,8 @@ export function useMiningScene({
     blockTexturesRef,
     droppedSpritesMap,
     fallingRockGraphicsMap,
+    dynamiteGraphicsMap,
+    dynamiteTextureRef,
     playerSpriteRef,
     remotePlayerRendererRef,
     lightingEngineRef,

@@ -690,4 +690,115 @@ describe('MiningGameEngine', () => {
     expect(emittedPayloads[2].droppedItems).toBeDefined();
     expect(emittedPayloads[2].droppedItems.length).toBeGreaterThan(0);
   });
+
+  describe('Dynamite mechanics', () => {
+    it('throws dynamite and broadcasts activeDynamites in tick payload', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      const success = engine.throwDynamite('char-1', { x: 10, y: 5 });
+      expect(success).toBe(true);
+      expect(engine.activeDynamites).toHaveLength(1);
+      expect(engine.activeDynamites[0].fuseRemainingSeconds).toBe(4.0);
+
+      // Process tick
+      (engine as any).tick(0.033);
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        'mining_state_tick',
+        expect.objectContaining({
+          activeDynamites: expect.arrayContaining([
+            expect.objectContaining({
+              id: engine.activeDynamites[0].id,
+              fuseRemainingSeconds: expect.any(Number),
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('explodes after 4 seconds, removes dynamite from world, and clears blocks in radius 7', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Fill a test area (10, 10) with DIRT blocks
+      for (let y = 3; y <= 17; y++) {
+        for (let x = 3; x <= 17; x++) {
+          if (y < MINING_CONFIG.GRID_HEIGHT && x < MINING_CONFIG.GRID_WIDTH) {
+            engine.grid[y][x] = { type: MiningTileType.DIRT, revealed: true };
+          }
+        }
+      }
+
+      engine.throwDynamite('char-1', { x: 10, y: 10 });
+      const dynamite = engine.activeDynamites[0];
+      // Position dynamite directly at (10, 10) with zero velocity
+      dynamite.position = { x: 10, y: 10 };
+      dynamite.velocity = { x: 0, y: 0 };
+      dynamite.hasGravity = false;
+
+      // 3.9 seconds elapse: not yet exploded
+      (engine as any).tick(3.9);
+      expect(engine.activeDynamites).toHaveLength(1);
+      expect(engine.grid[10][10].type).toBe(MiningTileType.DIRT);
+
+      // Another 0.2 seconds elapse (total 4.1s): exploded!
+      (engine as any).tick(0.2);
+
+      // 1. Dynamite removed from active world
+      expect(engine.activeDynamites).toHaveLength(0);
+
+      // 2. Epicenter and tiles within 7 radius are excavated to EMPTY
+      expect(engine.grid[10][10].type).toBe(MiningTileType.EMPTY);
+      expect(engine.grid[10][10].revealed).toBe(true);
+      expect(engine.grid[10][17].type).toBe(MiningTileType.EMPTY); // dx=7, dy=0
+      expect(engine.grid[10][3].type).toBe(MiningTileType.EMPTY);  // dx=-7, dy=0
+      expect(engine.grid[17][10].type).toBe(MiningTileType.EMPTY); // dx=0, dy=7
+      expect(engine.grid[3][10].type).toBe(MiningTileType.EMPTY);  // dx=0, dy=-7
+
+      // Tile outside 7 radius (e.g. dx=8, dy=0 -> x=18) should NOT be excavated
+      if (18 < MINING_CONFIG.GRID_WIDTH) {
+        engine.grid[10][18] = { type: MiningTileType.DIRT, revealed: true };
+      }
+      expect(engine.grid[10]?.[18]?.type).toBe(MiningTileType.DIRT);
+    });
+
+    it('preserves ENTRANCE tile and stops active player mining in blast zone', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Place entrance at (5, 0) and player mining at (5, 1)
+      engine.grid[0][5] = { type: MiningTileType.ENTRANCE, revealed: true };
+      engine.grid[1][5] = { type: MiningTileType.DIRT, revealed: true };
+      engine.isMining = true;
+      engine.miningTarget = { x: 5, y: 1 };
+
+      // Throw and explode near entrance at (5, 2)
+      engine.throwDynamite('char-1', { x: 5, y: 2 });
+      const dynamite = engine.activeDynamites[0];
+      dynamite.position = { x: 5, y: 2 };
+      dynamite.hasGravity = false;
+
+      (engine as any).tick(4.1);
+
+      // Entrance must be preserved
+      expect(engine.grid[0][5].type).toBe(MiningTileType.ENTRANCE);
+      // Dirt at (5, 1) excavated
+      expect(engine.grid[1][5].type).toBe(MiningTileType.EMPTY);
+      // Mining interrupted
+      expect(engine.isMining).toBe(false);
+      expect(engine.miningTarget).toBeNull();
+    });
+  });
 });

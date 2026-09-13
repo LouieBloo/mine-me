@@ -1,5 +1,5 @@
 import { Assets, Graphics, Sprite, Texture, type Container } from 'pixi.js';
-import { getAssetUrl, type MiningDroppedItem } from '@mine-me/shared';
+import { getAssetUrl, type MiningDroppedItem, type MiningActiveDynamite } from '@mine-me/shared';
 import { TILE_SIZE } from './MiningTileRenderer';
 
 export interface ActiveFallingRock {
@@ -118,6 +118,67 @@ export class MiningEntityRenderer {
         fallingRocksContainer.removeChild(view);
         view.destroy();
         fallingRockGraphicsMap.delete(id);
+      }
+    });
+  }
+
+  public static updateActiveDynamites(
+    dynamitesContainer: Container,
+    activeDynamites: MiningActiveDynamite[],
+    dynamiteGraphicsMap: Map<string, Sprite | Graphics>,
+    tileSize: number = TILE_SIZE,
+    dynamiteTexture?: Texture | null
+  ): void {
+    const activeKeys = new Set<string>();
+
+    for (const dynamite of activeDynamites) {
+      activeKeys.add(dynamite.id);
+      let view = dynamiteGraphicsMap.get(dynamite.id);
+
+      if (dynamiteTexture) {
+        if (!view || !(view instanceof Sprite)) {
+          if (view) {
+            dynamitesContainer.removeChild(view);
+            view.destroy();
+          }
+          const sprite = new Sprite(dynamiteTexture);
+          sprite.anchor.set(0.5);
+          sprite.width = tileSize * 0.7;
+          sprite.height = tileSize * 0.7;
+          dynamitesContainer.addChild(sprite);
+          view = sprite;
+          dynamiteGraphicsMap.set(dynamite.id, view);
+        } else if (view.texture !== dynamiteTexture) {
+          view.texture = dynamiteTexture;
+        }
+      } else {
+        if (!view || view instanceof Sprite) {
+          if (view) {
+            dynamitesContainer.removeChild(view);
+            view.destroy();
+          }
+          const graphics = new Graphics();
+          graphics.roundRect(-tileSize * 0.15, -tileSize * 0.3, tileSize * 0.3, tileSize * 0.6, 2);
+          graphics.fill(0xdc2626);
+          graphics.rect(-tileSize * 0.05, -tileSize * 0.4, tileSize * 0.1, tileSize * 0.1);
+          graphics.fill(0xf59e0b);
+          dynamitesContainer.addChild(graphics);
+          view = graphics;
+          dynamiteGraphicsMap.set(dynamite.id, view);
+        }
+      }
+
+      // Position in world pixel coordinates
+      view.x = dynamite.position.x * tileSize;
+      view.y = dynamite.position.y * tileSize;
+    }
+
+    // Clean up dynamites that exploded or were removed
+    dynamiteGraphicsMap.forEach((view, id) => {
+      if (!activeKeys.has(id)) {
+        dynamitesContainer.removeChild(view);
+        view.destroy();
+        dynamiteGraphicsMap.delete(id);
       }
     });
   }

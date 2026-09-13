@@ -6,6 +6,7 @@ import {
   getTileMineTime,
   isTileMineable,
   isTileSolid,
+  type MiningActiveDynamite,
   type MiningBackpackItem,
   type MiningDroppedItem,
   type MiningFallingRock,
@@ -25,6 +26,7 @@ import {
 } from '../miningMap.service';
 import { MiningPlayerBody } from './physics/MiningPlayerBody';
 import { MiningRockEntity } from './physics/MiningRockEntity';
+import { MiningDynamiteEntity } from './physics/MiningDynamiteEntity';
 
 export interface MiningPlayerSession {
   characterId: string;
@@ -73,6 +75,9 @@ export class MiningGameEngine {
   public grid: ServerMiningGrid;
   public activeRocks: MiningRockEntity[] = [];
   private rockCounter = 0;
+
+  public activeDynamites: MiningDynamiteEntity[] = [];
+  private dynamiteCounter = 0;
 
   public players: Map<string, MiningPlayerSession> = new Map();
   public primaryCharacterId: string = '';
@@ -521,6 +526,36 @@ export class MiningGameEngine {
   }
 
   /**
+   * Throw a stick of dynamite from the player's position towards target coordinates.
+   */
+  public throwDynamite(characterId: string, target: MiningPosition): boolean {
+    const session = this.players.get(characterId);
+    if (!session) return false;
+
+    this.dynamiteCounter++;
+    const dynamiteId = `dynamite_${characterId}_${this.dynamiteCounter}_${Date.now()}`;
+
+    const startX = session.playerBody.position.x;
+    const startY = session.playerBody.position.y;
+
+    const dx = target.x - startX;
+    const dy = target.y - startY;
+    const dist = Math.hypot(dx, dy);
+
+    const dirX = dist > 0.001 ? dx / dist : (session.isFacingLeft ? -1 : 1);
+    const dirY = dist > 0.001 ? dy / dist : -0.5;
+
+    // Ballistic toss speed scaled smoothly by target distance
+    const speed = Math.min(18, Math.max(6, dist * 1.5));
+    const vx = dirX * speed;
+    const vy = dirY * speed - 2.5; // slight upward toss arc
+
+    const dynamite = new MiningDynamiteEntity(dynamiteId, { x: startX, y: startY }, { x: vx, y: vy }, 4.0);
+    this.activeDynamites.push(dynamite);
+    return true;
+  }
+
+  /**
    * Main 30 Hz simulation tick execution.
    */
   private tick(dt: number): void {
@@ -572,6 +607,9 @@ export class MiningGameEngine {
 
     // 3. Falling rocks simulation
     this.updateFallingRocks(dt);
+
+    // 3.5. Dynamite continuous physics & fuse countdown simulation
+    this.updateActiveDynamites(dt);
 
     // 4. Validate & trigger mining actions for each player
     for (const session of this.players.values()) {
@@ -697,6 +735,89 @@ export class MiningGameEngine {
       }
       return true;
     });
+  }
+
+  /**
+   * Update active thrown dynamites, integrate physics, count down fuses, and detonate when timer expires.
+   */
+  private updateActiveDynamites(dt: number): void {
+    if (this.activeDynamites.length === 0) return;
+
+    for (const dynamite of this.activeDynamites) {
+      dynamite.update(dt, this.grid);
+      if (dynamite.hasExploded) {
+        this.explodeDynamite(dynamite);
+      }
+    }
+
+    // Remove exploded dynamites from the active game world
+    this.activeDynamites = this.activeDynamites.filter((d) => !d.hasExploded);
+  }
+
+  /**
+   * Explodes a dynamite stick:
+   * Excavates all blocks within a 7-tile radius from epicenter, cleans up tiles,
+   * stops affected player mining, and triggers unsupported rock gravity.
+   */
+  public explodeDynamite(dynamite: MiningDynamiteEntity): void {
+    const cx = Math.floor(dynamite.position.x);
+    const cy = Math.floor(dynamite.position.y);
+    const radius = 7;
+    const radiusSq = radius * radius;
+    const affectedCols = new Set<number>();
+
+    // 1. Excavate all blocks in a 7-tile radius
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (dx * dx + dy * dy <= radiusSq) {
+          const tx = cx + dx;
+          const ty = cy + dy;
+          if (isInBounds(tx, ty)) {
+            const tile = this.grid[ty][tx];
+            // Preserve cavern exit entrance
+            if (tile.type !== MiningTileType.ENTRANCE && tile.type !== MiningTileType.EMPTY) {
+              tile.type = MiningTileType.EMPTY;
+              tile.revealed = true;
+              tile.damageMs = 0;
+              this.pendingRevealedTiles.push({
+                x: tx,
+                y: ty,
+                type: MiningTileType.EMPTY,
+                damageStage: 0,
+              });
+              affectedCols.add(tx);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Interrupt any player currently mining a block inside the blast zone
+    for (const session of this.players.values()) {
+      if (session.isMining && session.miningTarget) {
+        const dtx = session.miningTarget.x - cx;
+        const dty = session.miningTarget.y - cy;
+        if (dtx * dtx + dty * dty <= radiusSq) {
+          this.stopMining(session.characterId);
+        }
+      }
+    }
+
+    // 3. Trigger falling rocks above the cleared cavern columns
+    for (const col of affectedCols) {
+      let highestClearedY = cy + radius;
+      for (let y = Math.max(0, cy - radius); y <= Math.min(MINING_CONFIG.GRID_HEIGHT - 1, cy + radius); y++) {
+        if (this.grid[y][col].type === MiningTileType.EMPTY) {
+          highestClearedY = Math.min(highestClearedY, y);
+        }
+      }
+      this.checkAndTriggerFallingRocks(col, highestClearedY);
+    }
+
+    // 4. Invalidate line of sight caches so players discover newly opened cavern
+    for (const session of this.players.values()) {
+      session.lastRevealGridPos = null;
+    }
   }
 
   /**
@@ -826,6 +947,16 @@ export class MiningGameEngine {
           }))
         : undefined;
 
+    const dynamitesPayload: MiningActiveDynamite[] | undefined =
+      this.activeDynamites.length > 0
+        ? this.activeDynamites.map((d) => ({
+            id: d.id,
+            position: { x: d.position.x, y: d.position.y },
+            velocity: { x: d.velocity.x, y: d.velocity.y },
+            fuseRemainingSeconds: d.fuseRemainingSeconds,
+          }))
+        : undefined;
+
     const revealedToSend = this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined;
 
     for (const session of this.players.values()) {
@@ -859,6 +990,7 @@ export class MiningGameEngine {
         temporaryBackpack: session.backpackDirty ? session.temporaryBackpack : undefined,
         droppedItems: this.droppedItemsDirty ? this.droppedItems : undefined,
         fallingRocks: fallingRocksPayload,
+        activeDynamites: dynamitesPayload,
         revealedTiles: revealedToSend,
         otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
         visionRange: session.visionRange,

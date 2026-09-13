@@ -62,8 +62,8 @@ export const MineView: React.FC = () => {
     setShowDebug((prev) => !prev);
   }, []);
 
-  // Torch and Ladder Placement Mode State from QuickAccessContext
-  const { isPlacingTorch, isPlacingLadder, selectSlot } = useQuickAccess();
+  // Torch, Ladder and Dynamite Placement Mode State from QuickAccessContext
+  const { isPlacingTorch, isPlacingLadder, isThrowingDynamite, selectSlot } = useQuickAccess();
 
   // Auto-select slot 1 only once when first entering the mine
   const initialSelectRef = useRef<boolean>(false);
@@ -80,6 +80,10 @@ export const MineView: React.FC = () => {
 
   const handleLadderPlaced = useCallback(() => {
     // Placement mode stays active until the player runs out of ladders; no toast needed
+  }, []);
+
+  const handleDynamiteThrown = useCallback(() => {
+    // Throw mode stays active until the player runs out of dynamite
   }, []);
 
   const handleVisionChange = useCallback((newVision: number) => {
@@ -274,6 +278,8 @@ export const MineView: React.FC = () => {
             onTorchPlaced={handleTorchPlaced}
             isPlacingLadder={isPlacingLadder}
             onLadderPlaced={handleLadderPlaced}
+            isThrowingDynamite={isThrowingDynamite}
+            onDynamiteThrown={handleDynamiteThrown}
             showDebug={showDebug}
             onToggleDebug={handleToggleDebug}
             onVisionChange={handleVisionChange}

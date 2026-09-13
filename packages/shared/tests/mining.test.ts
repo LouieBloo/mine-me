@@ -136,4 +136,19 @@ describe('Mining Tile Definitions & Helpers', () => {
       expect(fallback.canBeDamaged).toBe(false);
     });
   });
+
+  describe('Dynamite item configuration', () => {
+    it('has DYNAMITE registered under CONSUMABLE item subtypes', async () => {
+      const { ITEM_SUBTYPES } = await import('../src');
+      expect(ITEM_SUBTYPES.CONSUMABLE).toContain('DYNAMITE');
+    });
+
+    it('has Dynamite item configured with subType DYNAMITE in items.json', async () => {
+      const items = (await import('../src/data/items.json')).default;
+      const dynamite = items.find((i: any) => i.name === 'Dynamite');
+      expect(dynamite).toBeDefined();
+      expect(dynamite?.subType).toBe('DYNAMITE');
+      expect(dynamite?.type).toBe('CONSUMABLE');
+    });
+  });
 });

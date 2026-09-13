@@ -146,6 +146,14 @@ export class MiningSessionManager {
       miningTimeMs: (session ? session.miningTimeMs : engine.miningTimeMs) || undefined,
       gameMode: engine.gameMode,
       otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
+      activeDynamites: engine.activeDynamites.length > 0
+        ? engine.activeDynamites.map((d) => ({
+            id: d.id,
+            position: { x: d.position.x, y: d.position.y },
+            velocity: { x: d.velocity.x, y: d.velocity.y },
+            fuseRemainingSeconds: d.fuseRemainingSeconds,
+          }))
+        : undefined,
     };
   }
 

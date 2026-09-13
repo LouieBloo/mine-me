@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { MiningEntityRenderer, type ActiveFallingRock } from './MiningEntityRenderer';
-import type { MiningDroppedItem } from '@mine-me/shared';
+import type { MiningDroppedItem, MiningActiveDynamite } from '@mine-me/shared';
 
 describe('MiningEntityRenderer', () => {
   let container: Container;
@@ -72,5 +72,55 @@ describe('MiningEntityRenderer', () => {
     MiningEntityRenderer.updateDroppedItems(container, [], spritesMap, 64);
     expect(spritesMap.size).toBe(0);
     expect(container.children.length).toBe(0);
+  });
+
+  describe('updateActiveDynamites', () => {
+    it('renders fallback graphics for active dynamites and updates world coordinates', () => {
+      const dynamites: MiningActiveDynamite[] = [
+        {
+          id: 'dyn-1',
+          position: { x: 5.5, y: 4.5 },
+          velocity: { x: 2, y: -1 },
+          fuseRemainingSeconds: 3.5,
+        },
+      ];
+      const viewsMap = new Map<string, Sprite | Graphics>();
+
+      MiningEntityRenderer.updateActiveDynamites(container, dynamites, viewsMap, 64);
+
+      expect(viewsMap.size).toBe(1);
+      const view = viewsMap.get('dyn-1');
+      expect(view).toBeInstanceOf(Graphics);
+      expect(view?.x).toBe(5.5 * 64);
+      expect(view?.y).toBe(4.5 * 64);
+      expect(container.children.length).toBe(1);
+
+      // Clean up when dynamite explodes and is removed
+      MiningEntityRenderer.updateActiveDynamites(container, [], viewsMap, 64);
+      expect(viewsMap.size).toBe(0);
+      expect(container.children.length).toBe(0);
+    });
+
+    it('renders Sprite when dynamiteTexture is provided', () => {
+      const dynamites: MiningActiveDynamite[] = [
+        {
+          id: 'dyn-2',
+          position: { x: 8, y: 6 },
+          velocity: { x: 0, y: 0 },
+          fuseRemainingSeconds: 2.0,
+        },
+      ];
+      const viewsMap = new Map<string, Sprite | Graphics>();
+      const mockTexture = Texture.WHITE;
+
+      MiningEntityRenderer.updateActiveDynamites(container, dynamites, viewsMap, 64, mockTexture);
+
+      expect(viewsMap.size).toBe(1);
+      const sprite = viewsMap.get('dyn-2');
+      expect(sprite).toBeInstanceOf(Sprite);
+      expect((sprite as Sprite).texture).toBe(mockTexture);
+      expect(sprite?.x).toBe(8 * 64);
+      expect(sprite?.y).toBe(6 * 64);
+    });
   });
 });

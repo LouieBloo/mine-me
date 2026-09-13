@@ -23,6 +23,9 @@ interface QuickAccessContextType {
   /** Whether ladder placement mode is currently active */
   isPlacingLadder: boolean;
   setIsPlacingLadder: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Whether dynamite throwing mode is currently active */
+  isThrowingDynamite: boolean;
+  setIsThrowingDynamite: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const QuickAccessContext = createContext<QuickAccessContextType | undefined>(undefined);
@@ -40,6 +43,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(null);
   const [isPlacingTorch, setIsPlacingTorch] = useState<boolean>(false);
   const [isPlacingLadder, setIsPlacingLadder] = useState<boolean>(false);
+  const [isThrowingDynamite, setIsThrowingDynamite] = useState<boolean>(false);
 
   // Load persisted quick slots when activeCharacter changes
   useEffect(() => {
@@ -144,7 +148,21 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         setIsPlacingLadder(false);
       }
     }
-  }, [playerState?.inventory?.items, isPlacingTorch, isPlacingLadder]);
+    if (isThrowingDynamite) {
+      const dynamiteCount = playerState?.inventory?.items
+        ? playerState.inventory.items
+            .filter(
+              (inv) =>
+                inv.item?.subType?.toUpperCase() === 'DYNAMITE' ||
+                inv.item?.name?.toLowerCase().includes('dynamite')
+            )
+            .reduce((sum, inv) => sum + inv.quantity, 0)
+        : 0;
+      if (dynamiteCount === 0) {
+        setIsThrowingDynamite(false);
+      }
+    }
+  }, [playerState?.inventory?.items, isPlacingTorch, isPlacingLadder, isThrowingDynamite]);
 
   // Derive live inventory entry directly from playerState.inventory.items
   const getSlotEntry = useCallback((slotIndex: number): { entry: InventoryEntry | null; totalQuantity: number } => {
@@ -182,6 +200,19 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
     const item = entry.item;
     const isTorch = item.subType?.toUpperCase() === 'TORCH' || item.name.toLowerCase().includes('torch');
     const isLadder = item.subType?.toUpperCase() === 'LADDER' || item.name.toLowerCase().includes('ladder');
+    const isDynamite = item.subType?.toUpperCase() === 'DYNAMITE' || item.name.toLowerCase().includes('dynamite');
+
+    if (isDynamite) {
+      if (totalQuantity <= 0) {
+        notificationService.error('No Dynamite', 'You do not have any dynamite left.');
+        setIsThrowingDynamite(false);
+        return;
+      }
+      setIsPlacingTorch(false);
+      setIsPlacingLadder(false);
+      setIsThrowingDynamite((prev) => !prev);
+      return;
+    }
 
     if (isTorch) {
       if (totalQuantity <= 0) {
@@ -190,6 +221,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         return;
       }
       setIsPlacingLadder(false);
+      setIsThrowingDynamite(false);
       setIsPlacingTorch(prev => !prev);
       return;
     }
@@ -201,13 +233,15 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         return;
       }
       setIsPlacingTorch(false);
+      setIsThrowingDynamite(false);
       setIsPlacingLadder(prev => !prev);
       return;
     }
 
-    // Reset placement modes if switching to another item
+    // Reset placement and throwing modes if switching to another item
     setIsPlacingTorch(false);
     setIsPlacingLadder(false);
+    setIsThrowingDynamite(false);
 
     if (item.type === 'GEAR') {
       if (!entry.equipped) {
@@ -288,6 +322,8 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         setIsPlacingTorch,
         isPlacingLadder,
         setIsPlacingLadder,
+        isThrowingDynamite,
+        setIsThrowingDynamite,
       }}
     >
       {children}
