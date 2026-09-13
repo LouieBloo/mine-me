@@ -338,3 +338,237 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
     expect(playerBodyRef.current.position.y).not.toBeCloseTo(posAfterJumpFrame + 0.3, 1);
   });
 });
+
+describe('useMiningTicker - Torch Preview Lighting', () => {
+  let mockApp: any;
+  let tickerCallbacks: (() => void)[] = [];
+  let playerContainer: any;
+  let gridContainer: any;
+  let currentRenderPosRef: any;
+  let targetServerPosRef: any;
+  let isFacingLeftRef: any;
+  let playerFacingDirRef: any;
+  let playerSpriteRef: any;
+  let activeFallingRocksRef: any;
+  let fallingRockGraphicsMap: any;
+  let debugGraphicsRef: any;
+  let showDebugRef: any;
+  let flashlightRef: any;
+  let lightingEngineRef: any;
+  let cameraRef: any;
+  let playerBodyRef: any;
+  let gridRef: any;
+  let keysPressedRef: any;
+  let isMiningRef: any;
+  let miningTargetRef: any;
+  let mockLightingEngine: any;
+  let mockLights: Map<string, any>;
+  let reticleState: any;
+  let mouseControllerRef: any;
+
+  beforeEach(() => {
+    tickerCallbacks = [];
+    mockApp = {
+      ticker: {
+        deltaMS: 16.67,
+        add: vi.fn((cb) => tickerCallbacks.push(cb)),
+        remove: vi.fn((cb) => {
+          tickerCallbacks = tickerCallbacks.filter((c) => c !== cb);
+        }),
+      },
+      screen: { width: 800, height: 600 },
+    };
+
+    playerContainer = { x: 0, y: 0 };
+    gridContainer = { x: 0, y: 0 };
+    currentRenderPosRef = { current: { x: 2, y: 4 } };
+    targetServerPosRef = { current: { x: 2, y: 4 } };
+    isFacingLeftRef = { current: false };
+    playerFacingDirRef = { current: { x: 1, y: 0 } };
+    playerSpriteRef = {
+      current: {
+        setFlipped: vi.fn(),
+        setState: vi.fn(),
+        setMoveVelocity: vi.fn(),
+        update: vi.fn(),
+      },
+    };
+    activeFallingRocksRef = { current: [] };
+    fallingRockGraphicsMap = { current: new Map() };
+    debugGraphicsRef = { current: null };
+    showDebugRef = { current: false };
+    flashlightRef = { current: null };
+    cameraRef = { current: null };
+    playerBodyRef = { current: new MiningPlayerBody({ x: 2, y: 4 }) };
+    gridRef = { current: [] };
+    keysPressedRef = {
+      current: {
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+        jump: false,
+        miningKey: false,
+        miningTarget: null,
+        sequence: 0,
+      },
+    };
+    isMiningRef = { current: false };
+    miningTargetRef = { current: null };
+
+    mockLights = new Map();
+    mockLightingEngine = {
+      addLight: vi.fn((light: any) => mockLights.set(light.id, light)),
+      removeLight: vi.fn((id: string) => mockLights.delete(id)),
+      getLight: vi.fn((id: string) => mockLights.get(id)),
+      markLightmapDirty: vi.fn(),
+      update: vi.fn(),
+    };
+    lightingEngineRef = { current: mockLightingEngine };
+
+    reticleState = { active: false, target: null, style: null };
+    mouseControllerRef = {
+      current: {
+        getReticleState: vi.fn(() => reticleState),
+        setPlayerPosition: vi.fn(),
+        setCamera: vi.fn(),
+        update: vi.fn(),
+        getWorldMousePosition: vi.fn(() => null),
+      },
+    };
+  });
+
+  const renderTickerHook = () => {
+    return renderHook(() =>
+      useMiningTicker({
+        app: mockApp,
+        playerContainerRef: { current: playerContainer },
+        gridContainerRef: { current: gridContainer },
+        fallingRocksContainerRef: { current: null },
+        currentRenderPosRef,
+        targetServerPosRef,
+        isFacingLeftRef,
+        playerFacingDirRef,
+        playerSpriteRef,
+        activeFallingRocksRef,
+        fallingRockGraphicsMap,
+        debugGraphicsRef,
+        showDebugRef,
+        flashlightRef,
+        lightingEngineRef,
+        cameraRef,
+        playerBodyRef,
+        gridRef,
+        keysPressedRef,
+        isMiningRef,
+        miningTargetRef,
+        mouseControllerRef,
+      })
+    );
+  };
+
+  it('adds normal torch point light to LightingEngine when in torch preview mode', () => {
+    renderTickerHook();
+
+    reticleState = {
+      active: true,
+      target: { x: 5, y: 7 },
+      style: {
+        showPreview: true,
+        previewType: 'TORCH',
+      },
+    };
+
+    tickerCallbacks[0]();
+
+    expect(mockLightingEngine.addLight).toHaveBeenCalledTimes(1);
+    const addedLight = mockLightingEngine.addLight.mock.calls[0][0];
+    expect(addedLight.id).toBe('torch_preview');
+    expect(addedLight.position.x).toBeCloseTo(5.446, 3);
+    expect(addedLight.position.y).toBeCloseTo(7.35, 3);
+    expect(addedLight.color).toBe(0xf59e0b);
+    expect(addedLight.baseIntensity).toBe(1.25);
+    expect(addedLight.flicker).toEqual({
+      speed: 4.0,
+      amount: 0.15,
+    });
+  });
+
+  it('updates existing torch preview light position and marks lightmap dirty when target tile changes', () => {
+    renderTickerHook();
+
+    // Step 1: Preview at (5, 7)
+    reticleState = {
+      active: true,
+      target: { x: 5, y: 7 },
+      style: { showPreview: true, previewType: 'TORCH' },
+    };
+    tickerCallbacks[0]();
+
+    const addedLight = mockLightingEngine.addLight.mock.calls[0][0];
+    expect(addedLight.position.x).toBeCloseTo(5.446, 3);
+    expect(mockLightingEngine.addLight).toHaveBeenCalledTimes(1);
+
+    // Step 2: Hover moves to adjacent valid tile (6, 7)
+    reticleState.target = { x: 6, y: 7 };
+    tickerCallbacks[0]();
+
+    // Should NOT create another light, but update position and mark dirty
+    expect(mockLightingEngine.addLight).toHaveBeenCalledTimes(1);
+    expect(addedLight.position.x).toBeCloseTo(6.446, 3);
+    expect(addedLight.position.y).toBeCloseTo(7.35, 3);
+    expect(mockLightingEngine.markLightmapDirty).toHaveBeenCalled();
+  });
+
+  it('removes torch preview light when preview mode is no longer active', () => {
+    renderTickerHook();
+
+    // Activate preview
+    reticleState = {
+      active: true,
+      target: { x: 5, y: 7 },
+      style: { showPreview: true, previewType: 'TORCH' },
+    };
+    tickerCallbacks[0]();
+    expect(mockLights.has('torch_preview')).toBe(true);
+
+    // Move to invalid tile (showPreview: false)
+    reticleState = {
+      active: true,
+      target: { x: 8, y: 8 },
+      style: { showPreview: false },
+    };
+    tickerCallbacks[0]();
+
+    expect(mockLightingEngine.removeLight).toHaveBeenCalledWith('torch_preview');
+    expect(mockLights.has('torch_preview')).toBe(false);
+  });
+
+  it('does not add torch preview light when previewType is LADDER', () => {
+    renderTickerHook();
+
+    reticleState = {
+      active: true,
+      target: { x: 5, y: 7 },
+      style: { showPreview: true, previewType: 'LADDER' },
+    };
+    tickerCallbacks[0]();
+
+    expect(mockLightingEngine.addLight).not.toHaveBeenCalled();
+  });
+
+  it('cleans up torch preview light on unmount', () => {
+    const { unmount } = renderTickerHook();
+
+    reticleState = {
+      active: true,
+      target: { x: 5, y: 7 },
+      style: { showPreview: true, previewType: 'TORCH' },
+    };
+    tickerCallbacks[0]();
+    expect(mockLights.has('torch_preview')).toBe(true);
+
+    unmount();
+    expect(mockLightingEngine.removeLight).toHaveBeenCalledWith('torch_preview');
+  });
+});

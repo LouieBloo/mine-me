@@ -7,8 +7,21 @@
     "textureUrl": null,
     "mineTimeMs": 1000,
     "staminaCost": 1,
+    "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.321Z",
-    "updatedAt": "2026-08-17T04:06:41.170Z"
+    "updatedAt": "2026-09-13T00:55:27.133Z"
+  },
+  {
+    "id": "block_copperium",
+    "typeKey": "COPPERIUM",
+    "name": "Copperium Ore",
+    "description": "Dense rock embedded with warm copper deposits and energetic fissures.",
+    "textureUrl": "/assets/mining/block_copperium-block.png",
+    "mineTimeMs": 1200,
+    "staminaCost": 1,
+    "idleParticleEffectId": "pe_fairy_sparkle",
+    "createdAt": "2026-09-13T00:55:27.153Z",
+    "updatedAt": "2026-09-13T01:09:40.606Z"
   },
   {
     "id": "block_dirt",
@@ -18,8 +31,9 @@
     "textureUrl": "/assets/mining/block_dirt-block.jpg",
     "mineTimeMs": 500,
     "staminaCost": 1,
+    "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.305Z",
-    "updatedAt": "2026-08-22T16:26:58.075Z"
+    "updatedAt": "2026-09-13T00:55:27.138Z"
   },
   {
     "id": "block_entrance",
@@ -29,8 +43,9 @@
     "textureUrl": "/assets/mining/block_entrance-block.png",
     "mineTimeMs": 0,
     "staminaCost": 0,
+    "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.325Z",
-    "updatedAt": "2026-08-17T04:06:41.178Z"
+    "updatedAt": "2026-09-13T00:55:27.142Z"
   },
   {
     "id": "block_mineral",
@@ -40,8 +55,9 @@
     "textureUrl": "/assets/mining/block_mineral-block.png",
     "mineTimeMs": 1500,
     "staminaCost": 1,
+    "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.316Z",
-    "updatedAt": "2026-08-17T04:06:41.181Z"
+    "updatedAt": "2026-09-13T00:55:27.146Z"
   },
   {
     "id": "block_rock",
@@ -51,7 +67,20 @@
     "textureUrl": "/assets/mining/block_rock-block.jpg",
     "mineTimeMs": 0,
     "staminaCost": 0,
+    "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.310Z",
-    "updatedAt": "2026-08-22T16:25:11.787Z"
+    "updatedAt": "2026-09-13T00:55:27.150Z"
+  },
+  {
+    "id": "block_silverium",
+    "typeKey": "SILVERIUM",
+    "name": "Silverium Ore",
+    "description": "Lustrous silver ore veins glowing with concentrated subterranean energy.",
+    "textureUrl": "/assets/mining/block_silverium-block.png",
+    "mineTimeMs": 2000,
+    "staminaCost": 2,
+    "idleParticleEffectId": "pe_fairy_sparkle",
+    "createdAt": "2026-09-13T00:55:27.158Z",
+    "updatedAt": "2026-09-13T01:10:09.553Z"
   }
 ]

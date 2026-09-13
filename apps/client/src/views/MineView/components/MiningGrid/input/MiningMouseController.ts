@@ -1,4 +1,12 @@
-import { MINING_CONFIG, MiningTileType, isTileMineable, type MiningClientTile, type MiningPosition, type Vector2D } from '@mine-me/shared';
+import {
+  MINING_CONFIG,
+  MiningTileType,
+  MouseActionTriggerMode,
+  isTileMineable,
+  type MiningClientTile,
+  type MiningPosition,
+  type Vector2D,
+} from '@mine-me/shared';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 import type { IMouseAction, ReticleStyle } from './MouseAction';
@@ -19,6 +27,9 @@ export class MiningMouseController {
   private tileSize: number;
 
   private isMouseDown = false;
+  private isExecutingAction = false;
+  private lastExecutedTarget: MiningPosition | null = null;
+  private lastExecutedTime = 0;
   private activeAction: IMouseAction | null = null;
   private hoveredTile: MiningPosition | null = null;
   private screenMousePos: Vector2D | null = null;
@@ -59,6 +70,7 @@ export class MiningMouseController {
     this.canvas = null;
     this.hoveredTile = null;
     this.screenMousePos = null;
+    this.lastExecutedTarget = null;
     if (this.isMouseDown) {
       this.isMouseDown = false;
       this.notifyMiningListeners(false, null);
@@ -79,7 +91,26 @@ export class MiningMouseController {
   }
 
   public setActiveAction(action: IMouseAction | null): void {
+    const isSameAction =
+      (!this.activeAction && !action) ||
+      (this.activeAction &&
+        action &&
+        this.activeAction.name === action.name &&
+        this.activeAction.triggerMode === action.triggerMode);
+
+    if (isSameAction) {
+      this.activeAction = action;
+      return;
+    }
+
     this.activeAction = action;
+    this.lastExecutedTarget = null;
+    // If switching or clearing active action while mouse was pressed down,
+    // reset isMouseDown to prevent accidental actions or runaway mining.
+    if (this.isMouseDown) {
+      this.isMouseDown = false;
+      this.notifyMiningListeners(false, null);
+    }
   }
 
   public getActiveAction(): IMouseAction | null {
@@ -276,6 +307,11 @@ export class MiningMouseController {
         this.notifyMiningListeners(true, tile);
       }
     }
+
+    // Continuous execution for actions with HOLD trigger mode (e.g. Ladder placement)
+    if (this.isMouseDown && this.activeAction?.triggerMode === MouseActionTriggerMode.HOLD && tile) {
+      this.tryExecuteActiveAction(tile);
+    }
   }
 
   private handlePointerMove = (e: PointerEvent): void => {
@@ -300,46 +336,84 @@ export class MiningMouseController {
       return;
     }
 
+    this.isMouseDown = true;
     this.screenMousePos = { x: e.clientX, y: e.clientY };
     const tile = this.screenToGridTile(e.clientX, e.clientY) || this.hoveredTile;
     this.hoveredTile = tile;
+    this.lastExecutedTarget = null;
 
     if (this.activeAction) {
-      if (!tile) return;
-      const target = { ...tile };
-      const canDo = this.activeAction.canExecute(target, this.playerPos, this.grid);
-      if (!canDo) {
-        this.notifyActionListeners(this.activeAction, target, false);
-        return;
-      }
-
-      try {
-        const success = await this.activeAction.execute(target, this.playerPos);
-        this.notifyActionListeners(this.activeAction, target, success);
-      } catch (err) {
-        console.error('[Mining Mouse] Action execution error:', err);
-        this.notifyActionListeners(this.activeAction, target, false);
+      if (tile) {
+        await this.tryExecuteActiveAction(tile);
       }
       return;
     }
 
     // Default left-click action is Mining
-    this.isMouseDown = true;
     this.notifyMiningListeners(true, tile);
   };
+
+  private async tryExecuteActiveAction(target: MiningPosition): Promise<boolean> {
+    if (!this.activeAction || this.isExecutingAction) return false;
+
+    const now = performance.now();
+    if (this.activeAction.cooldownMs && now - this.lastExecutedTime < this.activeAction.cooldownMs) {
+      return false;
+    }
+
+    // Avoid duplicate execution on the exact same tile while held
+    if (
+      this.lastExecutedTarget &&
+      this.lastExecutedTarget.x === target.x &&
+      this.lastExecutedTarget.y === target.y
+    ) {
+      return false;
+    }
+
+    const canDo = this.activeAction.canExecute(target, this.playerPos, this.grid);
+    if (!canDo) {
+      // For single-click actions, notify listeners of invalid attempt
+      if (this.activeAction.triggerMode === MouseActionTriggerMode.SINGLE) {
+        this.notifyActionListeners(this.activeAction, target, false);
+      }
+      return false;
+    }
+
+    this.isExecutingAction = true;
+    this.lastExecutedTarget = { ...target };
+    this.lastExecutedTime = now;
+
+    try {
+      const success = await this.activeAction.execute(target, this.playerPos);
+      this.notifyActionListeners(this.activeAction, target, success);
+      return success;
+    } catch (err) {
+      console.error('[Mining Mouse] Action execution error:', err);
+      this.notifyActionListeners(this.activeAction, target, false);
+      return false;
+    } finally {
+      this.isExecutingAction = false;
+    }
+  }
 
   private handlePointerUp = (e: PointerEvent): void => {
     if (e.button !== 0) return;
     if (this.isMouseDown) {
       this.isMouseDown = false;
-      this.notifyMiningListeners(false, null);
+      this.lastExecutedTarget = null;
+      if (!this.activeAction) {
+        this.notifyMiningListeners(false, null);
+      }
     }
   };
 
   private handleBlur = (): void => {
     if (this.isMouseDown) {
       this.isMouseDown = false;
-      this.notifyMiningListeners(false, null);
+      this.lastExecutedTarget = null;
+      if (!this.activeAction) {
+        this.notifyMiningListeners(false, null);
+      }
     }
   };
 
@@ -348,7 +422,10 @@ export class MiningMouseController {
     this.screenMousePos = null;
     if (this.isMouseDown) {
       this.isMouseDown = false;
-      this.notifyMiningListeners(false, null);
+      this.lastExecutedTarget = null;
+      if (!this.activeAction) {
+        this.notifyMiningListeners(false, null);
+      }
     }
     this.notifyHoverListeners();
   };

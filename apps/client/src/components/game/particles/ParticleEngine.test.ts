@@ -105,7 +105,7 @@ describe('ParticleEngine', () => {
   });
 
   it('should manage continuous emitters', () => {
-    const emitter = engine.addEmitter(continuousConfig, { x: 200, y: 200 });
+    const emitter = engine.addEmitter(continuousConfig, { x: 200, y: 200 }, { stagger: false });
     expect(engine.getEmitterCount()).toBe(1);
 
     // Update by 0.1s: rate is 20/s, so accumulator reaches 2 particles
@@ -120,6 +120,13 @@ describe('ParticleEngine', () => {
     emitter.stop();
     engine.update(0.1);
     expect(engine.getEmitterCount()).toBe(0);
+  });
+
+  it('should stagger initial accumulator when stagger option is enabled by default', () => {
+    const emitter = engine.addEmitter(continuousConfig, { x: 0, y: 0 });
+    // continuousConfig rate is 20, interval is 0.05s. Initial accumulator is in [-0.05, 0]
+    expect(emitter.accumulator).toBeLessThanOrEqual(0);
+    expect(emitter.accumulator).toBeGreaterThanOrEqual(-0.05);
   });
 
   it('should respect emitter duration', () => {

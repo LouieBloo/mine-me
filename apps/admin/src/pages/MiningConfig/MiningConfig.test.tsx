@@ -127,4 +127,61 @@ describe('MiningConfig Page', () => {
 
     expect(screen.getByText('65%')).toBeInTheDocument();
   });
+
+  it('renders ore vein inputs and displays ore stats in metrics', async () => {
+    mockFetchWithAuth.mockImplementation((url: string) => {
+      if (url === '/api/admin/mining-config') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => DEFAULT_MINING_MAP_CONFIG,
+        });
+      }
+      if (url === '/api/admin/mining-config/preview') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            seed: 12345,
+            stats: {
+              width: 45,
+              height: 45,
+              totalTiles: 2025,
+              emptyCount: 450,
+              solidCount: 1575,
+              mineralCount: 150,
+              rockCount: 180,
+              chestCount: 4,
+              copperiumCount: 42,
+              silveriumCount: 18,
+              voidPercentage: 22.7,
+              solidPercentage: 77.3,
+            },
+            tiles: Array.from({ length: 45 }, () => Array.from({ length: 45 }, () => 1)),
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+
+    render(
+      <ToastProvider>
+        <BrowserRouter>
+          <MiningConfig />
+        </BrowserRouter>
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('MINE GENERATOR CONFIG')).toBeInTheDocument();
+    });
+
+    expect(screen.getByLabelText(/Copperium Abundance/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Silverium Abundance/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Silverium Min Depth/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Ore Cluster Chance/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText('42')).toBeInTheDocument();
+      expect(screen.getByText('18')).toBeInTheDocument();
+    });
+  });
 });

@@ -107,7 +107,7 @@ export class MiningMapGenerator {
     this.carveCaverns();
     this.carveTunnels();
     this.protectSurfaceAndSpawn();
-    this.placeMinerals();
+    this.placeOreVeins();
     this.placeRocks();
     this.placeChests();
     return this.grid;
@@ -257,11 +257,49 @@ export class MiningMapGenerator {
     }
   }
 
-  private placeMinerals(): void {
+  /**
+   * Places discrete ore veins/nodes for Copperium and Silverium.
+   * - Copperium is a common metal ore found across mid and deep strata.
+   * - Silverium is a rarer precious ore constrained to deeper strata (>= silveriumMinDepth).
+   * - Ores spawn as discrete multi-tile nodes/clusters (random 2-5 contiguous tiles per node).
+   */
+  private placeOreVeins(): void {
+    const clusterChance = (this.config.oreClusterChance ?? 65) / 100;
+
+    // 1. Place Copperium Veins
+    this.spawnOreType({
+      tileType: MiningTileType.COPPERIUM,
+      percentage: this.config.copperiumPercentage ?? 4,
+      minDepth: 2,
+      clusterChance,
+      maxClusterSize: 5,
+    });
+
+    // 2. Place Silverium Veins (rarer, strictly deep)
+    this.spawnOreType({
+      tileType: MiningTileType.SILVERIUM,
+      percentage: this.config.silveriumPercentage ?? 2,
+      minDepth: this.config.silveriumMinDepth ?? 12,
+      clusterChance: Math.min(0.8, clusterChance * 1.1),
+      maxClusterSize: 4,
+    });
+  }
+
+  private spawnOreType(opts: {
+    tileType: MiningTileType;
+    percentage: number;
+    minDepth: number;
+    clusterChance: number;
+    maxClusterSize: number;
+  }): void {
+    if (opts.percentage <= 0) return;
+
     const eligibleDirt: MiningPosition[] = [];
-    for (let y = 1; y < this.height; y++) {
+    for (let y = Math.max(1, opts.minDepth); y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         if (this.grid[y][x].type === MiningTileType.DIRT) {
+          // Avoid entrance corridor
+          if (y <= 2 && Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= 1) continue;
           eligibleDirt.push({ x, y });
         }
       }
@@ -269,9 +307,9 @@ export class MiningMapGenerator {
 
     if (eligibleDirt.length === 0) return;
 
-    const targetCount = Math.max(1, Math.floor((eligibleDirt.length * this.config.mineralPercentage) / 100));
+    const targetCount = Math.max(1, Math.floor((eligibleDirt.length * opts.percentage) / 100));
 
-    // Fisher-Yates shuffle
+    // Fisher-Yates shuffle seed positions
     for (let i = eligibleDirt.length - 1; i > 0; i--) {
       const j = Math.floor(this.rng() * (i + 1));
       [eligibleDirt[i], eligibleDirt[j]] = [eligibleDirt[j], eligibleDirt[i]];
@@ -279,33 +317,50 @@ export class MiningMapGenerator {
 
     let placed = 0;
     let idx = 0;
+
     while (placed < targetCount && idx < eligibleDirt.length) {
       const seedPos = eligibleDirt[idx++];
       if (this.grid[seedPos.y][seedPos.x].type !== MiningTileType.DIRT) continue;
 
-      // Avoid placing immediately below entrance
-      if (seedPos.y === 1 && Math.abs(seedPos.x - MINING_CONFIG.ENTRANCE_X) <= 1) continue;
-
-      this.grid[seedPos.y][seedPos.x] = { type: MiningTileType.MINERAL, revealed: false };
+      this.grid[seedPos.y][seedPos.x] = { type: opts.tileType, revealed: false };
       placed++;
 
-      // Vein clustering: expand to 1 or 2 adjacent dirt blocks
-      if (this.rng() < 0.5 && placed < targetCount) {
+      // Clustered node expansion: expand organically to contiguous neighbors
+      const clusterTarget = 1 + Math.floor(this.rng() * opts.maxClusterSize);
+      let clusterCount = 1;
+      const queue: MiningPosition[] = [seedPos];
+
+      while (queue.length > 0 && clusterCount < clusterTarget && placed < targetCount) {
+        const curr = queue.shift()!;
+        if (this.rng() > opts.clusterChance) continue;
+
         const neighbors = [
-          { x: seedPos.x + 1, y: seedPos.y },
-          { x: seedPos.x - 1, y: seedPos.y },
-          { x: seedPos.x, y: seedPos.y + 1 },
-          { x: seedPos.x, y: seedPos.y - 1 },
+          { x: curr.x + 1, y: curr.y },
+          { x: curr.x - 1, y: curr.y },
+          { x: curr.x, y: curr.y + 1 },
+          { x: curr.x, y: curr.y - 1 },
         ];
+
+        // Shuffle neighbors for organic vein shapes
+        for (let i = neighbors.length - 1; i > 0; i--) {
+          const j = Math.floor(this.rng() * (i + 1));
+          [neighbors[i], neighbors[j]] = [neighbors[j], neighbors[i]];
+        }
+
         for (const n of neighbors) {
           if (
-            n.x >= 0 && n.x < this.width && n.y >= 2 && n.y < this.height &&
+            n.x >= 0 &&
+            n.x < this.width &&
+            n.y >= opts.minDepth &&
+            n.y < this.height &&
             this.grid[n.y][n.x].type === MiningTileType.DIRT &&
-            placed < targetCount
+            placed < targetCount &&
+            clusterCount < clusterTarget
           ) {
-            this.grid[n.y][n.x] = { type: MiningTileType.MINERAL, revealed: false };
+            this.grid[n.y][n.x] = { type: opts.tileType, revealed: false };
             placed++;
-            if (this.rng() < 0.5) break;
+            clusterCount++;
+            queue.push(n);
           }
         }
       }

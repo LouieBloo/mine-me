@@ -89,4 +89,15 @@ describe('ItemDetail Page', () => {
     fireEvent.click(climbCheckbox);
     expect(climbCheckbox.checked).toBe(true);
   });
+
+  it('renders Trigger Mode selector and allows changing to HOLD', async () => {
+    renderDetail('item_torch');
+    expect(await screen.findByText('Trigger Mode')).toBeDefined();
+
+    const triggerModeSelect = screen.getByLabelText(/Trigger Mode/i) as HTMLSelectElement;
+    expect(triggerModeSelect.value).toBe('SINGLE');
+
+    fireEvent.change(triggerModeSelect, { target: { value: 'HOLD' } });
+    expect(triggerModeSelect.value).toBe('HOLD');
+  });
 });

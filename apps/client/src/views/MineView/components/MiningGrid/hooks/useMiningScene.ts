@@ -10,6 +10,8 @@ import { ParticleEngine } from '../../../../../components/game/particles/Particl
 import {
   MiningTileType,
   MINING_CONFIG,
+  DEFAULT_PARTICLE_EFFECTS,
+  type ParticleEffectConfig,
   getAssetUrl,
   type MiningSessionClientState,
   type Vector2D,
@@ -51,8 +53,14 @@ export function useMiningScene({
   const tileGraphicsMap = useRef<Map<string, Graphics>>(new Map());
   const tileSpritesMap = useRef<Map<string, Sprite>>(new Map());
   const blockTexturesRef = useRef<Map<number, Texture>>(new Map());
+  const blockParticleConfigsRef = useRef<Map<MiningTileType, ParticleEffectConfig>>(
+    new Map([
+      [MiningTileType.COPPERIUM, DEFAULT_PARTICLE_EFFECTS.fairy_sparkle],
+      [MiningTileType.SILVERIUM, DEFAULT_PARTICLE_EFFECTS.fairy_sparkle],
+    ])
+  );
   const droppedSpritesMap = useRef<Map<string, Sprite | Graphics>>(new Map());
-  const fallingRockGraphicsMap = useRef<Map<string, Graphics>>(new Map());
+  const fallingRockGraphicsMap = useRef<Map<string, Sprite | Graphics>>(new Map());
 
   const playerSpriteRef = useRef<ModularCharacterSprite | null>(null);
   const otherPlayersContainerRef = useRef<Container | null>(null);
@@ -226,9 +234,19 @@ export function useMiningScene({
         if (res.ok) {
           const blocks = await res.json();
           for (const blk of blocks) {
-            if (blk.textureUrl) {
-              const tileType = MiningTileType[blk.typeKey as keyof typeof MiningTileType];
-              if (tileType !== undefined) {
+            const tileType = MiningTileType[blk.typeKey as keyof typeof MiningTileType];
+            if (tileType !== undefined) {
+              if (blk.idleParticleEffect?.config) {
+                blockParticleConfigsRef.current.set(tileType, blk.idleParticleEffect.config);
+              } else if (blk.idleParticleEffect?.name && (DEFAULT_PARTICLE_EFFECTS as Record<string, any>)[blk.idleParticleEffect.name]) {
+                blockParticleConfigsRef.current.set(tileType, (DEFAULT_PARTICLE_EFFECTS as Record<string, any>)[blk.idleParticleEffect.name]);
+              } else if (blk.idleParticleEffectId && (DEFAULT_PARTICLE_EFFECTS as Record<string, any>)[blk.idleParticleEffectId]) {
+                blockParticleConfigsRef.current.set(tileType, (DEFAULT_PARTICLE_EFFECTS as Record<string, any>)[blk.idleParticleEffectId]);
+              } else if (blk.idleParticleEffectId === null) {
+                blockParticleConfigsRef.current.delete(tileType);
+              }
+
+              if (blk.textureUrl) {
                 const p = Assets.load(getAssetUrl(blk.textureUrl))
                   .then((tex) => {
                     blockTexturesRef.current.set(tileType, tex);
@@ -267,6 +285,42 @@ export function useMiningScene({
             console.warn('[MiningGrid] Could not load default ladder texture:', e);
           });
         blockPromises.push(ladderFallbackPromise);
+
+        // Fallback for rock texture
+        const rockTileUrl = getAssetUrl('/assets/mining/block_rock-block.jpg');
+        const rockFallbackPromise = Assets.load(rockTileUrl)
+          .then((texture) => {
+            blockTexturesRef.current.set(MiningTileType.ROCK, texture);
+            setTileTextureLoaded((prev) => prev + 1);
+          })
+          .catch((e) => {
+            console.warn('[MiningGrid] Could not load default rock texture:', e);
+          });
+        blockPromises.push(rockFallbackPromise);
+
+        // Fallback for Copperium texture
+        const copperiumTileUrl = getAssetUrl('/assets/mining/block_copperium-block.jpg');
+        const copperiumFallbackPromise = Assets.load(copperiumTileUrl)
+          .then((texture) => {
+            blockTexturesRef.current.set(MiningTileType.COPPERIUM, texture);
+            setTileTextureLoaded((prev) => prev + 1);
+          })
+          .catch((e) => {
+            console.warn('[MiningGrid] Could not load default copperium texture:', e);
+          });
+        blockPromises.push(copperiumFallbackPromise);
+
+        // Fallback for Silverium texture
+        const silveriumTileUrl = getAssetUrl('/assets/mining/block_silverium-block.jpg');
+        const silveriumFallbackPromise = Assets.load(silveriumTileUrl)
+          .then((texture) => {
+            blockTexturesRef.current.set(MiningTileType.SILVERIUM, texture);
+            setTileTextureLoaded((prev) => prev + 1);
+          })
+          .catch((e) => {
+            console.warn('[MiningGrid] Could not load default silverium texture:', e);
+          });
+        blockPromises.push(silveriumFallbackPromise);
       }
 
       // Always load Torch and Ladder tile textures
@@ -281,7 +335,7 @@ export function useMiningScene({
         });
       blockPromises.push(torchPromise);
 
-      const ladderAlwaysTileUrl = getAssetUrl('/assets/mining/block_entrance-block.png');
+      const ladderAlwaysTileUrl = getAssetUrl('/assets/icons/items/cmts2w7ql0000ji8t408x8rci_icon.png');
       const ladderAlwaysPromise = Assets.load(ladderAlwaysTileUrl)
         .then((texture) => {
           blockTexturesRef.current.set(MiningTileType.LADDER, texture);
@@ -397,5 +451,6 @@ export function useMiningScene({
     lightingEngineRef,
     flashlightRef,
     particleEngineRef,
+    blockParticleConfigsRef,
   };
 }

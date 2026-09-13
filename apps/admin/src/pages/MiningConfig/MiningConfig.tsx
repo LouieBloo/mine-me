@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
-import { DEFAULT_MINING_MAP_CONFIG, type MiningMapConfigData } from '@mine-me/shared';
+import { DEFAULT_MINING_MAP_CONFIG, MiningTileType, type MiningMapConfigData } from '@mine-me/shared';
 import './MiningConfig.css';
 
 interface PreviewStats {
@@ -14,6 +14,8 @@ interface PreviewStats {
   mineralCount: number;
   rockCount: number;
   chestCount: number;
+  copperiumCount?: number;
+  silveriumCount?: number;
   voidPercentage: number;
   solidPercentage: number;
 }
@@ -37,6 +39,10 @@ const PRESETS: Record<string, Partial<MiningMapConfigData>> = {
     rockPercentage: 12,
     mineralPercentage: 10,
     chestCount: 4,
+    copperiumPercentage: 4,
+    silveriumPercentage: 2,
+    silveriumMinDepth: 12,
+    oreClusterChance: 65,
   },
   'Sprawling Caverns': {
     cavernDensity: 65,
@@ -50,6 +56,10 @@ const PRESETS: Record<string, Partial<MiningMapConfigData>> = {
     rockPercentage: 10,
     mineralPercentage: 12,
     chestCount: 6,
+    copperiumPercentage: 5,
+    silveriumPercentage: 3,
+    silveriumMinDepth: 10,
+    oreClusterChance: 70,
   },
   'Winding Labyrinth': {
     cavernDensity: 20,
@@ -63,6 +73,10 @@ const PRESETS: Record<string, Partial<MiningMapConfigData>> = {
     rockPercentage: 14,
     mineralPercentage: 10,
     chestCount: 5,
+    copperiumPercentage: 3,
+    silveriumPercentage: 2,
+    silveriumMinDepth: 14,
+    oreClusterChance: 60,
   },
   'Solid Deep Core': {
     cavernDensity: 15,
@@ -76,6 +90,10 @@ const PRESETS: Record<string, Partial<MiningMapConfigData>> = {
     rockPercentage: 18,
     mineralPercentage: 14,
     chestCount: 4,
+    copperiumPercentage: 6,
+    silveriumPercentage: 4,
+    silveriumMinDepth: 8,
+    oreClusterChance: 80,
   },
 };
 
@@ -113,16 +131,20 @@ export default function MiningConfig() {
         let color = '#78350f'; // DIRT
         if (y === 0 && x === 22) {
           color = '#10b981'; // ENTRANCE (emerald)
-        } else if (type === 0) {
+        } else if (type === MiningTileType.EMPTY) {
           color = '#090d16'; // EMPTY / Void
-        } else if (type === 1) {
+        } else if (type === MiningTileType.DIRT) {
           color = '#78350f'; // DIRT
-        } else if (type === 2) {
+        } else if (type === MiningTileType.ROCK) {
           color = '#64748b'; // ROCK
-        } else if (type === 3) {
+        } else if (type === MiningTileType.MINERAL) {
           color = '#f59e0b'; // MINERAL
-        } else if (type === 4) {
+        } else if (type === MiningTileType.CHEST) {
           color = '#eab308'; // CHEST
+        } else if (type === MiningTileType.COPPERIUM) {
+          color = '#b45309'; // COPPERIUM (burnished copper)
+        } else if (type === MiningTileType.SILVERIUM) {
+          color = '#38bdf8'; // SILVERIUM (electric cyan/silver)
         }
 
         ctx.fillStyle = color;
@@ -492,23 +514,7 @@ export default function MiningConfig() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label htmlFor="mineralPercentage" className="text-sm font-semibold text-slate-700">
-                  Mineral Veins (%)
-                </label>
-                <input
-                  id="mineralPercentage"
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={config.mineralPercentage}
-                  onChange={e => handleFieldChange('mineralPercentage', Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-                <p className="text-xs text-slate-400">% of solid ground.</p>
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label htmlFor="rockPercentage" className="text-sm font-semibold text-slate-700">
                   Falling Rocks (%)
@@ -539,6 +545,84 @@ export default function MiningConfig() {
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
                 />
                 <p className="text-xs text-slate-400">Placed on cavern floors.</p>
+              </div>
+            </div>
+
+            {/* Ore Veins & Clustering */}
+            <div className="border-t border-slate-100 pt-4 space-y-3">
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>⚡</span> Ore Veins & Discrete Nodes
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Controls node clustering and generation for Copperium and Silverium.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label htmlFor="copperiumPercentage" className="text-sm font-semibold text-slate-700">
+                    Copperium Abundance (%)
+                  </label>
+                  <input
+                    id="copperiumPercentage"
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={config.copperiumPercentage ?? 4}
+                    onChange={e => handleFieldChange('copperiumPercentage', Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <p className="text-xs text-slate-400">Common conductive ore throughout strata.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="silveriumPercentage" className="text-sm font-semibold text-slate-700">
+                    Silverium Abundance (%)
+                  </label>
+                  <input
+                    id="silveriumPercentage"
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={config.silveriumPercentage ?? 2}
+                    onChange={e => handleFieldChange('silveriumPercentage', Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <p className="text-xs text-slate-400">Rarer high-grade energy conductor.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="silveriumMinDepth" className="text-sm font-semibold text-slate-700">
+                    Silverium Min Depth (Tiles)
+                  </label>
+                  <input
+                    id="silveriumMinDepth"
+                    type="number"
+                    min="1"
+                    max="40"
+                    value={config.silveriumMinDepth ?? 12}
+                    onChange={e => handleFieldChange('silveriumMinDepth', Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <p className="text-xs text-slate-400">Prevents Silverium from appearing near surface.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="oreClusterChance" className="text-sm font-semibold text-slate-700">
+                    Ore Cluster Chance (%)
+                  </label>
+                  <input
+                    id="oreClusterChance"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={config.oreClusterChance ?? 65}
+                    onChange={e => handleFieldChange('oreClusterChance', Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <p className="text-xs text-slate-400">Probability of expanding seed into 2-5 contiguous tiles.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -603,7 +687,7 @@ export default function MiningConfig() {
             </div>
 
             {/* Map Legend */}
-            <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-semibold text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200">
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-xs bg-[#10b981] inline-block"></span>
                 <span>Entrance</span>
@@ -621,18 +705,22 @@ export default function MiningConfig() {
                 <span>Rocks</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-xs bg-[#f59e0b] inline-block"></span>
-                <span>Minerals</span>
-              </div>
-              <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-xs bg-[#eab308] inline-block"></span>
                 <span>Chests</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-xs bg-[#b45309] inline-block"></span>
+                <span>Copperium</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-xs bg-[#38bdf8] inline-block"></span>
+                <span>Silverium</span>
               </div>
             </div>
 
             {/* Summary Metrics */}
             {previewData?.stats && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
                   <div className="text-xl font-black text-blue-600">{previewData.stats.voidPercentage}%</div>
                   <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Cave Openings</div>
@@ -642,16 +730,20 @@ export default function MiningConfig() {
                   <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Solid Strata</div>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
-                  <div className="text-xl font-black text-amber-500">{previewData.stats.mineralCount}</div>
-                  <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Minerals</div>
-                </div>
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
                   <div className="text-xl font-black text-slate-600">{previewData.stats.rockCount}</div>
                   <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Rocks</div>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
                   <div className="text-xl font-black text-yellow-500">{previewData.stats.chestCount}</div>
                   <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Chests</div>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+                  <div className="text-xl font-black text-amber-600">{previewData.stats.copperiumCount ?? 0}</div>
+                  <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Copperium</div>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+                  <div className="text-xl font-black text-sky-500">{previewData.stats.silveriumCount ?? 0}</div>
+                  <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Silverium</div>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
                   <div className="text-xl font-black text-slate-800">{previewData.stats.totalTiles}</div>

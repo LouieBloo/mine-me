@@ -1,4 +1,5 @@
 import type { GearSubType } from './index';
+import type { ParticleEffect } from './particles';
 
 // ============================================================================
 // Mining Mini-Game Types & Constants
@@ -22,7 +23,7 @@ export const MINING_CONFIG = {
   ENTRANCE_Y: 0,
 
   /** Default vision range in tiles (cardinally adjacent) */
-  DEFAULT_VISION_RANGE: 3,
+  DEFAULT_VISION_RANGE: 6,
 
   /** Stamina cost per block mined */
   MINING_STAMINA_COST: 1,
@@ -59,9 +60,9 @@ export const MINING_CONFIG = {
   /** Lighting system configuration */
   SUNLIGHT_MAX_DEPTH: 8, // tiles before sunlight fully fades
   SUNLIGHT_LATERAL_FALLOFF: 0.4, // multiplier per lateral tile
-  FLASHLIGHT_RADIUS: 5.5, // tiles
+  FLASHLIGHT_RADIUS: 11.0, // tiles (scaled with doubled vision range)
   FLASHLIGHT_CONE_ANGLE: 75, // degrees
-  FLASHLIGHT_AURA_RADIUS: 1.6, // small 360° aura so player is never blind behind
+  FLASHLIGHT_AURA_RADIUS: 3.2, // small 360° aura so player is never blind behind (doubled from 1.6)
   TORCH_RADIUS: 3.8, // tiles
   TORCH_FLICKER_SPEED: 4.0, // Hz
   TORCH_FLICKER_AMOUNT: 0.15, // intensity variation
@@ -87,11 +88,13 @@ export const MiningTileType = {
   ENTRANCE: 5,
   LADDER: 6,
   TORCH: 7,
+  COPPERIUM: 8,
+  SILVERIUM: 9,
 } as const;
 
 export type MiningTileType = (typeof MiningTileType)[keyof typeof MiningTileType];
 
-export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE';
+export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE' | 'COPPERIUM' | 'SILVERIUM';
 
 export interface MiningBlockConfig {
   id: string;
@@ -101,6 +104,8 @@ export interface MiningBlockConfig {
   textureUrl?: string | null;
   mineTimeMs: number;
   staminaCost: number;
+  idleParticleEffectId?: string | null;
+  idleParticleEffect?: ParticleEffect | null;
   createdAt?: string | Date;
   updatedAt?: string | Date;
 }
@@ -120,6 +125,8 @@ export interface MiningTileDefinition {
   isTransparent: boolean;
   /** Default duration in ms to mine this block (if mineable) */
   defaultMineTimeMs?: number;
+  /** Name of the particle effect to emit from this tile */
+  particleEffect?: string;
 }
 
 export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinition> = {
@@ -198,6 +205,26 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     isClimbable: false,
     isTransparent: true,
   },
+  [MiningTileType.COPPERIUM]: {
+    type: MiningTileType.COPPERIUM,
+    name: 'Copperium',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    defaultMineTimeMs: 1200,
+  },
+  [MiningTileType.SILVERIUM]: {
+    type: MiningTileType.SILVERIUM,
+    name: 'Silverium',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    defaultMineTimeMs: 2000,
+  },
 };
 
 export function getTileDefinition(type: MiningTileType): MiningTileDefinition {
@@ -228,11 +255,39 @@ export function getTileMineTime(type: MiningTileType): number {
   return getTileDefinition(type).defaultMineTimeMs ?? MINING_CONFIG.DIRT_MINE_TIME_MS;
 }
 
+export function getTileParticleEffect(
+  type: MiningTileType,
+  blockConfigs?: Map<MiningTileType, MiningBlockConfig> | Record<string, any>
+): string | undefined {
+  if (blockConfigs) {
+    const config = blockConfigs instanceof Map ? blockConfigs.get(type) : blockConfigs[type];
+    if (config?.idleParticleEffect?.name) {
+      return config.idleParticleEffect.name;
+    }
+    if (config?.idleParticleEffectId) {
+      return config.idleParticleEffectId;
+    }
+  }
+  return getTileDefinition(type).particleEffect;
+}
+
 export function canPlaceBuildable(buildableType: MiningTileType, targetType: MiningTileType): boolean {
   if (targetType === MiningTileType.ENTRANCE) return false;
   if (targetType === buildableType) return false;
   return true;
 }
+
+/**
+ * Defines the trigger mode for mouse actions, tools, and usable items.
+ * - SINGLE: Triggers once per click (requires releasing and clicking again to re-trigger).
+ * - HOLD: Triggers repeatedly / continuously as long as the mouse button is held down and conditions are met.
+ */
+export const MouseActionTriggerMode = {
+  SINGLE: 'SINGLE',
+  HOLD: 'HOLD',
+} as const;
+
+export type MouseActionTriggerMode = (typeof MouseActionTriggerMode)[keyof typeof MouseActionTriggerMode];
 
 
 // ---------------------------------------------------------------------------
@@ -399,6 +454,8 @@ export interface MiningStateTickPayload {
   revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
   /** Other players in the shared room during multiplayer sessions. */
   otherPlayers?: MiningRemotePlayer[];
+  /** Current vision discovery range in tiles. */
+  visionRange?: number;
 }
 
 /**
@@ -420,6 +477,10 @@ export interface MiningMapConfigData {
   rockPercentage: number;
   mineralPercentage: number;
   chestCount: number;
+  copperiumPercentage: number;
+  silveriumPercentage: number;
+  silveriumMinDepth: number;
+  oreClusterChance: number;
 }
 
 export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
@@ -436,5 +497,9 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   rockPercentage: MINING_CONFIG.ROCK_PERCENTAGE,
   mineralPercentage: MINING_CONFIG.MINERAL_PERCENTAGE,
   chestCount: MINING_CONFIG.TREASURE_CHEST_COUNT,
+  copperiumPercentage: 4,
+  silveriumPercentage: 2,
+  silveriumMinDepth: 12,
+  oreClusterChance: 65,
 };
 

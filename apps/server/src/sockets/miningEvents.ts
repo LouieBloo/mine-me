@@ -379,6 +379,33 @@ export const handleMiningCancel = async (
 };
 
 /**
+ * Handler: mining_increase_vision
+ * Increases the player's view distance temporarily for this mining game session,
+ * and immediately reveals newly uncovered surrounding tiles.
+ */
+export const handleMiningIncreaseVision = async (
+  io: Server,
+  socket: Socket,
+  payload?: { amount?: number }
+): Promise<GameEventResult> => {
+  const characterId = socket.data.characterId;
+  if (!characterId) return { success: false, error: 'No character selected.' };
+
+  const engine = miningSessionManager.getSession(characterId);
+  if (!engine) return { success: false, error: 'No active mining session.' };
+
+  const delta = typeof payload?.amount === 'number' && payload.amount > 0 ? payload.amount : 1;
+  const newVision = engine.increaseVisionRange(characterId, delta);
+
+  return {
+    success: true,
+    data: {
+      visionRange: newVision,
+    },
+  };
+};
+
+/**
  * Clean up mining session on disconnect.
  */
 export const cleanupMiningSession = async (characterId: string): Promise<void> => {

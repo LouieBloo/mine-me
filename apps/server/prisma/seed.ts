@@ -113,7 +113,7 @@ async function main() {
   // 2. Seed Items
   const items = JSON.parse(fs.readFileSync(path.join(dataPath, 'items.json'), 'utf-8'));
   for (const itemData of items) {
-    const { dropTableItems, cityMaterials, inventoryItems, itemEffects, ...itemRoot } = itemData;
+    const { dropTableItems, cityMaterials, inventoryItems, itemEffects, particleEffect, ...itemRoot } = itemData;
     await prisma.item.upsert({
       where: { id: itemRoot.id },
       update: itemRoot,
@@ -223,6 +223,7 @@ async function main() {
           textureUrl: blockData.textureUrl,
           mineTimeMs: blockData.mineTimeMs,
           staminaCost: blockData.staminaCost,
+          idleParticleEffectId: blockData.idleParticleEffectId || null,
         },
         create: {
           id: blockData.id,
@@ -232,6 +233,7 @@ async function main() {
           textureUrl: blockData.textureUrl,
           mineTimeMs: blockData.mineTimeMs,
           staminaCost: blockData.staminaCost,
+          idleParticleEffectId: blockData.idleParticleEffectId || null,
         },
       });
     }

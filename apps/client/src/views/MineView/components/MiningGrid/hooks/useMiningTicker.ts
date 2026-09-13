@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import type { Application, Container, Graphics, Texture } from 'pixi.js';
+import type { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import type { ModularCharacterSprite } from '../../../../../components/game/sprites';
 import type { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
+import { PointLight } from '../../../../../components/game/lighting/PointLight';
 import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
@@ -25,7 +26,7 @@ export interface UseMiningTickerOptions {
   playerSpriteRef: React.RefObject<ModularCharacterSprite | null>;
   remotePlayerRendererRef?: React.RefObject<MiningRemotePlayerRenderer | null>;
   activeFallingRocksRef: React.MutableRefObject<ActiveFallingRock[]>;
-  fallingRockGraphicsMap: React.MutableRefObject<Map<string, Graphics>>;
+  fallingRockGraphicsMap: React.MutableRefObject<Map<string, Sprite | Graphics>>;
   reticleGraphicsRef?: React.RefObject<Graphics | null>;
   mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
   debugGraphicsRef: React.RefObject<Graphics | null>;
@@ -274,13 +275,15 @@ export function useMiningTicker({
       }
 
       miningProfiler.startSection('Falling Rocks');
-      // Render active falling rocks in continuous space
+      // Render active falling rocks in continuous space with rock texture/sprite
       if (fallingRocksContainer) {
+        const rockTexture = blockTexturesRef?.current?.get(MiningTileType.ROCK);
         MiningEntityRenderer.updateFallingRocks(
           fallingRocksContainer,
           activeFallingRocksRef.current,
           fallingRockGraphicsMap.current,
-          TILE_SIZE
+          TILE_SIZE,
+          rockTexture
         );
       }
 
@@ -384,6 +387,51 @@ export function useMiningTicker({
         flashlight.setDirection(playerFacingDirRef.current.x, playerFacingDirRef.current.y);
       }
 
+      // Update dynamic torch preview lighting when hovering in valid torch placement mode
+      const lightingEngine = lightingEngineRef.current;
+      if (lightingEngine) {
+        const reticleState = mouseControllerRef?.current?.getReticleState();
+        const isTorchPreview = Boolean(
+          reticleState?.active &&
+            reticleState?.target &&
+            reticleState?.style?.showPreview &&
+            reticleState?.style?.previewType === 'TORCH'
+        );
+
+        const TORCH_PREVIEW_LIGHT_ID = 'torch_preview';
+        const previewLight = lightingEngine.getLight(TORCH_PREVIEW_LIGHT_ID);
+
+        if (isTorchPreview && reticleState?.target) {
+          const targetX = reticleState.target.x + 0.446;
+          const targetY = reticleState.target.y + 0.35;
+
+          if (previewLight) {
+            if (previewLight.position.x !== targetX || previewLight.position.y !== targetY) {
+              previewLight.setPosition(targetX, targetY);
+              lightingEngine.markLightmapDirty();
+            }
+          } else {
+            lightingEngine.addLight(
+              new PointLight(
+                TORCH_PREVIEW_LIGHT_ID,
+                { x: targetX, y: targetY },
+                0xf59e0b,
+                1.25,
+                MINING_CONFIG.TORCH_RADIUS,
+                {
+                  flicker: {
+                    speed: MINING_CONFIG.TORCH_FLICKER_SPEED,
+                    amount: MINING_CONFIG.TORCH_FLICKER_AMOUNT,
+                  },
+                }
+              )
+            );
+          }
+        } else if (previewLight) {
+          lightingEngine.removeLight(TORCH_PREVIEW_LIGHT_ID);
+        }
+      }
+
       // Update and re-render lighting engine lightmap
       lightingEngineRef.current?.update(dt, currentPos, playerFacingDirRef.current);
 
@@ -401,6 +449,7 @@ export function useMiningTicker({
       if (renderer && originalRender) {
         renderer.render = originalRender;
       }
+      lightingEngineRef.current?.removeLight('torch_preview');
     };
   }, [app]);
 }

@@ -14,7 +14,6 @@ import {
   DEFAULT_PARTICLE_EFFECTS,
   getAssetUrl,
   canTileBeDamaged,
-  isTileTransparent,
 } from '@mine-me/shared';
 import { PointLight } from '../../../../components/game/lighting/PointLight';
 import type { EmitterHandle } from '../../../../components/game/particles/ParticleEngine';
@@ -43,6 +42,7 @@ interface MiningGridProps {
   onLadderPlaced?: () => void;
   showDebug?: boolean;
   onToggleDebug?: () => void;
+  onVisionChange?: (newVision: number) => void;
 }
 
 export const MiningGrid: React.FC<MiningGridProps> = ({
@@ -57,9 +57,13 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onLadderPlaced,
   showDebug,
   onToggleDebug,
+  onVisionChange,
 }) => {
   const { app } = usePixiStage();
   const { onEvent, sendGameEvent } = useSocket();
+
+  const onVisionChangeRef = useRef(onVisionChange);
+  onVisionChangeRef.current = onVisionChange;
 
   // Authoritative in-memory grid ref (avoids React state thrashing and 5,000-tile clones)
   const gridRef = useRef<MiningClientTile[][]>(
@@ -136,6 +140,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     lightingEngineRef,
     flashlightRef,
     particleEngineRef,
+    blockParticleConfigsRef,
   } = useMiningScene({
     app,
     initialSessionState,
@@ -147,6 +152,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   });
 
   const torchEmittersRef = useRef<Map<string, EmitterHandle>>(new Map());
+  const blockEmittersRef = useRef<Map<string, EmitterHandle>>(new Map());
 
   // Attach canvas to MouseController and sync camera
   useEffect(() => {
@@ -169,11 +175,35 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   useEffect(() => {
     const mouseController = mouseControllerRef.current;
     if (isPlacingTorch) {
+      const torchItem = playerState?.inventory?.items?.find(
+        (inv: any) =>
+          inv.item?.subType?.toUpperCase() === 'TORCH' ||
+          inv.item?.name?.toLowerCase().includes('torch')
+      )?.item;
+
       mouseController.setActiveAction(
         new TorchPlacementAction(async (target) => {
           try {
             const res = await sendGameEvent({ type: 'mining_place_torch', target });
             if (res.success) {
+              const tile = gridRef.current[target.y]?.[target.x];
+              if (tile) {
+                tile.type = MiningTileType.TORCH;
+                tile.revealed = true;
+                tile.damageStage = 0;
+              }
+              const tilesContainer = tilesContainerRef.current;
+              if (tilesContainer && containersReady) {
+                MiningTileRenderer.updateRevealedTiles(
+                  tilesContainer,
+                  [{ x: target.x, y: target.y, type: MiningTileType.TORCH }],
+                  gridRef.current,
+                  blockTexturesRef.current,
+                  tileGraphicsMap.current,
+                  tileSpritesMap.current,
+                  TILE_SIZE
+                );
+              }
               onTorchPlaced?.();
               return true;
             } else {
@@ -185,14 +215,38 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
             notificationService.error('Error', err.message || 'Failed to place torch.');
             return false;
           }
-        })
+        }, torchItem?.triggerMode)
       );
     } else if (isPlacingLadder) {
+      const ladderItem = playerState?.inventory?.items?.find(
+        (inv: any) =>
+          inv.item?.subType?.toUpperCase() === 'LADDER' ||
+          inv.item?.name?.toLowerCase().includes('ladder')
+      )?.item;
+
       mouseController.setActiveAction(
         new LadderPlacementAction(async (target) => {
           try {
             const res = await sendGameEvent({ type: 'mining_place_ladder', target });
             if (res.success) {
+              const tile = gridRef.current[target.y]?.[target.x];
+              if (tile) {
+                tile.type = MiningTileType.LADDER;
+                tile.revealed = true;
+                tile.damageStage = 0;
+              }
+              const tilesContainer = tilesContainerRef.current;
+              if (tilesContainer && containersReady) {
+                MiningTileRenderer.updateRevealedTiles(
+                  tilesContainer,
+                  [{ x: target.x, y: target.y, type: MiningTileType.LADDER }],
+                  gridRef.current,
+                  blockTexturesRef.current,
+                  tileGraphicsMap.current,
+                  tileSpritesMap.current,
+                  TILE_SIZE
+                );
+              }
               onLadderPlaced?.();
               return true;
             } else {
@@ -204,12 +258,17 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
             notificationService.error('Error', err.message || 'Failed to place ladder.');
             return false;
           }
-        })
+        }, ladderItem?.triggerMode)
       );
     } else {
       mouseController.setActiveAction(null);
+      lightingEngineRef.current?.removeLight('torch_preview');
     }
-  }, [isPlacingTorch, isPlacingLadder, sendGameEvent, onTorchPlaced, onLadderPlaced]);
+
+    return () => {
+      lightingEngineRef.current?.removeLight('torch_preview');
+    };
+  }, [isPlacingTorch, isPlacingLadder, sendGameEvent, onTorchPlaced, onLadderPlaced, containersReady, playerState?.inventory?.items]);
 
   // Real-time Input Controls Hook
   const { keysPressedRef } = useMiningInput({
@@ -223,6 +282,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     mouseControllerRef,
     zoom,
     onZoomChange,
+    onVisionChange,
   });
 
   // Initial Full-Grid Render & Initial Dynamic Tile Lights
@@ -245,24 +305,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
       gridRef.current.forEach((row, y) => {
         row.forEach((tile, x) => {
-          const mineralLightId = `mineral_${x}_${y}`;
           const chestLightId = `chest_${x}_${y}`;
           const torchLightId = `torch_${x}_${y}`;
-
-          if (tile.revealed && tile.type === MiningTileType.MINERAL) {
-            if (!lightingEngine.getLight(mineralLightId)) {
-              lightingEngine.addLight(
-                new PointLight(
-                  mineralLightId,
-                  { x: x + 0.5, y: y + 0.5 },
-                  0x38bdf8,
-                  0.75,
-                  1.6,
-                  { pulse: { speed: 2.5, minIntensity: 0.35, maxIntensity: 0.85 } }
-                )
-              );
-            }
-          }
 
           if (tile.revealed && tile.type === MiningTileType.CHEST) {
             if (!lightingEngine.getLight(chestLightId)) {
@@ -305,9 +349,29 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
               torchEmittersRef.current.set(torchLightId, emitter);
             }
           }
+
+          // Ambient block particle effects from dynamic config (NO LIGHT)
+          const particleConfig = tile.revealed ? blockParticleConfigsRef.current.get(tile.type) : undefined;
+          if (particleConfig && particleEngineRef.current) {
+            const blockEmitterId = `block_effect_${x}_${y}`;
+            if (!blockEmittersRef.current.has(blockEmitterId)) {
+              const emitter = particleEngineRef.current.addEmitter(
+                particleConfig,
+                { x: (x + 0.5) * TILE_SIZE, y: (y + 0.5) * TILE_SIZE }
+              );
+              blockEmittersRef.current.set(blockEmitterId, emitter);
+            }
+          }
         });
       });
     }
+
+    return () => {
+      torchEmittersRef.current.forEach((emitter) => emitter.destroy());
+      torchEmittersRef.current.clear();
+      blockEmittersRef.current.forEach((emitter) => emitter.destroy());
+      blockEmittersRef.current.clear();
+    };
   }, [containersReady, tileTextureLoaded]);
 
   // Real-time 30 Hz server ticks subscription (updates refs & graphics incrementally with ZERO React re-renders)
@@ -324,6 +388,11 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       // Update remote players
       if (remotePlayerRendererRef.current && payload.otherPlayers) {
         remotePlayerRendererRef.current.updatePlayers(payload.otherPlayers);
+      }
+
+      // Update vision range if provided
+      if (payload.visionRange !== undefined) {
+        onVisionChangeRef.current?.(payload.visionRange);
       }
 
       // Incremental Tile Updates
@@ -369,7 +438,17 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
               if (wasDestroyed) {
                 // Block broke completely: trigger full break crumble
                 lastDamageParticleTimeRef.current.delete(tileKey);
-                if (prevTile.type === MiningTileType.MINERAL) {
+                const blockEmitterId = `block_effect_${rt.x}_${rt.y}`;
+                if (blockEmittersRef.current.has(blockEmitterId)) {
+                  blockEmittersRef.current.get(blockEmitterId)?.destroy();
+                  blockEmittersRef.current.delete(blockEmitterId);
+                }
+
+                const prevParticleConfig = blockParticleConfigsRef.current.get(prevTile.type);
+                if (prevParticleConfig) {
+                  particleEngineRef.current.spawnBurst(prevParticleConfig, hitPos);
+                  particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
+                } else if (prevTile.type === MiningTileType.MINERAL) {
                   particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
                 } else {
                   particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_hit, hitPos);
@@ -379,7 +458,11 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
                 const lastTime = lastDamageParticleTimeRef.current.get(tileKey) || 0;
                 if (now - lastTime >= 240) {
                   lastDamageParticleTimeRef.current.set(tileKey, now);
-                  if (prevTile.type === MiningTileType.MINERAL) {
+                  const prevParticleConfig = blockParticleConfigsRef.current.get(prevTile.type);
+                  if (prevParticleConfig) {
+                    particleEngineRef.current.spawnBurst(prevParticleConfig, hitPos);
+                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
+                  } else if (prevTile.type === MiningTileType.MINERAL) {
                     particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
                   } else {
                     particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_chip, hitPos);
@@ -410,42 +493,19 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           miningProfiler.recordExternal('Tile Reveal Render', performance.now() - tileRenderStart);
         }
 
-        // Update sunlight & dynamic lights for revealed tiles
+        // Sync lights with modified tiles
         const lightingEngine = lightingEngineRef.current;
         if (lightingEngine) {
-          const affectsSunlight = payload.revealedTiles.some(
-            (rt) => rt.y <= MINING_CONFIG.SUNLIGHT_MAX_DEPTH + 1 && isTileTransparent(rt.type)
-          );
-          if (affectsSunlight) {
-            lightingEngine.markSunlightDirty(grid);
-          }
+          lightingEngine.updateGrid(grid);
 
           for (const rt of payload.revealedTiles) {
-            const x = rt.x;
-            const y = rt.y;
+            const { x, y } = rt;
             const tile = grid[y]?.[x];
             if (!tile) continue;
 
-            const mineralLightId = `mineral_${x}_${y}`;
             const chestLightId = `chest_${x}_${y}`;
             const torchLightId = `torch_${x}_${y}`;
-
-            if (tile.revealed && tile.type === MiningTileType.MINERAL) {
-              if (!lightingEngine.getLight(mineralLightId)) {
-                lightingEngine.addLight(
-                  new PointLight(
-                    mineralLightId,
-                    { x: x + 0.5, y: y + 0.5 },
-                    0x38bdf8,
-                    0.75,
-                    1.6,
-                    { pulse: { speed: 2.5, minIntensity: 0.35, maxIntensity: 0.85 } }
-                  )
-                );
-              }
-            } else {
-              lightingEngine.removeLight(mineralLightId);
-            }
+            const blockEmitterId = `block_effect_${x}_${y}`;
 
             if (tile.revealed && tile.type === MiningTileType.CHEST) {
               if (!lightingEngine.getLight(chestLightId)) {
@@ -496,6 +556,23 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
                 torchEmittersRef.current.delete(torchLightId);
               }
             }
+
+            // Continuous block particle effect from dynamic config (NO LIGHT)
+            const particleConfig = tile.revealed ? blockParticleConfigsRef.current.get(tile.type) : undefined;
+            if (particleConfig && particleEngineRef.current) {
+              if (!blockEmittersRef.current.has(blockEmitterId)) {
+                const emitter = particleEngineRef.current.addEmitter(
+                  particleConfig,
+                  { x: (x + 0.5) * TILE_SIZE, y: (y + 0.5) * TILE_SIZE }
+                );
+                blockEmittersRef.current.set(blockEmitterId, emitter);
+              }
+            } else {
+              if (blockEmittersRef.current.has(blockEmitterId)) {
+                blockEmittersRef.current.get(blockEmitterId)?.destroy();
+                blockEmittersRef.current.delete(blockEmitterId);
+              }
+            }
           }
         }
 
@@ -521,6 +598,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       cleanup();
       torchEmittersRef.current.forEach((emitter) => emitter.destroy());
       torchEmittersRef.current.clear();
+      blockEmittersRef.current.forEach((emitter) => emitter.destroy());
+      blockEmittersRef.current.clear();
     };
   }, [onEvent, containersReady]);
 

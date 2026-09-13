@@ -31,6 +31,10 @@ export async function getActiveMiningConfig(): Promise<MiningMapConfigData> {
         rockPercentage: config.rockPercentage,
         mineralPercentage: config.mineralPercentage,
         chestCount: config.chestCount,
+        copperiumPercentage: config.copperiumPercentage,
+        silveriumPercentage: config.silveriumPercentage,
+        silveriumMinDepth: config.silveriumMinDepth,
+        oreClusterChance: config.oreClusterChance,
       };
       return cachedConfig;
     }
@@ -62,6 +66,10 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     rockPercentage: data.rockPercentage ?? existing?.rockPercentage ?? DEFAULT_MINING_MAP_CONFIG.rockPercentage,
     mineralPercentage: data.mineralPercentage ?? existing?.mineralPercentage ?? DEFAULT_MINING_MAP_CONFIG.mineralPercentage,
     chestCount: data.chestCount ?? existing?.chestCount ?? DEFAULT_MINING_MAP_CONFIG.chestCount,
+    copperiumPercentage: data.copperiumPercentage ?? existing?.copperiumPercentage ?? DEFAULT_MINING_MAP_CONFIG.copperiumPercentage,
+    silveriumPercentage: data.silveriumPercentage ?? existing?.silveriumPercentage ?? DEFAULT_MINING_MAP_CONFIG.silveriumPercentage,
+    silveriumMinDepth: data.silveriumMinDepth ?? existing?.silveriumMinDepth ?? DEFAULT_MINING_MAP_CONFIG.silveriumMinDepth,
+    oreClusterChance: data.oreClusterChance ?? existing?.oreClusterChance ?? DEFAULT_MINING_MAP_CONFIG.oreClusterChance,
     isActive: true,
   };
 
@@ -93,13 +101,18 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     rockPercentage: saved.rockPercentage,
     mineralPercentage: saved.mineralPercentage,
     chestCount: saved.chestCount,
+    copperiumPercentage: saved.copperiumPercentage,
+    silveriumPercentage: saved.silveriumPercentage,
+    silveriumMinDepth: saved.silveriumMinDepth,
+    oreClusterChance: saved.oreClusterChance,
   };
 
   return cachedConfig;
 }
 
 export async function resetMiningConfig(): Promise<MiningMapConfigData> {
-  return updateMiningConfig(DEFAULT_MINING_MAP_CONFIG);
+  const res = await updateMiningConfig(DEFAULT_MINING_MAP_CONFIG);
+  return res;
 }
 
 export function clearMiningConfigCache(): void {

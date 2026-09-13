@@ -75,6 +75,7 @@ export const getItemEnums = (req: Request, res: Response) => {
     types: ITEM_TYPES,
     subTypes: ITEM_SUBTYPES,
     rarities: ITEM_RARITIES,
+    triggerModes: ['SINGLE', 'HOLD'],
   });
 };
 

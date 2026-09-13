@@ -82,6 +82,13 @@ export const MineView: React.FC = () => {
     // Placement mode stays active until the player runs out of ladders; no toast needed
   }, []);
 
+  const handleVisionChange = useCallback((newVision: number) => {
+    setMiningSession((prev) => {
+      if (!prev || prev.visionRange === newVision) return prev;
+      return { ...prev, visionRange: newVision };
+    });
+  }, [setMiningSession]);
+
   // Track whether session has already been extracted/cleaned up so unmount doesn't double-cancel
   const isCleanedUpRef = useRef<boolean>(false);
 
@@ -269,6 +276,7 @@ export const MineView: React.FC = () => {
             onLadderPlaced={handleLadderPlaced}
             showDebug={showDebug}
             onToggleDebug={handleToggleDebug}
+            onVisionChange={handleVisionChange}
           />
         </PixiStageProvider>
       )}

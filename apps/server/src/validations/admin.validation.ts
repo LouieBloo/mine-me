@@ -32,6 +32,7 @@ export const itemValidation = [
   body('isStartingPiece').optional().isBoolean().withMessage('isStartingPiece must be a boolean'),
   body('canBeDamaged').optional().isBoolean().withMessage('canBeDamaged must be a boolean'),
   body('canBeClimbed').optional().isBoolean().withMessage('canBeClimbed must be a boolean'),
+  body('triggerMode').optional().isIn(['SINGLE', 'HOLD']).withMessage('triggerMode must be SINGLE or HOLD'),
   body('experience').optional().isInt({ min: 0 }).withMessage('Experience must be >= 0'),
   body('combatScore').optional().isInt({ min: 0 }).withMessage('Combat Score must be >= 0'),
   body('defenseScore').optional().isInt({ min: 0 }).withMessage('Defense Score must be >= 0'),
@@ -96,4 +97,8 @@ export const miningConfigValidation = [
   body('rockPercentage').optional().isInt({ min: 0, max: 50 }).withMessage('Rock Percentage must be between 0 and 50'),
   body('mineralPercentage').optional().isInt({ min: 0, max: 50 }).withMessage('Mineral Percentage must be between 0 and 50'),
   body('chestCount').optional().isInt({ min: 0, max: 20 }).withMessage('Chest Count must be between 0 and 20'),
+  body('copperiumPercentage').optional().isInt({ min: 0, max: 30 }).withMessage('Copperium Percentage must be between 0 and 30'),
+  body('silveriumPercentage').optional().isInt({ min: 0, max: 20 }).withMessage('Silverium Percentage must be between 0 and 20'),
+  body('silveriumMinDepth').optional().isInt({ min: 1, max: 40 }).withMessage('Silverium Min Depth must be between 1 and 40'),
+  body('oreClusterChance').optional().isInt({ min: 0, max: 100 }).withMessage('Ore Cluster Chance must be between 0 and 100'),
 ];

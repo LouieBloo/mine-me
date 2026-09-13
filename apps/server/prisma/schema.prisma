@@ -90,6 +90,7 @@ model Item {
   defenseScore    Int             @default(0)
   canBeDamaged    Boolean         @default(false)
   canBeClimbed    Boolean         @default(false)
+  triggerMode     MouseActionTriggerMode @default(SINGLE)
   particleEffectId String?
   particleEffect   ParticleEffect? @relation(fields: [particleEffectId], references: [id], onDelete: SetNull)
   createdAt       DateTime        @default(now())
@@ -200,15 +201,17 @@ model ObjectEffects {
 }
 
 model MiningBlock {
-  id          String   @id @default(cuid())
-  typeKey     String   @unique
-  name        String
-  description String?
-  textureUrl  String?
-  mineTimeMs  Int      @default(500)
-  staminaCost Int      @default(1)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String          @id @default(cuid())
+  typeKey              String          @unique
+  name                 String
+  description          String?
+  textureUrl           String?
+  mineTimeMs           Int             @default(500)
+  staminaCost          Int             @default(1)
+  idleParticleEffectId String?
+  idleParticleEffect   ParticleEffect? @relation(fields: [idleParticleEffectId], references: [id], onDelete: SetNull)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 }
 
 model MiningMapConfig {
@@ -224,23 +227,28 @@ model MiningMapConfig {
   tunnelMaxLength   Int      @default(30)
   tunnelWidth       Int      @default(1)
   tunnelMinDepth    Int      @default(2)
-  rockPercentage    Int      @default(12)
-  mineralPercentage Int      @default(10)
-  chestCount        Int      @default(4)
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  rockPercentage      Int      @default(12)
+  mineralPercentage   Int      @default(10)
+  chestCount          Int      @default(4)
+  copperiumPercentage Int      @default(4)
+  silveriumPercentage Int      @default(2)
+  silveriumMinDepth   Int      @default(12)
+  oreClusterChance    Int      @default(65)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model ParticleEffect {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?
-  type        String   @default("CONTINUOUS")
-  config      Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  items       Item[]
+  id           String        @id @default(cuid())
+  name         String        @unique
+  description  String?
+  type         String        @default("CONTINUOUS")
+  config       Json
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  items        Item[]
+  miningBlocks MiningBlock[]
 }
 
 enum CharacterStatus {
@@ -265,4 +273,9 @@ enum ItemRarity {
 enum AccomplishmentType {
   DUNGEON_LEVEL_CLEARED
   DUNGEON_CLEARED
+}
+
+enum MouseActionTriggerMode {
+  SINGLE
+  HOLD
 }

@@ -16,29 +16,37 @@ export default function BlockDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [block, setBlock] = useState<MiningBlockConfig | null>(null);
+  const [particleEffectsList, setParticleEffectsList] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     mineTimeMs: 500,
     staminaCost: 1,
+    idleParticleEffectId: '',
   });
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    fetchWithAuth(`/api/admin/blocks/${id}`)
-      .then((res) => {
+    Promise.all([
+      fetchWithAuth(`/api/admin/blocks/${id}`).then((res) => {
         if (!res.ok) throw new Error('Failed to fetch block details');
         return res.json();
-      })
-      .then((data: MiningBlockConfig) => {
+      }),
+      fetchWithAuth('/api/admin/particle-effects')
+        .then((res) => (res.ok ? res.json() : []))
+        .catch(() => []),
+    ])
+      .then(([data, particleEffectsJson]: [MiningBlockConfig, any[]]) => {
         setBlock(data);
+        setParticleEffectsList(Array.isArray(particleEffectsJson) ? particleEffectsJson : []);
         setFormData({
           name: data.name || '',
           description: data.description || '',
           mineTimeMs: data.mineTimeMs ?? 500,
           staminaCost: data.staminaCost ?? 1,
+          idleParticleEffectId: data.idleParticleEffectId || '',
         });
         setLoading(false);
       })
@@ -48,7 +56,7 @@ export default function BlockDetail() {
       });
   }, [id]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -61,10 +69,14 @@ export default function BlockDetail() {
     if (!block) return;
     setSaving(true);
     try {
+      const payload = {
+        ...formData,
+        idleParticleEffectId: formData.idleParticleEffectId || null,
+      };
       const res = await fetchWithAuth(`/api/admin/blocks/${block.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -192,6 +204,40 @@ export default function BlockDetail() {
                   />
                   <span className="text-[11px] text-slate-400 font-medium">Stamina spent per block mined</span>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label htmlFor="idleParticleEffectId" className="block text-xs font-black uppercase text-slate-600 tracking-wider">
+                    Idle Particle Effect
+                  </label>
+                  {formData.idleParticleEffectId && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/particle-effects/${formData.idleParticleEffectId}`)}
+                      className="cursor-pointer text-[11px] font-bold text-sky-600 hover:text-sky-800 underline"
+                    >
+                      View FX ↗
+                    </button>
+                  )}
+                </div>
+                <select
+                  id="idleParticleEffectId"
+                  name="idleParticleEffectId"
+                  value={formData.idleParticleEffectId || ''}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-800 cursor-pointer"
+                >
+                  <option value="">None (No Particle Effect)</option>
+                  {particleEffectsList.map((pe) => (
+                    <option key={pe.id} value={pe.id}>
+                      {pe.name} ({pe.config?.emitterType || pe.type})
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  Continuous ambient sparkles/effects emitted from this block in-game (no light)
+                </span>
               </div>
 
               <div className="pt-4">

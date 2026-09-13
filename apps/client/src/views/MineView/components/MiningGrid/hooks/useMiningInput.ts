@@ -15,6 +15,7 @@ export interface UseMiningInputOptions {
   mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
   zoom: number;
   onZoomChange?: (zoom: number) => void;
+  onVisionChange?: (newVision: number) => void;
 }
 
 export function useMiningInput({
@@ -28,9 +29,12 @@ export function useMiningInput({
   mouseControllerRef,
   zoom,
   onZoomChange,
+  onVisionChange,
 }: UseMiningInputOptions) {
   const onToggleDebugRef = useRef(onToggleDebug);
   onToggleDebugRef.current = onToggleDebug;
+  const onVisionChangeRef = useRef(onVisionChange);
+  onVisionChangeRef.current = onVisionChange;
   const keysPressedRef = useRef<{
     up: boolean;
     down: boolean;
@@ -63,6 +67,10 @@ export function useMiningInput({
   useEffect(() => {
     onZoomChangeRef.current = onZoomChange;
   }, [onZoomChange]);
+
+  useEffect(() => {
+    onVisionChangeRef.current = onVisionChange;
+  }, [onVisionChange]);
 
   // Subscribe to mouse-driven mining button and target changes
   useEffect(() => {
@@ -176,6 +184,19 @@ export function useMiningInput({
         // Toggle Debug Collision & Reach Shapes ON/OFF
         showDebugRef.current = !showDebugRef.current;
         onToggleDebugRef.current?.();
+      } else if (
+        (e.code === 'NumpadAdd' || (e.key === '+' && (e.location === 3 || !e.ctrlKey))) &&
+        isKeyDown &&
+        !e.repeat
+      ) {
+        // Increase view distance for current character (numpad '+' hotkey)
+        sendGameEvent({ type: 'mining_increase_vision', amount: 1 })
+          ?.then((res: any) => {
+            if (res?.success && typeof res?.data?.visionRange === 'number') {
+              onVisionChangeRef.current?.(res.data.visionRange);
+            }
+          })
+          ?.catch?.(() => {});
       }
 
       if (changed) {

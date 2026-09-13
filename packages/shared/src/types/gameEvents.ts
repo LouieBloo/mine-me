@@ -155,6 +155,11 @@ export interface MiningPlaceTorchPayload extends GameEventBase {
   target: MiningPosition;
 }
 
+export interface MiningIncreaseVisionPayload extends GameEventBase {
+  type: 'mining_increase_vision';
+  amount?: number;
+}
+
 // ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
@@ -169,6 +174,7 @@ export type GameEventPayload =
   | MiningInteractPayload
   | MiningPlaceLadderPayload
   | MiningPlaceTorchPayload
+  | MiningIncreaseVisionPayload
   | MiningMovePayload
   | MiningMineStartPayload
   | MiningMineCompletePayload

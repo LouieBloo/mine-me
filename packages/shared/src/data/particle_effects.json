@@ -1,49 +1,47 @@
 [
   {
-    "id": "pe_torch_flame",
-    "name": "Torch Flame",
-    "description": "Continuous rising flame embers and incandescent sparks for torches and lanterns.",
-    "type": "CONTINUOUS",
-    "config": {
-      "emitterType": "continuous",
-      "rate": 35,
-      "lifetime": { "min": 0.4, "max": 0.9 },
-      "speed": { "min": 20, "max": 65 },
-      "angle": { "min": 255, "max": 285 },
-      "gravity": { "x": 0, "y": -15 },
-      "friction": 0.98,
-      "scale": { "start": 1.2, "end": 0.2 },
-      "color": { "start": "#ffaa22", "end": "#ef4444" },
-      "alpha": { "start": 0.95, "end": 0.0 },
-      "blendMode": "add",
-      "shape": "circle",
-      "spawnRadius": 4
-    },
-    "createdAt": "2026-09-10T12:00:00.000Z",
-    "updatedAt": "2026-09-10T12:00:00.000Z"
-  },
-  {
     "id": "pe_dirt_hit",
     "name": "Block Dirt Hit",
     "description": "Single-shot burst of gravel and dirt chunks flying outward on pickaxe strike.",
     "type": "BURST",
     "config": {
-      "emitterType": "burst",
-      "burstCount": 16,
-      "lifetime": { "min": 0.3, "max": 0.65 },
-      "speed": { "min": 60, "max": 180 },
-      "angle": { "min": 190, "max": 350 },
-      "gravity": { "x": 0, "y": 320 },
-      "friction": 0.96,
-      "scale": { "start": 1.0, "end": 0.3 },
-      "color": { "start": "#92400e", "end": "#451a03" },
-      "alpha": { "start": 1.0, "end": 0.0 },
-      "blendMode": "normal",
+      "alpha": {
+        "end": 0,
+        "start": 1
+      },
+      "angle": {
+        "max": 350,
+        "min": 190
+      },
+      "color": {
+        "end": "#451a03",
+        "start": "#92400e"
+      },
+      "scale": {
+        "end": 0.3,
+        "start": 1
+      },
       "shape": "pixel",
+      "speed": {
+        "max": 180,
+        "min": 60
+      },
+      "gravity": {
+        "x": 0,
+        "y": 320
+      },
+      "friction": 0.96,
+      "lifetime": {
+        "max": 0.65,
+        "min": 0.3
+      },
+      "blendMode": "normal",
+      "burstCount": 16,
+      "emitterType": "burst",
       "spawnRadius": 6
     },
-    "createdAt": "2026-09-10T12:00:00.000Z",
-    "updatedAt": "2026-09-10T12:00:00.000Z"
+    "createdAt": "2026-09-10T23:47:42.985Z",
+    "updatedAt": "2026-09-13T01:41:45.295Z"
   },
   {
     "id": "pe_mineral_hit",
@@ -51,22 +49,43 @@
     "description": "Prismatic luminescent crystal shards bursting upon mining an ore deposit.",
     "type": "BURST",
     "config": {
-      "emitterType": "burst",
-      "burstCount": 20,
-      "lifetime": { "min": 0.35, "max": 0.8 },
-      "speed": { "min": 80, "max": 210 },
-      "angle": { "min": 0, "max": 360 },
-      "gravity": { "x": 0, "y": 120 },
-      "friction": 0.97,
-      "scale": { "start": 1.4, "end": 0.2 },
-      "color": { "start": "#38bdf8", "end": "#f59e0b" },
-      "alpha": { "start": 1.0, "end": 0.0 },
-      "blendMode": "add",
+      "alpha": {
+        "end": 0,
+        "start": 1
+      },
+      "angle": {
+        "max": 360,
+        "min": 0
+      },
+      "color": {
+        "end": "#f59e0b",
+        "start": "#38bdf8"
+      },
+      "scale": {
+        "end": 0.2,
+        "start": 1.4
+      },
       "shape": "spark",
+      "speed": {
+        "max": 210,
+        "min": 80
+      },
+      "gravity": {
+        "x": 0,
+        "y": 120
+      },
+      "friction": 0.97,
+      "lifetime": {
+        "max": 0.8,
+        "min": 0.35
+      },
+      "blendMode": "add",
+      "burstCount": 20,
+      "emitterType": "burst",
       "spawnRadius": 8
     },
-    "createdAt": "2026-09-10T12:00:00.000Z",
-    "updatedAt": "2026-09-10T12:00:00.000Z"
+    "createdAt": "2026-09-10T23:47:42.989Z",
+    "updatedAt": "2026-09-13T01:41:45.299Z"
   },
   {
     "id": "pe_magic_aura",
@@ -74,21 +93,131 @@
     "description": "Continuous orbit of celestial energy and mystical purple sparkles.",
     "type": "CONTINUOUS",
     "config": {
-      "emitterType": "continuous",
       "rate": 20,
-      "lifetime": { "min": 0.6, "max": 1.2 },
-      "speed": { "min": 15, "max": 40 },
-      "angle": { "min": 0, "max": 360 },
-      "gravity": { "x": 0, "y": -20 },
-      "friction": 0.99,
-      "scale": { "start": 0.8, "end": 0.1 },
-      "color": { "start": "#c084fc", "end": "#38bdf8" },
-      "alpha": { "start": 0.9, "end": 0.0 },
-      "blendMode": "add",
+      "alpha": {
+        "end": 0,
+        "start": 0.9
+      },
+      "angle": {
+        "max": 360,
+        "min": 0
+      },
+      "color": {
+        "end": "#38bdf8",
+        "start": "#c084fc"
+      },
+      "scale": {
+        "end": 0.1,
+        "start": 0.8
+      },
       "shape": "spark",
+      "speed": {
+        "max": 40,
+        "min": 15
+      },
+      "gravity": {
+        "x": 0,
+        "y": -20
+      },
+      "friction": 0.99,
+      "lifetime": {
+        "max": 1.2,
+        "min": 0.6
+      },
+      "blendMode": "add",
+      "emitterType": "continuous",
       "spawnRadius": 14
     },
-    "createdAt": "2026-09-10T12:00:00.000Z",
-    "updatedAt": "2026-09-10T12:00:00.000Z"
+    "createdAt": "2026-09-10T23:47:42.993Z",
+    "updatedAt": "2026-09-13T01:41:45.304Z"
+  },
+  {
+    "id": "pe_fairy_sparkle",
+    "name": "Fairy Sparkles",
+    "description": "Subtle floating white and gold sparkle flakes reminiscent of fairy dust.",
+    "type": "CONTINUOUS",
+    "config": {
+      "rate": 1,
+      "alpha": {
+        "end": 0,
+        "start": 0.85
+      },
+      "angle": {
+        "max": 310,
+        "min": 230
+      },
+      "color": {
+        "end": "#fbbf24",
+        "start": "#ffffff"
+      },
+      "scale": {
+        "end": 0.3,
+        "start": 0.6
+      },
+      "shape": "spark",
+      "speed": {
+        "max": 18,
+        "min": 5
+      },
+      "gravity": {
+        "x": 0,
+        "y": -6
+      },
+      "friction": 0.98,
+      "lifetime": {
+        "max": 1.6,
+        "min": 0.8
+      },
+      "blendMode": "add",
+      "turbulence": 8,
+      "emitterType": "continuous",
+      "spawnRadius": 30
+    },
+    "createdAt": "2026-09-13T01:34:00.471Z",
+    "updatedAt": "2026-09-13T01:51:52.643Z"
+  },
+  {
+    "id": "pe_torch_flame",
+    "name": "Torch Flame",
+    "description": "Continuous rising flame embers and incandescent sparks for torches and lanterns.",
+    "type": "CONTINUOUS",
+    "config": {
+      "rate": 35,
+      "alpha": {
+        "end": 0,
+        "start": 0.95
+      },
+      "angle": {
+        "max": 285,
+        "min": 255
+      },
+      "color": {
+        "end": "#ef4444",
+        "start": "#ffaa22"
+      },
+      "scale": {
+        "end": 0.2,
+        "start": 1.2
+      },
+      "shape": "circle",
+      "speed": {
+        "max": 65,
+        "min": 20
+      },
+      "gravity": {
+        "x": 0,
+        "y": -15
+      },
+      "friction": 0.98,
+      "lifetime": {
+        "max": 0.9,
+        "min": 0.4
+      },
+      "blendMode": "add",
+      "emitterType": "continuous",
+      "spawnRadius": 4
+    },
+    "createdAt": "2026-09-10T23:47:42.979Z",
+    "updatedAt": "2026-09-13T01:41:45.289Z"
   }
 ]

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MiningMouseController } from './MiningMouseController';
 import { TorchPlacementAction, LadderPlacementAction } from './MouseAction';
-import { MiningTileType, type MiningClientTile } from '@mine-me/shared';
+import { MiningTileType, MouseActionTriggerMode, type MiningClientTile } from '@mine-me/shared';
 
 describe('MiningMouseController and MouseAction', () => {
   let controller: MiningMouseController;
@@ -20,6 +20,19 @@ describe('MiningMouseController and MouseAction', () => {
   });
 
   describe('LadderPlacementAction', () => {
+    it('has triggerMode set to HOLD for continuous placement', () => {
+      const onPlace = vi.fn();
+      const action = new LadderPlacementAction(onPlace);
+      expect(action.triggerMode).toBe(MouseActionTriggerMode.HOLD);
+      expect(action.name).toBe('place_ladder');
+    });
+
+    it('allows overriding triggerMode dynamically from item config', () => {
+      const onPlace = vi.fn();
+      const action = new LadderPlacementAction(onPlace, MouseActionTriggerMode.SINGLE);
+      expect(action.triggerMode).toBe(MouseActionTriggerMode.SINGLE);
+    });
+
     it('allows placement on revealed empty tile within reach', () => {
       const onPlace = vi.fn().mockResolvedValue(true);
       const action = new LadderPlacementAction(onPlace);
@@ -60,6 +73,19 @@ describe('MiningMouseController and MouseAction', () => {
   });
 
   describe('TorchPlacementAction', () => {
+    it('has triggerMode set to SINGLE for single-click placement', () => {
+      const onPlace = vi.fn();
+      const action = new TorchPlacementAction(onPlace);
+      expect(action.triggerMode).toBe(MouseActionTriggerMode.SINGLE);
+      expect(action.name).toBe('place_torch');
+    });
+
+    it('allows overriding triggerMode dynamically from item config', () => {
+      const onPlace = vi.fn();
+      const action = new TorchPlacementAction(onPlace, MouseActionTriggerMode.HOLD);
+      expect(action.triggerMode).toBe(MouseActionTriggerMode.HOLD);
+    });
+
     it('allows placement on revealed empty tile within 1 tile distance', () => {
       const onPlace = vi.fn().mockResolvedValue(true);
       const action = new TorchPlacementAction(onPlace);
@@ -274,6 +300,207 @@ describe('MiningMouseController and MouseAction', () => {
       // Should automatically re-target to tile 3 without moving mouse!
       expect(miningSpy).toHaveBeenCalledWith(true, { x: 3, y: 2 });
       expect(controller.getHoveredTile()).toEqual({ x: 3, y: 2 });
+
+      controller.detach();
+    });
+  });
+
+  describe('MouseActionTriggerMode handling in controller', () => {
+    let mockCanvas: HTMLCanvasElement;
+    let mockCamera: any;
+    const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    beforeEach(() => {
+      mockGrid = Array.from({ length: 10 }, () =>
+        Array.from({ length: 10 }, () => ({
+          type: MiningTileType.EMPTY,
+          revealed: true,
+        }))
+      );
+      controller.setGrid(mockGrid);
+      controller.setPlayerPosition({ x: 5.5, y: 5.5 });
+
+      mockCanvas = document.createElement('canvas');
+      mockCanvas.getBoundingClientRect = () => ({
+        left: 0,
+        top: 0,
+        width: 1000,
+        height: 1000,
+        right: 1000,
+        bottom: 1000,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+      mockCamera = {
+        screenToWorld: (pos: { x: number; y: number }) => ({ x: pos.x, y: pos.y }),
+      };
+      controller.attach(mockCanvas);
+      controller.setCamera(mockCamera);
+    });
+
+    it('TorchPlacementAction (SINGLE): executes once on click, and does NOT execute repeatedly when held', async () => {
+      const onPlace = vi.fn().mockResolvedValue(true);
+      const torchAction = new TorchPlacementAction(onPlace);
+      controller.setActiveAction(torchAction);
+
+      // Mouse down on tile (5, 5) -> clientX: 5 * 64 + 10 = 330, clientY: 330
+      window.dispatchEvent(
+        new PointerEvent('pointerdown', { button: 0, clientX: 330, clientY: 330 })
+      );
+      await flushPromises();
+
+      expect(onPlace).toHaveBeenCalledTimes(1);
+      expect(onPlace).toHaveBeenCalledWith({ x: 5, y: 5 });
+
+      // Pointer moves to tile (6, 5) while holding mouse button down -> clientX: 6 * 64 + 10 = 394
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 394, clientY: 330 }));
+      controller.update();
+      await flushPromises();
+
+      // Should NOT have triggered again because triggerMode is SINGLE!
+      expect(onPlace).toHaveBeenCalledTimes(1);
+
+      // Releasing and clicking on (6, 5) triggers second torch
+      window.dispatchEvent(new PointerEvent('pointerup', { button: 0, clientX: 394, clientY: 330 }));
+      window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 394, clientY: 330 }));
+      await flushPromises();
+
+      expect(onPlace).toHaveBeenCalledTimes(2);
+      expect(onPlace).toHaveBeenLastCalledWith({ x: 6, y: 5 });
+
+      controller.detach();
+    });
+
+    it('LadderPlacementAction (HOLD): continuously places ladders as mouse moves to new tiles while held', async () => {
+      const onPlace = vi.fn().mockImplementation((target) => {
+        // simulate placing ladder in grid
+        mockGrid[target.y][target.x].type = MiningTileType.LADDER;
+        return Promise.resolve(true);
+      });
+      const ladderAction = new LadderPlacementAction(onPlace);
+      controller.setActiveAction(ladderAction);
+
+      // Mouse down on tile (5, 5)
+      window.dispatchEvent(
+        new PointerEvent('pointerdown', { button: 0, clientX: 330, clientY: 330 })
+      );
+      await flushPromises();
+
+      expect(onPlace).toHaveBeenCalledTimes(1);
+      expect(onPlace).toHaveBeenCalledWith({ x: 5, y: 5 });
+
+      // Calling update on the same tile (5, 5) does NOT duplicate placement
+      controller.update();
+      await flushPromises();
+      expect(onPlace).toHaveBeenCalledTimes(1);
+
+      // Player moves down 1 block and pointer moves down to tile (5, 6) -> clientY: 6 * 64 + 10 = 394
+      controller.setPlayerPosition({ x: 5.5, y: 6.5 });
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 330, clientY: 394 }));
+      controller.update();
+      await flushPromises();
+
+      // Automatically placed ladder on (5, 6)!
+      expect(onPlace).toHaveBeenCalledTimes(2);
+      expect(onPlace).toHaveBeenLastCalledWith({ x: 5, y: 6 });
+
+      // Player moves down to tile (5, 7)
+      controller.setPlayerPosition({ x: 5.5, y: 7.5 });
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 330, clientY: 458 }));
+      controller.update();
+      await flushPromises();
+
+      expect(onPlace).toHaveBeenCalledTimes(3);
+      expect(onPlace).toHaveBeenLastCalledWith({ x: 5, y: 7 });
+
+      // Releasing pointer stops hold placement
+      window.dispatchEvent(new PointerEvent('pointerup', { button: 0, clientX: 330, clientY: 458 }));
+      controller.setPlayerPosition({ x: 5.5, y: 8.5 });
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 330, clientY: 522 }));
+      controller.update();
+      await flushPromises();
+
+      expect(onPlace).toHaveBeenCalledTimes(3);
+
+      controller.detach();
+    });
+
+    it('LadderPlacementAction (HOLD): holding mouse while out of reach places ladder as soon as player moves into reach', async () => {
+      const onPlace = vi.fn().mockImplementation((target) => {
+        mockGrid[target.y][target.x].type = MiningTileType.LADDER;
+        return Promise.resolve(true);
+      });
+      const ladderAction = new LadderPlacementAction(onPlace);
+      controller.setActiveAction(ladderAction);
+
+      // Player at (5.5, 3.5), clicks and holds at tile (5, 6) -> dy = Math.abs(6.5 - 3.5) = 3.0 > 1.85 (out of reach)
+      controller.setPlayerPosition({ x: 5.5, y: 3.5 });
+      window.dispatchEvent(
+        new PointerEvent('pointerdown', { button: 0, clientX: 330, clientY: 394 })
+      );
+      await flushPromises();
+
+      // Cannot execute yet because out of reach
+      expect(onPlace).not.toHaveBeenCalled();
+      expect(controller.getIsMouseDown()).toBe(true);
+
+      // Player starts climbing down to (5.5, 4.5) -> dy = 2.0 > 1.85
+      controller.setPlayerPosition({ x: 5.5, y: 4.5 });
+      controller.update();
+      await flushPromises();
+      expect(onPlace).not.toHaveBeenCalled();
+
+      // Player moves closer to (5.5, 5.0) -> dy = 1.5 <= 1.85 (in reach!)
+      controller.setPlayerPosition({ x: 5.5, y: 5.0 });
+      controller.update();
+      await flushPromises();
+
+      // Automatically executes as soon as it becomes available!
+      expect(onPlace).toHaveBeenCalledTimes(1);
+      expect(onPlace).toHaveBeenCalledWith({ x: 5, y: 6 });
+
+      controller.detach();
+    });
+
+    it('resets isMouseDown if activeAction changes or clears while holding mouse', () => {
+      const onPlace = vi.fn();
+      const ladderAction = new LadderPlacementAction(onPlace);
+      controller.setActiveAction(ladderAction);
+
+      window.dispatchEvent(
+        new PointerEvent('pointerdown', { button: 0, clientX: 330, clientY: 330 })
+      );
+      expect(controller.getIsMouseDown()).toBe(true);
+
+      // Action is cleared (e.g. ran out of ladders)
+      controller.setActiveAction(null);
+
+      // isMouseDown must be reset to false to avoid immediately triggering mining mode
+      expect(controller.getIsMouseDown()).toBe(false);
+
+      controller.detach();
+    });
+
+    it('preserves isMouseDown when setActiveAction is called with the same action type (e.g. inventory re-render)', () => {
+      const onPlace1 = vi.fn();
+      const ladderAction1 = new LadderPlacementAction(onPlace1, MouseActionTriggerMode.HOLD);
+      controller.setActiveAction(ladderAction1);
+
+      window.dispatchEvent(
+        new PointerEvent('pointerdown', { button: 0, clientX: 330, clientY: 330 })
+      );
+      expect(controller.getIsMouseDown()).toBe(true);
+
+      // A re-render happens (e.g. character inventory quantity changes from 20 to 19),
+      // instantiating a new LadderPlacementAction with the same name and triggerMode
+      const onPlace2 = vi.fn();
+      const ladderAction2 = new LadderPlacementAction(onPlace2, MouseActionTriggerMode.HOLD);
+      controller.setActiveAction(ladderAction2);
+
+      // isMouseDown must be preserved so hold-to-repeat continues uninterrupted!
+      expect(controller.getIsMouseDown()).toBe(true);
+      expect(controller.getActiveAction()).toBe(ladderAction2);
 
       controller.detach();
     });

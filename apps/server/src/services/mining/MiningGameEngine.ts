@@ -283,6 +283,25 @@ export class MiningGameEngine {
     }
   }
 
+  /**
+   * Increases the player's view distance temporarily for this mining session,
+   * and immediately reveals newly uncovered tiles around the player.
+   */
+  public increaseVisionRange(characterId?: string, amount: number = 1): number {
+    const session = (characterId ? this.players.get(characterId) : null) ?? this.primarySession;
+    if (!session) return MINING_CONFIG.DEFAULT_VISION_RANGE;
+
+    session.visionRange = Math.max(1, Math.min(30, session.visionRange + amount));
+    session.lastRevealGridPos = null;
+
+    const currentGridPos = {
+      x: Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.round(session.playerBody.position.x))),
+      y: Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.round(session.playerBody.position.y))),
+    };
+    this.revealAndTrackTiles(currentGridPos, session.visionRange);
+    return session.visionRange;
+  }
+
   public get isMining(): boolean {
     return this.primarySession?.isMining ?? false;
   }
@@ -842,6 +861,7 @@ export class MiningGameEngine {
         fallingRocks: fallingRocksPayload,
         revealedTiles: revealedToSend,
         otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
+        visionRange: session.visionRange,
       };
 
       session.backpackDirty = false;

@@ -117,5 +117,108 @@ describe('miningMap.service', () => {
         }
       }
     });
+
+    it('generates Copperium and Silverium blocks with Silverium strictly below silveriumMinDepth', () => {
+      const minDepth = 12;
+      const grid = generateMiningMap({
+        seed: 55555,
+        config: {
+          copperiumPercentage: 5,
+          silveriumPercentage: 3,
+          silveriumMinDepth: minDepth,
+        },
+      });
+
+      let copperiumCount = 0;
+      let silveriumCount = 0;
+
+      for (let y = 0; y < MINING_CONFIG.GRID_HEIGHT; y++) {
+        for (let x = 0; x < MINING_CONFIG.GRID_WIDTH; x++) {
+          const tileType = grid[y][x].type;
+          if (tileType === MiningTileType.COPPERIUM) {
+            copperiumCount++;
+          }
+          if (tileType === MiningTileType.SILVERIUM) {
+            silveriumCount++;
+            // Silverium must NEVER spawn above silveriumMinDepth
+            expect(y).toBeGreaterThanOrEqual(minDepth);
+          }
+        }
+      }
+
+      expect(copperiumCount).toBeGreaterThan(0);
+      expect(silveriumCount).toBeGreaterThan(0);
+    });
+
+    it('spawns Copperium and Silverium in contiguous clusters when oreClusterChance is high', () => {
+      const grid = generateMiningMap({
+        seed: 77777,
+        config: {
+          copperiumPercentage: 6,
+          silveriumPercentage: 4,
+          silveriumMinDepth: 10,
+          oreClusterChance: 100,
+        },
+      });
+
+      // Find at least one cluster of Copperium with adjacent Copperium neighbors
+      let foundCopperiumCluster = false;
+      let foundSilveriumCluster = false;
+
+      const directions = [
+        [0, -1], [0, 1], [-1, 0], [1, 0],
+      ];
+
+      for (let y = 1; y < MINING_CONFIG.GRID_HEIGHT; y++) {
+        for (let x = 0; x < MINING_CONFIG.GRID_WIDTH; x++) {
+          const type = grid[y][x].type;
+          if (type === MiningTileType.COPPERIUM && !foundCopperiumCluster) {
+            const hasAdjacent = directions.some(([dx, dy]) => {
+              const nx = x + dx;
+              const ny = y + dy;
+              return nx >= 0 && nx < MINING_CONFIG.GRID_WIDTH && ny >= 0 && ny < MINING_CONFIG.GRID_HEIGHT &&
+                grid[ny][nx].type === MiningTileType.COPPERIUM;
+            });
+            if (hasAdjacent) foundCopperiumCluster = true;
+          }
+
+          if (type === MiningTileType.SILVERIUM && !foundSilveriumCluster) {
+            const hasAdjacent = directions.some(([dx, dy]) => {
+              const nx = x + dx;
+              const ny = y + dy;
+              return nx >= 0 && nx < MINING_CONFIG.GRID_WIDTH && ny >= 0 && ny < MINING_CONFIG.GRID_HEIGHT &&
+                grid[ny][nx].type === MiningTileType.SILVERIUM;
+            });
+            if (hasAdjacent) foundSilveriumCluster = true;
+          }
+        }
+      }
+
+      expect(foundCopperiumCluster).toBe(true);
+      expect(foundSilveriumCluster).toBe(true);
+    });
+
+    it('respects zero-percentage settings to disable Copperium and Silverium generation', () => {
+      const grid = generateMiningMap({
+        seed: 88888,
+        config: {
+          copperiumPercentage: 0,
+          silveriumPercentage: 0,
+        },
+      });
+
+      let copperiumCount = 0;
+      let silveriumCount = 0;
+
+      for (let y = 0; y < MINING_CONFIG.GRID_HEIGHT; y++) {
+        for (let x = 0; x < MINING_CONFIG.GRID_WIDTH; x++) {
+          if (grid[y][x].type === MiningTileType.COPPERIUM) copperiumCount++;
+          if (grid[y][x].type === MiningTileType.SILVERIUM) silveriumCount++;
+        }
+      }
+
+      expect(copperiumCount).toBe(0);
+      expect(silveriumCount).toBe(0);
+    });
   });
 });

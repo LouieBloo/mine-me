@@ -44,19 +44,27 @@ describe('Admin Mining Config API Routes', () => {
     expect(res.body.tunnelCount).toBe(DEFAULT_MINING_MAP_CONFIG.tunnelCount);
   });
 
-  it('PUT /admin/mining-config updates and saves new parameters', async () => {
+  it('PUT /admin/mining-config updates and saves new parameters including ore vein settings', async () => {
     const res = await request(app)
       .put('/admin/mining-config')
       .send({
         cavernDensity: 50,
         tunnelCount: 8,
         rockPercentage: 15,
+        copperiumPercentage: 6,
+        silveriumPercentage: 3,
+        silveriumMinDepth: 15,
+        oreClusterChance: 75,
       });
 
     expect(res.status).toBe(200);
     expect(res.body.cavernDensity).toBe(50);
     expect(res.body.tunnelCount).toBe(8);
     expect(res.body.rockPercentage).toBe(15);
+    expect(res.body.copperiumPercentage).toBe(6);
+    expect(res.body.silveriumPercentage).toBe(3);
+    expect(res.body.silveriumMinDepth).toBe(15);
+    expect(res.body.oreClusterChance).toBe(75);
   });
 
   it('PUT /admin/mining-config rejects invalid values out of bounds', async () => {
@@ -69,7 +77,7 @@ describe('Admin Mining Config API Routes', () => {
     expect(res.status).toBe(400);
   });
 
-  it('POST /admin/mining-config/preview returns 2D grid matrix and calculated metrics', async () => {
+  it('POST /admin/mining-config/preview returns 2D grid matrix and calculated metrics including ores', async () => {
     const res = await request(app)
       .post('/admin/mining-config/preview')
       .send({
@@ -77,6 +85,10 @@ describe('Admin Mining Config API Routes', () => {
         config: {
           cavernDensity: 40,
           tunnelCount: 5,
+          copperiumPercentage: 5,
+          silveriumPercentage: 3,
+          silveriumMinDepth: 10,
+          oreClusterChance: 70,
         },
       });
 
@@ -88,6 +100,10 @@ describe('Admin Mining Config API Routes', () => {
     expect(res.body.stats).toBeDefined();
     expect(res.body.stats.voidPercentage).toBeGreaterThanOrEqual(0);
     expect(res.body.stats.solidPercentage).toBeGreaterThan(0);
+    expect(res.body.stats.copperiumCount).toBeDefined();
+    expect(res.body.stats.silveriumCount).toBeDefined();
+    expect(res.body.stats.copperiumCount).toBeGreaterThan(0);
+    expect(res.body.stats.silveriumCount).toBeGreaterThan(0);
   });
 
   it('POST /admin/mining-config/reset restores default configuration', async () => {

@@ -10,6 +10,7 @@ import {
   isTileClimbable,
   isTileTransparent,
   getTileMineTime,
+  getTileParticleEffect,
 } from '../src';
 
 describe('Mining Tile Definitions & Helpers', () => {
@@ -29,10 +30,12 @@ describe('Mining Tile Definitions & Helpers', () => {
   });
 
   describe('canTileBeDamaged', () => {
-    it('returns true only for damageable tiles (DIRT, MINERAL, CHEST)', () => {
+    it('returns true only for damageable tiles (DIRT, MINERAL, CHEST, COPPERIUM, SILVERIUM)', () => {
       expect(canTileBeDamaged(MiningTileType.DIRT)).toBe(true);
       expect(canTileBeDamaged(MiningTileType.MINERAL)).toBe(true);
       expect(canTileBeDamaged(MiningTileType.CHEST)).toBe(true);
+      expect(canTileBeDamaged(MiningTileType.COPPERIUM)).toBe(true);
+      expect(canTileBeDamaged(MiningTileType.SILVERIUM)).toBe(true);
 
       // Non-damageable / indestructible tiles
       expect(canTileBeDamaged(MiningTileType.EMPTY)).toBe(false);
@@ -48,6 +51,8 @@ describe('Mining Tile Definitions & Helpers', () => {
       expect(isTileMineable(MiningTileType.DIRT)).toBe(true);
       expect(isTileMineable(MiningTileType.MINERAL)).toBe(true);
       expect(isTileMineable(MiningTileType.CHEST)).toBe(true);
+      expect(isTileMineable(MiningTileType.COPPERIUM)).toBe(true);
+      expect(isTileMineable(MiningTileType.SILVERIUM)).toBe(true);
 
       expect(isTileMineable(MiningTileType.EMPTY)).toBe(false);
       expect(isTileMineable(MiningTileType.ENTRANCE)).toBe(false);
@@ -63,6 +68,8 @@ describe('Mining Tile Definitions & Helpers', () => {
       expect(isTileSolid(MiningTileType.ROCK)).toBe(true);
       expect(isTileSolid(MiningTileType.MINERAL)).toBe(true);
       expect(isTileSolid(MiningTileType.CHEST)).toBe(true);
+      expect(isTileSolid(MiningTileType.COPPERIUM)).toBe(true);
+      expect(isTileSolid(MiningTileType.SILVERIUM)).toBe(true);
 
       // Non-solid walkable/passable tiles
       expect(isTileSolid(MiningTileType.EMPTY)).toBe(false);
@@ -92,6 +99,8 @@ describe('Mining Tile Definitions & Helpers', () => {
       expect(isTileTransparent(MiningTileType.ROCK)).toBe(false);
       expect(isTileTransparent(MiningTileType.MINERAL)).toBe(false);
       expect(isTileTransparent(MiningTileType.CHEST)).toBe(false);
+      expect(isTileTransparent(MiningTileType.COPPERIUM)).toBe(false);
+      expect(isTileTransparent(MiningTileType.SILVERIUM)).toBe(false);
     });
   });
 
@@ -100,7 +109,23 @@ describe('Mining Tile Definitions & Helpers', () => {
       expect(getTileMineTime(MiningTileType.DIRT)).toBe(MINING_CONFIG.DIRT_MINE_TIME_MS);
       expect(getTileMineTime(MiningTileType.MINERAL)).toBe(MINING_CONFIG.MINERAL_MINE_TIME_MS);
       expect(getTileMineTime(MiningTileType.CHEST)).toBe(MINING_CONFIG.CHEST_MINE_TIME_MS);
+      expect(getTileMineTime(MiningTileType.COPPERIUM)).toBe(1200);
+      expect(getTileMineTime(MiningTileType.SILVERIUM)).toBe(2000);
       expect(getTileMineTime(MiningTileType.EMPTY)).toBe(MINING_CONFIG.DIRT_MINE_TIME_MS);
+    });
+  });
+
+  describe('getTileParticleEffect', () => {
+    it('returns effect from dynamic blockConfigs map or undefined if not configured', () => {
+      const dynamicConfigs = new Map<any, any>([
+        [MiningTileType.COPPERIUM, { idleParticleEffect: { name: 'fairy_sparkle' } }],
+        [MiningTileType.SILVERIUM, { idleParticleEffectId: 'pe_fairy_sparkle' }],
+      ]);
+
+      expect(getTileParticleEffect(MiningTileType.COPPERIUM, dynamicConfigs)).toBe('fairy_sparkle');
+      expect(getTileParticleEffect(MiningTileType.SILVERIUM, dynamicConfigs)).toBe('pe_fairy_sparkle');
+      expect(getTileParticleEffect(MiningTileType.DIRT, dynamicConfigs)).toBeUndefined();
+      expect(getTileParticleEffect(MiningTileType.DIRT)).toBeUndefined();
     });
   });
 

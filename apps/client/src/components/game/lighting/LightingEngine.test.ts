@@ -313,4 +313,24 @@ describe('LightingEngine', () => {
 
     engine.destroy();
   });
+
+  it('should mark lightmap dirty and trigger re-render on next update when markLightmapDirty is called', () => {
+    const engine = new LightingEngine(mockApp, mockContainer, 20, 20, 64);
+    // Initial update to clear initial dirty state
+    engine.update(0.016, { x: 5, y: 5 }, { x: 1, y: 0 });
+    mockApp.renderer.render.mockClear();
+
+    // Calling update again without changes should skip rendering
+    engine.update(0.016, { x: 5, y: 5 }, { x: 1, y: 0 });
+    expect(mockApp.renderer.render).not.toHaveBeenCalled();
+
+    // Now call markLightmapDirty()
+    engine.markLightmapDirty();
+
+    // Update should now re-render
+    engine.update(0.016, { x: 5, y: 5 }, { x: 1, y: 0 });
+    expect(mockApp.renderer.render).toHaveBeenCalledTimes(1);
+
+    engine.destroy();
+  });
 });

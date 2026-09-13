@@ -12,6 +12,7 @@ interface ItemEnums {
   types: string[];
   subTypes: Record<string, string[]>;
   rarities: string[];
+  triggerModes?: string[];
 }
 
 export default function ItemDetail() {
@@ -21,7 +22,7 @@ export default function ItemDetail() {
 
   const [data, setData] = useState<any>(isNew ? {
     name: '', description: '', type: 'GEAR', subType: 'HEAD',
-    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, experience: 0,
+    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', triggerMode: 'SINGLE', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, experience: 0,
     combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
@@ -193,6 +194,21 @@ export default function ItemDetail() {
                 {enums?.rarities.map(r => <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase().replace(/_/g, ' ')}</option>)}
               </select>
               {errors.rarity && <p className="text-red-500 text-xs font-bold mt-1">{errors.rarity}</p>}
+            </div>
+
+            {/* Trigger Mode */}
+            <div className="space-y-2">
+              <label htmlFor="triggerMode" className="text-xs font-black text-slate-400 uppercase tracking-widest">Trigger Mode</label>
+              <select
+                id="triggerMode"
+                value={data.triggerMode || 'SINGLE'}
+                onChange={(e) => { setData({ ...data, triggerMode: e.target.value }); if (errors.triggerMode) setErrors({ ...errors, triggerMode: '' }); }}
+                className={`item-detail-select ${errors.triggerMode ? 'has-error' : ''}`}
+              >
+                <option value="SINGLE">Single Click (Click each time)</option>
+                <option value="HOLD">Hold to Repeat (Continuous placement)</option>
+              </select>
+              {errors.triggerMode && <p className="text-red-500 text-xs font-bold mt-1">{errors.triggerMode}</p>}
             </div>
 
             {/* Particle Effect */}

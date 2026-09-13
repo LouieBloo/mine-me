@@ -77,6 +77,7 @@ export class InventoryService {
       gearImageUrl: item.gearImageUrl,
       isStartingPiece: item.isStartingPiece,
       experience: item.experience,
+      triggerMode: item.triggerMode,
       combatScore: item.combatScore,
       defenseScore: item.defenseScore,
       itemEffects: (item.itemEffects || []).map((ie: any) => ({

@@ -1,4 +1,4 @@
-import { Assets, Graphics, Sprite, type Container } from 'pixi.js';
+import { Assets, Graphics, Sprite, Texture, type Container } from 'pixi.js';
 import { getAssetUrl, type MiningDroppedItem } from '@mine-me/shared';
 import { TILE_SIZE } from './MiningTileRenderer';
 
@@ -64,32 +64,59 @@ export class MiningEntityRenderer {
   public static updateFallingRocks(
     fallingRocksContainer: Container,
     fallingRocks: ActiveFallingRock[],
-    fallingRockGraphicsMap: Map<string, Graphics>,
-    tileSize: number = TILE_SIZE
+    fallingRockGraphicsMap: Map<string, Sprite | Graphics>,
+    tileSize: number = TILE_SIZE,
+    rockTexture?: Texture | null
   ): void {
     const activeRockKeys = new Set<string>();
 
     for (const rock of fallingRocks) {
       activeRockKeys.add(rock.id);
-      let rockGraphics = fallingRockGraphicsMap.get(rock.id);
-      if (!rockGraphics) {
-        rockGraphics = new Graphics();
-        rockGraphics.rect(0, 0, tileSize, tileSize);
-        rockGraphics.fill(0x334155);
-        fallingRocksContainer.addChild(rockGraphics);
-        fallingRockGraphicsMap.set(rock.id, rockGraphics);
+      let rockView = fallingRockGraphicsMap.get(rock.id);
+
+      if (rockTexture) {
+        // If we have a texture and the current view isn't a Sprite, replace it
+        if (!rockView || !(rockView instanceof Sprite)) {
+          if (rockView) {
+            fallingRocksContainer.removeChild(rockView);
+            rockView.destroy();
+          }
+          const sprite = new Sprite(rockTexture);
+          sprite.width = tileSize;
+          sprite.height = tileSize;
+          fallingRocksContainer.addChild(sprite);
+          rockView = sprite;
+          fallingRockGraphicsMap.set(rock.id, rockView);
+        } else if (rockView.texture !== rockTexture) {
+          rockView.texture = rockTexture;
+        }
+      } else {
+        // Fallback: draw textured/styled graphics if texture not loaded
+        if (!rockView || rockView instanceof Sprite) {
+          if (rockView) {
+            fallingRocksContainer.removeChild(rockView);
+            rockView.destroy();
+          }
+          const graphics = new Graphics();
+          graphics.rect(0, 0, tileSize, tileSize);
+          graphics.fill(0x334155);
+          fallingRocksContainer.addChild(graphics);
+          rockView = graphics;
+          fallingRockGraphicsMap.set(rock.id, rockView);
+        }
       }
+
       // rock.x and rock.y are CENTER coordinates (e.g. tileX+0.5, tileY+0.5)
       // Convert to top-left pixel coordinates to align with grid tile rendering
-      rockGraphics.x = (rock.x - 0.5) * tileSize;
-      rockGraphics.y = (rock.y - 0.5) * tileSize;
+      rockView.x = (rock.x - 0.5) * tileSize;
+      rockView.y = (rock.y - 0.5) * tileSize;
     }
 
-    // Clean up graphics for rocks that have settled back into grid
-    fallingRockGraphicsMap.forEach((graphics, id) => {
+    // Clean up graphics/sprites for rocks that have settled back into grid
+    fallingRockGraphicsMap.forEach((view, id) => {
       if (!activeRockKeys.has(id)) {
-        fallingRocksContainer.removeChild(graphics);
-        graphics.destroy();
+        fallingRocksContainer.removeChild(view);
+        view.destroy();
         fallingRockGraphicsMap.delete(id);
       }
     });

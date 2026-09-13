@@ -160,6 +160,13 @@ export class LightingEngine {
   }
 
   /**
+   * Manually mark the lightmap dirty so it re-renders on the next frame update.
+   */
+  public markLightmapDirty(): void {
+    this.isLightmapDirty = true;
+  }
+
+  /**
    * Frame update called from the Pixi ticker.
    * Updates light animations and re-renders the lightmap ONLY when dirty.
    */

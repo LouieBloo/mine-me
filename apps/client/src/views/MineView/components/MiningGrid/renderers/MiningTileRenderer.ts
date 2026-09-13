@@ -74,6 +74,42 @@ export class MiningTileRenderer {
       case MiningTileType.TORCH:
         MiningTileRenderer.drawTorch(graphics, tileSize);
         break;
+      case MiningTileType.COPPERIUM:
+        // Dark shale with warm copper nuggets and cyan energy flecks
+        graphics.rect(0, 0, tileSize, tileSize);
+        graphics.fill(0x1e1b18);
+        graphics.circle(20, 22, 5);
+        graphics.circle(42, 38, 6);
+        graphics.circle(36, 18, 4);
+        graphics.fill(0xb45309);
+        graphics.circle(22, 24, 2);
+        graphics.circle(44, 40, 2.5);
+        graphics.fill(0xf59e0b);
+        // Cyan energy fissure
+        graphics.moveTo(10, 48);
+        graphics.lineTo(26, 32);
+        graphics.lineTo(38, 36);
+        graphics.lineTo(54, 14);
+        graphics.stroke({ width: 1.5, color: 0x38bdf8, alpha: 0.9 });
+        break;
+      case MiningTileType.SILVERIUM:
+        // Deep granite with lustrous silver facets and cyan energy fissures
+        graphics.rect(0, 0, tileSize, tileSize);
+        graphics.fill(0x0f172a);
+        graphics.circle(18, 20, 5);
+        graphics.circle(44, 26, 6);
+        graphics.circle(30, 44, 4.5);
+        graphics.fill(0x94a3b8);
+        graphics.circle(19, 21, 2.5);
+        graphics.circle(45, 27, 3);
+        graphics.fill(0xe2e8f0);
+        // Cyan energy fissure
+        graphics.moveTo(14, 12);
+        graphics.lineTo(28, 30);
+        graphics.lineTo(40, 28);
+        graphics.lineTo(52, 50);
+        graphics.stroke({ width: 1.5, color: 0x06b6d4, alpha: 0.95 });
+        break;
     }
   }
 

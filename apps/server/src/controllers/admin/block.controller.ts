@@ -33,7 +33,8 @@ export const blockTextureUpload = upload.single('texture');
 export const getBlocks = async (req: Request, res: Response) => {
   try {
     const blocks = await prisma.miningBlock.findMany({
-      orderBy: { typeKey: 'asc' }
+      orderBy: { typeKey: 'asc' },
+      include: { idleParticleEffect: true }
     });
     res.json(blocks);
   } catch (err: any) {
@@ -50,7 +51,8 @@ export const getBlock = async (req: Request, res: Response) => {
           { id },
           { typeKey: id.toUpperCase() }
         ]
-      }
+      },
+      include: { idleParticleEffect: true }
     });
 
     if (!block) {
@@ -67,7 +69,7 @@ export const getBlock = async (req: Request, res: Response) => {
 export const updateBlock = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, mineTimeMs, staminaCost } = req.body;
+    const { name, description, mineTimeMs, staminaCost, idleParticleEffectId } = req.body;
 
     const block = await prisma.miningBlock.update({
       where: { id },
@@ -75,8 +77,10 @@ export const updateBlock = async (req: Request, res: Response) => {
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
         ...(mineTimeMs !== undefined && { mineTimeMs: Number(mineTimeMs) }),
-        ...(staminaCost !== undefined && { staminaCost: Number(staminaCost) })
-      }
+        ...(staminaCost !== undefined && { staminaCost: Number(staminaCost) }),
+        ...(idleParticleEffectId !== undefined && { idleParticleEffectId: idleParticleEffectId || null })
+      },
+      include: { idleParticleEffect: true }
     });
 
     const allBlocks = await prisma.miningBlock.findMany({

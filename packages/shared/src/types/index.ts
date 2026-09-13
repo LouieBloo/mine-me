@@ -1,4 +1,5 @@
 import type { ParticleEffect } from './particles';
+import type { MouseActionTriggerMode } from './mining';
 
 export type CharacterClass = 'Warrior' | 'Mage' | 'Rogue';
 export type Profession = 'Mining' | 'Herbalism' | 'Farming' | 'Lumberjack' | 'Chemistry' | 'Blacksmithing';
@@ -116,6 +117,7 @@ export interface GameItem {
   defenseScore?: number;
   canBeDamaged?: boolean;
   canBeClimbed?: boolean;
+  triggerMode?: MouseActionTriggerMode;
   particleEffectId?: string | null;
   particleEffect?: ParticleEffect | null;
   itemEffects?: ObjectEffects[];

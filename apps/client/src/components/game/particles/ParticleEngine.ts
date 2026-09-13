@@ -293,16 +293,26 @@ export class ParticleEngine {
 
   /**
    * Registers a persistent emitter (e.g. torch flame, magic aura) that continuously spawns particles.
+   * @param options.stagger If true (default), randomly staggers the initial accumulator so multiple emitters do not fire in sync.
    */
-  public addEmitter(config: ParticleEffectConfig, initialPosition: { x: number; y: number }): EmitterHandle {
+  public addEmitter(
+    config: ParticleEffectConfig,
+    initialPosition: { x: number; y: number },
+    options?: { stagger?: boolean }
+  ): EmitterHandle {
     const id = `emitter_${this.nextEmitterId++}`;
+    const rate = config.rate || 20;
+    const interval = 1 / rate;
+    const shouldStagger = options?.stagger ?? true;
+    const initialAccumulator = shouldStagger ? -Math.random() * interval : 0;
+
     const handle: EmitterHandle = {
       id,
       config,
       position: { ...initialPosition },
       active: true,
       elapsed: 0,
-      accumulator: 0,
+      accumulator: initialAccumulator,
       setPosition: (pos: { x: number; y: number }) => {
         handle.position.x = pos.x;
         handle.position.y = pos.y;
