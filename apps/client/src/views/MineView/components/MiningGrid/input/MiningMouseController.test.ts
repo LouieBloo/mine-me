@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MiningMouseController } from './MiningMouseController';
-import { TorchPlacementAction, LadderPlacementAction, DynamiteThrowAction } from './MouseAction';
+import { TorchPlacementAction, LadderPlacementAction, DynamiteThrowAction, ThrowableItemAction } from './MouseAction';
 import { MiningTileType, MouseActionTriggerMode, type MiningClientTile } from '@mine-me/shared';
 
 describe('MiningMouseController and MouseAction', () => {
@@ -527,14 +527,167 @@ describe('MiningMouseController and MouseAction', () => {
       expect(style.showPreview).toBe(false);
     });
 
-    it('calls onThrow with targeted position on execute', async () => {
+    it('has isContinuous set to true and style.isFreeAim set to true', () => {
+      const onThrow = vi.fn();
+      const action = new DynamiteThrowAction(onThrow);
+      expect(action.isContinuous).toBe(true);
+
+      const style = action.getReticleStyle({ x: 3.2, y: 7.8 }, { x: 5.5, y: 5.5 }, mockGrid);
+      expect(style.isFreeAim).toBe(true);
+    });
+
+    it('executes throw with continuous world coordinates when clicking anywhere on canvas', async () => {
+      const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
       const onThrow = vi.fn().mockResolvedValue(true);
       const action = new DynamiteThrowAction(onThrow);
+      controller.setActiveAction(action);
 
-      const target = { x: 7, y: 2 };
-      const success = await action.execute(target);
-      expect(success).toBe(true);
-      expect(onThrow).toHaveBeenCalledWith(target);
+      const mockCanvas = document.createElement('canvas');
+      mockCanvas.getBoundingClientRect = () => ({
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 600,
+        right: 800,
+        bottom: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+      controller.attach(mockCanvas);
+
+      const mockCamera = {
+        screenToWorld: vi.fn().mockImplementation((pos) => ({ x: pos.x + 100, y: pos.y + 50 })),
+      } as any;
+      controller.setCamera(mockCamera);
+
+      // Move mouse to (clientX: 200, clientY: 150) -> world: (300, 200) -> continuous tiles: (300/64, 200/64) = (4.6875, 3.125)
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 200, clientY: 150 }));
+      controller.update();
+
+      const reticle = controller.getReticleState();
+      expect(reticle.active).toBe(true);
+      expect(reticle.style?.isFreeAim).toBe(true);
+      expect(reticle.target?.x).toBeCloseTo(4.6875);
+      expect(reticle.target?.y).toBeCloseTo(3.125);
+
+      // Click and release to throw
+      window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 200, clientY: 150 }));
+      window.dispatchEvent(new PointerEvent('pointerup', { button: 0, clientX: 200, clientY: 150 }));
+      await flushPromises();
+
+      expect(onThrow).toHaveBeenCalledTimes(1);
+      const thrownTarget = onThrow.mock.calls[0][0];
+      expect(thrownTarget.x).toBeCloseTo(4.6875);
+      expect(thrownTarget.y).toBeCloseTo(3.125);
+
+      controller.detach();
+    });
+
+    it('charges throw force while mouse is held down and executes on release', async () => {
+      const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
+      const onThrow = vi.fn().mockResolvedValue(true);
+      const action = new ThrowableItemAction({
+        onThrow,
+        maxChargeTimeMs: 1000,
+        maxHoldTimeMs: 2000,
+      });
+      controller.setActiveAction(action);
+
+      const mockCanvas = document.createElement('canvas');
+      mockCanvas.getBoundingClientRect = () => ({
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 600,
+        right: 800,
+        bottom: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+      controller.attach(mockCanvas);
+
+      const mockCamera = {
+        screenToWorld: vi.fn().mockImplementation((pos) => ({ x: pos.x, y: pos.y })),
+      } as any;
+      controller.setCamera(mockCamera);
+
+      // 1. Pointerdown starts charging
+      window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 200, clientY: 150 }));
+      expect(action.isCharging).toBe(true);
+      expect(action.isOvercharged).toBe(false);
+
+      // Check reticle style shows charging and trajectory points
+      const chargingReticle = controller.getReticleState();
+      expect(chargingReticle.style?.isCharging).toBe(true);
+      expect(chargingReticle.style?.trajectoryPoints?.length).toBeGreaterThan(0);
+
+      // Simulate charge update
+      action.updateCharge(performance.now() + 500);
+      expect(action.chargeRatio).toBeGreaterThan(0.4);
+
+      // 2. Pointerup releases and throws with forceRatio
+      window.dispatchEvent(new PointerEvent('pointerup', { button: 0, clientX: 200, clientY: 150 }));
+      await flushPromises();
+
+      expect(onThrow).toHaveBeenCalledTimes(1);
+      expect(action.isCharging).toBe(false);
+
+      controller.detach();
+    });
+
+    it('cancels throw and hides parabola when holding past maxHoldTimeMs (overcharge)', async () => {
+      const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
+      const onThrow = vi.fn().mockResolvedValue(true);
+      const action = new ThrowableItemAction({
+        onThrow,
+        maxChargeTimeMs: 1000,
+        maxHoldTimeMs: 2000,
+      });
+      controller.setActiveAction(action);
+
+      const mockCanvas = document.createElement('canvas');
+      mockCanvas.getBoundingClientRect = () => ({
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 600,
+        right: 800,
+        bottom: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+      controller.attach(mockCanvas);
+
+      const mockCamera = {
+        screenToWorld: vi.fn().mockImplementation((pos) => ({ x: pos.x, y: pos.y })),
+      } as any;
+      controller.setCamera(mockCamera);
+
+      // Start charging
+      window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 200, clientY: 150 }));
+      expect(action.isCharging).toBe(true);
+
+      // Simulate holding past 2000ms
+      action.updateCharge(performance.now() + 2500);
+      expect(action.isOvercharged).toBe(true);
+
+      // Parabola disappears on overcharge
+      const overchargedReticle = controller.getReticleState();
+      expect(overchargedReticle.style?.trajectoryPoints).toBeUndefined();
+      expect(overchargedReticle.style?.isValid).toBe(false);
+
+      // Releasing pointerup does NOT execute throw
+      window.dispatchEvent(new PointerEvent('pointerup', { button: 0, clientX: 200, clientY: 150 }));
+      await flushPromises();
+
+      expect(onThrow).not.toHaveBeenCalled();
+      expect(action.isCharging).toBe(false);
+
+      controller.detach();
     });
   });
 });
+

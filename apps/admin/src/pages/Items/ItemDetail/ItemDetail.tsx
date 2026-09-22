@@ -6,6 +6,7 @@ import { useApi } from '../../../hooks/useApi';
 import type { ItemType } from '@mine-me/shared/types';
 import ItemIconUpload from './ItemIconUpload';
 import ItemGearUpload from './ItemGearUpload';
+import ItemColliderEditor from '../../../components/ItemColliderEditor/ItemColliderEditor';
 import './ItemDetail.css';
 
 interface ItemEnums {
@@ -22,8 +23,8 @@ export default function ItemDetail() {
 
   const [data, setData] = useState<any>(isNew ? {
     name: '', description: '', type: 'GEAR', subType: 'HEAD',
-    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', triggerMode: 'SINGLE', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, experience: 0,
-    combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null
+    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', triggerMode: 'SINGLE', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, throwable: false, experience: 0,
+    combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null, physicsConfig: null
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
   const [effectsList, setEffectsList] = useState<any[]>([]);
@@ -445,7 +446,7 @@ export default function ItemDetail() {
             {/* World Interaction Toggles */}
             <div className="space-y-3 md:col-span-2 pt-4 border-t border-slate-100">
               <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">World & In-Game Properties</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <label className="text-sm font-bold text-slate-700 cursor-pointer flex items-center bg-slate-50 hover:bg-slate-100/80 p-3.5 rounded-xl border border-slate-200 transition-colors">
                   <input
                     type="checkbox"
@@ -477,7 +478,32 @@ export default function ItemDetail() {
                     <span className="block text-[11px] text-slate-500 font-normal">Allows player to climb vertically (like ladders)</span>
                   </div>
                 </label>
+
+                <label className="text-sm font-bold text-slate-700 cursor-pointer flex items-center bg-slate-50 hover:bg-slate-100/80 p-3.5 rounded-xl border border-slate-200 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={data.throwable || false}
+                    onChange={(e) => {
+                      setData({ ...data, throwable: e.target.checked });
+                      if (errors.throwable) setErrors({ ...errors, throwable: '' });
+                    }}
+                    className="w-5 h-5 mr-3 rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                  />
+                  <div>
+                    <span className="block font-black text-xs uppercase tracking-wider text-slate-800">Throwable</span>
+                    <span className="block text-[11px] text-slate-500 font-normal">Enables crosshairs and parabola charge throwing</span>
+                  </div>
+                </label>
               </div>
+            </div>
+
+            {/* 2D Collider & Rigid Body Physics Section */}
+            <div className="md:col-span-2 pt-4 border-t border-slate-100">
+              <ItemColliderEditor
+                item={data}
+                physicsConfig={data.physicsConfig}
+                onChange={(newPhysicsConfig) => setData({ ...data, physicsConfig: newPhysicsConfig })}
+              />
             </div>
           </div>
 

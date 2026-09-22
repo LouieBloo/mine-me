@@ -48,10 +48,20 @@ describe('MiningEntityRenderer', () => {
     expect((sprite as Sprite).texture).toBe(mockTexture);
     expect((sprite as Sprite).width).toBe(64);
     expect((sprite as Sprite).height).toBe(64);
-    // (x - 0.5) * 64 => (2.5 - 0.5) * 64 = 128
-    expect((sprite as Sprite).x).toBe(128);
-    // (y - 0.5) * 64 => (3.5 - 0.5) * 64 = 192
-    expect((sprite as Sprite).y).toBe(192);
+    expect((sprite as Sprite).anchor.x).toBe(0.5);
+    expect((sprite as Sprite).anchor.y).toBe(0.5);
+    expect((sprite as Sprite).x).toBe(160);
+    expect((sprite as Sprite).y).toBe(224);
+
+    // Verify rotation with angle
+    MiningEntityRenderer.updateFallingRocks(
+      container,
+      [{ id: 'rock_1', x: 2.5, y: 3.5, angle: 1.25 }],
+      viewsMap,
+      64,
+      mockTexture
+    );
+    expect((sprite as Sprite).rotation).toBe(1.25);
   });
 
   it('updates dropped items and removes vanished items', () => {

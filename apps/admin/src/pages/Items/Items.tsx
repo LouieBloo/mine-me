@@ -50,6 +50,12 @@ export default function Items() {
       headerName: 'Climbable',
       valueFormatter: (params: any) => params.value ? 'Yes' : 'No',
       minWidth: 120,
+    },
+    {
+      field: 'throwable',
+      headerName: 'Throwable',
+      valueFormatter: (params: any) => params.value ? 'Yes' : 'No',
+      minWidth: 120,
     }
   ];
 

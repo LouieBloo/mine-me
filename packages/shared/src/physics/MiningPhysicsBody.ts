@@ -19,18 +19,40 @@ export interface PhysicsBodyOptions {
  * Handles continuous movement integration, gravity, and AABB rectangular collision resolution against static grid tiles.
  */
 export abstract class MiningPhysicsBody {
-  public position: Vector2D;
-  public velocity: Vector2D = { x: 0, y: 0 };
+  protected _position: Vector2D;
+  protected _velocity: Vector2D = { x: 0, y: 0 };
+  protected _hasGravity: boolean;
+
+  public get position(): Vector2D {
+    return this._position;
+  }
+  public set position(pos: Vector2D) {
+    this._position = pos;
+  }
+
+  public get velocity(): Vector2D {
+    return this._velocity;
+  }
+  public set velocity(vel: Vector2D) {
+    this._velocity = vel;
+  }
+
+  public get hasGravity(): boolean {
+    return this._hasGravity;
+  }
+  public set hasGravity(val: boolean) {
+    this._hasGravity = val;
+  }
+
   public halfWidth: number;
   public halfHeight: number;
   public radius: number;
-  public hasGravity: boolean;
   public gravityScale: number;
   public isGrounded: boolean = false;
   public mass: number;
 
   constructor(options: PhysicsBodyOptions) {
-    this.position = { ...options.position };
+    this._position = { ...options.position };
     if (options.width !== undefined && options.height !== undefined) {
       this.halfWidth = options.width / 2;
       this.halfHeight = options.height / 2;
@@ -42,7 +64,7 @@ export abstract class MiningPhysicsBody {
       this.halfHeight = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE) / 2;
     }
     this.radius = Math.max(this.halfWidth, this.halfHeight);
-    this.hasGravity = options.hasGravity ?? true;
+    this._hasGravity = options.hasGravity ?? true;
     this.gravityScale = options.gravityScale ?? 1.0;
     this.mass = options.mass ?? 1.0;
   }

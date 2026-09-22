@@ -15,6 +15,11 @@ export interface ReticleStyle {
   isValid: boolean;
   showPreview?: boolean;
   previewType?: 'TORCH' | 'LADDER';
+  isFreeAim?: boolean;
+  trajectoryPoints?: Vector2D[];
+  isCharging?: boolean;
+  chargeRatio?: number;
+  isOvercharged?: boolean;
 }
 
 export interface MouseActionConfig {
@@ -22,6 +27,8 @@ export interface MouseActionConfig {
   triggerMode: MouseActionTriggerMode;
   /** Minimum delay in milliseconds between executions when triggerMode is HOLD. Defaults to 0. */
   cooldownMs?: number;
+  /** When true, this action targets continuous world float coordinates rather than snapped grid tiles */
+  isContinuous?: boolean;
 }
 
 /**
@@ -32,9 +39,10 @@ export interface IMouseAction {
   readonly name: string;
   readonly triggerMode: MouseActionTriggerMode;
   readonly cooldownMs?: number;
-  canExecute(target: MiningPosition, playerPos: Vector2D, grid: MiningClientTile[][]): boolean;
-  execute(target: MiningPosition, playerPos: Vector2D): Promise<boolean> | boolean;
-  getReticleStyle(target: MiningPosition, playerPos: Vector2D, grid: MiningClientTile[][]): ReticleStyle;
+  readonly isContinuous?: boolean;
+  canExecute(target: MiningPosition | Vector2D, playerPos: Vector2D, grid: MiningClientTile[][]): boolean;
+  execute(target: MiningPosition | Vector2D, playerPos: Vector2D): Promise<boolean> | boolean;
+  getReticleStyle(target: MiningPosition | Vector2D, playerPos: Vector2D, grid: MiningClientTile[][]): ReticleStyle;
 }
 
 /**
@@ -44,23 +52,25 @@ export abstract class BaseMouseAction implements IMouseAction {
   public readonly name: string;
   public readonly triggerMode: MouseActionTriggerMode;
   public readonly cooldownMs: number;
+  public readonly isContinuous: boolean;
 
   constructor(config: MouseActionConfig) {
     this.name = config.name;
     this.triggerMode = config.triggerMode;
     this.cooldownMs = config.cooldownMs ?? 0;
+    this.isContinuous = config.isContinuous ?? false;
   }
 
   public abstract canExecute(
-    target: MiningPosition,
+    target: MiningPosition | Vector2D,
     playerPos: Vector2D,
     grid: MiningClientTile[][]
   ): boolean;
 
-  public abstract execute(target: MiningPosition, playerPos?: Vector2D): Promise<boolean> | boolean;
+  public abstract execute(target: MiningPosition | Vector2D, playerPos?: Vector2D): Promise<boolean> | boolean;
 
   public abstract getReticleStyle(
-    target: MiningPosition,
+    target: MiningPosition | Vector2D,
     playerPos: Vector2D,
     grid: MiningClientTile[][]
   ): ReticleStyle;
@@ -199,47 +209,219 @@ export class LadderPlacementAction extends BaseBuildablePlacementAction {
   }
 }
 
+export interface ThrowableActionConfig extends Partial<MouseActionConfig> {
+  onThrow: (target: Vector2D, forceRatio: number) => Promise<boolean> | boolean;
+  maxChargeTimeMs?: number;
+  maxHoldTimeMs?: number;
+  itemId?: string;
+  physicsConfig?: any;
+}
+
+/**
+ * Action for throwing generic throwable items (dynamite, bombs, etc.).
+ * Supports hold-to-charge force scaling with parabolic trajectory preview
+ * and overcharge cancellation.
+ */
+export class ThrowableItemAction extends BaseMouseAction {
+  protected onThrow: (target: Vector2D, forceRatio: number) => Promise<boolean> | boolean;
+  public readonly maxChargeTimeMs: number;
+  public readonly maxHoldTimeMs: number;
+  public readonly itemId?: string;
+  public readonly physicsConfig?: any;
+
+  private _isCharging: boolean = false;
+  private _chargeStartTime: number = 0;
+  private _chargeRatio: number = 0;
+  private _isOvercharged: boolean = false;
+
+  constructor(config: ThrowableActionConfig) {
+    super({
+      name: config.name || 'throw_item',
+      triggerMode: config.triggerMode ?? MouseActionTriggerMode.SINGLE,
+      cooldownMs: config.cooldownMs ?? 200,
+      isContinuous: true,
+    });
+    this.onThrow = config.onThrow;
+    this.maxChargeTimeMs = config.maxChargeTimeMs ?? 1200;
+    this.maxHoldTimeMs = config.maxHoldTimeMs ?? 2000;
+    this.itemId = config.itemId;
+    this.physicsConfig = config.physicsConfig;
+  }
+
+  public get isCharging(): boolean {
+    return this._isCharging;
+  }
+
+  public get isOvercharged(): boolean {
+    return this._isOvercharged;
+  }
+
+  public get chargeRatio(): number {
+    return this._chargeRatio;
+  }
+
+  public startCharging(): void {
+    this._isCharging = true;
+    this._chargeStartTime = performance.now();
+    this._chargeRatio = 0.05;
+    this._isOvercharged = false;
+  }
+
+  public updateCharge(now: number = performance.now()): void {
+    if (!this._isCharging) return;
+    const elapsed = now - this._chargeStartTime;
+    if (elapsed >= this.maxHoldTimeMs) {
+      this._isOvercharged = true;
+      this._chargeRatio = 0;
+    } else {
+      this._isOvercharged = false;
+      this._chargeRatio = Math.min(1.0, Math.max(0.05, elapsed / this.maxChargeTimeMs));
+    }
+  }
+
+  public stopCharging(): { isOvercharged: boolean; forceRatio: number } {
+    const wasOvercharged = this._isOvercharged;
+    const ratio = this._chargeRatio;
+    this._isCharging = false;
+    this._chargeStartTime = 0;
+    this._chargeRatio = 0;
+    this._isOvercharged = false;
+    return { isOvercharged: wasOvercharged, forceRatio: ratio };
+  }
+
+  public cancelCharging(): void {
+    this._isCharging = false;
+    this._chargeStartTime = 0;
+    this._chargeRatio = 0;
+    this._isOvercharged = false;
+  }
+
+  public canExecute(
+    _target: MiningPosition | Vector2D,
+    _playerPos: Vector2D,
+    _grid: MiningClientTile[][]
+  ): boolean {
+    return !this._isOvercharged;
+  }
+
+  public async execute(target: MiningPosition | Vector2D, _playerPos?: Vector2D, forceRatio?: number): Promise<boolean> {
+    const ratio = forceRatio ?? (this._chargeRatio > 0 ? this._chargeRatio : 1.0);
+    return this.onThrow(target as Vector2D, ratio);
+  }
+
+  public computeTrajectory(
+    playerPos: Vector2D,
+    target: Vector2D,
+    forceRatio: number,
+    grid?: MiningClientTile[][],
+    stepCount: number = 32,
+    dt: number = 0.04
+  ): Vector2D[] {
+    const points: Vector2D[] = [];
+    const startX = playerPos.x;
+    const startY = playerPos.y;
+
+    const dx = target.x - startX;
+    const dy = target.y - startY;
+    const dist = Math.hypot(dx, dy);
+
+    const dirX = dist > 0.001 ? dx / dist : 1;
+    const dirY = dist > 0.001 ? dy / dist : -0.5;
+
+    const throwPower = this.physicsConfig?.throwPower ?? 14.0;
+    const effectivePower = throwPower * (0.25 + 0.75 * forceRatio);
+    const speed = Math.min(effectivePower * 1.5, Math.max(6, dist * (effectivePower / 8.0)));
+    const vx = dirX * speed;
+    const vy = dirY * speed - 2.5 * (0.25 + 0.75 * forceRatio);
+    const gravity = 28.0 * (this.physicsConfig?.gravityScale ?? 1.0);
+
+    let curX = startX;
+    let curY = startY;
+    let curVx = vx;
+    let curVy = vy;
+
+    points.push({ x: curX, y: curY });
+
+    for (let i = 0; i < stepCount; i++) {
+      curX += curVx * dt;
+      curY += curVy * dt;
+      curVy += gravity * dt;
+
+      if (grid && grid.length > 0) {
+        const tileX = Math.floor(curX);
+        const tileY = Math.floor(curY);
+        if (
+          tileY >= 0 &&
+          tileY < grid.length &&
+          tileX >= 0 &&
+          tileX < (grid[0]?.length || 0)
+        ) {
+          const tile = grid[tileY][tileX];
+          if (
+            tile &&
+            tile.type !== MiningTileType.EMPTY &&
+            tile.type !== MiningTileType.LADDER &&
+            tile.type !== MiningTileType.TORCH
+          ) {
+            points.push({ x: curX, y: curY });
+            break;
+          }
+        } else if (tileY >= grid.length || tileX < 0 || tileX >= (grid[0]?.length || 0)) {
+          points.push({ x: curX, y: curY });
+          break;
+        }
+      }
+
+      points.push({ x: curX, y: curY });
+    }
+
+    return points;
+  }
+
+  public getReticleStyle(
+    target: MiningPosition | Vector2D,
+    playerPos: Vector2D,
+    grid: MiningClientTile[][]
+  ): ReticleStyle {
+    let trajectoryPoints: Vector2D[] | undefined;
+    if (this._isCharging && !this._isOvercharged && this._chargeRatio > 0) {
+      const maxSteps = Math.min(36, Math.max(8, Math.floor(10 + this._chargeRatio * 26)));
+      trajectoryPoints = this.computeTrajectory(playerPos, target as Vector2D, this._chargeRatio, grid, maxSteps, 0.04);
+    }
+
+    return {
+      color: 0xef4444,
+      alpha: this._isOvercharged ? 0.3 : 0.85,
+      strokeColor: this._isOvercharged ? 0x6b7280 : 0xb91c1c,
+      isValid: !this._isOvercharged,
+      showPreview: false,
+      isFreeAim: true,
+      trajectoryPoints,
+      isCharging: this._isCharging,
+      chargeRatio: this._chargeRatio,
+      isOvercharged: this._isOvercharged,
+    };
+  }
+}
+
 /**
  * Action for throwing Dynamite towards the mouse cursor.
- * Triggered on click (SINGLE mode) or configured item triggerMode.
+ * Subclasses ThrowableItemAction for backwards compatibility and generic mechanics.
  */
-export class DynamiteThrowAction extends BaseMouseAction {
-  protected onThrow: (target: MiningPosition) => Promise<boolean> | boolean;
-
+export class DynamiteThrowAction extends ThrowableItemAction {
   constructor(
-    onThrow: (target: MiningPosition) => Promise<boolean> | boolean,
-    triggerMode: MouseActionTriggerMode = MouseActionTriggerMode.SINGLE
+    onThrow: (target: MiningPosition | Vector2D, forceRatio?: number) => Promise<boolean> | boolean,
+    triggerMode: MouseActionTriggerMode = MouseActionTriggerMode.SINGLE,
+    options?: { maxChargeTimeMs?: number; maxHoldTimeMs?: number; itemId?: string; physicsConfig?: any }
   ) {
     super({
       name: 'throw_dynamite',
       triggerMode,
+      onThrow: (target, ratio) => onThrow(target, ratio),
+      maxChargeTimeMs: options?.maxChargeTimeMs,
+      maxHoldTimeMs: options?.maxHoldTimeMs,
+      itemId: options?.itemId,
+      physicsConfig: options?.physicsConfig,
     });
-    this.onThrow = onThrow;
-  }
-
-  public canExecute(
-    _target: MiningPosition,
-    _playerPos: Vector2D,
-    _grid: MiningClientTile[][]
-  ): boolean {
-    return true;
-  }
-
-  public async execute(target: MiningPosition, _playerPos?: Vector2D): Promise<boolean> {
-    return this.onThrow(target);
-  }
-
-  public getReticleStyle(
-    _target: MiningPosition,
-    _playerPos: Vector2D,
-    _grid: MiningClientTile[][]
-  ): ReticleStyle {
-    return {
-      color: 0xef4444,
-      alpha: 0.85,
-      strokeColor: 0xb91c1c,
-      isValid: true,
-      showPreview: false,
-    };
   }
 }

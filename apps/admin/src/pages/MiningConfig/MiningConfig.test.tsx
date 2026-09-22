@@ -185,3 +185,4 @@ describe('MiningConfig Page', () => {
     });
   });
 });
+

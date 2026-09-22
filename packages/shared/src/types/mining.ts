@@ -1,4 +1,4 @@
-import type { GearSubType } from './index';
+import type { GearSubType, ItemPhysicsConfig } from './index';
 import type { ParticleEffect } from './particles';
 
 // ============================================================================
@@ -47,6 +47,7 @@ export const MINING_CONFIG = {
 
   /** Continuous physics parameters */
   TILE_SIZE: 32,
+  TILE_WORLD_PIXELS: 64, // Client viewport & rigid world rendering tile size in pixels (64px)
   PLAYER_RADIUS: 12,
   PLAYER_COLLIDER_WIDTH: 20, // Fall & movement rectangle collider width in pixels (~0.625 tiles)
   PLAYER_COLLIDER_HEIGHT: 28, // Fall & movement rectangle collider height in pixels (~0.875 tiles)
@@ -74,6 +75,8 @@ export const MINING_CONFIG = {
   /** Max session duration before server automatically closes session (15 minutes) */
   MAX_SESSION_DURATION_SECONDS: 15 * 60,
 } as const;
+
+export const MINING_TILE_WORLD_PIXELS = 64;
 
 // ---------------------------------------------------------------------------
 // Tile Types
@@ -326,6 +329,7 @@ export interface MiningDroppedItem {
   itemName: string;
   iconUrl: string | null;
   quantity: number;
+  physicsConfig?: ItemPhysicsConfig;
 }
 
 /**
@@ -345,6 +349,8 @@ export interface MiningFallingRock {
   id: string;
   position: Vector2D;
   velocity: Vector2D;
+  angle?: number;
+  angularVelocity?: number;
 }
 
 /**
@@ -354,7 +360,10 @@ export interface MiningActiveDynamite {
   id: string;
   position: Vector2D;
   velocity: Vector2D;
+  angle?: number;
+  angularVelocity?: number;
   fuseRemainingSeconds: number;
+  physicsConfig?: ItemPhysicsConfig;
 }
 
 /**
@@ -494,6 +503,15 @@ export interface MiningMapConfigData {
   silveriumPercentage: number;
   silveriumMinDepth: number;
   oreClusterChance: number;
+  /** Physics & RigidBody Settings */
+  gravityEnabled?: boolean;
+  gravity?: number;
+  dynamiteBounciness?: number;
+  dynamiteFriction?: number;
+  dynamiteThrowPower?: number;
+  dynamiteFuseSeconds?: number;
+  rockGravityScale?: number;
+  rockRestitution?: number;
 }
 
 export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
@@ -514,5 +532,12 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   silveriumPercentage: 2,
   silveriumMinDepth: 12,
   oreClusterChance: 65,
+  gravityEnabled: true,
+  gravity: 28.0,
+  dynamiteBounciness: 0.45,
+  dynamiteFriction: 0.4,
+  dynamiteThrowPower: 14.0,
+  dynamiteFuseSeconds: 4.0,
+  rockGravityScale: 1.2,
+  rockRestitution: 0.1,
 };
-

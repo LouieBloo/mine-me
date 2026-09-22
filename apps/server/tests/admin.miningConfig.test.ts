@@ -67,6 +67,31 @@ describe('Admin Mining Config API Routes', () => {
     expect(res.body.oreClusterChance).toBe(75);
   });
 
+  it('PUT /admin/mining-config updates and saves rigid body physics parameters', async () => {
+    const res = await request(app)
+      .put('/admin/mining-config')
+      .send({
+        gravityEnabled: false,
+        gravity: 35.5,
+        dynamiteBounciness: 0.7,
+        dynamiteFriction: 0.3,
+        dynamiteThrowPower: 18.0,
+        dynamiteFuseSeconds: 5.0,
+        rockGravityScale: 1.5,
+        rockRestitution: 0.2,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.gravityEnabled).toBe(false);
+    expect(res.body.gravity).toBe(35.5);
+    expect(res.body.dynamiteBounciness).toBe(0.7);
+    expect(res.body.dynamiteFriction).toBe(0.3);
+    expect(res.body.dynamiteThrowPower).toBe(18.0);
+    expect(res.body.dynamiteFuseSeconds).toBe(5.0);
+    expect(res.body.rockGravityScale).toBe(1.5);
+    expect(res.body.rockRestitution).toBe(0.2);
+  });
+
   it('PUT /admin/mining-config rejects invalid values out of bounds', async () => {
     const res = await request(app)
       .put('/admin/mining-config')

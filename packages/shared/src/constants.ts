@@ -1,4 +1,22 @@
-import type { GearSubType, ItemType } from './types';
+import type { GearSubType, ItemType, ItemPhysicsConfig } from './types';
+
+export const DEFAULT_DYNAMITE_PHYSICS_CONFIG: ItemPhysicsConfig = {
+  hasPhysics: true,
+  colliderType: 'RECTANGLE',
+  colliderWidth: 32,
+  colliderHeight: 10,
+  colliderOffsetX: 0,
+  colliderOffsetY: 0,
+  mass: 1.0,
+  friction: 0.4,
+  restitution: 0.45,
+  gravityScale: 1.0,
+  linearDamping: 0.05,
+  angularDamping: 0.4,
+  allowRotation: true,
+  throwPower: 14.0,
+  fuseSeconds: 4.0,
+};
 
 // Legacy knight body gear offsets (deprecated in favor of modular character skeleton)
 export const GEAR_OFFSETS: Record<GearSubType, { x: number; y: number }> = {

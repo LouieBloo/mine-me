@@ -1,4 +1,4 @@
-import type { MiningPosition, MiningDirection, MiningInputState } from './mining';
+import type { MiningPosition, MiningDirection, MiningInputState, Vector2D } from './mining';
 
 // ============================================================================
 // Game Event Types — Discriminated Union Pattern
@@ -157,7 +157,16 @@ export interface MiningPlaceTorchPayload extends GameEventBase {
 
 export interface MiningThrowDynamitePayload extends GameEventBase {
   type: 'mining_throw_dynamite';
-  target: MiningPosition;
+  target: MiningPosition | Vector2D;
+  itemId?: string;
+  forceRatio?: number;
+}
+
+export interface MiningThrowItemPayload extends GameEventBase {
+  type: 'mining_throw_item';
+  target: MiningPosition | Vector2D;
+  itemId?: string;
+  forceRatio?: number;
 }
 
 export interface MiningIncreaseVisionPayload extends GameEventBase {
@@ -180,6 +189,7 @@ export type GameEventPayload =
   | MiningPlaceLadderPayload
   | MiningPlaceTorchPayload
   | MiningThrowDynamitePayload
+  | MiningThrowItemPayload
   | MiningIncreaseVisionPayload
   | MiningMovePayload
   | MiningMineStartPayload

@@ -311,15 +311,15 @@ export const handleMiningPlaceTorch = async (
 };
 
 /**
- * Handler: mining_throw_dynamite
- * Throws a dynamite towards target position if player has dynamite in inventory.
- * Authoritative: Deducts 1 dynamite, creates physics entity with 4s fuse,
- * and starts countdown on server.
+ * Handler: mining_throw_dynamite & mining_throw_item
+ * Throws a throwable item (dynamite, bomb, etc.) towards target position if player has it in inventory.
+ * Authoritative: Deducts 1 item, creates physics entity with fuse,
+ * and starts countdown on server with scaled throw force.
  */
 export const handleMiningThrowDynamite = async (
   io: Server,
   socket: Socket,
-  payload: { target: { x: number; y: number } },
+  payload: { target: { x: number; y: number }; forceRatio?: number; itemId?: string },
 ): Promise<GameEventResult> => {
   const characterId = socket.data.characterId;
   if (!characterId) return { success: false, error: 'No character selected.' };
@@ -331,34 +331,52 @@ export const handleMiningThrowDynamite = async (
     return { success: false, error: 'Target position is required.' };
   }
 
-  // 1. Check if user has dynamite in character inventory
-  const characterInventoryDynamite = await prisma.inventoryItem.findFirst({
-    where: {
-      characterId,
-      quantity: { gt: 0 },
-      item: { subType: { equals: 'DYNAMITE', mode: 'insensitive' } },
-    },
-    include: { item: true },
-  });
-
-  if (!characterInventoryDynamite) {
-    return { success: false, error: 'You do not have any dynamite to throw.' };
+  // 1. Check if user has the specific item (or any throwable / dynamite) in character inventory
+  let inventoryItemToThrow: any = null;
+  if (payload.itemId) {
+    inventoryItemToThrow = await prisma.inventoryItem.findFirst({
+      where: {
+        characterId,
+        itemId: payload.itemId,
+        quantity: { gt: 0 },
+      },
+      include: { item: true },
+    });
   }
 
-  // 2. Launch dynamite in server engine (calculates throw trajectory & starts 4s fuse)
-  const thrown = engine.throwDynamite(characterId, payload.target);
+  if (!inventoryItemToThrow) {
+    inventoryItemToThrow = await prisma.inventoryItem.findFirst({
+      where: {
+        characterId,
+        quantity: { gt: 0 },
+        OR: [
+          { item: { throwable: true } },
+          { item: { subType: { equals: 'DYNAMITE', mode: 'insensitive' } } },
+        ],
+      } as any,
+      include: { item: true },
+    });
+  }
+
+  if (!inventoryItemToThrow) {
+    return { success: false, error: 'You do not have any dynamite or throwable items to throw.' };
+  }
+
+  // 2. Launch throwable item in server engine (calculates throw trajectory & starts fuse)
+  const itemPhysicsConfig = ((inventoryItemToThrow.item as any).physicsConfig as any) || undefined;
+  const thrown = engine.throwDynamite(characterId, payload.target, itemPhysicsConfig, payload.forceRatio);
   if (!thrown) {
-    return { success: false, error: 'Failed to throw dynamite.' };
+    return { success: false, error: 'Failed to throw item.' };
   }
 
-  // 3. Deduct dynamite from character inventory
-  if (characterInventoryDynamite.quantity <= 1) {
+  // 3. Deduct 1 item from character inventory
+  if (inventoryItemToThrow.quantity <= 1) {
     await prisma.inventoryItem.delete({
-      where: { id: characterInventoryDynamite.id },
+      where: { id: inventoryItemToThrow.id },
     });
   } else {
     await prisma.inventoryItem.update({
-      where: { id: characterInventoryDynamite.id },
+      where: { id: inventoryItemToThrow.id },
       data: { quantity: { decrement: 1 } },
     });
   }
@@ -389,6 +407,8 @@ export const handleMiningThrowDynamite = async (
 
   return { success: true };
 };
+
+export const handleMiningThrowItem = handleMiningThrowDynamite;
 
 /**
  * Handler: mining_exit

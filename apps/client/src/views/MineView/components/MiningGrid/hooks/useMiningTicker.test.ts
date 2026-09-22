@@ -571,4 +571,106 @@ describe('useMiningTicker - Torch Preview Lighting', () => {
     unmount();
     expect(mockLightingEngine.removeLight).toHaveBeenCalledWith('torch_preview');
   });
+
+  describe('Debug Mode - Colliders Overlay', () => {
+    it('renders block colliders, item colliders, and falling rock colliders when showDebug is enabled', () => {
+      const mockG: any = {
+        clear: vi.fn(),
+        rect: vi.fn().mockReturnThis(),
+        stroke: vi.fn().mockReturnThis(),
+        moveTo: vi.fn().mockReturnThis(),
+        lineTo: vi.fn().mockReturnThis(),
+        circle: vi.fn().mockReturnThis(),
+        fill: vi.fn().mockReturnThis(),
+        poly: vi.fn().mockReturnThis(),
+        closePath: vi.fn().mockReturnThis(),
+      };
+
+      const activeDynamites = [
+        {
+          id: 'dyn-1',
+          position: { x: 3, y: 3 },
+          velocity: { x: 0, y: 0 },
+          angle: 0.5,
+          fuseRemainingSeconds: 3.5,
+          physicsConfig: {
+            hasPhysics: true,
+            mass: 1,
+            colliderType: 'RECTANGLE' as const,
+            colliderWidth: 32,
+            colliderHeight: 10,
+            colliderRadius: 8,
+            colliderOffsetX: 0,
+            colliderOffsetY: 0,
+          },
+        },
+      ];
+
+      const activeRocks = [
+        {
+          id: 'rock-1',
+          x: 4,
+          y: 4,
+          angle: 0,
+        },
+      ];
+
+      const droppedItems = [
+        {
+          position: { x: 5, y: 5 },
+          itemId: 'potion-1',
+          itemName: 'Health Potion',
+          iconUrl: null,
+          quantity: 1,
+          physicsConfig: {
+            hasPhysics: true,
+            colliderType: 'CIRCLE' as const,
+            colliderRadius: 12,
+            colliderOffsetX: 0,
+            colliderOffsetY: 0,
+          },
+        },
+      ];
+
+      renderHook(() =>
+        useMiningTicker({
+          app: mockApp,
+          playerContainerRef: { current: playerContainer },
+          gridContainerRef: { current: gridContainer },
+          fallingRocksContainerRef: { current: null },
+          currentRenderPosRef: { current: { x: 2, y: 4 } },
+          targetServerPosRef: { current: { x: 2, y: 4 } },
+          isFacingLeftRef: { current: false },
+          playerFacingDirRef: { current: { x: 1, y: 0 } },
+          playerSpriteRef: { current: null },
+          activeFallingRocksRef: { current: activeRocks as any },
+          fallingRockGraphicsMap: { current: new Map() },
+          activeDynamitesRef: { current: activeDynamites as any },
+          droppedItemsRef: { current: droppedItems as any },
+          debugGraphicsRef: { current: mockG },
+          showDebugRef: { current: true },
+          flashlightRef: { current: null },
+          lightingEngineRef: { current: null },
+          cameraRef: { current: null },
+          playerBodyRef,
+          gridRef,
+          keysPressedRef,
+          isMiningRef,
+          miningTargetRef,
+        })
+      );
+
+      // Trigger frame
+      tickerCallbacks[0]();
+
+      expect(mockG.clear).toHaveBeenCalled();
+      // Block colliders rendered for solid tiles (y >= 5 in mock grid)
+      expect(mockG.rect).toHaveBeenCalled();
+      // Dynamite polygon collider rendered
+      expect(mockG.poly).toHaveBeenCalled();
+      // Rock circle collider & dropped item circle collider rendered
+      expect(mockG.circle).toHaveBeenCalled();
+    });
+  });
 });
+

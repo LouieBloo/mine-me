@@ -1,4 +1,6 @@
 import { Socket } from 'socket.io';
+import fs from 'fs';
+import path from 'path';
 import {
   MINING_CONFIG,
   MiningTileType,
@@ -16,6 +18,9 @@ import {
   type MiningRemotePlayer,
   type MiningStateTickPayload,
   type Vector2D,
+  MiningRigidWorld,
+  DEFAULT_DYNAMITE_PHYSICS_CONFIG,
+  type ItemPhysicsConfig,
 } from '@mine-me/shared';
 import {
   generateMiningMap,
@@ -73,6 +78,7 @@ export class MiningGameEngine {
   public readonly seed: number;
 
   public grid: ServerMiningGrid;
+  public rigidWorld: MiningRigidWorld;
   public activeRocks: MiningRockEntity[] = [];
   private rockCounter = 0;
 
@@ -106,6 +112,20 @@ export class MiningGameEngine {
 
     // Generate authoritative grid
     this.grid = generateMiningMap({ seed: this.seed, config: options.mapConfig });
+
+    // Initialize Planck.js rigid body physics world
+    this.rigidWorld = new MiningRigidWorld({
+      width: options.mapConfig?.gridWidth ?? MINING_CONFIG.GRID_WIDTH,
+      height: options.mapConfig?.gridHeight ?? MINING_CONFIG.GRID_HEIGHT,
+      gravityEnabled: options.mapConfig?.gravityEnabled ?? true,
+      gravity: options.mapConfig?.gravity ?? MINING_CONFIG.GRAVITY,
+      dynamiteBounciness: options.mapConfig?.dynamiteBounciness,
+      dynamiteFriction: options.mapConfig?.dynamiteFriction,
+      dynamiteThrowPower: options.mapConfig?.dynamiteThrowPower,
+      rockGravityScale: options.mapConfig?.rockGravityScale,
+      rockRestitution: options.mapConfig?.rockRestitution,
+    });
+    this.rigidWorld.setGrid(this.grid);
 
     // If options included an initial character and socket, initialize player session
     if (options.characterId && options.socket) {
@@ -387,6 +407,7 @@ export class MiningGameEngine {
       this.intervalId = null;
     }
     this.isStopped = true;
+    this.rigidWorld.destroy();
   }
 
   public handleInput(characterIdOrInput: string | MiningInputState, maybeInput?: MiningInputState): void {
@@ -526,9 +547,52 @@ export class MiningGameEngine {
   }
 
   /**
+   * Helper to retrieve configured dynamite item physics from items.json or defaults.
+   */
+  public getDynamiteItemPhysicsConfig(): ItemPhysicsConfig {
+    try {
+      const itemsPath = path.join(__dirname, '../../../../../packages/shared/src/data/items.json');
+      if (fs.existsSync(itemsPath)) {
+        const items = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
+        const dynamiteItem = (items as any[]).find((item: any) => item.subType === 'DYNAMITE');
+        if (dynamiteItem?.physicsConfig) {
+          return dynamiteItem.physicsConfig as ItemPhysicsConfig;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_DYNAMITE_PHYSICS_CONFIG;
+  }
+
+  /**
+   * Helper to retrieve configured item physics from items.json for any item.
+   */
+  public getItemPhysicsConfig(itemId: string): ItemPhysicsConfig | undefined {
+    try {
+      const itemsPath = path.join(__dirname, '../../../../../packages/shared/src/data/items.json');
+      if (fs.existsSync(itemsPath)) {
+        const items = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
+        const found = (items as any[]).find((item: any) => item.id === itemId || item.name?.toLowerCase() === itemId.toLowerCase());
+        if (found?.physicsConfig) {
+          return found.physicsConfig as ItemPhysicsConfig;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return undefined;
+  }
+
+  /**
    * Throw a stick of dynamite from the player's position towards target coordinates.
    */
-  public throwDynamite(characterId: string, target: MiningPosition): boolean {
+  public throwDynamite(
+    characterId: string,
+    target: MiningPosition,
+    physicsConfig?: ItemPhysicsConfig,
+    forceRatio: number = 1.0,
+  ): boolean {
     const session = this.players.get(characterId);
     if (!session) return false;
 
@@ -545,12 +609,26 @@ export class MiningGameEngine {
     const dirX = dist > 0.001 ? dx / dist : (session.isFacingLeft ? -1 : 1);
     const dirY = dist > 0.001 ? dy / dist : -0.5;
 
-    // Ballistic toss speed scaled smoothly by target distance
-    const speed = Math.min(18, Math.max(6, dist * 1.5));
+    const config = physicsConfig ?? this.getDynamiteItemPhysicsConfig();
+    const throwPower = config.throwPower ?? this.rigidWorld.config.dynamiteThrowPower ?? 14.0;
+    const clampedRatio = Math.min(1.0, Math.max(0.1, forceRatio));
+    const effectivePower = throwPower * (0.25 + 0.75 * clampedRatio);
+    const speed = Math.min(effectivePower * 1.5, Math.max(6, dist * (effectivePower / 8.0)));
     const vx = dirX * speed;
-    const vy = dirY * speed - 2.5; // slight upward toss arc
+    const vy = dirY * speed - 2.5 * (0.25 + 0.75 * clampedRatio); // slight upward toss arc scaled with force
 
-    const dynamite = new MiningDynamiteEntity(dynamiteId, { x: startX, y: startY }, { x: vx, y: vy }, 4.0);
+    const dynamite = new MiningDynamiteEntity(
+      dynamiteId,
+      { x: startX, y: startY },
+      { x: vx, y: vy },
+      config.fuseSeconds ?? 4.0,
+      this.rigidWorld,
+      {
+        bounciness: config.restitution ?? 0.45,
+        friction: config.friction ?? 0.4,
+        physicsConfig: config,
+      }
+    );
     this.activeDynamites.push(dynamite);
     return true;
   }
@@ -604,6 +682,9 @@ export class MiningGameEngine {
       // Item pickups
       this.checkItemPickupsForPlayer(session);
     }
+
+    // 2.5. Step Planck rigid world
+    this.rigidWorld.step(dt);
 
     // 3. Falling rocks simulation
     this.updateFallingRocks(dt);
@@ -729,6 +810,7 @@ export class MiningGameEngine {
         const { x, y } = rock.settledTile;
         if (isInBounds(x, y)) {
           this.grid[y][x] = { type: MiningTileType.ROCK, revealed: true };
+          this.rigidWorld.addTileCollider(x, y);
           this.pendingRevealedTiles.push({ x, y, type: MiningTileType.ROCK });
         }
         return false;
@@ -760,8 +842,8 @@ export class MiningGameEngine {
    * stops affected player mining, and triggers unsupported rock gravity.
    */
   public explodeDynamite(dynamite: MiningDynamiteEntity): void {
-    const cx = Math.floor(dynamite.position.x);
-    const cy = Math.floor(dynamite.position.y);
+    const cx = Math.round(dynamite.position.x);
+    const cy = Math.round(dynamite.position.y);
     const radius = 7;
     const radiusSq = radius * radius;
     const affectedCols = new Set<number>();
@@ -779,6 +861,7 @@ export class MiningGameEngine {
               tile.type = MiningTileType.EMPTY;
               tile.revealed = true;
               tile.damageMs = 0;
+              this.rigidWorld.removeTileCollider(tx, ty);
               this.pendingRevealedTiles.push({
                 x: tx,
                 y: ty,
@@ -827,11 +910,15 @@ export class MiningGameEngine {
     for (let y = clearedY - 1; y >= 0; y--) {
       if (this.grid[y][clearedX].type === MiningTileType.ROCK) {
         this.grid[y][clearedX] = { type: MiningTileType.EMPTY, revealed: true };
+        this.rigidWorld.removeTileCollider(clearedX, y);
         this.pendingRevealedTiles.push({ x: clearedX, y, type: MiningTileType.EMPTY, damageStage: 0 });
 
         this.rockCounter++;
         const rockId = `rock_${clearedX}_${y}_${this.rockCounter}`;
-        const rockEntity = new MiningRockEntity(rockId, clearedX, y);
+        const rockEntity = new MiningRockEntity(rockId, clearedX, y, this.rigidWorld, {
+          gravityScale: this.rigidWorld.config.rockGravityScale,
+          restitution: this.rigidWorld.config.rockRestitution,
+        });
         this.activeRocks.push(rockEntity);
       } else if (isTileSolid(this.grid[y][clearedX].type)) {
         break;
@@ -847,6 +934,7 @@ export class MiningGameEngine {
 
     // Excavate tile
     this.grid[target.y][target.x] = { type: MiningTileType.EMPTY, revealed: true };
+    this.rigidWorld.removeTileCollider(target.x, target.y);
     this.pendingRevealedTiles.push({ x: target.x, y: target.y, type: MiningTileType.EMPTY, damageStage: 0 });
 
     // Invalidate last reveal positions so line-of-sight updates immediately
@@ -862,6 +950,7 @@ export class MiningGameEngine {
         itemName: 'Copper Ore',
         iconUrl: '/assets/items/copper_ore.png',
         quantity: 1,
+        physicsConfig: this.getItemPhysicsConfig('copper_ore'),
       });
       this.droppedItemsDirty = true;
     } else if (tile.type === MiningTileType.CHEST) {
@@ -871,6 +960,7 @@ export class MiningGameEngine {
         itemName: 'Gold Coins',
         iconUrl: '/assets/items/gold_coin.png',
         quantity: 50,
+        physicsConfig: this.getItemPhysicsConfig('gold_coin'),
       });
       this.droppedItemsDirty = true;
     }
@@ -944,6 +1034,8 @@ export class MiningGameEngine {
             id: r.id,
             position: { x: r.position.x, y: r.position.y },
             velocity: { x: r.velocity.x, y: r.velocity.y },
+            angle: r.angle,
+            angularVelocity: r.angularVelocity,
           }))
         : undefined;
 
@@ -953,7 +1045,10 @@ export class MiningGameEngine {
             id: d.id,
             position: { x: d.position.x, y: d.position.y },
             velocity: { x: d.velocity.x, y: d.velocity.y },
+            angle: d.angle,
+            angularVelocity: d.angularVelocity,
             fuseRemainingSeconds: d.fuseRemainingSeconds,
+            physicsConfig: d.physicsConfig,
           }))
         : undefined;
 

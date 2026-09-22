@@ -9,7 +9,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0"
+    "@prisma/client": "^5.22.0",
+    "planck": "^1.5.0"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

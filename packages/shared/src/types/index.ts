@@ -101,6 +101,32 @@ export const ITEM_SUBTYPES: Record<ItemType, string[]> = {
 
 export const ITEM_RARITIES: ItemRarity[] = ['LOW', 'MEDIUM', 'RARE', 'VERY_RARE'];
 
+export type ItemColliderType = 'NONE' | 'CIRCLE' | 'RECTANGLE';
+
+export interface ItemPhysicsConfig {
+  hasPhysics: boolean;
+  colliderType: ItemColliderType;
+  // Collider dimensions in pixels relative to sprite center
+  colliderWidth?: number;
+  colliderHeight?: number;
+  colliderRadius?: number;
+  colliderOffsetX?: number;
+  colliderOffsetY?: number;
+
+  // Rigid body dynamics
+  mass?: number;
+  friction?: number;
+  restitution?: number;
+  gravityScale?: number;
+  linearDamping?: number;
+  angularDamping?: number;
+  allowRotation?: boolean;
+
+  // Custom action dynamics (e.g. dynamite toss power & fuse)
+  throwPower?: number;
+  fuseSeconds?: number;
+}
+
 export interface GameItem {
   id: string;
   name: string;
@@ -117,10 +143,12 @@ export interface GameItem {
   defenseScore?: number;
   canBeDamaged?: boolean;
   canBeClimbed?: boolean;
+  throwable?: boolean;
   triggerMode?: MouseActionTriggerMode;
   particleEffectId?: string | null;
   particleEffect?: ParticleEffect | null;
   itemEffects?: ObjectEffects[];
+  physicsConfig?: ItemPhysicsConfig | null;
 }
 
 export interface GearItem extends GameItem {

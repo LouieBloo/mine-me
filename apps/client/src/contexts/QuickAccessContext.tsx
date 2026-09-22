@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useGame } from './GameContext';
 import { useSocket } from './SocketContext';
 import { notificationService } from '../services/notificationService';
-import type { InventoryEntry } from '@mine-me/shared';
+import type { InventoryEntry, GameItem } from '@mine-me/shared';
 
 interface QuickAccessContextType {
   /** 4 quick slots storing item definition IDs (or null if empty) */
@@ -23,7 +23,12 @@ interface QuickAccessContextType {
   /** Whether ladder placement mode is currently active */
   isPlacingLadder: boolean;
   setIsPlacingLadder: React.Dispatch<React.SetStateAction<boolean>>;
-  /** Whether dynamite throwing mode is currently active */
+  /** Currently selected throwable item, if throwing mode is active */
+  activeThrowableItem: GameItem | null;
+  /** Whether throwable object mode is currently active */
+  isThrowingItem: boolean;
+  setIsThrowingItem: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Backwards compatibility alias for dynamite */
   isThrowingDynamite: boolean;
   setIsThrowingDynamite: React.Dispatch<React.SetStateAction<boolean>>;
 }
@@ -43,7 +48,8 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(null);
   const [isPlacingTorch, setIsPlacingTorch] = useState<boolean>(false);
   const [isPlacingLadder, setIsPlacingLadder] = useState<boolean>(false);
-  const [isThrowingDynamite, setIsThrowingDynamite] = useState<boolean>(false);
+  const [isThrowingItem, setIsThrowingItem] = useState<boolean>(false);
+  const [activeThrowableItem, setActiveThrowableItem] = useState<GameItem | null>(null);
 
   // Load persisted quick slots when activeCharacter changes
   useEffect(() => {
@@ -148,21 +154,24 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         setIsPlacingLadder(false);
       }
     }
-    if (isThrowingDynamite) {
-      const dynamiteCount = playerState?.inventory?.items
+    if (isThrowingItem) {
+      const throwableCount = playerState?.inventory?.items
         ? playerState.inventory.items
-            .filter(
-              (inv) =>
-                inv.item?.subType?.toUpperCase() === 'DYNAMITE' ||
-                inv.item?.name?.toLowerCase().includes('dynamite')
-            )
+            .filter((inv) => {
+              const it = inv.item;
+              if (activeThrowableItem?.id) {
+                return it?.id === activeThrowableItem.id;
+              }
+              return it?.throwable || it?.subType?.toUpperCase() === 'DYNAMITE' || it?.name?.toLowerCase().includes('dynamite');
+            })
             .reduce((sum, inv) => sum + inv.quantity, 0)
         : 0;
-      if (dynamiteCount === 0) {
-        setIsThrowingDynamite(false);
+      if (throwableCount === 0) {
+        setIsThrowingItem(false);
+        setActiveThrowableItem(null);
       }
     }
-  }, [playerState?.inventory?.items, isPlacingTorch, isPlacingLadder, isThrowingDynamite]);
+  }, [playerState?.inventory?.items, isPlacingTorch, isPlacingLadder, isThrowingItem, activeThrowableItem]);
 
   // Derive live inventory entry directly from playerState.inventory.items
   const getSlotEntry = useCallback((slotIndex: number): { entry: InventoryEntry | null; totalQuantity: number } => {
@@ -200,17 +209,22 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
     const item = entry.item;
     const isTorch = item.subType?.toUpperCase() === 'TORCH' || item.name.toLowerCase().includes('torch');
     const isLadder = item.subType?.toUpperCase() === 'LADDER' || item.name.toLowerCase().includes('ladder');
-    const isDynamite = item.subType?.toUpperCase() === 'DYNAMITE' || item.name.toLowerCase().includes('dynamite');
+    const isThrowable = item.throwable || item.subType?.toUpperCase() === 'DYNAMITE' || item.name.toLowerCase().includes('dynamite');
 
-    if (isDynamite) {
+    if (isThrowable) {
       if (totalQuantity <= 0) {
-        notificationService.error('No Dynamite', 'You do not have any dynamite left.');
-        setIsThrowingDynamite(false);
+        notificationService.error(`No ${item.name}`, `You do not have any ${item.name} left.`);
+        setIsThrowingItem(false);
+        setActiveThrowableItem(null);
         return;
       }
       setIsPlacingTorch(false);
       setIsPlacingLadder(false);
-      setIsThrowingDynamite((prev) => !prev);
+      setIsThrowingItem((prev) => {
+        const next = !prev;
+        setActiveThrowableItem(next ? item : null);
+        return next;
+      });
       return;
     }
 
@@ -221,7 +235,8 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         return;
       }
       setIsPlacingLadder(false);
-      setIsThrowingDynamite(false);
+      setIsThrowingItem(false);
+      setActiveThrowableItem(null);
       setIsPlacingTorch(prev => !prev);
       return;
     }
@@ -233,7 +248,8 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         return;
       }
       setIsPlacingTorch(false);
-      setIsThrowingDynamite(false);
+      setIsThrowingItem(false);
+      setActiveThrowableItem(null);
       setIsPlacingLadder(prev => !prev);
       return;
     }
@@ -241,7 +257,8 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
     // Reset placement and throwing modes if switching to another item
     setIsPlacingTorch(false);
     setIsPlacingLadder(false);
-    setIsThrowingDynamite(false);
+    setIsThrowingItem(false);
+    setActiveThrowableItem(null);
 
     if (item.type === 'GEAR') {
       if (!entry.equipped) {
@@ -322,8 +339,11 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         setIsPlacingTorch,
         isPlacingLadder,
         setIsPlacingLadder,
-        isThrowingDynamite,
-        setIsThrowingDynamite,
+        activeThrowableItem,
+        isThrowingItem,
+        setIsThrowingItem,
+        isThrowingDynamite: isThrowingItem,
+        setIsThrowingDynamite: setIsThrowingItem,
       }}
     >
       {children}

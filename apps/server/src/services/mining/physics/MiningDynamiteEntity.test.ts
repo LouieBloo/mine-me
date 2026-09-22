@@ -87,4 +87,28 @@ describe('MiningDynamiteEntity', () => {
     // Snapped flush before wall tile
     expect(dynamite.position.x).toBeLessThan(12);
   });
+
+  it('preserves physicsConfig provided in options', () => {
+    const customConfig = {
+      hasPhysics: true,
+      colliderType: 'RECTANGLE' as const,
+      colliderWidth: 32,
+      colliderHeight: 10,
+      colliderRadius: 8,
+      colliderOffsetX: 0,
+      colliderOffsetY: 0,
+    };
+    const dynamite = new MiningDynamiteEntity(
+      'dyn-6',
+      { x: 5, y: 5 },
+      { x: 1, y: 0 },
+      4.0,
+      undefined,
+      { physicsConfig: customConfig }
+    );
+
+    expect(dynamite.physicsConfig).toBeDefined();
+    expect(dynamite.physicsConfig?.colliderWidth).toBe(32);
+    expect(dynamite.physicsConfig?.colliderHeight).toBe(10);
+  });
 });

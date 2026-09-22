@@ -6,6 +6,7 @@ export interface ActiveFallingRock {
   id: string;
   x: number;
   y: number;
+  angle?: number;
 }
 
 export class MiningEntityRenderer {
@@ -28,26 +29,35 @@ export class MiningEntityRenderer {
         if (item.iconUrl) {
           const loadSprite = async () => {
             try {
-              const texture = await Assets.load(getAssetUrl(item.iconUrl));
+              const url = getAssetUrl(item.iconUrl);
+              const texture = await Assets.load(url);
               const sprite = new Sprite(texture);
               sprite.anchor.set(0.5);
-              sprite.x = itemX;
-              sprite.y = itemY;
               sprite.width = tileSize * 0.6;
               sprite.height = tileSize * 0.6;
+              sprite.x = itemX;
+              sprite.y = itemY;
               droppedItemsContainer.addChild(sprite);
               droppedSpritesMap.set(key, sprite);
             } catch {
-              const fallback = new Graphics();
-              fallback.x = itemX;
-              fallback.y = itemY;
-              fallback.circle(0, 0, 10);
-              fallback.fill(0xf59e0b);
-              droppedItemsContainer.addChild(fallback);
-              droppedSpritesMap.set(key, fallback);
+              const graphics = new Graphics();
+              graphics.circle(0, 0, tileSize * 0.25);
+              graphics.fill(0xf59e0b);
+              graphics.x = itemX;
+              graphics.y = itemY;
+              droppedItemsContainer.addChild(graphics);
+              droppedSpritesMap.set(key, graphics);
             }
           };
           loadSprite();
+        } else {
+          const graphics = new Graphics();
+          graphics.circle(0, 0, tileSize * 0.25);
+          graphics.fill(0xf59e0b);
+          graphics.x = itemX;
+          graphics.y = itemY;
+          droppedItemsContainer.addChild(graphics);
+          droppedSpritesMap.set(key, graphics);
         }
       }
     });
@@ -82,6 +92,7 @@ export class MiningEntityRenderer {
             rockView.destroy();
           }
           const sprite = new Sprite(rockTexture);
+          sprite.anchor.set(0.5);
           sprite.width = tileSize;
           sprite.height = tileSize;
           fallingRocksContainer.addChild(sprite);
@@ -98,18 +109,20 @@ export class MiningEntityRenderer {
             rockView.destroy();
           }
           const graphics = new Graphics();
-          graphics.rect(0, 0, tileSize, tileSize);
-          graphics.fill(0x334155);
+          graphics.roundRect(-tileSize * 0.45, -tileSize * 0.45, tileSize * 0.9, tileSize * 0.9, 4);
+          graphics.fill(0x475569);
           fallingRocksContainer.addChild(graphics);
           rockView = graphics;
           fallingRockGraphicsMap.set(rock.id, rockView);
         }
       }
 
-      // rock.x and rock.y are CENTER coordinates (e.g. tileX+0.5, tileY+0.5)
-      // Convert to top-left pixel coordinates to align with grid tile rendering
-      rockView.x = (rock.x - 0.5) * tileSize;
-      rockView.y = (rock.y - 0.5) * tileSize;
+      // rock.x and rock.y are centered coordinates
+      rockView.x = rock.x * tileSize;
+      rockView.y = rock.y * tileSize;
+      if (typeof rock.angle === 'number') {
+        rockView.rotation = rock.angle;
+      }
     }
 
     // Clean up graphics/sprites for rocks that have settled back into grid
@@ -143,8 +156,9 @@ export class MiningEntityRenderer {
           }
           const sprite = new Sprite(dynamiteTexture);
           sprite.anchor.set(0.5);
-          sprite.width = tileSize * 0.7;
-          sprite.height = tileSize * 0.7;
+          // Scale sprite to match the 32px base item resolution (32 / 64 = 0.5 of a tile)
+          sprite.width = tileSize * 0.5;
+          sprite.height = tileSize * 0.5;
           dynamitesContainer.addChild(sprite);
           view = sprite;
           dynamiteGraphicsMap.set(dynamite.id, view);
@@ -158,9 +172,12 @@ export class MiningEntityRenderer {
             view.destroy();
           }
           const graphics = new Graphics();
-          graphics.roundRect(-tileSize * 0.15, -tileSize * 0.3, tileSize * 0.3, tileSize * 0.6, 2);
+          // Fallback matching the configured hotdog dimensions (32px x 10px in 64px tile space)
+          const w = (dynamite.physicsConfig?.colliderWidth ?? 32) * (tileSize / 64);
+          const h = (dynamite.physicsConfig?.colliderHeight ?? 10) * (tileSize / 64);
+          graphics.roundRect(-w / 2, -h / 2, w, h, 2);
           graphics.fill(0xdc2626);
-          graphics.rect(-tileSize * 0.05, -tileSize * 0.4, tileSize * 0.1, tileSize * 0.1);
+          graphics.rect(w / 2, -2, 4, 4);
           graphics.fill(0xf59e0b);
           dynamitesContainer.addChild(graphics);
           view = graphics;
@@ -171,6 +188,9 @@ export class MiningEntityRenderer {
       // Position in world pixel coordinates
       view.x = dynamite.position.x * tileSize;
       view.y = dynamite.position.y * tileSize;
+      if (typeof dynamite.angle === 'number') {
+        view.rotation = dynamite.angle;
+      }
     }
 
     // Clean up dynamites that exploded or were removed

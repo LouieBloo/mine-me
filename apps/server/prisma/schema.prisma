@@ -90,9 +90,11 @@ model Item {
   defenseScore    Int             @default(0)
   canBeDamaged    Boolean         @default(false)
   canBeClimbed    Boolean         @default(false)
+  throwable       Boolean         @default(false)
   triggerMode     MouseActionTriggerMode @default(SINGLE)
   particleEffectId String?
   particleEffect   ParticleEffect? @relation(fields: [particleEffectId], references: [id], onDelete: SetNull)
+  physicsConfig   Json?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   cityMaterials   CityMaterial[]
@@ -234,6 +236,15 @@ model MiningMapConfig {
   silveriumPercentage Int      @default(2)
   silveriumMinDepth   Int      @default(12)
   oreClusterChance    Int      @default(65)
+  // Physics & RigidBody Settings
+  gravityEnabled      Boolean  @default(true)
+  gravity             Float    @default(28.0)
+  dynamiteBounciness  Float    @default(0.45)
+  dynamiteFriction    Float    @default(0.4)
+  dynamiteThrowPower  Float    @default(14.0)
+  dynamiteFuseSeconds Float    @default(4.0)
+  rockGravityScale    Float    @default(1.2)
+  rockRestitution     Float    @default(0.1)
   isActive            Boolean  @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

@@ -15,13 +15,15 @@ import {
   getAssetUrl,
   canTileBeDamaged,
   type MiningActiveDynamite,
+  type MiningDroppedItem,
+  type GameItem,
 } from '@mine-me/shared';
 import { PointLight } from '../../../../components/game/lighting/PointLight';
 import type { EmitterHandle } from '../../../../components/game/particles/ParticleEngine';
 import { useSocket } from '../../../../contexts/SocketContext';
 import { notificationService } from '../../../../services/notificationService';
 import { MiningMouseController } from './input/MiningMouseController';
-import { TorchPlacementAction, LadderPlacementAction, DynamiteThrowAction } from './input/MouseAction';
+import { TorchPlacementAction, LadderPlacementAction, ThrowableItemAction } from './input/MouseAction';
 import { useMiningInput } from './hooks/useMiningInput';
 import { useMiningScene } from './hooks/useMiningScene';
 import { useMiningTicker } from './hooks/useMiningTicker';
@@ -42,6 +44,8 @@ interface MiningGridProps {
   isPlacingLadder?: boolean;
   onLadderPlaced?: () => void;
   isThrowingDynamite?: boolean;
+  isThrowingItem?: boolean;
+  activeThrowableItem?: GameItem | null;
   onDynamiteThrown?: () => void;
   showDebug?: boolean;
   onToggleDebug?: () => void;
@@ -59,6 +63,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   isPlacingLadder = false,
   onLadderPlaced,
   isThrowingDynamite = false,
+  isThrowingItem = false,
+  activeThrowableItem = null,
   onDynamiteThrown,
   showDebug,
   onToggleDebug,
@@ -101,6 +107,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
   const activeFallingRocksRef = useRef<{ id: string; x: number; y: number }[]>([]);
   const activeDynamitesRef = useRef<MiningActiveDynamite[]>([]);
+  const droppedItemsRef = useRef<MiningDroppedItem[]>([]);
   const lastDamageParticleTimeRef = useRef<Map<string, number>>(new Map());
 
   // Smooth rendering lerp position references
@@ -269,30 +276,44 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           }
         }, ladderItem?.triggerMode)
       );
-    } else if (isThrowingDynamite) {
-      const dynamiteItem = playerState?.inventory?.items?.find(
-        (inv: any) =>
-          inv.item?.subType?.toUpperCase() === 'DYNAMITE' ||
-          inv.item?.name?.toLowerCase().includes('dynamite')
-      )?.item;
+    } else if (isThrowingItem || isThrowingDynamite) {
+      const targetItem =
+        activeThrowableItem ||
+        playerState?.inventory?.items?.find(
+          (inv: any) =>
+            inv.item?.throwable === true ||
+            inv.item?.subType?.toUpperCase() === 'DYNAMITE' ||
+            inv.item?.name?.toLowerCase().includes('dynamite')
+        )?.item;
 
       mouseController.setActiveAction(
-        new DynamiteThrowAction(async (target) => {
-          try {
-            const res = await sendGameEvent({ type: 'mining_throw_dynamite', target });
-            if (res.success) {
-              onDynamiteThrown?.();
-              return true;
-            } else {
-              notificationService.error('Cannot Throw Dynamite', res.error || 'Failed to throw dynamite.');
+        new ThrowableItemAction({
+          name: targetItem ? `throw_${targetItem.name.toLowerCase().replace(/\s+/g, '_')}` : 'throw_dynamite',
+          itemId: targetItem?.id,
+          physicsConfig: (targetItem as any)?.physicsConfig,
+          triggerMode: targetItem?.triggerMode,
+          onThrow: async (target, forceRatio) => {
+            try {
+              const res = await sendGameEvent({
+                type: 'mining_throw_dynamite',
+                target,
+                forceRatio,
+                itemId: targetItem?.id,
+              } as any);
+              if (res.success) {
+                onDynamiteThrown?.();
+                return true;
+              } else {
+                notificationService.error('Cannot Throw Item', res.error || 'Failed to throw item.');
+                return false;
+              }
+            } catch (err: any) {
+              console.error('[MiningGrid] mining_throw_dynamite error:', err);
+              notificationService.error('Error', err.message || 'Failed to throw item.');
               return false;
             }
-          } catch (err: any) {
-            console.error('[MiningGrid] mining_throw_dynamite error:', err);
-            notificationService.error('Error', err.message || 'Failed to throw dynamite.');
-            return false;
-          }
-        }, dynamiteItem?.triggerMode)
+          },
+        })
       );
     } else {
       mouseController.setActiveAction(null);
@@ -302,7 +323,19 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     return () => {
       lightingEngineRef.current?.removeLight('torch_preview');
     };
-  }, [isPlacingTorch, isPlacingLadder, isThrowingDynamite, sendGameEvent, onTorchPlaced, onLadderPlaced, onDynamiteThrown, containersReady, playerState?.inventory?.items]);
+  }, [
+    isPlacingTorch,
+    isPlacingLadder,
+    isThrowingDynamite,
+    isThrowingItem,
+    activeThrowableItem,
+    sendGameEvent,
+    onTorchPlaced,
+    onLadderPlaced,
+    onDynamiteThrown,
+    containersReady,
+    playerState?.inventory?.items,
+  ]);
 
   // Real-time Input Controls Hook
   const { keysPressedRef } = useMiningInput({
@@ -617,6 +650,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
       // Update dropped items
       const droppedItemsContainer = droppedItemsContainerRef.current;
+      if (payload.droppedItems) {
+        droppedItemsRef.current = payload.droppedItems;
+      }
       if (droppedItemsContainer && containersReady && payload.droppedItems) {
         MiningEntityRenderer.updateDroppedItems(
           droppedItemsContainer,
@@ -656,6 +692,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     activeDynamitesRef,
     dynamiteGraphicsMap,
     dynamiteTextureRef,
+    droppedItemsRef,
     reticleGraphicsRef,
     mouseControllerRef,
     debugGraphicsRef,

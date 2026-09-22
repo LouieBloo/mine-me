@@ -32,11 +32,13 @@ export const itemValidation = [
   body('isStartingPiece').optional().isBoolean().withMessage('isStartingPiece must be a boolean'),
   body('canBeDamaged').optional().isBoolean().withMessage('canBeDamaged must be a boolean'),
   body('canBeClimbed').optional().isBoolean().withMessage('canBeClimbed must be a boolean'),
+  body('throwable').optional().isBoolean().withMessage('throwable must be a boolean'),
   body('triggerMode').optional().isIn(['SINGLE', 'HOLD']).withMessage('triggerMode must be SINGLE or HOLD'),
   body('experience').optional().isInt({ min: 0 }).withMessage('Experience must be >= 0'),
   body('combatScore').optional().isInt({ min: 0 }).withMessage('Combat Score must be >= 0'),
   body('defenseScore').optional().isInt({ min: 0 }).withMessage('Defense Score must be >= 0'),
-  body('particleEffectId').optional({ nullable: true }).isString().withMessage('particleEffectId must be a string')
+  body('particleEffectId').optional({ nullable: true }).isString().withMessage('particleEffectId must be a string'),
+  body('physicsConfig').optional({ nullable: true }).isObject().withMessage('physicsConfig must be an object')
 ];
 
 export const mobValidation = [
@@ -101,4 +103,13 @@ export const miningConfigValidation = [
   body('silveriumPercentage').optional().isInt({ min: 0, max: 20 }).withMessage('Silverium Percentage must be between 0 and 20'),
   body('silveriumMinDepth').optional().isInt({ min: 1, max: 40 }).withMessage('Silverium Min Depth must be between 1 and 40'),
   body('oreClusterChance').optional().isInt({ min: 0, max: 100 }).withMessage('Ore Cluster Chance must be between 0 and 100'),
+  body('gravityEnabled').optional().isBoolean().withMessage('Gravity Enabled must be a boolean'),
+  body('gravity').optional().isFloat({ min: 0, max: 100 }).withMessage('Gravity must be between 0 and 100'),
+  body('dynamiteBounciness').optional().isFloat({ min: 0, max: 1 }).withMessage('Dynamite Bounciness must be between 0 and 1'),
+  body('dynamiteFriction').optional().isFloat({ min: 0, max: 1 }).withMessage('Dynamite Friction must be between 0 and 1'),
+  body('dynamiteThrowPower').optional().isFloat({ min: 1, max: 50 }).withMessage('Dynamite Throw Power must be between 1 and 50'),
+  body('dynamiteFuseSeconds').optional().isFloat({ min: 0.5, max: 30 }).withMessage('Dynamite Fuse Seconds must be between 0.5 and 30'),
+  body('rockGravityScale').optional().isFloat({ min: 0.1, max: 5 }).withMessage('Rock Gravity Scale must be between 0.1 and 5'),
+  body('rockRestitution').optional().isFloat({ min: 0, max: 1 }).withMessage('Rock Restitution must be between 0 and 1'),
 ];
+

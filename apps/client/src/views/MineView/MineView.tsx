@@ -62,8 +62,8 @@ export const MineView: React.FC = () => {
     setShowDebug((prev) => !prev);
   }, []);
 
-  // Torch, Ladder and Dynamite Placement Mode State from QuickAccessContext
-  const { isPlacingTorch, isPlacingLadder, isThrowingDynamite, selectSlot } = useQuickAccess();
+  // Torch, Ladder and Dynamite/Throwable Placement Mode State from QuickAccessContext
+  const { isPlacingTorch, isPlacingLadder, isThrowingDynamite, isThrowingItem, activeThrowableItem, selectSlot } = useQuickAccess();
 
   // Auto-select slot 1 only once when first entering the mine
   const initialSelectRef = useRef<boolean>(false);
@@ -279,6 +279,8 @@ export const MineView: React.FC = () => {
             isPlacingLadder={isPlacingLadder}
             onLadderPlaced={handleLadderPlaced}
             isThrowingDynamite={isThrowingDynamite}
+            isThrowingItem={isThrowingItem}
+            activeThrowableItem={activeThrowableItem}
             onDynamiteThrown={handleDynamiteThrown}
             showDebug={showDebug}
             onToggleDebug={handleToggleDebug}

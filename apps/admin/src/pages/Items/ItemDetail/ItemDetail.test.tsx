@@ -90,6 +90,17 @@ describe('ItemDetail Page', () => {
     expect(climbCheckbox.checked).toBe(true);
   });
 
+  it('allows toggling Throwable checkbox', async () => {
+    renderDetail('new');
+    expect(await screen.findByText('World & In-Game Properties')).toBeDefined();
+
+    const throwableCheckbox = screen.getByLabelText(/Throwable/i) as HTMLInputElement;
+    expect(throwableCheckbox.checked).toBe(false);
+
+    fireEvent.click(throwableCheckbox);
+    expect(throwableCheckbox.checked).toBe(true);
+  });
+
   it('renders Trigger Mode selector and allows changing to HOLD', async () => {
     renderDetail('item_torch');
     expect(await screen.findByText('Trigger Mode')).toBeDefined();
@@ -99,5 +110,12 @@ describe('ItemDetail Page', () => {
 
     fireEvent.change(triggerModeSelect, { target: { value: 'HOLD' } });
     expect(triggerModeSelect.value).toBe('HOLD');
+  });
+
+  it('renders 2D Collider & Rigid Body Editor within ItemDetail', async () => {
+    renderDetail('item_torch');
+    expect(await screen.findByText('2D Collider & Rigid Body Editor')).toBeDefined();
+    expect(screen.getByRole('button', { name: /Circle/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /Rectangle/i })).toBeDefined();
   });
 });

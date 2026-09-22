@@ -9,7 +9,7 @@ import {
 } from '@mine-me/shared';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
-import type { IMouseAction, ReticleStyle } from './MouseAction';
+import { type IMouseAction, type ReticleStyle, ThrowableItemAction } from './MouseAction';
 
 export interface MouseControllerOptions {
   tileSize?: number;
@@ -28,14 +28,14 @@ export class MiningMouseController {
 
   private isMouseDown = false;
   private isExecutingAction = false;
-  private lastExecutedTarget: MiningPosition | null = null;
+  private lastExecutedTarget: (MiningPosition | Vector2D) | null = null;
   private lastExecutedTime = 0;
   private activeAction: IMouseAction | null = null;
   private hoveredTile: MiningPosition | null = null;
   private screenMousePos: Vector2D | null = null;
 
   private hoverListeners: Set<(tile: MiningPosition | null) => void> = new Set();
-  private actionListeners: Set<(action: IMouseAction, target: MiningPosition, success: boolean) => void> = new Set();
+  private actionListeners: Set<(action: IMouseAction, target: MiningPosition | Vector2D, success: boolean) => void> = new Set();
   private miningListeners: Set<(isMining: boolean, target: MiningPosition | null) => void> = new Set();
 
   constructor(options?: MouseControllerOptions) {
@@ -71,6 +71,9 @@ export class MiningMouseController {
     this.hoveredTile = null;
     this.screenMousePos = null;
     this.lastExecutedTarget = null;
+    if (this.activeAction instanceof ThrowableItemAction && this.activeAction.isCharging) {
+      this.activeAction.cancelCharging();
+    }
     if (this.isMouseDown) {
       this.isMouseDown = false;
       this.notifyMiningListeners(false, null);
@@ -101,6 +104,10 @@ export class MiningMouseController {
     if (isSameAction) {
       this.activeAction = action;
       return;
+    }
+
+    if (this.activeAction instanceof ThrowableItemAction && this.activeAction.isCharging) {
+      this.activeAction.cancelCharging();
     }
 
     this.activeAction = action;
@@ -178,9 +185,25 @@ export class MiningMouseController {
    */
   public getReticleState(): {
     active: boolean;
-    target: MiningPosition | null;
+    target: (MiningPosition | Vector2D) | null;
     style: ReticleStyle | null;
   } {
+    if (this.activeAction?.isContinuous) {
+      const worldPos = this.getWorldMousePosition();
+      if (worldPos) {
+        const continuousTarget: Vector2D = {
+          x: worldPos.x / this.tileSize,
+          y: worldPos.y / this.tileSize,
+        };
+        const style = this.activeAction.getReticleStyle(continuousTarget, this.playerPos, this.grid);
+        return {
+          active: true,
+          target: continuousTarget,
+          style,
+        };
+      }
+    }
+
     if (!this.hoveredTile) {
       return { active: false, target: null, style: null };
     }
@@ -269,7 +292,7 @@ export class MiningMouseController {
   }
 
   public onActionExecuted(
-    callback: (action: IMouseAction, target: MiningPosition, success: boolean) => void
+    callback: (action: IMouseAction, target: MiningPosition | Vector2D, success: boolean) => void
   ): () => void {
     this.actionListeners.add(callback);
     return () => this.actionListeners.delete(callback);
@@ -308,6 +331,11 @@ export class MiningMouseController {
       }
     }
 
+    // Update charging state if holding mouse with a ThrowableItemAction
+    if (this.isMouseDown && this.activeAction instanceof ThrowableItemAction && this.activeAction.isCharging) {
+      this.activeAction.updateCharge(performance.now());
+    }
+
     // Continuous execution for actions with HOLD trigger mode (e.g. Ladder placement)
     if (this.isMouseDown && this.activeAction?.triggerMode === MouseActionTriggerMode.HOLD && tile) {
       this.tryExecuteActiveAction(tile);
@@ -343,7 +371,20 @@ export class MiningMouseController {
     this.lastExecutedTarget = null;
 
     if (this.activeAction) {
-      if (tile) {
+      if (this.activeAction instanceof ThrowableItemAction) {
+        this.activeAction.startCharging();
+        return;
+      }
+      if (this.activeAction.isContinuous) {
+        const worldPos = this.getWorldMousePosition();
+        if (worldPos) {
+          const continuousTarget: Vector2D = {
+            x: worldPos.x / this.tileSize,
+            y: worldPos.y / this.tileSize,
+          };
+          await this.tryExecuteActiveAction(continuousTarget);
+        }
+      } else if (tile) {
         await this.tryExecuteActiveAction(tile);
       }
       return;
@@ -353,7 +394,7 @@ export class MiningMouseController {
     this.notifyMiningListeners(true, tile);
   };
 
-  private async tryExecuteActiveAction(target: MiningPosition): Promise<boolean> {
+  private async tryExecuteActiveAction(target: MiningPosition | Vector2D): Promise<boolean> {
     if (!this.activeAction || this.isExecutingAction) return false;
 
     const now = performance.now();
@@ -396,8 +437,56 @@ export class MiningMouseController {
     }
   }
 
-  private handlePointerUp = (e: PointerEvent): void => {
+  private async tryExecuteThrowableAction(target: Vector2D, forceRatio: number): Promise<boolean> {
+    if (!this.activeAction || !(this.activeAction instanceof ThrowableItemAction) || this.isExecutingAction) {
+      return false;
+    }
+
+    const now = performance.now();
+    if (this.activeAction.cooldownMs && now - this.lastExecutedTime < this.activeAction.cooldownMs) {
+      return false;
+    }
+
+    const canDo = this.activeAction.canExecute(target, this.playerPos, this.grid);
+    if (!canDo) {
+      this.notifyActionListeners(this.activeAction, target, false);
+      return false;
+    }
+
+    this.isExecutingAction = true;
+    this.lastExecutedTarget = { ...target };
+    this.lastExecutedTime = now;
+
+    try {
+      const success = await (this.activeAction as any).execute(target, this.playerPos, forceRatio);
+      this.notifyActionListeners(this.activeAction, target, success);
+      return success;
+    } catch (err) {
+      console.error('[Mining Mouse] Throwable action execution error:', err);
+      this.notifyActionListeners(this.activeAction, target, false);
+      return false;
+    } finally {
+      this.isExecutingAction = false;
+    }
+  }
+
+  private handlePointerUp = async (e: PointerEvent): Promise<void> => {
     if (e.button !== 0) return;
+
+    if (this.activeAction instanceof ThrowableItemAction && this.activeAction.isCharging) {
+      const { isOvercharged, forceRatio } = this.activeAction.stopCharging();
+      if (!isOvercharged && forceRatio > 0) {
+        const worldPos = this.getWorldMousePosition();
+        if (worldPos) {
+          const continuousTarget: Vector2D = {
+            x: worldPos.x / this.tileSize,
+            y: worldPos.y / this.tileSize,
+          };
+          await this.tryExecuteThrowableAction(continuousTarget, forceRatio);
+        }
+      }
+    }
+
     if (this.isMouseDown) {
       this.isMouseDown = false;
       this.lastExecutedTarget = null;
@@ -408,6 +497,9 @@ export class MiningMouseController {
   };
 
   private handleBlur = (): void => {
+    if (this.activeAction instanceof ThrowableItemAction && this.activeAction.isCharging) {
+      this.activeAction.cancelCharging();
+    }
     if (this.isMouseDown) {
       this.isMouseDown = false;
       this.lastExecutedTarget = null;
@@ -420,6 +512,9 @@ export class MiningMouseController {
   private handlePointerLeave = (): void => {
     this.hoveredTile = null;
     this.screenMousePos = null;
+    if (this.activeAction instanceof ThrowableItemAction && this.activeAction.isCharging) {
+      this.activeAction.cancelCharging();
+    }
     if (this.isMouseDown) {
       this.isMouseDown = false;
       this.lastExecutedTarget = null;
@@ -435,7 +530,7 @@ export class MiningMouseController {
     this.hoverListeners.forEach((cb) => cb(tileCopy));
   }
 
-  private notifyActionListeners(action: IMouseAction, target: MiningPosition, success: boolean): void {
+  private notifyActionListeners(action: IMouseAction, target: MiningPosition | Vector2D, success: boolean): void {
     this.actionListeners.forEach((cb) => cb(action, target, success));
   }
 

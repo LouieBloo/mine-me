@@ -35,6 +35,14 @@ export async function getActiveMiningConfig(): Promise<MiningMapConfigData> {
         silveriumPercentage: config.silveriumPercentage,
         silveriumMinDepth: config.silveriumMinDepth,
         oreClusterChance: config.oreClusterChance,
+        gravityEnabled: config.gravityEnabled,
+        gravity: config.gravity,
+        dynamiteBounciness: config.dynamiteBounciness,
+        dynamiteFriction: config.dynamiteFriction,
+        dynamiteThrowPower: config.dynamiteThrowPower,
+        dynamiteFuseSeconds: config.dynamiteFuseSeconds,
+        rockGravityScale: config.rockGravityScale,
+        rockRestitution: config.rockRestitution,
       };
       return cachedConfig;
     }
@@ -70,6 +78,14 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     silveriumPercentage: data.silveriumPercentage ?? existing?.silveriumPercentage ?? DEFAULT_MINING_MAP_CONFIG.silveriumPercentage,
     silveriumMinDepth: data.silveriumMinDepth ?? existing?.silveriumMinDepth ?? DEFAULT_MINING_MAP_CONFIG.silveriumMinDepth,
     oreClusterChance: data.oreClusterChance ?? existing?.oreClusterChance ?? DEFAULT_MINING_MAP_CONFIG.oreClusterChance,
+    gravityEnabled: data.gravityEnabled ?? existing?.gravityEnabled ?? DEFAULT_MINING_MAP_CONFIG.gravityEnabled ?? true,
+    gravity: data.gravity ?? existing?.gravity ?? DEFAULT_MINING_MAP_CONFIG.gravity ?? 28.0,
+    dynamiteBounciness: data.dynamiteBounciness ?? existing?.dynamiteBounciness ?? DEFAULT_MINING_MAP_CONFIG.dynamiteBounciness ?? 0.45,
+    dynamiteFriction: data.dynamiteFriction ?? existing?.dynamiteFriction ?? DEFAULT_MINING_MAP_CONFIG.dynamiteFriction ?? 0.4,
+    dynamiteThrowPower: data.dynamiteThrowPower ?? existing?.dynamiteThrowPower ?? DEFAULT_MINING_MAP_CONFIG.dynamiteThrowPower ?? 14.0,
+    dynamiteFuseSeconds: data.dynamiteFuseSeconds ?? existing?.dynamiteFuseSeconds ?? DEFAULT_MINING_MAP_CONFIG.dynamiteFuseSeconds ?? 4.0,
+    rockGravityScale: data.rockGravityScale ?? existing?.rockGravityScale ?? DEFAULT_MINING_MAP_CONFIG.rockGravityScale ?? 1.2,
+    rockRestitution: data.rockRestitution ?? existing?.rockRestitution ?? DEFAULT_MINING_MAP_CONFIG.rockRestitution ?? 0.1,
     isActive: true,
   };
 
@@ -105,6 +121,14 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     silveriumPercentage: saved.silveriumPercentage,
     silveriumMinDepth: saved.silveriumMinDepth,
     oreClusterChance: saved.oreClusterChance,
+    gravityEnabled: saved.gravityEnabled,
+    gravity: saved.gravity,
+    dynamiteBounciness: saved.dynamiteBounciness,
+    dynamiteFriction: saved.dynamiteFriction,
+    dynamiteThrowPower: saved.dynamiteThrowPower,
+    dynamiteFuseSeconds: saved.dynamiteFuseSeconds,
+    rockGravityScale: saved.rockGravityScale,
+    rockRestitution: saved.rockRestitution,
   };
 
   return cachedConfig;

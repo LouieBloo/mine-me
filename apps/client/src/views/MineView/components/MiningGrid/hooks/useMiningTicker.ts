@@ -7,7 +7,21 @@ import { PointLight } from '../../../../../components/game/lighting/PointLight';
 import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
-import { MINING_CONFIG, type Vector2D, type MiningSessionClientState, type MiningClientTile, type MiningInputState, type MiningPosition, type MiningActiveDynamite, MiningPlayerBody, MiningTileType } from '@mine-me/shared';
+import {
+  MINING_CONFIG,
+  MINING_TILE_WORLD_PIXELS,
+  type Vector2D,
+  type MiningSessionClientState,
+  type MiningClientTile,
+  type MiningInputState,
+  type MiningPosition,
+  type MiningActiveDynamite,
+  type MiningDroppedItem,
+  MiningPlayerBody,
+  MiningTileType,
+  isTileSolid,
+  DEFAULT_DYNAMITE_PHYSICS_CONFIG,
+} from '@mine-me/shared';
 import { MiningEntityRenderer, type ActiveFallingRock } from '../renderers/MiningEntityRenderer';
 import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
 import { miningProfiler } from '../utils/MiningProfiler';
@@ -31,6 +45,7 @@ export interface UseMiningTickerOptions {
   activeDynamitesRef?: React.MutableRefObject<MiningActiveDynamite[]>;
   dynamiteGraphicsMap?: React.MutableRefObject<Map<string, Sprite | Graphics>>;
   dynamiteTextureRef?: React.RefObject<Texture | null>;
+  droppedItemsRef?: React.MutableRefObject<MiningDroppedItem[]>;
   reticleGraphicsRef?: React.RefObject<Graphics | null>;
   mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
   debugGraphicsRef: React.RefObject<Graphics | null>;
@@ -65,6 +80,7 @@ export function useMiningTicker({
   activeDynamitesRef,
   dynamiteGraphicsMap,
   dynamiteTextureRef,
+  droppedItemsRef,
   reticleGraphicsRef,
   mouseControllerRef,
   debugGraphicsRef,
@@ -285,6 +301,13 @@ export function useMiningTicker({
       miningProfiler.startSection('Falling Rocks');
       // Render active falling rocks in continuous space with rock texture/sprite
       if (fallingRocksContainer) {
+        if (activeFallingRocksRef.current) {
+          for (const rock of activeFallingRocksRef.current) {
+            if (typeof rock.angle === 'number') {
+              rock.angle += 2.5 * dt;
+            }
+          }
+        }
         const rockTexture = blockTexturesRef?.current?.get(MiningTileType.ROCK);
         MiningEntityRenderer.updateFallingRocks(
           fallingRocksContainer,
@@ -298,6 +321,18 @@ export function useMiningTicker({
       miningProfiler.startSection('Dynamites');
       const dynamitesContainer = dynamitesContainerRef?.current;
       if (dynamitesContainer && activeDynamitesRef?.current && dynamiteGraphicsMap?.current) {
+        // Step active dynamites forward locally between server snapshot ticks for buttery smooth tumbling
+        for (const dyn of activeDynamitesRef.current) {
+          if (dyn.velocity) {
+            dyn.position.x += dyn.velocity.x * dt;
+            dyn.position.y += dyn.velocity.y * dt;
+            dyn.velocity.y += MINING_CONFIG.GRAVITY * 0.8 * dt;
+          }
+          if (typeof dyn.angularVelocity === 'number') {
+            dyn.angle = (dyn.angle ?? 0) + dyn.angularVelocity * dt;
+          }
+        }
+
         MiningEntityRenderer.updateActiveDynamites(
           dynamitesContainer,
           activeDynamitesRef.current,
@@ -317,31 +352,129 @@ export function useMiningTicker({
         if (reticleState.active && reticleState.target && reticleState.style) {
           const rx = reticleState.target.x * TILE_SIZE;
           const ry = reticleState.target.y * TILE_SIZE;
-          reticleGraphics.rect(rx, ry, TILE_SIZE, TILE_SIZE);
-          reticleGraphics.fill({ color: reticleState.style.color, alpha: reticleState.style.alpha });
-          reticleGraphics.stroke({ width: 2, color: reticleState.style.strokeColor, alpha: 0.9 });
 
-          // If actively mining this target block, draw an inner pulsing damage frame
-          const isMiningThis =
-            isMining &&
-            miningTarget &&
-            miningTarget.x === reticleState.target.x &&
-            miningTarget.y === reticleState.target.y;
+          if (reticleState.style.isFreeAim) {
+            const isCharging = reticleState.style.isCharging;
+            const isOvercharged = reticleState.style.isOvercharged;
+            const chargeRatio = reticleState.style.chargeRatio ?? 0;
+            const trajectoryPoints = reticleState.style.trajectoryPoints;
 
-          if (isMiningThis) {
-            const pulse = 0.5 + Math.sin(animTime * 15) * 0.5;
-            reticleGraphics.rect(rx + 3, ry + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-            reticleGraphics.stroke({ width: 1.5, color: 0xf59e0b, alpha: 0.4 + pulse * 0.5 });
-          }
+            // Aim color shifts dynamically from vibrant amber/orange to blazing red as force increases
+            let aimColor = reticleState.style.strokeColor ?? 0xef4444;
+            let aimAlpha = reticleState.style.alpha ?? 0.85;
 
-          if (reticleState.style.showPreview) {
-            const previewGlow = 0.7 + Math.sin(animTime * 8) * 0.2;
-            if (reticleState.style.previewType === 'LADDER') {
-              const ladderTex = blockTexturesRef?.current?.get(MiningTileType.LADDER);
-              MiningTileRenderer.drawLadder(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, ladderTex);
-            } else {
-              const torchTex = blockTexturesRef?.current?.get(MiningTileType.TORCH);
-              MiningTileRenderer.drawTorch(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, torchTex);
+            if (isOvercharged) {
+              aimColor = 0x6b7280; // Overcharged: muted grey
+              aimAlpha = 0.4;
+            } else if (isCharging) {
+              if (chargeRatio >= 0.99) {
+                // Max force: pulsing fiery amber / neon red
+                const pulse = 0.8 + Math.sin(animTime * 20) * 0.2;
+                aimColor = 0xf59e0b;
+                aimAlpha = pulse;
+              } else if (chargeRatio > 0.5) {
+                aimColor = 0xf97316; // Orange
+                aimAlpha = 0.9;
+              } else {
+                aimColor = 0xef4444; // Red
+                aimAlpha = 0.85;
+              }
+            }
+
+            // Draw parabola when charging and not overcharged
+            if (isCharging && !isOvercharged && trajectoryPoints && trajectoryPoints.length > 1) {
+              // 1. Draw glowing parabola arc
+              reticleGraphics.moveTo(trajectoryPoints[0].x * TILE_SIZE, trajectoryPoints[0].y * TILE_SIZE);
+              for (let i = 1; i < trajectoryPoints.length; i++) {
+                reticleGraphics.lineTo(trajectoryPoints[i].x * TILE_SIZE, trajectoryPoints[i].y * TILE_SIZE);
+              }
+              // Outer subtle glow
+              reticleGraphics.stroke({ width: 4, color: aimColor, alpha: 0.3 });
+              // Core crisp arc
+              reticleGraphics.moveTo(trajectoryPoints[0].x * TILE_SIZE, trajectoryPoints[0].y * TILE_SIZE);
+              for (let i = 1; i < trajectoryPoints.length; i++) {
+                reticleGraphics.lineTo(trajectoryPoints[i].x * TILE_SIZE, trajectoryPoints[i].y * TILE_SIZE);
+              }
+              reticleGraphics.stroke({ width: 2, color: 0xffffff, alpha: 0.9 });
+
+              // 2. Draw spaced trajectory beads along the arc
+              for (let i = 0; i < trajectoryPoints.length; i += 2) {
+                const pt = trajectoryPoints[i];
+                const ptX = pt.x * TILE_SIZE;
+                const ptY = pt.y * TILE_SIZE;
+                reticleGraphics.circle(ptX, ptY, 2.5);
+                reticleGraphics.fill({ color: aimColor, alpha: 0.85 });
+              }
+
+              // 3. Landing/Impact marker at the end of the arc
+              const endPt = trajectoryPoints[trajectoryPoints.length - 1];
+              const endX = endPt.x * TILE_SIZE;
+              const endY = endPt.y * TILE_SIZE;
+              reticleGraphics.circle(endX, endY, 6);
+              reticleGraphics.stroke({ width: 2, color: aimColor, alpha: 0.9 });
+              reticleGraphics.circle(endX, endY, 2.5);
+              reticleGraphics.fill({ color: 0xffffff, alpha: 0.95 });
+            } else if (!isCharging && !isOvercharged) {
+              // When not charging (idle free-aim), show subtle guideline from player center to cursor
+              const playerPixelX = currentPos.x * TILE_SIZE;
+              const playerPixelY = currentPos.y * TILE_SIZE;
+              reticleGraphics.moveTo(playerPixelX, playerPixelY);
+              reticleGraphics.lineTo(rx, ry);
+              reticleGraphics.stroke({ width: 1.5, color: aimColor, alpha: 0.25 });
+            }
+
+            // Circular crosshair ring
+            const ringRadius = isCharging && chargeRatio >= 0.99 ? 11 : 9;
+            reticleGraphics.circle(rx, ry, ringRadius);
+            reticleGraphics.stroke({ width: 2, color: aimColor, alpha: aimAlpha });
+
+            // If charging and not overcharged, draw circular charge meter progress arc
+            if (isCharging && !isOvercharged && chargeRatio > 0) {
+              reticleGraphics.arc(rx, ry, ringRadius + 4, -Math.PI / 2, -Math.PI / 2 + chargeRatio * Math.PI * 2);
+              reticleGraphics.stroke({ width: 2.5, color: aimColor, alpha: 0.95 });
+            }
+
+            // Crosshair notches
+            reticleGraphics.moveTo(rx - 13, ry);
+            reticleGraphics.lineTo(rx - 4, ry);
+            reticleGraphics.moveTo(rx + 4, ry);
+            reticleGraphics.lineTo(rx + 13, ry);
+            reticleGraphics.moveTo(rx, ry - 13);
+            reticleGraphics.lineTo(rx, ry - 4);
+            reticleGraphics.moveTo(rx, ry + 4);
+            reticleGraphics.lineTo(rx, ry + 13);
+            reticleGraphics.stroke({ width: 2, color: aimColor, alpha: aimAlpha });
+
+            // Center targeting pip
+            reticleGraphics.circle(rx, ry, 2);
+            reticleGraphics.fill({ color: aimColor, alpha: aimAlpha });
+          } else {
+            reticleGraphics.rect(rx, ry, TILE_SIZE, TILE_SIZE);
+            reticleGraphics.fill({ color: reticleState.style.color, alpha: reticleState.style.alpha });
+            reticleGraphics.stroke({ width: 2, color: reticleState.style.strokeColor, alpha: 0.9 });
+
+            // If actively mining this target block, draw an inner pulsing damage frame
+            const isMiningThis =
+              isMining &&
+              miningTarget &&
+              miningTarget.x === reticleState.target.x &&
+              miningTarget.y === reticleState.target.y;
+
+            if (isMiningThis) {
+              const pulse = 0.5 + Math.sin(animTime * 15) * 0.5;
+              reticleGraphics.rect(rx + 3, ry + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+              reticleGraphics.stroke({ width: 1.5, color: 0xf59e0b, alpha: 0.4 + pulse * 0.5 });
+            }
+
+            if (reticleState.style.showPreview) {
+              const previewGlow = 0.7 + Math.sin(animTime * 8) * 0.2;
+              if (reticleState.style.previewType === 'LADDER') {
+                const ladderTex = blockTexturesRef?.current?.get(MiningTileType.LADDER);
+                MiningTileRenderer.drawLadder(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, ladderTex);
+              } else {
+                const torchTex = blockTexturesRef?.current?.get(MiningTileType.TORCH);
+                MiningTileRenderer.drawTorch(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, torchTex);
+              }
             }
           }
         }
@@ -395,6 +528,137 @@ export function useMiningTicker({
             const targetY = miningTarget.y * TILE_SIZE;
             debugGraphics.rect(targetX, targetY, TILE_SIZE, TILE_SIZE);
             debugGraphics.stroke({ width: 2.5, color: 0xef4444, alpha: 0.9 });
+          }
+
+          // 7. Block Colliders (Planck static tile colliders in viewport)
+          const grid = gridRef?.current;
+          if (grid) {
+            const minTileX = Math.max(0, Math.floor(currentPos.x - 22));
+            const maxTileX = Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.ceil(currentPos.x + 22));
+            const minTileY = Math.max(0, Math.floor(currentPos.y - 18));
+            const maxTileY = Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.ceil(currentPos.y + 18));
+
+            for (let ty = minTileY; ty <= maxTileY; ty++) {
+              const row = grid[ty];
+              if (!row) continue;
+              for (let tx = minTileX; tx <= maxTileX; tx++) {
+                const tile = row[tx];
+                if (tile && isTileSolid(tile.type)) {
+                  const bx = tx * TILE_SIZE;
+                  const by = ty * TILE_SIZE;
+                  debugGraphics.rect(bx, by, TILE_SIZE, TILE_SIZE);
+                  debugGraphics.stroke({ width: 1, color: 0xf97316, alpha: 0.45 });
+                  debugGraphics.fill({ color: 0xf97316, alpha: 0.08 });
+                }
+              }
+            }
+          }
+
+          // 8. Item Colliders (Active thrown dynamites with oriented collision shapes)
+          if (activeDynamitesRef?.current && activeDynamitesRef.current.length > 0) {
+            for (const dyn of activeDynamitesRef.current) {
+              const px = dyn.position.x * TILE_SIZE;
+              const py = dyn.position.y * TILE_SIZE;
+              const angle = dyn.angle ?? 0;
+              const cfg = dyn.physicsConfig ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG;
+
+              const cos = Math.cos(angle);
+              const sin = Math.sin(angle);
+
+              const scale = TILE_SIZE / MINING_TILE_WORLD_PIXELS;
+
+              if (cfg.colliderType === 'CIRCLE') {
+                const radius = (cfg.colliderRadius ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG.colliderRadius ?? 8) * scale;
+                const ox = (cfg.colliderOffsetX ?? 0) * scale;
+                const oy = (cfg.colliderOffsetY ?? 0) * scale;
+                const cx = px + (ox * cos - oy * sin);
+                const cy = py + (ox * sin + oy * cos);
+
+                debugGraphics.circle(cx, cy, radius);
+                debugGraphics.stroke({ width: 2, color: 0x06b6d4, alpha: 0.95 });
+                debugGraphics.fill({ color: 0x06b6d4, alpha: 0.25 });
+
+                // Rotation indicator line
+                debugGraphics.moveTo(cx, cy);
+                debugGraphics.lineTo(cx + cos * radius, cy + sin * radius);
+                debugGraphics.stroke({ width: 2, color: 0x22d3ee, alpha: 1 });
+              } else {
+                // RECTANGLE collider (e.g. 32px x 10px hotdog)
+                const w = (cfg.colliderWidth ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG.colliderWidth ?? 32) * scale;
+                const h = (cfg.colliderHeight ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG.colliderHeight ?? 10) * scale;
+                const hw = w / 2;
+                const hh = h / 2;
+                const ox = (cfg.colliderOffsetX ?? 0) * scale;
+                const oy = (cfg.colliderOffsetY ?? 0) * scale;
+
+                const localCorners = [
+                  { x: ox - hw, y: oy - hh },
+                  { x: ox + hw, y: oy - hh },
+                  { x: ox + hw, y: oy + hh },
+                  { x: ox - hw, y: oy + hh },
+                ];
+
+                const worldCorners = localCorners.map((pt) => ({
+                  x: px + (pt.x * cos - pt.y * sin),
+                  y: py + (pt.x * sin + pt.y * cos),
+                }));
+
+                debugGraphics.poly(worldCorners).fill({ color: 0x38bdf8, alpha: 0.25 }).stroke({ width: 2, color: 0x38bdf8, alpha: 0.95 });
+
+                // Heading pointer line from center to top edge
+                const tipX = px + (ox * cos - (oy - hh) * sin);
+                const tipY = py + (ox * sin + (oy - hh) * cos);
+                debugGraphics.moveTo(px, py);
+                debugGraphics.lineTo(tipX, tipY);
+                debugGraphics.stroke({ width: 2, color: 0xfacc15, alpha: 0.95 });
+              }
+
+              // Center anchor point
+              debugGraphics.circle(px, py, 2.5);
+              debugGraphics.fill({ color: 0xef4444, alpha: 1 });
+            }
+          }
+
+          // 9. Falling Rock Colliders (Spherical dynamic bodies)
+          if (activeFallingRocksRef?.current && activeFallingRocksRef.current.length > 0) {
+            for (const rock of activeFallingRocksRef.current) {
+              const rx = rock.x * TILE_SIZE;
+              const ry = rock.y * TILE_SIZE;
+              const rockRadius = 0.42 * TILE_SIZE;
+              debugGraphics.circle(rx, ry, rockRadius);
+              debugGraphics.stroke({ width: 2, color: 0xa855f7, alpha: 0.9 });
+              debugGraphics.fill({ color: 0xa855f7, alpha: 0.2 });
+              debugGraphics.circle(rx, ry, 2.5);
+              debugGraphics.fill({ color: 0xc084fc, alpha: 1 });
+            }
+          }
+
+          // 10. Dropped Item Colliders (Any item on the ground that has a physicsConfig)
+          if (droppedItemsRef?.current && droppedItemsRef.current.length > 0) {
+            for (const item of droppedItemsRef.current) {
+              const cfg = item.physicsConfig;
+              if (!cfg || cfg.colliderType === 'NONE') continue;
+
+              const px = (item.position.x + 0.5) * TILE_SIZE;
+              const py = (item.position.y + 0.5) * TILE_SIZE;
+
+              if (cfg.colliderType === 'CIRCLE') {
+                const radius = cfg.colliderRadius ?? 8;
+                const ox = cfg.colliderOffsetX ?? 0;
+                const oy = cfg.colliderOffsetY ?? 0;
+                debugGraphics.circle(px + ox, py + oy, radius);
+                debugGraphics.stroke({ width: 1.5, color: 0x10b981, alpha: 0.95 }); // Emerald
+                debugGraphics.fill({ color: 0x10b981, alpha: 0.2 });
+              } else if (cfg.colliderType === 'RECTANGLE') {
+                const w = cfg.colliderWidth ?? 16;
+                const h = cfg.colliderHeight ?? 16;
+                const ox = cfg.colliderOffsetX ?? 0;
+                const oy = cfg.colliderOffsetY ?? 0;
+                debugGraphics.rect(px + ox - w / 2, py + oy - h / 2, w, h);
+                debugGraphics.stroke({ width: 1.5, color: 0x10b981, alpha: 0.95 }); // Emerald
+                debugGraphics.fill({ color: 0x10b981, alpha: 0.2 });
+              }
+            }
           }
         }
       }
