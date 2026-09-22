@@ -737,8 +737,9 @@ describe('MiningGameEngine', () => {
         }
       }
 
-      engine.throwDynamite('char-1', { x: 10, y: 10 });
+      engine.throwDynamite('char-1', { x: 10, y: 10 }, undefined, 1.0, 7);
       const dynamite = engine.activeDynamites[0];
+      const dynamiteId = dynamite.id;
       // Position dynamite directly at (10, 10) with zero velocity
       dynamite.position = { x: 10, y: 10 };
       dynamite.velocity = { x: 0, y: 0 };
@@ -754,6 +755,19 @@ describe('MiningGameEngine', () => {
 
       // 1. Dynamite removed from active world
       expect(engine.activeDynamites).toHaveLength(0);
+
+      // Verify explosion event was emitted via socket
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        'mining_state_tick',
+        expect.objectContaining({
+          explosions: expect.arrayContaining([
+            expect.objectContaining({
+              id: dynamiteId,
+              radius: 7,
+            }),
+          ]),
+        })
+      );
 
       // 2. Epicenter and tiles within 7 radius are excavated to EMPTY
       expect(engine.grid[10][10].type).toBe(MiningTileType.EMPTY);
@@ -799,6 +813,78 @@ describe('MiningGameEngine', () => {
       // Mining interrupted
       expect(engine.isMining).toBe(false);
       expect(engine.miningTarget).toBeNull();
+    });
+
+    it('excavates only blocks within custom explosionRadius (e.g. radius 3)', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Fill area around (10, 10) with DIRT blocks
+      for (let y = 5; y <= 15; y++) {
+        for (let x = 5; x <= 15; x++) {
+          engine.grid[y][x] = { type: MiningTileType.DIRT, revealed: true };
+        }
+      }
+
+      // Throw dynamite with a custom explosion radius of 3
+      engine.throwDynamite('char-1', { x: 10, y: 10 }, undefined, 1.0, 3);
+      const dynamite = engine.activeDynamites[0];
+      dynamite.position = { x: 10, y: 10 };
+      dynamite.hasGravity = false;
+
+      (engine as any).tick(4.1);
+
+      // Dynamite removed from active world
+      expect(engine.activeDynamites).toHaveLength(0);
+
+      // Blocks at radius <= 3 should be excavated
+      expect(engine.grid[10][10].type).toBe(MiningTileType.EMPTY);
+      expect(engine.grid[10][13].type).toBe(MiningTileType.EMPTY); // dx=3
+      expect(engine.grid[10][7].type).toBe(MiningTileType.EMPTY);  // dx=-3
+      expect(engine.grid[13][10].type).toBe(MiningTileType.EMPTY); // dy=3
+      expect(engine.grid[7][10].type).toBe(MiningTileType.EMPTY);  // dy=-3
+
+      // Blocks outside radius 3 (e.g. distance 4 or 5) must NOT be excavated
+      expect(engine.grid[10][14].type).toBe(MiningTileType.DIRT);  // dx=4
+      expect(engine.grid[10][6].type).toBe(MiningTileType.DIRT);   // dx=-4
+      expect(engine.grid[14][10].type).toBe(MiningTileType.DIRT);  // dy=4
+      expect(engine.grid[6][10].type).toBe(MiningTileType.DIRT);   // dy=-4
+    });
+
+    it('does NOT explode or excavate blocks when item has no explosion effect (explosionRadius is undefined or 0)', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Fill area around (10, 10) with DIRT blocks
+      for (let y = 8; y <= 12; y++) {
+        for (let x = 8; x <= 12; x++) {
+          engine.grid[y][x] = { type: MiningTileType.DIRT, revealed: true };
+        }
+      }
+
+      // Throw item without an explosion effect (explosionRadius: 0 / undefined)
+      engine.throwDynamite('char-1', { x: 10, y: 10 }, undefined, 1.0, 0);
+      const dynamite = engine.activeDynamites[0];
+      dynamite.position = { x: 10, y: 10 };
+      dynamite.hasGravity = false;
+
+      (engine as any).tick(4.1);
+
+      // Item despawns after fuse expires
+      expect(engine.activeDynamites).toHaveLength(0);
+
+      // ZERO blocks are excavated because it has no explosion effect!
+      expect(engine.grid[10][10].type).toBe(MiningTileType.DIRT);
+      expect(engine.grid[10][11].type).toBe(MiningTileType.DIRT);
+      expect(engine.grid[11][10].type).toBe(MiningTileType.DIRT);
     });
   });
 });

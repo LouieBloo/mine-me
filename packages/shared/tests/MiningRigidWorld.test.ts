@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MiningRigidWorld } from '../src/physics/MiningRigidWorld';
+import { MiningRigidWorld, calculateThrowVelocity } from '../src/physics/MiningRigidWorld';
 import { MiningTileType } from '../src/types/mining';
 
 describe('MiningRigidWorld (Planck.js Integration)', () => {
@@ -170,5 +170,33 @@ describe('MiningRigidWorld (Planck.js Integration)', () => {
     expect(shape.getType()).toBe('circle');
     // Expected radius: 16 / 64 = 0.25 tiles
     expect(shape.m_radius).toBeCloseTo(0.25, 4);
+  });
+
+  describe('calculateThrowVelocity', () => {
+    it('scales velocity relative to cursor distance (closer cursor produces smaller toss)', () => {
+      const closeVelocity = calculateThrowVelocity(5, 5, 7, 5, 1.0, 20.5);
+      const farVelocity = calculateThrowVelocity(5, 5, 15, 5, 1.0, 20.5);
+
+      const closeSpeed = Math.hypot(closeVelocity.x, closeVelocity.y);
+      const farSpeed = Math.hypot(farVelocity.x, farVelocity.y);
+
+      expect(closeSpeed).toBeLessThan(farSpeed);
+      expect(closeVelocity.x).toBeGreaterThan(0);
+      expect(farVelocity.x).toBeGreaterThan(closeVelocity.x);
+    });
+
+    it('scales velocity linearly with forceRatio', () => {
+      const halfForce = calculateThrowVelocity(5, 5, 12, 5, 0.5, 20.5);
+      const fullForce = calculateThrowVelocity(5, 5, 12, 5, 1.0, 20.5);
+
+      expect(halfForce.x).toBeCloseTo(fullForce.x * 0.5, 4);
+      expect(halfForce.y).toBeCloseTo(fullForce.y * 0.5, 4);
+    });
+
+    it('caps initial speed at maximum throwPower', () => {
+      const extremeVelocity = calculateThrowVelocity(5, 5, 100, -50, 1.0, 20.5);
+      const speed = Math.hypot(extremeVelocity.x, extremeVelocity.y);
+      expect(speed).toBeCloseTo(20.5, 3);
+    });
   });
 });

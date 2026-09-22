@@ -333,6 +333,14 @@ export const handleMiningThrowDynamite = async (
 
   // 1. Check if user has the specific item (or any throwable / dynamite) in character inventory
   let inventoryItemToThrow: any = null;
+  const itemInclude = {
+    include: {
+      itemEffects: {
+        include: { effect: true },
+      },
+    },
+  };
+
   if (payload.itemId) {
     inventoryItemToThrow = await prisma.inventoryItem.findFirst({
       where: {
@@ -340,7 +348,7 @@ export const handleMiningThrowDynamite = async (
         itemId: payload.itemId,
         quantity: { gt: 0 },
       },
-      include: { item: true },
+      include: { item: itemInclude },
     });
   }
 
@@ -354,7 +362,7 @@ export const handleMiningThrowDynamite = async (
           { item: { subType: { equals: 'DYNAMITE', mode: 'insensitive' } } },
         ],
       } as any,
-      include: { item: true },
+      include: { item: itemInclude },
     });
   }
 
@@ -364,7 +372,18 @@ export const handleMiningThrowDynamite = async (
 
   // 2. Launch throwable item in server engine (calculates throw trajectory & starts fuse)
   const itemPhysicsConfig = ((inventoryItemToThrow.item as any).physicsConfig as any) || undefined;
-  const thrown = engine.throwDynamite(characterId, payload.target, itemPhysicsConfig, payload.forceRatio);
+  const explodeEffect = (inventoryItemToThrow.item as any)?.itemEffects?.find(
+    (ie: any) => ie.effect?.explodes === true && ie.value > 0
+  );
+  const explosionRadius = explodeEffect ? Number(explodeEffect.value) : undefined;
+
+  const thrown = engine.throwDynamite(
+    characterId,
+    payload.target,
+    itemPhysicsConfig,
+    payload.forceRatio,
+    explosionRadius
+  );
   if (!thrown) {
     return { success: false, error: 'Failed to throw item.' };
   }

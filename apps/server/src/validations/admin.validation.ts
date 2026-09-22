@@ -78,7 +78,8 @@ export const effectValidation = [
   body('description').trim().notEmpty().withMessage('Description is required'),
   body('healthGain').optional().isBoolean().withMessage('healthGain must be a boolean'),
   body('staminaGain').optional().isBoolean().withMessage('staminaGain must be a boolean'),
-  body('miningSpeedModifier').optional().isBoolean().withMessage('miningSpeedModifier must be a boolean')
+  body('miningSpeedModifier').optional().isBoolean().withMessage('miningSpeedModifier must be a boolean'),
+  body('explodes').optional().isBoolean().withMessage('explodes must be a boolean')
 ];
 
 export const particleEffectValidation = [

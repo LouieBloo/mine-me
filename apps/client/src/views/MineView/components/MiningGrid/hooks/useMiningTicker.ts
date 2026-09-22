@@ -7,6 +7,7 @@ import { PointLight } from '../../../../../components/game/lighting/PointLight';
 import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
+import type { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
 import {
   MINING_CONFIG,
   MINING_TILE_WORLD_PIXELS,
@@ -45,6 +46,7 @@ export interface UseMiningTickerOptions {
   activeDynamitesRef?: React.MutableRefObject<MiningActiveDynamite[]>;
   dynamiteGraphicsMap?: React.MutableRefObject<Map<string, Sprite | Graphics>>;
   dynamiteTextureRef?: React.RefObject<Texture | null>;
+  dynamiteVisualManagerRef?: React.RefObject<DynamiteVisualManager | null>;
   droppedItemsRef?: React.MutableRefObject<MiningDroppedItem[]>;
   reticleGraphicsRef?: React.RefObject<Graphics | null>;
   mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
@@ -80,6 +82,7 @@ export function useMiningTicker({
   activeDynamitesRef,
   dynamiteGraphicsMap,
   dynamiteTextureRef,
+  dynamiteVisualManagerRef,
   droppedItemsRef,
   reticleGraphicsRef,
   mouseControllerRef,
@@ -342,6 +345,15 @@ export function useMiningTicker({
         );
       }
 
+      // Update dynamite particle effects (fuse sparks & flame) and illumination (fuse PointLight)
+      dynamiteVisualManagerRef?.current?.update(
+        activeDynamitesRef?.current || [],
+        dt,
+        particleEngineRef?.current,
+        lightingEngineRef?.current,
+        TILE_SIZE
+      );
+
       miningProfiler.startSection('Reticle');
       // Render Reticle Hover / Placement highlight
       const reticleGraphics = reticleGraphicsRef?.current;
@@ -384,13 +396,16 @@ export function useMiningTicker({
             // Draw parabola when charging and not overcharged
             if (isCharging && !isOvercharged && trajectoryPoints && trajectoryPoints.length > 1) {
               // 1. Draw glowing parabola arc
+              reticleGraphics.beginPath();
               reticleGraphics.moveTo(trajectoryPoints[0].x * TILE_SIZE, trajectoryPoints[0].y * TILE_SIZE);
               for (let i = 1; i < trajectoryPoints.length; i++) {
                 reticleGraphics.lineTo(trajectoryPoints[i].x * TILE_SIZE, trajectoryPoints[i].y * TILE_SIZE);
               }
               // Outer subtle glow
               reticleGraphics.stroke({ width: 4, color: aimColor, alpha: 0.3 });
+
               // Core crisp arc
+              reticleGraphics.beginPath();
               reticleGraphics.moveTo(trajectoryPoints[0].x * TILE_SIZE, trajectoryPoints[0].y * TILE_SIZE);
               for (let i = 1; i < trajectoryPoints.length; i++) {
                 reticleGraphics.lineTo(trajectoryPoints[i].x * TILE_SIZE, trajectoryPoints[i].y * TILE_SIZE);
@@ -402,6 +417,7 @@ export function useMiningTicker({
                 const pt = trajectoryPoints[i];
                 const ptX = pt.x * TILE_SIZE;
                 const ptY = pt.y * TILE_SIZE;
+                reticleGraphics.beginPath();
                 reticleGraphics.circle(ptX, ptY, 2.5);
                 reticleGraphics.fill({ color: aimColor, alpha: 0.85 });
               }
@@ -410,42 +426,22 @@ export function useMiningTicker({
               const endPt = trajectoryPoints[trajectoryPoints.length - 1];
               const endX = endPt.x * TILE_SIZE;
               const endY = endPt.y * TILE_SIZE;
+              reticleGraphics.beginPath();
               reticleGraphics.circle(endX, endY, 6);
               reticleGraphics.stroke({ width: 2, color: aimColor, alpha: 0.9 });
+              reticleGraphics.beginPath();
               reticleGraphics.circle(endX, endY, 2.5);
               reticleGraphics.fill({ color: 0xffffff, alpha: 0.95 });
-            } else if (!isCharging && !isOvercharged) {
-              // When not charging (idle free-aim), show subtle guideline from player center to cursor
-              const playerPixelX = currentPos.x * TILE_SIZE;
-              const playerPixelY = currentPos.y * TILE_SIZE;
-              reticleGraphics.moveTo(playerPixelX, playerPixelY);
-              reticleGraphics.lineTo(rx, ry);
-              reticleGraphics.stroke({ width: 1.5, color: aimColor, alpha: 0.25 });
             }
 
-            // Circular crosshair ring
+            // Circular reticle around cursor
             const ringRadius = isCharging && chargeRatio >= 0.99 ? 11 : 9;
+            reticleGraphics.beginPath();
             reticleGraphics.circle(rx, ry, ringRadius);
             reticleGraphics.stroke({ width: 2, color: aimColor, alpha: aimAlpha });
 
-            // If charging and not overcharged, draw circular charge meter progress arc
-            if (isCharging && !isOvercharged && chargeRatio > 0) {
-              reticleGraphics.arc(rx, ry, ringRadius + 4, -Math.PI / 2, -Math.PI / 2 + chargeRatio * Math.PI * 2);
-              reticleGraphics.stroke({ width: 2.5, color: aimColor, alpha: 0.95 });
-            }
-
-            // Crosshair notches
-            reticleGraphics.moveTo(rx - 13, ry);
-            reticleGraphics.lineTo(rx - 4, ry);
-            reticleGraphics.moveTo(rx + 4, ry);
-            reticleGraphics.lineTo(rx + 13, ry);
-            reticleGraphics.moveTo(rx, ry - 13);
-            reticleGraphics.lineTo(rx, ry - 4);
-            reticleGraphics.moveTo(rx, ry + 4);
-            reticleGraphics.lineTo(rx, ry + 13);
-            reticleGraphics.stroke({ width: 2, color: aimColor, alpha: aimAlpha });
-
             // Center targeting pip
+            reticleGraphics.beginPath();
             reticleGraphics.circle(rx, ry, 2);
             reticleGraphics.fill({ color: aimColor, alpha: aimAlpha });
           } else {
@@ -734,6 +730,10 @@ export function useMiningTicker({
         renderer.render = originalRender;
       }
       lightingEngineRef.current?.removeLight('torch_preview');
+      dynamiteVisualManagerRef?.current?.destroy(
+        particleEngineRef?.current,
+        lightingEngineRef?.current
+      );
     };
   }, [app]);
 }

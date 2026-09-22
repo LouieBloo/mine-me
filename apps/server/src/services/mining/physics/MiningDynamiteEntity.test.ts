@@ -111,4 +111,16 @@ describe('MiningDynamiteEntity', () => {
     expect(dynamite.physicsConfig?.colliderWidth).toBe(32);
     expect(dynamite.physicsConfig?.colliderHeight).toBe(10);
   });
+
+  it('stores explosionRadius from options when configured', () => {
+    const dynamite = new MiningDynamiteEntity('dyn-radius', { x: 10, y: 5 }, { x: 0, y: 0 }, 4.0, undefined, {
+      explosionRadius: 5,
+    });
+    expect(dynamite.explosionRadius).toBe(5);
+  });
+
+  it('leaves explosionRadius undefined if no explosion effect is configured', () => {
+    const dynamite = new MiningDynamiteEntity('dyn-no-radius', { x: 10, y: 5 }, { x: 0, y: 0 }, 4.0);
+    expect(dynamite.explosionRadius).toBeUndefined();
+  });
 });

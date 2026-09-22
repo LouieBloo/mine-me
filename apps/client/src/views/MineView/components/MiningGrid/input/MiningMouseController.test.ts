@@ -688,6 +688,26 @@ describe('MiningMouseController and MouseAction', () => {
 
       controller.detach();
     });
+
+    it('computes different trajectory arcs relative to cursor location', () => {
+      const action = new ThrowableItemAction({ onThrow: vi.fn() });
+      const playerPos = { x: 5, y: 5 };
+
+      // Target close to player vs far from player
+      const closeTarget = { x: 7, y: 5 };
+      const farTarget = { x: 15, y: 5 };
+
+      const closeTrajectory = action.computeTrajectory(playerPos, closeTarget, 1.0, mockGrid);
+      const farTrajectory = action.computeTrajectory(playerPos, farTarget, 1.0, mockGrid);
+
+      expect(closeTrajectory.length).toBeGreaterThan(1);
+      expect(farTrajectory.length).toBeGreaterThan(1);
+
+      // Initial step x-displacement should be smaller for closer target than further target
+      const closeDx = closeTrajectory[1].x - closeTrajectory[0].x;
+      const farDx = farTrajectory[1].x - farTrajectory[0].x;
+      expect(closeDx).toBeLessThan(farDx);
+    });
   });
 });
 

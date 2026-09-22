@@ -24,6 +24,7 @@ export interface DynamiteBodyOptions {
   density?: number;
   mass?: number;
   physicsConfig?: ItemPhysicsConfig;
+  explosionRadius?: number;
 }
 
 export interface RockBodyOptions {
@@ -338,4 +339,57 @@ export class MiningRigidWorld {
     }
     this.boundaryBodies = [];
   }
+}
+
+/**
+ * Calculates initial launch velocity for throwable entities targeted towards a cursor/target coordinate.
+ * The arc is physically relative to cursor location (closer cursor -> lower velocity toss, further cursor -> higher toss),
+ * clamped to throwPower, and scaled linearly by forceRatio.
+ */
+export function calculateThrowVelocity(
+  startX: number,
+  startY: number,
+  targetX: number,
+  targetY: number,
+  forceRatio: number = 1.0,
+  throwPower: number = 20.5,
+  gravity: number = MINING_CONFIG.GRAVITY,
+  gravityScale: number = 1.0,
+  isFacingLeft: boolean = false
+): Vector2D {
+  const dx = targetX - startX;
+  const dy = targetY - startY;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist < 0.05) {
+    const dirX = isFacingLeft ? -1 : 1;
+    const speed = Math.min(throwPower, 6.0) * Math.max(0.05, Math.min(1.0, forceRatio));
+    return { x: dirX * speed, y: -2.0 * forceRatio };
+  }
+
+  const effectiveGravity = Math.max(1.0, gravity * (gravityScale ?? 1.0));
+  const dxAbs = Math.max(0.4, Math.abs(dx));
+  const dyUp = Math.max(0, -dy);
+
+  // Flight time tuned so trajectory is broad, flat, and forward-reaching rather than overly steep
+  const t0 = Math.sqrt((2 * dxAbs) / (effectiveGravity * 3.6)) + Math.sqrt((2 * dyUp) / (effectiveGravity * 3.0));
+  const flightTime = Math.min(0.70, Math.max(0.15, t0));
+
+  let vx = dx / flightTime;
+  let vy = dy / flightTime - 0.5 * effectiveGravity * flightTime;
+
+  // Cap initial speed by maximum throwPower
+  const currentSpeed = Math.hypot(vx, vy);
+  if (currentSpeed > throwPower && currentSpeed > 0.001) {
+    const scale = throwPower / currentSpeed;
+    vx *= scale;
+    vy *= scale;
+  }
+
+  // Scale linearly with forceRatio
+  const clampedRatio = Math.min(1.0, Math.max(0.05, forceRatio));
+  return {
+    x: vx * clampedRatio,
+    y: vy * clampedRatio,
+  };
 }

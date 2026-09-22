@@ -5,6 +5,7 @@ import * as planck from 'planck';
 export class MiningDynamiteEntity extends MiningPhysicsBody {
   public readonly id: string;
   public readonly physicsConfig?: ItemPhysicsConfig;
+  public readonly explosionRadius?: number;
   public fuseRemainingSeconds: number;
   public hasExploded: boolean = false;
   public angle: number = 0;
@@ -60,6 +61,7 @@ export class MiningDynamiteEntity extends MiningPhysicsBody {
 
     this.id = id;
     this.physicsConfig = options?.physicsConfig;
+    this.explosionRadius = options?.explosionRadius;
     this._position = { ...initialPosition };
     this._velocity = { ...initialVelocity };
     this._hasGravity = true;

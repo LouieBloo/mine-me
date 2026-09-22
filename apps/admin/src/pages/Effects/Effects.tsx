@@ -46,6 +46,11 @@ export default function Effects() {
       field: 'miningSpeedModifier', 
       headerName: 'Mining Speed',
       cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
+    },
+    { 
+      field: 'explodes', 
+      headerName: 'Explodes',
+      cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
     }
   ];
 

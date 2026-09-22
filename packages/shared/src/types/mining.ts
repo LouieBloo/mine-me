@@ -364,6 +364,7 @@ export interface MiningActiveDynamite {
   angularVelocity?: number;
   fuseRemainingSeconds: number;
   physicsConfig?: ItemPhysicsConfig;
+  explosionRadius?: number;
 }
 
 /**
@@ -473,11 +474,22 @@ export interface MiningStateTickPayload {
   droppedItems?: MiningDroppedItem[];
   fallingRocks?: MiningFallingRock[];
   activeDynamites?: MiningActiveDynamite[];
+  /** Explosions that detonated during this simulation tick. */
+  explosions?: MiningExplosionEvent[];
   revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
   /** Other players in the shared room during multiplayer sessions. */
   otherPlayers?: MiningRemotePlayer[];
   /** Current vision discovery range in tiles. */
   visionRange?: number;
+}
+
+/**
+ * Event emitted when an explosive item detonates in the cavern world.
+ */
+export interface MiningExplosionEvent {
+  id: string;
+  position: Vector2D;
+  radius: number;
 }
 
 /**

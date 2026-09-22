@@ -125,6 +125,12 @@ export interface ItemPhysicsConfig {
   // Custom action dynamics (e.g. dynamite toss power & fuse)
   throwPower?: number;
   fuseSeconds?: number;
+
+  // Custom particle effect associations
+  fuseSparksEffectId?: string;
+  fuseFlamesEffectId?: string;
+  explosionSmokeEffectId?: string;
+  explosionFlashEffectId?: string;
 }
 
 export interface GameItem {
@@ -251,6 +257,7 @@ export interface Effect {
   healthGain: boolean;
   staminaGain: boolean;
   miningSpeedModifier?: boolean;
+  explodes?: boolean;
   createdAt: string;
   updatedAt: string;
 }

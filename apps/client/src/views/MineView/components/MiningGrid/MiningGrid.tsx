@@ -29,6 +29,7 @@ import { useMiningScene } from './hooks/useMiningScene';
 import { useMiningTicker } from './hooks/useMiningTicker';
 import { MiningTileRenderer, TILE_SIZE } from './renderers/MiningTileRenderer';
 import { MiningEntityRenderer } from './renderers/MiningEntityRenderer';
+import { DynamiteVisualManager } from './renderers/DynamiteVisualManager';
 import { miningProfiler } from './utils/MiningProfiler';
 import './MiningGrid.css';
 
@@ -107,6 +108,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
   const activeFallingRocksRef = useRef<{ id: string; x: number; y: number }[]>([]);
   const activeDynamitesRef = useRef<MiningActiveDynamite[]>([]);
+  const dynamiteVisualManagerRef = useRef<DynamiteVisualManager>(new DynamiteVisualManager());
   const droppedItemsRef = useRef<MiningDroppedItem[]>([]);
   const lastDamageParticleTimeRef = useRef<Map<string, number>>(new Map());
 
@@ -453,6 +455,16 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         : [];
       activeDynamitesRef.current = payload.activeDynamites || [];
 
+      // Process explosions if received in server tick
+      if (payload.explosions && payload.explosions.length > 0) {
+        dynamiteVisualManagerRef.current.handleExplosionEvents(
+          payload.explosions,
+          particleEngineRef.current,
+          lightingEngineRef.current,
+          TILE_SIZE
+        );
+      }
+
       // Update remote players
       if (remotePlayerRendererRef.current && payload.otherPlayers) {
         remotePlayerRendererRef.current.updatePlayers(payload.otherPlayers);
@@ -671,6 +683,10 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       torchEmittersRef.current.clear();
       blockEmittersRef.current.forEach((emitter) => emitter.destroy());
       blockEmittersRef.current.clear();
+      dynamiteVisualManagerRef.current.destroy(
+        particleEngineRef.current,
+        lightingEngineRef.current
+      );
     };
   }, [onEvent, containersReady]);
 
@@ -692,6 +708,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     activeDynamitesRef,
     dynamiteGraphicsMap,
     dynamiteTextureRef,
+    dynamiteVisualManagerRef,
     droppedItemsRef,
     reticleGraphicsRef,
     mouseControllerRef,

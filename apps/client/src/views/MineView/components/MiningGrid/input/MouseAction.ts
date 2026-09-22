@@ -3,6 +3,7 @@ import {
   MINING_CONFIG,
   canPlaceBuildable,
   MouseActionTriggerMode,
+  calculateThrowVelocity,
   type MiningClientTile,
   type MiningPosition,
   type Vector2D,
@@ -242,7 +243,7 @@ export class ThrowableItemAction extends BaseMouseAction {
       isContinuous: true,
     });
     this.onThrow = config.onThrow;
-    this.maxChargeTimeMs = config.maxChargeTimeMs ?? 1200;
+    this.maxChargeTimeMs = config.maxChargeTimeMs ?? 750;
     this.maxHoldTimeMs = config.maxHoldTimeMs ?? 2000;
     this.itemId = config.itemId;
     this.physicsConfig = config.physicsConfig;
@@ -314,31 +315,33 @@ export class ThrowableItemAction extends BaseMouseAction {
     target: Vector2D,
     forceRatio: number,
     grid?: MiningClientTile[][],
-    stepCount: number = 32,
-    dt: number = 0.04
+    stepCount: number = 45,
+    dt: number = 0.035
   ): Vector2D[] {
     const points: Vector2D[] = [];
     const startX = playerPos.x;
     const startY = playerPos.y;
 
-    const dx = target.x - startX;
-    const dy = target.y - startY;
-    const dist = Math.hypot(dx, dy);
+    const throwPower = this.physicsConfig?.throwPower ?? 20.5;
+    const gravityScale = this.physicsConfig?.gravityScale ?? 1.0;
+    const gravity = MINING_CONFIG.GRAVITY * gravityScale;
 
-    const dirX = dist > 0.001 ? dx / dist : 1;
-    const dirY = dist > 0.001 ? dy / dist : -0.5;
-
-    const throwPower = this.physicsConfig?.throwPower ?? 14.0;
-    const effectivePower = throwPower * (0.25 + 0.75 * forceRatio);
-    const speed = Math.min(effectivePower * 1.5, Math.max(6, dist * (effectivePower / 8.0)));
-    const vx = dirX * speed;
-    const vy = dirY * speed - 2.5 * (0.25 + 0.75 * forceRatio);
-    const gravity = 28.0 * (this.physicsConfig?.gravityScale ?? 1.0);
+    const initialVel = calculateThrowVelocity(
+      startX,
+      startY,
+      target.x,
+      target.y,
+      forceRatio,
+      throwPower,
+      MINING_CONFIG.GRAVITY,
+      gravityScale,
+      target.x < startX
+    );
 
     let curX = startX;
     let curY = startY;
-    let curVx = vx;
-    let curVy = vy;
+    let curVx = initialVel.x;
+    let curVy = initialVel.y;
 
     points.push({ x: curX, y: curY });
 
@@ -385,8 +388,7 @@ export class ThrowableItemAction extends BaseMouseAction {
   ): ReticleStyle {
     let trajectoryPoints: Vector2D[] | undefined;
     if (this._isCharging && !this._isOvercharged && this._chargeRatio > 0) {
-      const maxSteps = Math.min(36, Math.max(8, Math.floor(10 + this._chargeRatio * 26)));
-      trajectoryPoints = this.computeTrajectory(playerPos, target as Vector2D, this._chargeRatio, grid, maxSteps, 0.04);
+      trajectoryPoints = this.computeTrajectory(playerPos, target as Vector2D, this._chargeRatio, grid);
     }
 
     return {

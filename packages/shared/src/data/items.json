@@ -20,7 +20,7 @@
     "canBeClimbed": false,
     "throwable": true,
     "triggerMode": "SINGLE",
-    "particleEffectId": "pe_fairy_sparkle",
+    "particleEffectId": "pe_dynamite_fuse_sparks",
     "physicsConfig": {
       "mass": 1,
       "friction": 0.4,
@@ -37,11 +37,35 @@
       "colliderHeight": 10,
       "colliderRadius": 8,
       "colliderOffsetX": 0,
-      "colliderOffsetY": 0
+      "colliderOffsetY": 0,
+      "fuseSparksEffectId": "pe_dynamite_fuse_sparks",
+      "fuseFlamesEffectId": "pe_dynamite_fuse_flames",
+      "explosionSmokeEffectId": "pe_dynamite_explosion_smoke",
+      "explosionFlashEffectId": "pe_dynamite_explosion_flash"
     },
     "createdAt": "2026-09-13T02:26:15.021Z",
     "updatedAt": "2026-09-22T01:15:24.151Z",
-    "itemEffects": [],
+    "itemEffects": [
+      {
+        "id": "cmud8ercu0003xp2s0hkbkjhz",
+        "itemId": "cmtz702uk0001nu7bn2tidnx0",
+        "effectId": "cmud7xntc00009cfye6butpfo",
+        "value": 3,
+        "createdAt": "2026-09-22T22:14:26.046Z",
+        "updatedAt": "2026-09-22T22:14:26.046Z",
+        "effect": {
+          "id": "cmud7xntc00009cfye6butpfo",
+          "name": "Explosion",
+          "description": "Explodes in X radius",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "explodes": true,
+          "createdAt": "2026-09-22T22:01:08.305Z",
+          "updatedAt": "2026-09-22T22:07:20.736Z"
+        }
+      }
+    ],
     "particleEffect": {
       "id": "pe_fairy_sparkle",
       "name": "Fairy Sparkles",
@@ -184,6 +208,7 @@
           "healthGain": false,
           "staminaGain": false,
           "miningSpeedModifier": true,
+          "explodes": false,
           "createdAt": "2026-08-21T00:20:10.026Z",
           "updatedAt": "2026-09-13T01:41:45.285Z"
         }
@@ -371,6 +396,7 @@
           "healthGain": false,
           "staminaGain": true,
           "miningSpeedModifier": false,
+          "explodes": false,
           "createdAt": "2026-06-22T00:13:18.717Z",
           "updatedAt": "2026-09-13T01:41:45.280Z"
         }
@@ -670,6 +696,7 @@
           "healthGain": true,
           "staminaGain": false,
           "miningSpeedModifier": false,
+          "explodes": false,
           "createdAt": "2026-06-22T00:13:18.699Z",
           "updatedAt": "2026-09-13T01:41:45.274Z"
         }

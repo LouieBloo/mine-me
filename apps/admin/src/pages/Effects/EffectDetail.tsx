@@ -8,7 +8,7 @@ export default function EffectDetail() {
   const { id } = useParams<{ id: string }>();
   const isNew = id === 'new';
   const navigate = useNavigate();
-  const [data, setData] = useState<any>(isNew ? { name: '', description: '', healthGain: false, staminaGain: false, miningSpeedModifier: false } : null);
+  const [data, setData] = useState<any>(isNew ? { name: '', description: '', healthGain: false, staminaGain: false, miningSpeedModifier: false, explodes: false } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -131,7 +131,7 @@ export default function EffectDetail() {
             </div>
 
             {/* Gains toggles */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 pt-2">
               <label className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">
                 <input
                   type="checkbox"
@@ -160,6 +160,16 @@ export default function EffectDetail() {
                   className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
                 Mining Speed Modifier
+              </label>
+
+              <label className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">
+                <input
+                  type="checkbox"
+                  checked={data.explodes || false}
+                  onChange={(e) => setData({ ...data, explodes: e.target.checked })}
+                  className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Explodes
               </label>
             </div>
           </div>

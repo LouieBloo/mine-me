@@ -17,6 +17,7 @@ import {
   type Vector2D,
 } from '@mine-me/shared';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
+import { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
 
 export interface UseMiningSceneOptions {
   app: Application | null;
@@ -327,6 +328,19 @@ export function useMiningScene({
             console.warn('[MiningGrid] Could not load default silverium texture:', e);
           });
         blockPromises.push(silveriumFallbackPromise);
+      }
+
+      // Fetch dynamic particle effects from API
+      try {
+        const peRes = await fetch(getAssetUrl('/api/public/particle-effects'));
+        if (peRes.ok) {
+          const effects = await peRes.json();
+          if (Array.isArray(effects)) {
+            DynamiteVisualManager.setCustomParticleEffects(effects);
+          }
+        }
+      } catch (err) {
+        console.warn('[MiningGrid] Could not load dynamic particle effects:', err);
       }
 
       // Always load Torch and Ladder tile textures

@@ -672,5 +672,65 @@ describe('useMiningTicker - Torch Preview Lighting', () => {
       expect(mockG.circle).toHaveBeenCalled();
     });
   });
+
+  describe('useMiningTicker - Dynamite Visual Effects', () => {
+    it('calls dynamiteVisualManager update each tick and destroy on unmount', () => {
+      const mockVisualManager = {
+        update: vi.fn(),
+        destroy: vi.fn(),
+      };
+
+      const { unmount } = renderHook(() =>
+        useMiningTicker({
+          app: mockApp,
+          playerContainerRef: { current: playerContainer },
+          gridContainerRef: { current: gridContainer },
+          fallingRocksContainerRef: { current: null },
+          currentRenderPosRef: { current: { x: 2, y: 4 } },
+          targetServerPosRef: { current: { x: 2, y: 4 } },
+          isFacingLeftRef: { current: false },
+          playerFacingDirRef: { current: { x: 1, y: 0 } },
+          playerSpriteRef: { current: null },
+          activeFallingRocksRef: { current: [] },
+          fallingRockGraphicsMap: { current: new Map() },
+          activeDynamitesRef: {
+            current: [
+              {
+                id: 'dyn-1',
+                position: { x: 5, y: 5 },
+                velocity: { x: 0, y: 0 },
+                fuseRemainingSeconds: 3,
+              },
+            ] as any,
+          },
+          dynamiteVisualManagerRef: { current: mockVisualManager as any },
+          droppedItemsRef: { current: [] },
+          debugGraphicsRef: { current: null },
+          showDebugRef: { current: false },
+          flashlightRef: { current: null },
+          lightingEngineRef: { current: null },
+          cameraRef: { current: null },
+          playerBodyRef,
+          gridRef,
+          keysPressedRef,
+          isMiningRef,
+          miningTargetRef,
+        })
+      );
+
+      tickerCallbacks[0]();
+
+      expect(mockVisualManager.update).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ id: 'dyn-1' })]),
+        expect.any(Number),
+        undefined,
+        null,
+        expect.any(Number)
+      );
+
+      unmount();
+      expect(mockVisualManager.destroy).toHaveBeenCalled();
+    });
+  });
 });
 

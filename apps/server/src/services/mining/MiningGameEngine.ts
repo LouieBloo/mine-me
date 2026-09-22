@@ -17,10 +17,12 @@ import {
   type MiningPosition,
   type MiningRemotePlayer,
   type MiningStateTickPayload,
+  type MiningExplosionEvent,
   type Vector2D,
   MiningRigidWorld,
   DEFAULT_DYNAMITE_PHYSICS_CONFIG,
   type ItemPhysicsConfig,
+  calculateThrowVelocity,
 } from '@mine-me/shared';
 import {
   generateMiningMap,
@@ -99,6 +101,7 @@ export class MiningGameEngine {
   private intervalId: NodeJS.Timeout | null = null;
   private isStopped = false;
   private pendingRevealedTiles: { x: number; y: number; type: MiningTileType; damageStage?: number }[] = [];
+  private pendingExplosions: MiningExplosionEvent[] = [];
   private droppedItemsDirty: boolean = true;
 
   constructor(options: MiningEngineOptions) {
@@ -585,6 +588,27 @@ export class MiningGameEngine {
   }
 
   /**
+   * Helper to retrieve configured explosion radius from items.json for any item based on effect.explodes === true.
+   * Does NOT check names, strictly checks effect.explodes === true.
+   */
+  public getItemExplosionRadius(itemId: string): number | undefined {
+    try {
+      const itemsPath = path.join(__dirname, '../../../../../packages/shared/src/data/items.json');
+      if (fs.existsSync(itemsPath)) {
+        const items = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
+        const found = (items as any[]).find((item: any) => item.id === itemId || item.name?.toLowerCase() === itemId.toLowerCase());
+        const explodeEffect = found?.itemEffects?.find((ie: any) => ie.effect?.explodes === true && ie.value > 0);
+        if (explodeEffect) {
+          return Number(explodeEffect.value);
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return undefined;
+  }
+
+  /**
    * Throw a stick of dynamite from the player's position towards target coordinates.
    */
   public throwDynamite(
@@ -592,6 +616,7 @@ export class MiningGameEngine {
     target: MiningPosition,
     physicsConfig?: ItemPhysicsConfig,
     forceRatio: number = 1.0,
+    explosionRadius?: number,
   ): boolean {
     const session = this.players.get(characterId);
     if (!session) return false;
@@ -602,20 +627,28 @@ export class MiningGameEngine {
     const startX = session.playerBody.position.x;
     const startY = session.playerBody.position.y;
 
-    const dx = target.x - startX;
-    const dy = target.y - startY;
-    const dist = Math.hypot(dx, dy);
-
-    const dirX = dist > 0.001 ? dx / dist : (session.isFacingLeft ? -1 : 1);
-    const dirY = dist > 0.001 ? dy / dist : -0.5;
-
     const config = physicsConfig ?? this.getDynamiteItemPhysicsConfig();
-    const throwPower = config.throwPower ?? this.rigidWorld.config.dynamiteThrowPower ?? 14.0;
-    const clampedRatio = Math.min(1.0, Math.max(0.1, forceRatio));
-    const effectivePower = throwPower * (0.25 + 0.75 * clampedRatio);
-    const speed = Math.min(effectivePower * 1.5, Math.max(6, dist * (effectivePower / 8.0)));
-    const vx = dirX * speed;
-    const vy = dirY * speed - 2.5 * (0.25 + 0.75 * clampedRatio); // slight upward toss arc scaled with force
+    const throwPower = config.throwPower ?? this.rigidWorld.config.dynamiteThrowPower ?? 20.5;
+    const gravityScale = config.gravityScale ?? 1.0;
+
+    const initialVel = calculateThrowVelocity(
+      startX,
+      startY,
+      target.x,
+      target.y,
+      forceRatio,
+      throwPower,
+      this.rigidWorld.config.gravity,
+      gravityScale,
+      session.isFacingLeft
+    );
+    const vx = initialVel.x;
+    const vy = initialVel.y;
+
+    // Use passed explosion radius, or check item effects from items.json for dynamite
+    const resolvedExplosionRadius = explosionRadius !== undefined 
+      ? explosionRadius 
+      : this.getItemExplosionRadius('dynamite');
 
     const dynamite = new MiningDynamiteEntity(
       dynamiteId,
@@ -627,6 +660,7 @@ export class MiningGameEngine {
         bounciness: config.restitution ?? 0.45,
         friction: config.friction ?? 0.4,
         physicsConfig: config,
+        explosionRadius: resolvedExplosionRadius,
       }
     );
     this.activeDynamites.push(dynamite);
@@ -838,15 +872,27 @@ export class MiningGameEngine {
 
   /**
    * Explodes a dynamite stick:
-   * Excavates all blocks within a 7-tile radius from epicenter, cleans up tiles,
+   * Excavates all blocks within its configured explosion radius from epicenter, cleans up tiles,
    * stops affected player mining, and triggers unsupported rock gravity.
+   * Nothing explodes unless an explosion effect (explodes: true) with radius > 0 is configured.
    */
   public explodeDynamite(dynamite: MiningDynamiteEntity): void {
+    const radius = dynamite.explosionRadius;
+    if (!radius || radius <= 0) {
+      return;
+    }
+
     const cx = Math.round(dynamite.position.x);
     const cy = Math.round(dynamite.position.y);
-    const radius = 7;
     const radiusSq = radius * radius;
     const affectedCols = new Set<number>();
+
+    // Queue authoritative explosion event for all clients in room
+    this.pendingExplosions.push({
+      id: dynamite.id,
+      position: { x: dynamite.position.x, y: dynamite.position.y },
+      radius,
+    });
 
     // 1. Excavate all blocks in a 7-tile radius
     for (let dy = -radius; dy <= radius; dy++) {
@@ -1049,10 +1095,12 @@ export class MiningGameEngine {
             angularVelocity: d.angularVelocity,
             fuseRemainingSeconds: d.fuseRemainingSeconds,
             physicsConfig: d.physicsConfig,
+            explosionRadius: d.explosionRadius,
           }))
         : undefined;
 
     const revealedToSend = this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined;
+    const explosionsToSend = this.pendingExplosions.length > 0 ? this.pendingExplosions : undefined;
 
     for (const session of this.players.values()) {
       if (!session.socket || !session.socket.connected) continue;
@@ -1086,6 +1134,7 @@ export class MiningGameEngine {
         droppedItems: this.droppedItemsDirty ? this.droppedItems : undefined,
         fallingRocks: fallingRocksPayload,
         activeDynamites: dynamitesPayload,
+        explosions: explosionsToSend,
         revealedTiles: revealedToSend,
         otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
         visionRange: session.visionRange,
@@ -1098,6 +1147,7 @@ export class MiningGameEngine {
     // Clear broadcast dirty flags after emitting to all sockets
     this.droppedItemsDirty = false;
     this.pendingRevealedTiles = [];
+    this.pendingExplosions = [];
   }
 
   /**

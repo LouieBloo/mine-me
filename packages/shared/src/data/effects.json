@@ -5,8 +5,10 @@
     "description": "Gain Life Instantly",
     "healthGain": true,
     "staminaGain": false,
+    "miningSpeedModifier": false,
+    "explodes": false,
     "createdAt": "2026-06-22T00:13:18.699Z",
-    "updatedAt": "2026-08-17T04:06:40.977Z"
+    "updatedAt": "2026-09-13T01:41:45.274Z"
   },
   {
     "id": "cmq1lathh0000w7bkm1lbqp29",
@@ -14,8 +16,10 @@
     "description": "Instantly gain stamina",
     "healthGain": false,
     "staminaGain": true,
+    "miningSpeedModifier": false,
+    "explodes": false,
     "createdAt": "2026-06-22T00:13:18.717Z",
-    "updatedAt": "2026-08-17T04:06:40.984Z"
+    "updatedAt": "2026-09-13T01:41:45.280Z"
   },
   {
     "id": "cmt27dcbt0000vx8zxmq1sokb",
@@ -23,7 +27,20 @@
     "description": "Mining Speed yo",
     "healthGain": false,
     "staminaGain": false,
+    "miningSpeedModifier": true,
+    "explodes": false,
     "createdAt": "2026-08-21T00:20:10.026Z",
-    "updatedAt": "2026-08-21T00:20:10.026Z"
+    "updatedAt": "2026-09-13T01:41:45.285Z"
+  },
+  {
+    "id": "cmud7xntc00009cfye6butpfo",
+    "name": "Explosion",
+    "description": "Explodes in X radius",
+    "healthGain": false,
+    "staminaGain": false,
+    "miningSpeedModifier": false,
+    "explodes": true,
+    "createdAt": "2026-09-22T22:01:08.305Z",
+    "updatedAt": "2026-09-22T22:01:08.305Z"
   }
 ]
