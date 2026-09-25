@@ -143,6 +143,7 @@ export interface GameItem {
   rarity?: ItemRarity;
   iconUrl?: string | null;
   gearImageUrl?: string | null;
+  inGameSpriteUrl?: string | null;
   isStartingPiece?: boolean;
   experience?: number;
   combatScore?: number;

@@ -40,6 +40,7 @@ adminRouter.post('/items', runValidation(AdminValidation.itemValidation), ItemCo
 adminRouter.put('/items/:id', runValidation(AdminValidation.itemValidation), ItemController.updateItem);
 adminRouter.post('/items/:id/icon', ItemController.itemIconUpload, ItemController.uploadItemIcon);
 adminRouter.post('/items/:id/gear-image', ItemController.itemGearImageUpload, ItemController.uploadItemGearImage);
+adminRouter.post('/items/:id/in-game-sprite', ItemController.itemInGameSpriteUpload, ItemController.uploadItemInGameSprite);
 
 // MOBS
 adminRouter.get('/mobs', MobController.getMobs);

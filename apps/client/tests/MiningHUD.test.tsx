@@ -133,4 +133,34 @@ describe('MiningHUD', () => {
     expect(screen.getByText(/Pos: \(15, 0\)/i)).toBeDefined();
     expect(screen.getByText(/Reach:/i)).toBeDefined();
   });
+
+  it('renders Temporary Backpack with items in the HUD overlay', () => {
+    const sessionWithBackpack: MiningSessionClientState = {
+      ...mockSessionState,
+      temporaryBackpack: [
+        {
+          itemId: 'item_copper_ore',
+          itemName: 'Copper Ore',
+          iconUrl: '/sprites/items/copper_ore.png',
+          quantity: 3,
+        },
+      ],
+    };
+
+    render(
+      <MiningHUD
+        sessionState={sessionWithBackpack}
+        playerState={mockPlayerState}
+        onExit={vi.fn()}
+        onAbandon={vi.fn()}
+        onRestart={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Temporary Backpack/i)).toBeDefined();
+    expect(screen.getByText('3 items')).toBeDefined();
+    expect(screen.getByText('3')).toBeDefined();
+    expect(screen.getByAltText('Copper Ore')).toBeDefined();
+  });
 });
+

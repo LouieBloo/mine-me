@@ -4,7 +4,8 @@ import { useApi } from '../../../hooks/useApi';
 import { useToast } from '../../../contexts/ToastContext';
 import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
 import BlockTextureUpload from './BlockTextureUpload';
-import type { MiningBlockConfig } from '@mine-me/shared';
+import { DropTableEditor } from '../../../components/DropTableEditor/DropTableEditor';
+import type { MiningBlockConfig, DropTable } from '@mine-me/shared';
 import './BlockDetail.css';
 
 export default function BlockDetail() {
@@ -17,6 +18,7 @@ export default function BlockDetail() {
   const [saving, setSaving] = useState(false);
   const [block, setBlock] = useState<MiningBlockConfig | null>(null);
   const [particleEffectsList, setParticleEffectsList] = useState<any[]>([]);
+  const [dropTable, setDropTable] = useState<Omit<DropTable, 'id'> | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -41,6 +43,7 @@ export default function BlockDetail() {
       .then(([data, particleEffectsJson]: [MiningBlockConfig, any[]]) => {
         setBlock(data);
         setParticleEffectsList(Array.isArray(particleEffectsJson) ? particleEffectsJson : []);
+        setDropTable(data.dropTable || null);
         setFormData({
           name: data.name || '',
           description: data.description || '',
@@ -72,6 +75,7 @@ export default function BlockDetail() {
       const payload = {
         ...formData,
         idleParticleEffectId: formData.idleParticleEffectId || null,
+        dropTable,
       };
       const res = await fetchWithAuth(`/api/admin/blocks/${block.id}`, {
         method: 'PUT',
@@ -238,6 +242,15 @@ export default function BlockDetail() {
                 <span className="text-[11px] text-slate-400 font-medium">
                   Continuous ambient sparkles/effects emitted from this block in-game (no light)
                 </span>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <DropTableEditor
+                  value={dropTable}
+                  onChange={(val) => setDropTable(val)}
+                  title="Block Drops"
+                  description="Configure items, Sol, and Experience dropped when this block is mined or destroyed."
+                />
               </div>
 
               <div className="pt-4">

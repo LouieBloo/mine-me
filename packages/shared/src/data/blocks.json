@@ -9,7 +9,9 @@
     "staminaCost": 1,
     "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.321Z",
-    "updatedAt": "2026-09-13T00:55:27.133Z"
+    "updatedAt": "2026-09-22T22:54:00.847Z",
+    "idleParticleEffect": null,
+    "dropTable": null
   },
   {
     "id": "block_copperium",
@@ -21,7 +23,75 @@
     "staminaCost": 1,
     "idleParticleEffectId": "pe_fairy_sparkle",
     "createdAt": "2026-09-13T00:55:27.153Z",
-    "updatedAt": "2026-09-13T01:09:40.606Z"
+    "updatedAt": "2026-09-25T03:38:21.568Z",
+    "idleParticleEffect": {
+      "id": "pe_fairy_sparkle",
+      "name": "Fairy Sparkles",
+      "description": "Subtle floating white and gold sparkle flakes reminiscent of fairy dust.",
+      "type": "CONTINUOUS",
+      "config": {
+        "rate": 1,
+        "alpha": {
+          "end": 0,
+          "start": 0.85
+        },
+        "angle": {
+          "max": 310,
+          "min": 230
+        },
+        "color": {
+          "end": "#fbbf24",
+          "start": "#ffffff"
+        },
+        "scale": {
+          "end": 0.3,
+          "start": 0.6
+        },
+        "shape": "spark",
+        "speed": {
+          "max": 18,
+          "min": 5
+        },
+        "gravity": {
+          "x": 0,
+          "y": -6
+        },
+        "friction": 0.98,
+        "lifetime": {
+          "max": 1.6,
+          "min": 0.8
+        },
+        "blendMode": "add",
+        "turbulence": 8,
+        "emitterType": "continuous",
+        "spawnRadius": 30
+      },
+      "createdAt": "2026-09-13T01:34:00.471Z",
+      "updatedAt": "2026-09-22T22:54:00.621Z"
+    },
+    "dropTable": {
+      "id": "cmugev18g0000qhftn66corzq",
+      "solMin": 0,
+      "solMax": 0,
+      "experience": 0,
+      "mobId": null,
+      "characterLevelId": null,
+      "miningBlockId": "block_copperium",
+      "createdAt": "2026-09-25T03:38:21.568Z",
+      "updatedAt": "2026-09-25T03:38:21.568Z",
+      "items": [
+        {
+          "id": "cmugev18g0002qhftnzxe7tua",
+          "dropTableId": "cmugev18g0000qhftn66corzq",
+          "itemId": "cmp6aexa30004idpx29gsz12l",
+          "chance": 100,
+          "minQuantity": 1,
+          "maxQuantity": 5,
+          "createdAt": "2026-09-25T03:38:21.568Z",
+          "updatedAt": "2026-09-25T03:38:21.568Z"
+        }
+      ]
+    }
   },
   {
     "id": "block_dirt",
@@ -33,7 +103,9 @@
     "staminaCost": 1,
     "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.305Z",
-    "updatedAt": "2026-09-13T00:55:27.138Z"
+    "updatedAt": "2026-09-22T22:54:00.855Z",
+    "idleParticleEffect": null,
+    "dropTable": null
   },
   {
     "id": "block_entrance",
@@ -45,7 +117,9 @@
     "staminaCost": 0,
     "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.325Z",
-    "updatedAt": "2026-09-13T00:55:27.142Z"
+    "updatedAt": "2026-09-22T22:54:00.858Z",
+    "idleParticleEffect": null,
+    "dropTable": null
   },
   {
     "id": "block_mineral",
@@ -57,7 +131,9 @@
     "staminaCost": 1,
     "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.316Z",
-    "updatedAt": "2026-09-13T00:55:27.146Z"
+    "updatedAt": "2026-09-22T22:54:00.862Z",
+    "idleParticleEffect": null,
+    "dropTable": null
   },
   {
     "id": "block_rock",
@@ -69,7 +145,9 @@
     "staminaCost": 0,
     "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.310Z",
-    "updatedAt": "2026-09-13T00:55:27.150Z"
+    "updatedAt": "2026-09-22T22:54:00.865Z",
+    "idleParticleEffect": null,
+    "dropTable": null
   },
   {
     "id": "block_silverium",
@@ -81,6 +159,74 @@
     "staminaCost": 2,
     "idleParticleEffectId": "pe_fairy_sparkle",
     "createdAt": "2026-09-13T00:55:27.158Z",
-    "updatedAt": "2026-09-13T01:10:09.553Z"
+    "updatedAt": "2026-09-25T03:41:51.932Z",
+    "idleParticleEffect": {
+      "id": "pe_fairy_sparkle",
+      "name": "Fairy Sparkles",
+      "description": "Subtle floating white and gold sparkle flakes reminiscent of fairy dust.",
+      "type": "CONTINUOUS",
+      "config": {
+        "rate": 1,
+        "alpha": {
+          "end": 0,
+          "start": 0.85
+        },
+        "angle": {
+          "max": 310,
+          "min": 230
+        },
+        "color": {
+          "end": "#fbbf24",
+          "start": "#ffffff"
+        },
+        "scale": {
+          "end": 0.3,
+          "start": 0.6
+        },
+        "shape": "spark",
+        "speed": {
+          "max": 18,
+          "min": 5
+        },
+        "gravity": {
+          "x": 0,
+          "y": -6
+        },
+        "friction": 0.98,
+        "lifetime": {
+          "max": 1.6,
+          "min": 0.8
+        },
+        "blendMode": "add",
+        "turbulence": 8,
+        "emitterType": "continuous",
+        "spawnRadius": 30
+      },
+      "createdAt": "2026-09-13T01:34:00.471Z",
+      "updatedAt": "2026-09-22T22:54:00.621Z"
+    },
+    "dropTable": {
+      "id": "cmugeyzrs0005qhftfmwj727y",
+      "solMin": 0,
+      "solMax": 0,
+      "experience": 0,
+      "mobId": null,
+      "characterLevelId": null,
+      "miningBlockId": "block_silverium",
+      "createdAt": "2026-09-25T03:41:26.296Z",
+      "updatedAt": "2026-09-25T03:41:51.932Z",
+      "items": [
+        {
+          "id": "cmugezjjw000eqhfta2g08kk8",
+          "dropTableId": "cmugeyzrs0005qhftfmwj727y",
+          "itemId": "cmp6ammsn0006idpxgnpsnyk1",
+          "chance": 100,
+          "minQuantity": 1,
+          "maxQuantity": 2,
+          "createdAt": "2026-09-25T03:41:51.932Z",
+          "updatedAt": "2026-09-25T03:41:51.932Z"
+        }
+      ]
+    }
   }
 ]

@@ -16,6 +16,7 @@ import {
   canTileBeDamaged,
   type MiningActiveDynamite,
   type MiningDroppedItem,
+  type MiningBackpackItem,
   type GameItem,
 } from '@mine-me/shared';
 import { PointLight } from '../../../../components/game/lighting/PointLight';
@@ -51,6 +52,7 @@ interface MiningGridProps {
   showDebug?: boolean;
   onToggleDebug?: () => void;
   onVisionChange?: (newVision: number) => void;
+  onBackpackChange?: (newBackpack: MiningBackpackItem[]) => void;
 }
 
 export const MiningGrid: React.FC<MiningGridProps> = ({
@@ -70,12 +72,16 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   showDebug,
   onToggleDebug,
   onVisionChange,
+  onBackpackChange,
 }) => {
   const { app } = usePixiStage();
   const { onEvent, sendGameEvent } = useSocket();
 
   const onVisionChangeRef = useRef(onVisionChange);
   onVisionChangeRef.current = onVisionChange;
+
+  const onBackpackChangeRef = useRef(onBackpackChange);
+  onBackpackChangeRef.current = onBackpackChange;
 
   // Authoritative in-memory grid ref (avoids React state thrashing and 5,000-tile clones)
   const gridRef = useRef<MiningClientTile[][]>(
@@ -473,6 +479,11 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       // Update vision range if provided
       if (payload.visionRange !== undefined) {
         onVisionChangeRef.current?.(payload.visionRange);
+      }
+
+      // Update temporary backpack if provided
+      if (payload.temporaryBackpack) {
+        onBackpackChangeRef.current?.(payload.temporaryBackpack);
       }
 
       // Incremental Tile Updates

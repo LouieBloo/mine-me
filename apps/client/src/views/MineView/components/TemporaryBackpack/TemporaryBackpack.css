@@ -1,0 +1,4 @@
+.temporary-backpack-container {
+  display: flex;
+  flex-direction: column;
+}

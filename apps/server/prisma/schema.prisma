@@ -84,6 +84,7 @@ model Item {
   rarity          ItemRarity      @default(LOW)
   iconUrl         String?
   gearImageUrl    String?
+  inGameSpriteUrl String?
   isStartingPiece Boolean         @default(false)
   experience      Int             @default(0)
   combatScore     Int             @default(0)
@@ -110,10 +111,12 @@ model DropTable {
   experience       Int             @default(0)
   mobId            String?         @unique
   characterLevelId String?         @unique
+  miningBlockId    String?         @unique
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   characterLevel   CharacterLevel? @relation("CharacterLevelDrops", fields: [characterLevelId], references: [id], onDelete: Cascade)
   mob              Mob?            @relation("MobDrops", fields: [mobId], references: [id], onDelete: Cascade)
+  miningBlock      MiningBlock?    @relation("MiningBlockDrops", fields: [miningBlockId], references: [id], onDelete: Cascade)
   items            DropTableItem[]
 }
 
@@ -213,6 +216,7 @@ model MiningBlock {
   staminaCost          Int             @default(1)
   idleParticleEffectId String?
   idleParticleEffect   ParticleEffect? @relation(fields: [idleParticleEffectId], references: [id], onDelete: SetNull)
+  dropTable            DropTable?      @relation("MiningBlockDrops")
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 }

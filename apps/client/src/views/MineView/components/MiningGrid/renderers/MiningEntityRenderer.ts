@@ -19,29 +19,41 @@ export class MiningEntityRenderer {
     const nextKeys = new Set<string>();
 
     droppedItems.forEach((item, idx) => {
-      const key = `${item.itemId}_${item.position.x}_${item.position.y}_${idx}`;
+      const key = item.id || `${item.itemId}_${item.position.x}_${item.position.y}_${idx}`;
       nextKeys.add(key);
 
-      if (!droppedSpritesMap.has(key)) {
-        const itemX = item.position.x * tileSize + tileSize / 2;
-        const itemY = item.position.y * tileSize + tileSize / 2;
+      const itemX = item.id
+        ? item.position.x * tileSize
+        : (Number.isInteger(item.position.x) ? item.position.x * tileSize + tileSize / 2 : item.position.x * tileSize);
+      const itemY = item.id
+        ? item.position.y * tileSize
+        : (Number.isInteger(item.position.y) ? item.position.y * tileSize + tileSize / 2 : item.position.y * tileSize);
 
-        if (item.iconUrl) {
+      const spriteUrl = item.inGameSpriteUrl || item.iconUrl;
+      const existing = droppedSpritesMap.get(key);
+
+      if (existing) {
+        existing.x = itemX;
+        existing.y = itemY;
+      } else {
+        if (spriteUrl) {
           const loadSprite = async () => {
             try {
-              const url = getAssetUrl(item.iconUrl);
+              const url = getAssetUrl(spriteUrl);
               const texture = await Assets.load(url);
               const sprite = new Sprite(texture);
               sprite.anchor.set(0.5);
-              sprite.width = tileSize * 0.6;
-              sprite.height = tileSize * 0.6;
+              // Requirement 4: Half a normal tile size (0.5 * tileSize)
+              sprite.width = tileSize * 0.5;
+              sprite.height = tileSize * 0.5;
               sprite.x = itemX;
               sprite.y = itemY;
               droppedItemsContainer.addChild(sprite);
               droppedSpritesMap.set(key, sprite);
             } catch {
               const graphics = new Graphics();
-              graphics.circle(0, 0, tileSize * 0.25);
+              const halfSize = tileSize * 0.5;
+              graphics.rect(-halfSize / 2, -halfSize / 2, halfSize, halfSize);
               graphics.fill(0xf59e0b);
               graphics.x = itemX;
               graphics.y = itemY;
@@ -52,7 +64,8 @@ export class MiningEntityRenderer {
           loadSprite();
         } else {
           const graphics = new Graphics();
-          graphics.circle(0, 0, tileSize * 0.25);
+          const halfSize = tileSize * 0.5;
+          graphics.rect(-halfSize / 2, -halfSize / 2, halfSize, halfSize);
           graphics.fill(0xf59e0b);
           graphics.x = itemX;
           graphics.y = itemY;

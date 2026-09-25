@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { type MiningSessionClientState, type PlayerState, MINING_CONFIG } from '@mine-me/shared';
 import { ZoomControl } from '../ZoomControl/ZoomControl';
+import { TemporaryBackpack } from '../TemporaryBackpack/TemporaryBackpack';
 import './MiningHUD.css';
 
 interface MiningHUDProps {
@@ -111,6 +112,9 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
           {onZoomChange && (
             <ZoomControl zoom={zoom} onZoomChange={onZoomChange} />
           )}
+
+          {/* Temporary Backpack */}
+          <TemporaryBackpack items={sessionState.temporaryBackpack || []} />
         </div>
 
         {/* Top Right: Debug Button, Refresh Button & Health/Stamina Panel */}

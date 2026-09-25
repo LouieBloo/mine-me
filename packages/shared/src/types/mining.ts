@@ -1,4 +1,4 @@
-import type { GearSubType, ItemPhysicsConfig } from './index';
+import type { GearSubType, ItemPhysicsConfig, DropTable } from './index';
 import type { ParticleEffect } from './particles';
 
 // ============================================================================
@@ -109,6 +109,7 @@ export interface MiningBlockConfig {
   staminaCost: number;
   idleParticleEffectId?: string | null;
   idleParticleEffect?: ParticleEffect | null;
+  dropTable?: DropTable | null;
   createdAt?: string | Date;
   updatedAt?: string | Date;
 }
@@ -324,10 +325,13 @@ export interface MiningClientTile {
  * The player must walk over the tile to pick it up.
  */
 export interface MiningDroppedItem {
+  id?: string;
   position: MiningPosition;
+  velocity?: Vector2D;
   itemId: string;
   itemName: string;
   iconUrl: string | null;
+  inGameSpriteUrl?: string | null;
   quantity: number;
   physicsConfig?: ItemPhysicsConfig;
 }

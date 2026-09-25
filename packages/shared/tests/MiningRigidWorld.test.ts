@@ -199,4 +199,34 @@ describe('MiningRigidWorld (Planck.js Integration)', () => {
       expect(speed).toBeCloseTo(20.5, 3);
     });
   });
+
+  describe('createItemBody', () => {
+    it('creates dynamic body with square half-tile collider and fixed rotation', () => {
+      const rigidWorld = new MiningRigidWorld({ width: 10, height: 10, gravity: 28 });
+      const itemBody = rigidWorld.createItemBody('item-1', { x: 5, y: 2 }, { x: 1, y: -2 });
+
+      expect(itemBody.getType()).toBe('dynamic');
+      expect(itemBody.isFixedRotation()).toBe(true);
+      expect(itemBody.getUserData()).toEqual({ id: 'item-1', type: 'item' });
+
+      // Fixture shape should be a Box (Polygon) with half-width 0.25 and half-height 0.25
+      const fixture = itemBody.getFixtureList();
+      expect(fixture).toBeDefined();
+      const shape: any = fixture?.getShape();
+      expect(shape.getType()).toBe('polygon');
+      // Total width and height = 0.5 tiles (half of a normal 1.0 tile)
+      expect(shape.m_vertices.length).toBe(4);
+
+      // Simulate gravity: item should fall downwards
+      rigidWorld.addTileCollider(5, 5); // Solid floor tile at y=5 (center at 5.5, 5.5)
+      for (let i = 0; i < 30; i++) {
+        rigidWorld.step(0.033);
+      }
+
+      // Item should have fallen from y=2 and landed near the top of the tile floor
+      expect(itemBody.getPosition().y).toBeGreaterThan(2);
+      expect(itemBody.getPosition().y).toBeLessThan(5.5);
+    });
+  });
 });
+

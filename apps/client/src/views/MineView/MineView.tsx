@@ -93,6 +93,13 @@ export const MineView: React.FC = () => {
     });
   }, [setMiningSession]);
 
+  const handleBackpackChange = useCallback((newBackpack: MiningBackpackItem[]) => {
+    setMiningSession((prev) => {
+      if (!prev) return prev;
+      return { ...prev, temporaryBackpack: newBackpack };
+    });
+  }, [setMiningSession]);
+
   // Track whether session has already been extracted/cleaned up so unmount doesn't double-cancel
   const isCleanedUpRef = useRef<boolean>(false);
 
@@ -285,6 +292,7 @@ export const MineView: React.FC = () => {
             showDebug={showDebug}
             onToggleDebug={handleToggleDebug}
             onVisionChange={handleVisionChange}
+            onBackpackChange={handleBackpackChange}
           />
         </PixiStageProvider>
       )}

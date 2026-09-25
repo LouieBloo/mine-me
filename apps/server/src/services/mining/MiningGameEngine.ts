@@ -24,6 +24,7 @@ import {
   type ItemPhysicsConfig,
   calculateThrowVelocity,
 } from '@mine-me/shared';
+import * as planck from 'planck';
 import {
   generateMiningMap,
   getDamageStage,
@@ -91,6 +92,10 @@ export class MiningGameEngine {
   public primaryCharacterId: string = '';
 
   public droppedItems: MiningDroppedItem[] = [];
+  public activeItemBodies: Map<string, planck.Body> = new Map();
+  private droppedItemCounter = 0;
+  private blocksCache: any[] | null = null;
+  private itemsCache: any[] | null = null;
 
   public maxDurationSeconds = MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
   public elapsedTimeSeconds = 0;
@@ -410,6 +415,10 @@ export class MiningGameEngine {
       this.intervalId = null;
     }
     this.isStopped = true;
+    for (const body of this.activeItemBodies.values()) {
+      this.rigidWorld.destroyBody(body);
+    }
+    this.activeItemBodies.clear();
     this.rigidWorld.destroy();
   }
 
@@ -569,22 +578,155 @@ export class MiningGameEngine {
   }
 
   /**
-   * Helper to retrieve configured item physics from items.json for any item.
+   * Helper to retrieve block configuration from blocks.json.
    */
-  public getItemPhysicsConfig(itemId: string): ItemPhysicsConfig | undefined {
+  public getBlockConfig(tileType: MiningTileType): any {
     try {
-      const itemsPath = path.join(__dirname, '../../../../../packages/shared/src/data/items.json');
-      if (fs.existsSync(itemsPath)) {
-        const items = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
-        const found = (items as any[]).find((item: any) => item.id === itemId || item.name?.toLowerCase() === itemId.toLowerCase());
-        if (found?.physicsConfig) {
-          return found.physicsConfig as ItemPhysicsConfig;
+      if (!this.blocksCache) {
+        const blocksPath = path.join(__dirname, '../../../../../packages/shared/src/data/blocks.json');
+        if (fs.existsSync(blocksPath)) {
+          this.blocksCache = JSON.parse(fs.readFileSync(blocksPath, 'utf-8'));
         }
+      }
+      const typeKeyMap: Record<number, string> = {
+        [MiningTileType.DIRT]: 'DIRT',
+        [MiningTileType.ROCK]: 'ROCK',
+        [MiningTileType.MINERAL]: 'MINERAL',
+        [MiningTileType.CHEST]: 'CHEST',
+        [MiningTileType.COPPERIUM]: 'COPPERIUM',
+        [MiningTileType.SILVERIUM]: 'SILVERIUM',
+      };
+      const key = typeKeyMap[tileType];
+      if (key && this.blocksCache) {
+        return this.blocksCache.find((b: any) => b.typeKey === key);
       }
     } catch {
       // ignore
     }
     return undefined;
+  }
+
+  /**
+   * Helper to retrieve item definition from items.json.
+   */
+  public getItemData(itemId: string): any {
+    try {
+      if (!this.itemsCache) {
+        const itemsPath = path.join(__dirname, '../../../../../packages/shared/src/data/items.json');
+        if (fs.existsSync(itemsPath)) {
+          this.itemsCache = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
+        }
+      }
+      if (this.itemsCache) {
+        return this.itemsCache.find((i: any) => i.id === itemId || i.name?.toLowerCase() === itemId.toLowerCase());
+      }
+    } catch {
+      // ignore
+    }
+    return undefined;
+  }
+
+  /**
+   * Helper to retrieve configured item physics from items.json for any item.
+   */
+  public getItemPhysicsConfig(itemId: string): ItemPhysicsConfig | undefined {
+    return this.getItemData(itemId)?.physicsConfig;
+  }
+
+  /**
+   * Spawns item drops for a destroyed block based on its configured DropTable.
+   * Multiple drops are spread out horizontally and launched with an upward arc so they don't overlap.
+   */
+  public spawnBlockDrops(tx: number, ty: number, tileType: MiningTileType): void {
+    if (tileType === MiningTileType.EMPTY || tileType === MiningTileType.ENTRANCE) return;
+
+    const blockConfig = this.getBlockConfig(tileType);
+    const dropTable = blockConfig?.dropTable;
+    const dropsToSpawn: { itemId: string; quantity: number }[] = [];
+
+    if (dropTable && Array.isArray(dropTable.items) && dropTable.items.length > 0) {
+      for (const entry of dropTable.items) {
+        const roll = Math.random() * 100;
+        if (roll <= entry.chance) {
+          const qty = Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1)) + entry.minQuantity;
+          if (qty > 0) {
+            dropsToSpawn.push({ itemId: entry.itemId, quantity: qty });
+          }
+        }
+      }
+    } else {
+      // Fallback for legacy blocks without drop tables configured
+      if (tileType === MiningTileType.MINERAL) {
+        dropsToSpawn.push({ itemId: 'copper_ore', quantity: 1 });
+      } else if (tileType === MiningTileType.CHEST) {
+        dropsToSpawn.push({ itemId: 'gold_coin', quantity: 50 });
+      }
+    }
+
+    if (dropsToSpawn.length === 0) return;
+
+    const N = dropsToSpawn.length;
+    dropsToSpawn.forEach((drop, idx) => {
+      this.droppedItemCounter++;
+      const id = `drop_${Date.now()}_${this.droppedItemCounter}_${idx}`;
+      const itemData = this.getItemData(drop.itemId);
+
+      // Requirement 5: Spread out multiple items so they don't overlap
+      const offsetX = N > 1 ? (idx - (N - 1) / 2) * 0.25 : 0;
+      const posX = tx + 0.5 + offsetX;
+      const posY = ty + 0.5;
+
+      const vx = N > 1
+        ? (idx - (N - 1) / 2) * 1.5 + (Math.random() - 0.5) * 0.4
+        : (Math.random() - 0.5) * 0.5;
+      const vy = N > 1
+        ? -2.2 - Math.random() * 1.0
+        : -1.8 - Math.random() * 0.6;
+
+      const rigidBody = this.rigidWorld.createItemBody(
+        id,
+        { x: posX, y: posY },
+        { x: vx, y: vy }
+      );
+      this.activeItemBodies.set(id, rigidBody);
+
+      this.droppedItems.push({
+        id,
+        position: { x: posX, y: posY },
+        velocity: { x: vx, y: vy },
+        itemId: drop.itemId,
+        itemName: itemData?.name || drop.itemId,
+        iconUrl: itemData?.iconUrl || null,
+        inGameSpriteUrl: itemData?.inGameSpriteUrl || null,
+        quantity: drop.quantity,
+        physicsConfig: itemData?.physicsConfig,
+      });
+    });
+
+    this.droppedItemsDirty = true;
+  }
+
+  /**
+   * Syncs Planck rigid body positions and velocities to dropped item entities during physics steps.
+   */
+  public updateDroppedItemsPhysics(): void {
+    if (this.droppedItems.length === 0 || this.activeItemBodies.size === 0) return;
+
+    for (const item of this.droppedItems) {
+      if (!item.id) continue;
+      const body = this.activeItemBodies.get(item.id);
+      if (!body) continue;
+
+      const pos = body.getPosition();
+      const vel = body.getLinearVelocity();
+      const speed = Math.hypot(vel.x, vel.y);
+
+      if (speed > 0.02 || Math.hypot(pos.x - item.position.x, pos.y - item.position.y) > 0.01) {
+        item.position = { x: pos.x, y: pos.y };
+        item.velocity = { x: vel.x, y: vel.y };
+        this.droppedItemsDirty = true;
+      }
+    }
   }
 
   /**
@@ -719,6 +861,9 @@ export class MiningGameEngine {
 
     // 2.5. Step Planck rigid world
     this.rigidWorld.step(dt);
+
+    // 2.6. Update dropped items physics
+    this.updateDroppedItemsPhysics();
 
     // 3. Falling rocks simulation
     this.updateFallingRocks(dt);
@@ -904,6 +1049,7 @@ export class MiningGameEngine {
             const tile = this.grid[ty][tx];
             // Preserve cavern exit entrance
             if (tile.type !== MiningTileType.ENTRANCE && tile.type !== MiningTileType.EMPTY) {
+              const previousType = tile.type;
               tile.type = MiningTileType.EMPTY;
               tile.revealed = true;
               tile.damageMs = 0;
@@ -915,6 +1061,7 @@ export class MiningGameEngine {
                 damageStage: 0,
               });
               affectedCols.add(tx);
+              this.spawnBlockDrops(tx, ty, previousType);
             }
           }
         }
@@ -977,6 +1124,8 @@ export class MiningGameEngine {
    */
   private completeMiningBlock(target: MiningPosition, miners?: MiningPlayerSession[]): void {
     const tile = this.grid[target.y][target.x];
+    if (tile.type === MiningTileType.EMPTY) return;
+    const previousType = tile.type;
 
     // Excavate tile
     this.grid[target.y][target.x] = { type: MiningTileType.EMPTY, revealed: true };
@@ -988,28 +1137,8 @@ export class MiningGameEngine {
       p.lastRevealGridPos = null;
     }
 
-    // Spawn items if Mineral or Chest
-    if (tile.type === MiningTileType.MINERAL) {
-      this.droppedItems.push({
-        position: target,
-        itemId: 'copper_ore',
-        itemName: 'Copper Ore',
-        iconUrl: '/assets/items/copper_ore.png',
-        quantity: 1,
-        physicsConfig: this.getItemPhysicsConfig('copper_ore'),
-      });
-      this.droppedItemsDirty = true;
-    } else if (tile.type === MiningTileType.CHEST) {
-      this.droppedItems.push({
-        position: target,
-        itemId: 'gold_coin',
-        itemName: 'Gold Coins',
-        iconUrl: '/assets/items/gold_coin.png',
-        quantity: 50,
-        physicsConfig: this.getItemPhysicsConfig('gold_coin'),
-      });
-      this.droppedItemsDirty = true;
-    }
+    // Spawn items from block's dropTable
+    this.spawnBlockDrops(target.x, target.y, previousType);
 
     // Trigger dynamic falling rock gravity for rocks directly above
     this.checkAndTriggerFallingRocks(target.x, target.y);
@@ -1032,6 +1161,14 @@ export class MiningGameEngine {
     this.droppedItems = this.droppedItems.filter((item) => {
       const dist = Math.hypot(session.playerBody.position.x - item.position.x, session.playerBody.position.y - item.position.y);
       if (dist <= 0.7) {
+        if (item.id) {
+          const body = this.activeItemBodies.get(item.id);
+          if (body) {
+            this.rigidWorld.destroyBody(body);
+            this.activeItemBodies.delete(item.id);
+          }
+        }
+
         const existing = session.temporaryBackpack.find((b) => b.itemId === item.itemId);
         if (existing) {
           existing.quantity += item.quantity;

@@ -129,4 +129,21 @@ describe('Mining Block Controller & Routes', () => {
     expect(res.status).toBe(200);
     expect(res.body[0].idleParticleEffectId).toBe('pe_fairy_sparkle');
   });
+
+  it('PUT /admin/blocks/:id updates block dropTable', async () => {
+    const res = await request(app)
+      .put('/admin/blocks/block_dirt')
+      .send({
+        dropTable: {
+          solMin: 0,
+          solMax: 5,
+          experience: 10,
+          items: [
+            { itemId: 'item_copper_ore', chance: 50, minQuantity: 1, maxQuantity: 2 },
+          ],
+        },
+      });
+
+    expect(res.status).toBe(200);
+  });
 });

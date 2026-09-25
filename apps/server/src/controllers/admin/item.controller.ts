@@ -45,6 +45,21 @@ export const itemIconUpload = upload.single('icon');
 const uploadGear = multer({ storage: gearStorage, fileFilter });
 export const itemGearImageUpload = uploadGear.single('gearImage');
 
+const inGameSpriteStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, '../../../../../packages/shared/assets/sprites/items');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase() || '.png';
+    cb(null, `${req.params.id}_ingame${ext}`);
+  }
+});
+
+const uploadInGameSprite = multer({ storage: inGameSpriteStorage, fileFilter });
+export const itemInGameSpriteUpload = uploadInGameSprite.single('inGameSprite');
+
 export const getItems = async (req: Request, res: Response) => {
   const { skip, take, where } = getPagination(req, 'name');
   // Support filtering by type and subType via query params
@@ -229,5 +244,47 @@ export const uploadItemGearImage = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error(error);
     res.status(500).json({ error: error.message || 'Failed to upload item gear image' });
+  }
+};
+
+export const uploadItemInGameSprite = async (req: Request, res: Response) => {
+  try {
+    const itemId = req.params.id;
+    const file = req.file;
+
+    const item = await prisma.item.findUnique({ where: { id: itemId } });
+    if (!item) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No in-game sprite file provided' });
+      return;
+    }
+
+    const inGameSpriteUrl = `/assets/sprites/items/${file.filename}`;
+
+    const updatedItem = await prisma.item.update({
+      where: { id: itemId },
+      data: { inGameSpriteUrl }
+    });
+
+    const allItems = await prisma.item.findMany({
+      include: {
+        itemEffects: {
+          include: {
+            effect: true
+          }
+        },
+        particleEffect: true
+      }
+    });
+    await syncJson('items.json', allItems);
+
+    res.json(updatedItem);
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ error: error.message || 'Failed to upload item in-game sprite' });
   }
 };

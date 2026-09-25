@@ -34,9 +34,18 @@ export interface RockBodyOptions {
   density?: number;
 }
 
+export interface ItemBodyOptions {
+  gravityScale?: number;
+  restitution?: number;
+  friction?: number;
+  density?: number;
+  linearDamping?: number;
+  angularDamping?: number;
+}
+
 export interface RigidEntityData {
   id: string;
-  type: 'dynamite' | 'rock' | 'projectile';
+  type: 'dynamite' | 'rock' | 'projectile' | 'item';
 }
 
 /**
@@ -298,6 +307,42 @@ export class MiningRigidWorld {
     });
 
     const data: RigidEntityData = { id, type: 'rock' };
+    body.setUserData(data);
+
+    return body;
+  }
+
+  /**
+   * Creates a dynamic rigid body for dropped items.
+   * Simple square collider of half normal tile size (0.5 x 0.5 tiles, or hx=0.25, hy=0.25).
+   * Respects gravity, lands on tiles, and keeps fixed rotation for clean sprite rendering.
+   */
+  public createItemBody(
+    id: string,
+    position: Vector2D,
+    velocity?: Vector2D,
+    options?: ItemBodyOptions
+  ): planck.Body {
+    const body = this.world.createBody({
+      type: 'dynamic',
+      position: planck.Vec2(position.x, position.y),
+      linearVelocity: planck.Vec2(velocity?.x ?? 0, velocity?.y ?? 0),
+      bullet: true, // Prevents tunneling through blocks
+      gravityScale: options?.gravityScale ?? 1.0,
+      linearDamping: options?.linearDamping ?? 0.2,
+      angularDamping: options?.angularDamping ?? 0.5,
+      fixedRotation: true,
+    });
+
+    // Simple square collider, half a normal tile size (0.5 x 0.5 total dimension)
+    body.createFixture({
+      shape: planck.Box(0.25, 0.25),
+      density: options?.density ?? 1.0,
+      restitution: options?.restitution ?? 0.2,
+      friction: options?.friction ?? 0.6,
+    });
+
+    const data: RigidEntityData = { id, type: 'item' };
     body.setUserData(data);
 
     return body;

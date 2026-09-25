@@ -887,4 +887,128 @@ describe('MiningGameEngine', () => {
       expect(engine.grid[11][10].type).toBe(MiningTileType.DIRT);
     });
   });
+
+  describe('Block item drops & physics', () => {
+    it('consults dropTable and spawns multiple spread-out items with rigid bodies when block is mined', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Mock block config with a dropTable that drops 2 distinct entries
+      vi.spyOn(engine, 'getBlockConfig').mockReturnValue({
+        id: 'block_copperium',
+        typeKey: 'COPPERIUM',
+        name: 'Copperium Ore',
+        dropTable: {
+          items: [
+            { itemId: 'copper_ore', chance: 100, minQuantity: 1, maxQuantity: 1 },
+            { itemId: 'gold_coin', chance: 100, minQuantity: 5, maxQuantity: 5 },
+          ],
+        },
+      });
+
+      engine.grid[5][10] = { type: MiningTileType.COPPERIUM, revealed: true };
+      (engine as any).completeMiningBlock({ x: 10, y: 5 });
+
+      expect(engine.droppedItems).toHaveLength(2);
+      const [item1, item2] = engine.droppedItems;
+
+      // Requirement 5: Spread out so they do not overlap
+      expect(item1.position.x).not.toEqual(item2.position.x);
+      expect(item1.velocity?.x).toBeLessThan(0);
+      expect(item2.velocity?.x).toBeGreaterThan(0);
+      expect(item1.velocity?.y).toBeLessThan(0); // Upward impulse
+      expect(item2.velocity?.y).toBeLessThan(0);
+
+      // Requirement 4: Planck dynamic body created
+      expect(engine.activeItemBodies.size).toBe(2);
+      expect(engine.activeItemBodies.has(item1.id!)).toBe(true);
+      expect(engine.activeItemBodies.has(item2.id!)).toBe(true);
+    });
+
+    it('spawns dropped items when blocks are destroyed by dynamite explosions', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      vi.spyOn(engine, 'getBlockConfig').mockReturnValue({
+        id: 'block_mineral',
+        typeKey: 'MINERAL',
+        dropTable: {
+          items: [
+            { itemId: 'copper_ore', chance: 100, minQuantity: 1, maxQuantity: 1 },
+          ],
+        },
+      });
+
+      // Place a block in the blast zone
+      engine.grid[10][11] = { type: MiningTileType.MINERAL, revealed: true };
+
+      // Throw dynamite right at it
+      engine.throwDynamite('char-1', { x: 10, y: 10 }, undefined, 1.0, 3);
+      const dynamite = engine.activeDynamites[0];
+      dynamite.position = { x: 10, y: 10 };
+      dynamite.hasGravity = false;
+
+      (engine as any).tick(4.1);
+
+      expect(engine.grid[10][11].type).toBe(MiningTileType.EMPTY);
+      expect(engine.droppedItems.length).toBeGreaterThan(0);
+      expect(engine.droppedItems[0].itemId).toBe('copper_ore');
+    });
+
+    it('integrates item gravity physics and cleans up rigid body on player pickup', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      vi.spyOn(engine, 'getBlockConfig').mockReturnValue({
+        id: 'block_chest',
+        typeKey: 'CHEST',
+        dropTable: {
+          items: [
+            { itemId: 'gold_coin', chance: 100, minQuantity: 10, maxQuantity: 10 },
+          ],
+        },
+      });
+
+      engine.grid[2][5] = { type: MiningTileType.CHEST, revealed: true };
+      (engine as any).completeMiningBlock({ x: 5, y: 2 });
+
+      expect(engine.droppedItems).toHaveLength(1);
+      const dropped = engine.droppedItems[0];
+      const initialY = dropped.position.y;
+
+      // Tick physics to let gravity pull item downward
+      for (let i = 0; i < 15; i++) {
+        (engine as any).tick(0.033);
+      }
+
+      // Position should have updated from Planck body
+      expect(dropped.position.y).toBeGreaterThan(initialY);
+
+      // Move player directly over the dropped item to trigger pickup
+      const session = engine.players.get('char-1')!;
+      session.playerBody.position = { x: dropped.position.x, y: dropped.position.y };
+
+      (engine as any).tick(0.033);
+
+      // Item picked up into temporary backpack and rigid body destroyed
+      expect(engine.droppedItems).toHaveLength(0);
+      expect(engine.activeItemBodies.size).toBe(0);
+      expect(session.temporaryBackpack).toHaveLength(1);
+      expect(session.temporaryBackpack[0].itemId).toBe('gold_coin');
+      expect(session.temporaryBackpack[0].quantity).toBe(10);
+    });
+  });
 });
+

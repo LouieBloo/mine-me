@@ -6,6 +6,7 @@ import { useApi } from '../../../hooks/useApi';
 import type { ItemType } from '@mine-me/shared/types';
 import ItemIconUpload from './ItemIconUpload';
 import ItemGearUpload from './ItemGearUpload';
+import ItemInGameSpriteUpload from './ItemInGameSpriteUpload/ItemInGameSpriteUpload';
 import ItemColliderEditor from '../../../components/ItemColliderEditor/ItemColliderEditor';
 import './ItemDetail.css';
 
@@ -533,11 +534,16 @@ export default function ItemDetail() {
       </div>
 
       {!isNew && (
-        <div className="pt-4">
+        <div className="pt-4 space-y-6">
           <ItemIconUpload 
             itemId={id!} 
             iconUrl={data.iconUrl} 
             onUploadSuccess={(updatedItem) => setData(updatedItem)} 
+          />
+          <ItemInGameSpriteUpload
+            itemId={id!}
+            inGameSpriteUrl={data.inGameSpriteUrl}
+            onUploadSuccess={(updatedItem) => setData(updatedItem)}
           />
           <ItemGearUpload
             itemId={id!}

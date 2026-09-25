@@ -67,16 +67,26 @@ describe('MiningEntityRenderer', () => {
   it('updates dropped items and removes vanished items', () => {
     const droppedItems: MiningDroppedItem[] = [
       {
+        id: 'drop-1',
         itemId: 'ore_iron',
         itemName: 'Iron Ore',
         iconUrl: null,
         quantity: 1,
-        position: { x: 1, y: 2 },
+        position: { x: 1.5, y: 2.5 },
       },
     ];
     const spritesMap = new Map<string, Sprite | Graphics>();
 
     MiningEntityRenderer.updateDroppedItems(container, droppedItems, spritesMap, 64);
+    expect(spritesMap.has('drop-1')).toBe(true);
+
+    // Update position on next tick as item falls
+    droppedItems[0].position = { x: 1.5, y: 3.2 };
+    MiningEntityRenderer.updateDroppedItems(container, droppedItems, spritesMap, 64);
+
+    const view = spritesMap.get('drop-1')!;
+    expect(view.x).toBe(1.5 * 64);
+    expect(view.y).toBe(3.2 * 64);
 
     // After cleanup with empty dropped items
     MiningEntityRenderer.updateDroppedItems(container, [], spritesMap, 64);
