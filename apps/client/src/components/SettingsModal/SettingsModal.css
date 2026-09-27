@@ -1,0 +1,62 @@
+/* Scoped styles for SettingsModal */
+.settings-modal-backdrop {
+  animation: modalFadeIn 0.15s ease-out;
+}
+
+.settings-modal-content {
+  animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Custom range slider styling */
+.sound-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: #334155;
+  outline: none;
+}
+
+.sound-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #eab308;
+  cursor: pointer;
+  border: 2px solid #0f172a;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+
+.sound-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  background: #facc15;
+}
+
+.sound-slider:disabled::-webkit-slider-thumb {
+  background: #64748b;
+  cursor: not-allowed;
+  transform: none;
+}

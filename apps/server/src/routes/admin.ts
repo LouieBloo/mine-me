@@ -12,6 +12,7 @@ import * as EffectController from '../controllers/admin/effect.controller';
 import * as BlockController from '../controllers/admin/block.controller';
 import * as MiningConfigController from '../controllers/admin/miningConfig.controller';
 import * as ParticleEffectController from '../controllers/admin/particleEffect.controller';
+import * as SoundController from '../controllers/admin/sound.controller';
 import * as AdminValidation from '../validations/admin.validation';
 
 const adminRouter = express.Router();
@@ -101,5 +102,12 @@ adminRouter.get('/particle-effects/:id', ParticleEffectController.getParticleEff
 adminRouter.post('/particle-effects', runValidation(AdminValidation.particleEffectValidation), ParticleEffectController.createParticleEffect);
 adminRouter.put('/particle-effects/:id', runValidation(AdminValidation.particleEffectValidation), ParticleEffectController.updateParticleEffect);
 adminRouter.delete('/particle-effects/:id', ParticleEffectController.deleteParticleEffect);
+
+// SOUNDS & MUSIC
+adminRouter.get('/sounds', SoundController.getSounds);
+adminRouter.get('/sounds/:id', SoundController.getSound);
+adminRouter.post('/sounds', SoundController.soundUploadMiddleware, SoundController.uploadSound);
+adminRouter.put('/sounds/:id', SoundController.updateSound);
+adminRouter.delete('/sounds/:id', SoundController.deleteSound);
 
 export { adminRouter };

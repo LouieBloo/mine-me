@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { useQuickAccess } from '../../contexts/QuickAccessContext';
+import { useSound } from '../../contexts/SoundContext';
 import { PixiStageProvider } from '../../components/game/PixiStageContext/PixiStageContext';
 import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
@@ -17,6 +18,7 @@ import './MineView.css';
 export const MineView: React.FC = () => {
   const { activeCharacter, playerState, miningSession, setMiningSession } = useGame();
   const { sendGameEvent, onEvent } = useSocket();
+  const { soundManager } = useSound();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -73,6 +75,14 @@ export const MineView: React.FC = () => {
       selectSlot(0).catch(() => {});
     }
   }, [selectSlot]);
+
+  // Start background music when entering the mine, stop when leaving
+  useEffect(() => {
+    soundManager.startSessionBgm();
+    return () => {
+      soundManager.stopBgm();
+    };
+  }, [soundManager]);
 
   const handleTorchPlaced = useCallback(() => {
     // Placement mode stays active until the player runs out of torches; no toast needed
@@ -146,6 +156,7 @@ export const MineView: React.FC = () => {
           setHasMovedOffEntrance(false);
           setShowExitConfirmation(false);
           selectSlot(0).catch(() => {});
+          soundManager.startSessionBgm();
         } else {
           isCleanedUpRef.current = true;
           notificationService.error('Mining Error', result.error || 'Failed to start mining session');

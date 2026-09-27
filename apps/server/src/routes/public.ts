@@ -53,3 +53,18 @@ publicRouter.get('/particle-effects', async (req: Request, res: Response): Promi
     return res.status(500).json({ error: err.message });
   }
 });
+
+publicRouter.get('/sounds/bgm', async (req: Request, res: Response): Promise<any> => {
+  try {
+    const bgmTracks = await prisma.sound.findMany({
+      where: {
+        type: 'BGM',
+        isActive: true
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+    return res.json(bgmTracks);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});

@@ -1,0 +1,12 @@
+/* Scoped styles for SettingsButton */
+.settings-button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.settings-button:hover .gear-icon {
+  transform: rotate(45deg);
+}
+
+.gear-icon {
+  transition: transform 0.3s ease;
+}

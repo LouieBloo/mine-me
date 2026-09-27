@@ -1,0 +1,192 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import request from 'supertest';
+import express from 'express';
+import { adminRouter } from '../src/routes/admin';
+import { publicRouter } from '../src/routes/public';
+import fs from 'fs';
+import path from 'path';
+
+// Mock auth middleware
+vi.mock('../src/middleware/auth', () => ({
+  adminMiddleware: (req: any, res: any, next: any) => next(),
+  authenticateToken: (req: any, res: any, next: any) => next(),
+}));
+
+let mockSounds: any[] = [];
+
+vi.mock('../src/index', () => ({
+  prisma: {
+    sound: {
+      findMany: vi.fn().mockImplementation(({ where } = {}) => {
+        let results = [...mockSounds];
+        if (where?.type) {
+          results = results.filter(s => s.type === where.type);
+        }
+        if (where?.isActive !== undefined) {
+          results = results.filter(s => s.isActive === where.isActive);
+        }
+        return Promise.resolve(results);
+      }),
+      findUnique: vi.fn().mockImplementation(({ where }) => {
+        const found = mockSounds.find(s => s.id === where.id);
+        return Promise.resolve(found || null);
+      }),
+      create: vi.fn().mockImplementation(({ data }) => {
+        const created = {
+          id: `sound_${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          ...data
+        };
+        mockSounds.push(created);
+        return Promise.resolve(created);
+      }),
+      update: vi.fn().mockImplementation(({ where, data }) => {
+        const idx = mockSounds.findIndex(s => s.id === where.id);
+        if (idx !== -1) {
+          mockSounds[idx] = { ...mockSounds[idx], ...data, updatedAt: new Date().toISOString() };
+          return Promise.resolve(mockSounds[idx]);
+        }
+        return Promise.reject(new Error('Sound not found'));
+      }),
+      delete: vi.fn().mockImplementation(({ where }) => {
+        const idx = mockSounds.findIndex(s => s.id === where.id);
+        if (idx !== -1) {
+          const removed = mockSounds.splice(idx, 1)[0];
+          return Promise.resolve(removed);
+        }
+        return Promise.reject(new Error('Sound not found'));
+      }),
+    },
+  },
+}));
+
+const app = express();
+app.use(express.json());
+app.use('/admin', adminRouter);
+app.use('/api/public', publicRouter);
+
+describe('Sound Admin & Public API', () => {
+  beforeEach(() => {
+    mockSounds = [
+      {
+        id: 'sound_1',
+        name: 'Cave Theme',
+        description: 'Atmospheric cave music',
+        type: 'BGM',
+        url: '/assets/sounds/cave-theme.mp3',
+        fileName: 'cave-theme.mp3',
+        fileSize: 1024000,
+        mimeType: 'audio/mpeg',
+        volume: 0.7,
+        loop: true,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'sound_2',
+        name: 'Pickaxe Hit',
+        description: 'Mining swing impact',
+        type: 'SFX',
+        url: '/assets/sounds/hit.mp3',
+        fileName: 'hit.mp3',
+        fileSize: 45000,
+        mimeType: 'audio/mpeg',
+        volume: 0.9,
+        loop: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'sound_3',
+        name: 'Disabled Track',
+        description: 'Inactive BGM',
+        type: 'BGM',
+        url: '/assets/sounds/inactive.mp3',
+        fileName: 'inactive.mp3',
+        fileSize: 500000,
+        mimeType: 'audio/mpeg',
+        volume: 0.5,
+        loop: true,
+        isActive: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+  });
+
+  it('GET /admin/sounds - returns all sounds', async () => {
+    const res = await request(app).get('/admin/sounds');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(3);
+  });
+
+  it('GET /admin/sounds?type=BGM - returns only BGM sounds', async () => {
+    const res = await request(app).get('/admin/sounds?type=BGM');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body.every((s: any) => s.type === 'BGM')).toBe(true);
+  });
+
+  it('GET /admin/sounds/:id - returns specific sound', async () => {
+    const res = await request(app).get('/admin/sounds/sound_1');
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Cave Theme');
+  });
+
+  it('GET /admin/sounds/:id - returns 404 if not found', async () => {
+    const res = await request(app).get('/admin/sounds/non_existent');
+    expect(res.status).toBe(404);
+  });
+
+  it('POST /admin/sounds - uploads sound file successfully', async () => {
+    // Create temporary dummy mp3 file buffer
+    const dummyBuffer = Buffer.from('ID3dummy-audio-content');
+
+    const res = await request(app)
+      .post('/admin/sounds')
+      .field('name', 'Mine Depths')
+      .field('type', 'BGM')
+      .field('volume', '0.8')
+      .field('loop', 'true')
+      .attach('file', dummyBuffer, 'mine_depths.mp3');
+
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('Mine Depths');
+    expect(res.body.type).toBe('BGM');
+    expect(res.body.volume).toBe(0.8);
+    expect(res.body.url).toContain('/assets/sounds/');
+  });
+
+  it('PUT /admin/sounds/:id - updates sound properties', async () => {
+    const res = await request(app)
+      .put('/admin/sounds/sound_1')
+      .send({
+        name: 'Cave Theme Remastered',
+        volume: 0.65,
+        isActive: false,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Cave Theme Remastered');
+    expect(res.body.volume).toBe(0.65);
+    expect(res.body.isActive).toBe(false);
+  });
+
+  it('DELETE /admin/sounds/:id - deletes sound', async () => {
+    const res = await request(app).delete('/admin/sounds/sound_2');
+    expect(res.status).toBe(200);
+    expect(mockSounds.find(s => s.id === 'sound_2')).toBeUndefined();
+  });
+
+  it('GET /api/public/sounds/bgm - returns only active BGM tracks', async () => {
+    const res = await request(app).get('/api/public/sounds/bgm');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].id).toBe('sound_1');
+    expect(res.body[0].isActive).toBe(true);
+    expect(res.body[0].type).toBe('BGM');
+  });
+});

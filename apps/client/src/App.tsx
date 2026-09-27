@@ -6,6 +6,9 @@ import { GameProvider } from './contexts/GameContext';
 import { SocketProvider } from './contexts/SocketContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { QuickAccessProvider } from './contexts/QuickAccessContext';
+import { SoundProvider } from './contexts/SoundContext';
+import { SettingsButton } from './components/SettingsButton/SettingsButton';
+import { SettingsModal } from './components/SettingsModal/SettingsModal';
 import { Auth } from './views/Auth/Auth';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
 import { CharacterSelection } from './views/CharacterSelection/CharacterSelection';
@@ -26,10 +29,14 @@ function App() {
         <SocketProvider>
           <ChatProvider>
             <QuickAccessProvider>
-              <BrowserRouter>
-              <Toaster position="top-center" visibleToasts={9} expand={true} richColors closeButton />
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
+              <SoundProvider>
+                <BrowserRouter>
+                  <Toaster position="top-center" visibleToasts={9} expand={true} richColors closeButton />
+                  {/* Persistent Top-Right Settings Button & Modal */}
+                  <SettingsButton />
+                  <SettingsModal />
+                  <Routes>
+                    <Route path="/auth" element={<Auth />} />
 
                 {/* Public Landing Page - No sidebars */}
                 <Route index element={<MainMenu />} />
@@ -51,6 +58,7 @@ function App() {
                 </Route>
               </Routes>
             </BrowserRouter>
+          </SoundProvider>
             </QuickAccessProvider>
           </ChatProvider>
         </SocketProvider>

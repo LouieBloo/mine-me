@@ -85,8 +85,24 @@ vi.mock('pixi.js', () => ({
 }));
 
 // Mock HTMLMediaElement methods for JSDOM
-if (typeof window !== 'undefined' && window.HTMLMediaElement) {
-  window.HTMLMediaElement.prototype.load = vi.fn();
-  window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
-  window.HTMLMediaElement.prototype.pause = vi.fn();
+if (typeof window !== 'undefined') {
+  if (window.HTMLMediaElement) {
+    window.HTMLMediaElement.prototype.load = vi.fn();
+    window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
+    window.HTMLMediaElement.prototype.pause = vi.fn();
+  }
+
+  if (typeof (window as any).Audio === 'undefined') {
+    (window as any).Audio = class {
+      src = '';
+      volume = 1;
+      muted = false;
+      loop = false;
+      play = vi.fn().mockResolvedValue(undefined);
+      pause = vi.fn();
+      load = vi.fn();
+      addEventListener = vi.fn();
+      removeEventListener = vi.fn();
+    };
+  }
 }

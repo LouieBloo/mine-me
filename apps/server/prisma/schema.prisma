@@ -295,3 +295,24 @@ enum MouseActionTriggerMode {
   SINGLE
   HOLD
 }
+
+enum SoundType {
+  BGM
+  SFX
+}
+
+model Sound {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  type        SoundType @default(BGM)
+  url         String
+  fileName    String
+  fileSize    Int       @default(0)
+  mimeType    String    @default("audio/mpeg")
+  volume      Float     @default(1.0)
+  loop        Boolean   @default(true)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}

@@ -279,3 +279,4 @@ export * from './gameEvents';
 export * from './mining';
 export * from './modularRig';
 export * from './particles';
+export * from './sound';

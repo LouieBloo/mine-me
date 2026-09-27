@@ -25,6 +25,12 @@ export default function Layout() {
           <NavLink to="/map-editor" className={navLinkClass}>Map Editor</NavLink>
           <NavLink to="/mining-config" className={navLinkClass}>Mine Generator</NavLink>
 
+          {/* Audio & Media */}
+          <div className="pt-3 pb-1 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Audio & Media
+          </div>
+          <NavLink to="/music" className={navLinkClass}>Music & Sounds</NavLink>
+
           {/* Items & Economy */}
           <div className="pt-3 pb-1 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Items & Economy

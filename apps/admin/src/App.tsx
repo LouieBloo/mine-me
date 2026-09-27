@@ -22,6 +22,7 @@ import ParticleEffectDetail from './pages/ParticleEffects/ParticleEffectDetail/P
 import Blocks from './pages/Blocks/Blocks';
 import BlockDetail from './pages/Blocks/BlockDetail/BlockDetail';
 import MiningConfig from './pages/MiningConfig/MiningConfig';
+import Music from './pages/Music/Music';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -83,6 +84,10 @@ const router = createBrowserRouter([
       {
         path: "mining-config",
         element: <MiningConfig />
+      },
+      {
+        path: "music",
+        element: <Music />
       },
       {
         path: "mobs",

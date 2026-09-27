@@ -1,0 +1,9 @@
+/* Scoped styles for Music page */
+.music-page {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.music-page audio {
+  height: 32px;
+  max-width: 240px;
+}

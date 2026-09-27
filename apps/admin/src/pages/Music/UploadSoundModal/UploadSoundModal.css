@@ -1,0 +1,13 @@
+/* Scoped styles for UploadSoundModal */
+.upload-sound-modal-overlay {
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
