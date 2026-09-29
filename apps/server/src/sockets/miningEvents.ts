@@ -376,13 +376,16 @@ export const handleMiningThrowDynamite = async (
     (ie: any) => ie.effect?.explodes === true && ie.value > 0
   );
   const explosionRadius = explodeEffect ? Number(explodeEffect.value) : undefined;
+  const soundEffects = (inventoryItemToThrow.item as any)?.soundEffects || undefined;
 
   const thrown = engine.throwDynamite(
     characterId,
     payload.target,
     itemPhysicsConfig,
     payload.forceRatio,
-    explosionRadius
+    explosionRadius,
+    inventoryItemToThrow.item?.id,
+    soundEffects
   );
   if (!thrown) {
     return { success: false, error: 'Failed to throw item.' };

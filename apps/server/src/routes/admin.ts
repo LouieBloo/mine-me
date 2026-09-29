@@ -42,6 +42,11 @@ adminRouter.put('/items/:id', runValidation(AdminValidation.itemValidation), Ite
 adminRouter.post('/items/:id/icon', ItemController.itemIconUpload, ItemController.uploadItemIcon);
 adminRouter.post('/items/:id/gear-image', ItemController.itemGearImageUpload, ItemController.uploadItemGearImage);
 adminRouter.post('/items/:id/in-game-sprite', ItemController.itemInGameSpriteUpload, ItemController.uploadItemInGameSprite);
+adminRouter.post('/items/:id/sound-effect', ItemController.itemSoundEffectUpload, ItemController.uploadItemSoundEffect);
+adminRouter.delete('/items/:id/sound-effect', ItemController.removeItemSoundEffect);
+adminRouter.post('/items/:id/sound-effects/:slot', ItemController.itemSoundEffectUpload, ItemController.uploadItemSoundEffect);
+adminRouter.patch('/items/:id/sound-effects/:slot', ItemController.updateItemSoundEffectSlot);
+adminRouter.delete('/items/:id/sound-effects/:slot', ItemController.removeItemSoundEffect);
 
 // MOBS
 adminRouter.get('/mobs', MobController.getMobs);
@@ -89,6 +94,8 @@ adminRouter.get('/blocks', BlockController.getBlocks);
 adminRouter.get('/blocks/:id', BlockController.getBlock);
 adminRouter.put('/blocks/:id', BlockController.updateBlock);
 adminRouter.post('/blocks/:id/texture', BlockController.blockTextureUpload, BlockController.uploadBlockTexture);
+adminRouter.post('/blocks/:id/sound-effect', BlockController.blockSoundEffectUpload, BlockController.uploadBlockSoundEffect);
+adminRouter.delete('/blocks/:id/sound-effect', BlockController.removeBlockSoundEffect);
 
 // MINING CONFIG
 adminRouter.get('/mining-config', MiningConfigController.getMiningConfig);

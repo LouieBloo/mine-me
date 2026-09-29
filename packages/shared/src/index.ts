@@ -10,3 +10,4 @@ export * from './physics/MiningPhysicsBody';
 export * from './physics/MiningPlayerBody';
 export * from './physics/MiningRigidWorld';
 export * from './utils/pixiParticlesConverter';
+export * from './sound';

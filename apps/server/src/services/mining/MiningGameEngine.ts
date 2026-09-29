@@ -21,7 +21,9 @@ import {
   type Vector2D,
   MiningRigidWorld,
   DEFAULT_DYNAMITE_PHYSICS_CONFIG,
+  DEFAULT_DYNAMITE_SOUNDS,
   type ItemPhysicsConfig,
+  type ItemSoundEffectsConfig,
   calculateThrowVelocity,
 } from '@mine-me/shared';
 import * as planck from 'planck';
@@ -751,6 +753,13 @@ export class MiningGameEngine {
   }
 
   /**
+   * Helper to retrieve configured soundEffects from items.json for any item.
+   */
+  public getItemSoundEffects(itemId: string): ItemSoundEffectsConfig | undefined {
+    return this.getItemData(itemId)?.soundEffects;
+  }
+
+  /**
    * Throw a stick of dynamite from the player's position towards target coordinates.
    */
   public throwDynamite(
@@ -759,6 +768,8 @@ export class MiningGameEngine {
     physicsConfig?: ItemPhysicsConfig,
     forceRatio: number = 1.0,
     explosionRadius?: number,
+    itemId?: string,
+    soundEffects?: ItemSoundEffectsConfig | null,
   ): boolean {
     const session = this.players.get(characterId);
     if (!session) return false;
@@ -790,7 +801,14 @@ export class MiningGameEngine {
     // Use passed explosion radius, or check item effects from items.json for dynamite
     const resolvedExplosionRadius = explosionRadius !== undefined 
       ? explosionRadius 
-      : this.getItemExplosionRadius('dynamite');
+      : this.getItemExplosionRadius(itemId ?? 'dynamite');
+
+    const resolvedSoundEffects =
+      soundEffects !== undefined
+        ? soundEffects
+        : (itemId ? this.getItemSoundEffects(itemId) : undefined) ??
+          this.getItemSoundEffects('dynamite') ??
+          DEFAULT_DYNAMITE_SOUNDS;
 
     const dynamite = new MiningDynamiteEntity(
       dynamiteId,
@@ -803,6 +821,8 @@ export class MiningGameEngine {
         friction: config.friction ?? 0.4,
         physicsConfig: config,
         explosionRadius: resolvedExplosionRadius,
+        itemId,
+        soundEffects: resolvedSoundEffects,
       }
     );
     this.activeDynamites.push(dynamite);
@@ -1037,6 +1057,7 @@ export class MiningGameEngine {
       id: dynamite.id,
       position: { x: dynamite.position.x, y: dynamite.position.y },
       radius,
+      soundUrl: dynamite.soundEffects?.explosion?.url ?? DEFAULT_DYNAMITE_SOUNDS.explosion?.url,
     });
 
     // 1. Excavate all blocks in a 7-tile radius
@@ -1233,6 +1254,8 @@ export class MiningGameEngine {
             fuseRemainingSeconds: d.fuseRemainingSeconds,
             physicsConfig: d.physicsConfig,
             explosionRadius: d.explosionRadius,
+            itemId: d.itemId,
+            soundEffects: d.soundEffects,
           }))
         : undefined;
 

@@ -10,9 +10,17 @@ interface Props<T> {
   rowData: T[];
   columnDefs: any[];
   entityName: string; // e.g., 'cities', 'items'
+  paginationPageSize?: number;
+  paginationPageSizeSelector?: number[] | boolean;
 }
 
-export const DataGrid = <T extends { id: string | number }>({ rowData, columnDefs, entityName }: Props<T>) => {
+export const DataGrid = <T extends { id: string | number }>({
+  rowData,
+  columnDefs,
+  entityName,
+  paginationPageSize = 100,
+  paginationPageSizeSelector = [25, 50, 100, 200],
+}: Props<T>) => {
   const navigate = useNavigate();
 
   const actionColumn = {
@@ -35,7 +43,7 @@ export const DataGrid = <T extends { id: string | number }>({ rowData, columnDef
   const finalColumnDefs = [...columnDefs, actionColumn];
 
   return (
-    <div className="nvg-admin-grid" style={{ height: 600, width: '100%' }}>
+    <div className="nvg-admin-grid flex-1 w-full" style={{ height: '100%', width: '100%' }}>
       <AgGridReact
         theme={themeQuartz}
         rowData={rowData}
@@ -48,7 +56,8 @@ export const DataGrid = <T extends { id: string | number }>({ rowData, columnDef
           resizable: true,
         }}
         pagination={true}
-        paginationPageSize={20}
+        paginationPageSize={paginationPageSize}
+        paginationPageSizeSelector={paginationPageSizeSelector}
       />
     </div>
   );

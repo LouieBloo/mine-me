@@ -30,21 +30,21 @@ export default function Blocks() {
   }, []);
 
   return (
-    <div className="blocks-page space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="blocks-page space-y-6 flex-1 flex flex-col min-h-0">
+      <div className="flex justify-between items-center shrink-0">
         <div>
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">MINING BLOCKS</h2>
           <p className="text-slate-500 font-medium">Manage mining block properties and custom sprite textures.</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col min-h-[400px]">
         {loading ? (
-          <div className="flex justify-center items-center py-24">
+          <div className="flex-1 flex justify-center items-center py-24">
             <LoadingSpinner size={60} />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto flex-1">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs font-black uppercase text-slate-500 tracking-wider">

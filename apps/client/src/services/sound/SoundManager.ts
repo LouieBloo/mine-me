@@ -12,6 +12,11 @@ import { MusicPlayer } from './MusicPlayer';
 
 const STORAGE_KEY = 'nvg_sound_settings';
 
+export interface PlaySfxOptions {
+  volumeScale?: number;
+  throttleMs?: number;
+}
+
 export class SoundManager {
   private static instance: SoundManager | null = null;
 
@@ -24,6 +29,11 @@ export class SoundManager {
   private isFetchingPlaylist: boolean = false;
   private hasPendingBgmPlay: boolean = false;
   private sfxCache: Map<string, Howl> = new Map();
+  private sfxLastPlayTimes: Map<string, number> = new Map();
+  private recentSfxTimes: number[] = [];
+  private static readonly DEFAULT_THROTTLE_MS = 75;
+  private static readonly MAX_CONCURRENT_BURST = 4;
+  private static readonly BURST_WINDOW_MS = 60;
 
   private constructor() {
     const saved = this.loadSettings();
@@ -222,11 +232,43 @@ export class SoundManager {
   }
 
   /**
-   * Plays a single-shot sound effect on the SFX channel.
+   * Plays a single-shot sound effect on the SFX channel with built-in deduplication
+   * and burst protection so mass block breaks never blow out audio.
    */
-  public playSfx(srcUrl: string, volumeScale: number = 1.0): Howl | null {
+  public playSfx(srcUrl: string, optionsOrVolume: number | PlaySfxOptions = 1.0): Howl | null {
     if (!this.sfxChannel.isEnabled() || this.sfxChannel.getVolume() <= 0) {
       return null;
+    }
+
+    const options: PlaySfxOptions =
+      typeof optionsOrVolume === 'number'
+        ? { volumeScale: optionsOrVolume }
+        : optionsOrVolume;
+
+    const volumeScale = options.volumeScale ?? 1.0;
+    const throttleMs = options.throttleMs ?? SoundManager.DEFAULT_THROTTLE_MS;
+
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+    // 1. Per-sound throttle (suppress duplicate instances of the same sound within throttleMs)
+    if (throttleMs > 0) {
+      const lastPlay = this.sfxLastPlayTimes.get(srcUrl) ?? 0;
+      if (now - lastPlay < throttleMs) {
+        return null;
+      }
+    }
+
+    // 2. Global burst rate-limiter: prevent audio distortion when many distinct sounds trigger simultaneously
+    this.recentSfxTimes = this.recentSfxTimes.filter(t => now - t < SoundManager.BURST_WINDOW_MS);
+    if (this.recentSfxTimes.length >= SoundManager.MAX_CONCURRENT_BURST) {
+      return null;
+    }
+
+    this.sfxLastPlayTimes.set(srcUrl, now);
+    this.recentSfxTimes.push(now);
+
+    if (Howler.ctx && Howler.ctx.state === 'suspended') {
+      Howler.ctx.resume().catch(() => {});
     }
 
     const fullUrl = getAssetUrl(srcUrl);
@@ -236,6 +278,15 @@ export class SoundManager {
       howl = new Howl({
         src: [fullUrl],
         volume: this.sfxChannel.getEffectiveVolume() * volumeScale,
+        onloaderror: (_id, err) => {
+          console.warn(`[SoundManager] Failed to load SFX "${fullUrl}":`, err);
+        },
+        onplayerror: (_id, err) => {
+          console.warn(`[SoundManager] Playback blocked for SFX "${fullUrl}":`, err);
+          howl?.once('unlock', () => {
+            howl?.play();
+          });
+        },
       });
       this.sfxCache.set(fullUrl, howl);
     } else {
@@ -245,6 +296,78 @@ export class SoundManager {
     this.sfxChannel.register(howl, volumeScale);
     howl.play();
     return howl;
+  }
+
+  private loopingSfx: Map<string, { howl: Howl; volumeScale: number }> = new Map();
+
+  /**
+   * Plays a continuous looping sound effect on the SFX channel under a unique key.
+   * Subsequent calls with the same key will return the existing playing Howl without re-triggering.
+   */
+  public playLoopingSfx(key: string, srcUrl: string, volumeScale: number = 1.0): Howl | null {
+    if (!this.sfxChannel.isEnabled() || this.sfxChannel.getVolume() <= 0) {
+      return null;
+    }
+
+    const existing = this.loopingSfx.get(key);
+    if (existing) {
+      return existing.howl;
+    }
+
+    if (Howler.ctx && Howler.ctx.state === 'suspended') {
+      Howler.ctx.resume().catch(() => {});
+    }
+
+    const fullUrl = getAssetUrl(srcUrl);
+    const howl = new Howl({
+      src: [fullUrl],
+      loop: true,
+      volume: this.sfxChannel.getEffectiveVolume() * volumeScale,
+      onloaderror: (_id, err) => {
+        console.warn(`[SoundManager] Failed to load looping SFX "${fullUrl}":`, err);
+      },
+      onplayerror: (_id, err) => {
+        console.warn(`[SoundManager] Playback blocked for looping SFX "${fullUrl}":`, err);
+        howl?.once('unlock', () => {
+          howl?.play();
+        });
+      },
+    });
+
+    this.sfxChannel.register(howl, volumeScale);
+    howl.play();
+    this.loopingSfx.set(key, { howl, volumeScale });
+    return howl;
+  }
+
+  /**
+   * Stops and releases an active looping sound effect by key.
+   */
+  public stopLoopingSfx(key: string): void {
+    const entry = this.loopingSfx.get(key);
+    if (entry) {
+      entry.howl.stop();
+      this.sfxChannel.unregister(entry.howl);
+      this.loopingSfx.delete(key);
+    }
+  }
+
+  /**
+   * Checks whether a looping SFX is currently tracked as active.
+   */
+  public isLoopingSfxPlaying(key: string): boolean {
+    return this.loopingSfx.has(key);
+  }
+
+  /**
+   * Stops all active looping sound effects (e.g. on unmount or scene change).
+   */
+  public stopAllLoopingSfx(): void {
+    for (const [, entry] of this.loopingSfx.entries()) {
+      entry.howl.stop();
+      this.sfxChannel.unregister(entry.howl);
+    }
+    this.loopingSfx.clear();
   }
 
   public subscribe(listener: (settings: SoundSettings) => void): () => void {

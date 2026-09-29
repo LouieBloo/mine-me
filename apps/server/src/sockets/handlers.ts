@@ -166,28 +166,13 @@ export const handleSocketConnection = (io: Server, socket: Socket) => {
           inventory: {
             include: {
               item: {
-                select: {
-                  id: true,
-                  name: true,
-                  description: true,
-                  type: true,
-                  subType: true,
-                  vendorBuyPrice: true,
-                  vendorSellPrice: true,
-                  userBuyPrice: true,
-                  userSellPrice: true,
-                  rarity: true,
-                  iconUrl: true,
-                  gearImageUrl: true,
-                  isStartingPiece: true,
-                  experience: true,
-                  combatScore: true,
-                  defenseScore: true,
+                include: {
                   itemEffects: {
                     include: {
                       effect: true
                     }
-                  }
+                  },
+                  particleEffect: true
                 }
               }
             }

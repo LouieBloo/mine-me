@@ -85,6 +85,8 @@ model Item {
   iconUrl         String?
   gearImageUrl    String?
   inGameSpriteUrl String?
+  soundEffectUrl  String?
+  soundEffects    Json?
   isStartingPiece Boolean         @default(false)
   experience      Int             @default(0)
   combatScore     Int             @default(0)
@@ -212,6 +214,7 @@ model MiningBlock {
   name                 String
   description          String?
   textureUrl           String?
+  soundEffectUrl       String?
   mineTimeMs           Int             @default(500)
   staminaCost          Int             @default(1)
   idleParticleEffectId String?

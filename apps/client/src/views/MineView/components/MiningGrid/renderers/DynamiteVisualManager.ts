@@ -1,9 +1,10 @@
-import type { MiningActiveDynamite, MiningExplosionEvent, ParticleEffectConfig, Vector2D } from '@mine-me/shared';
-import { DEFAULT_PARTICLE_EFFECTS } from '@mine-me/shared';
+import type { MiningActiveDynamite, MiningExplosionEvent, ParticleEffectConfig, Vector2D, ItemSoundEffectsConfig } from '@mine-me/shared';
+import { DEFAULT_PARTICLE_EFFECTS, DEFAULT_DYNAMITE_SOUNDS } from '@mine-me/shared';
 import { TILE_SIZE } from './MiningTileRenderer';
 import type { ParticleEngine, EmitterHandle } from '../../../../../components/game/particles/ParticleEngine';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
+import type { SoundManager } from '../../../../../services/sound';
 
 interface ActiveExplosionFlash {
   id: string;
@@ -23,10 +24,20 @@ interface ActiveExplosionFlash {
  */
 export class DynamiteVisualManager {
   private static customConfigs: Map<string, ParticleEffectConfig> = new Map();
+  private static customItems: Map<string, any> = new Map();
   private fuseEmitters: Map<string, { sparks: EmitterHandle; flames: EmitterHandle }> = new Map();
   private fuseLightIds: Set<string> = new Set();
+  private activeFuseSoundKeys: Set<string> = new Set();
+  private lastLocalThrowTime: number = 0;
   private explosionFlashes: ActiveExplosionFlash[] = [];
   private lastKnownDynamites: Map<string, MiningActiveDynamite> = new Map();
+
+  /**
+   * Records a local player throw to avoid duplicating throw sound when server acknowledges.
+   */
+  public recordLocalThrow(): void {
+    this.lastLocalThrowTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  }
 
   /**
    * Registers custom or database-defined particle effect configs fetched from the API.
@@ -42,6 +53,32 @@ export class DynamiteVisualManager {
         this.customConfigs.set(normalizedKey, pe.config);
       }
     }
+  }
+
+  /**
+   * Registers item definitions from the API to dynamically resolve custom item sound profiles.
+   */
+  public static setCustomItems(items: any[]): void {
+    for (const item of items) {
+      if (item.id) this.customItems.set(item.id, item);
+      if (item.subType) {
+        this.customItems.set(item.subType, item);
+        this.customItems.set(item.subType.toUpperCase(), item);
+      }
+    }
+  }
+
+  /**
+   * Retrieves sound configuration for an item ID or subType, falling back to DEFAULT_DYNAMITE_SOUNDS.
+   */
+  public static getItemSoundConfig(itemIdOrSubtype?: string): ItemSoundEffectsConfig {
+    if (itemIdOrSubtype) {
+      const found = this.customItems.get(itemIdOrSubtype) ?? this.customItems.get(itemIdOrSubtype.toUpperCase());
+      if (found?.soundEffects) {
+        return found.soundEffects;
+      }
+    }
+    return DEFAULT_DYNAMITE_SOUNDS;
   }
 
   /**
@@ -105,12 +142,25 @@ export class DynamiteVisualManager {
     dt: number,
     particleEngine?: ParticleEngine | null,
     lightingEngine?: LightingEngine | null,
-    tileSize: number = TILE_SIZE
+    tileSize: number = TILE_SIZE,
+    soundManager?: SoundManager | null
   ): void {
     const currentKeys = new Set<string>();
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
     for (const dyn of activeDynamites) {
       currentKeys.add(dyn.id);
+
+      // Check for newly spawned dynamite that was NOT thrown locally (e.g. remote player throw)
+      if (!this.lastKnownDynamites.has(dyn.id)) {
+        if (now - this.lastLocalThrowTime > 800) {
+          const remoteThrowSound = dyn.soundEffects?.throw?.url ?? DEFAULT_DYNAMITE_SOUNDS.throw?.url;
+          if (remoteThrowSound && soundManager) {
+            soundManager.playSfx(remoteThrowSound);
+          }
+        }
+      }
+
       this.lastKnownDynamites.set(dyn.id, { ...dyn });
 
       const fusePos = DynamiteVisualManager.calculateFuseWorldPosition(dyn, tileSize);
@@ -170,9 +220,25 @@ export class DynamiteVisualManager {
           lightingEngine.markLightmapDirty();
         }
       }
+
+      // 3. Audio Effect (Burning fuse ticking loop)
+      if (soundManager) {
+        const fuseKey = `dynamite_fuse_${dyn.id}`;
+        const fuseConfig = dyn.soundEffects?.inGameEffect ?? DEFAULT_DYNAMITE_SOUNDS.inGameEffect;
+        const fuseUrl = fuseConfig?.url;
+        if (fuseUrl) {
+          if (fuseConfig.loop !== false) {
+            soundManager.playLoopingSfx(fuseKey, fuseUrl);
+            this.activeFuseSoundKeys.add(fuseKey);
+          } else if (!this.activeFuseSoundKeys.has(fuseKey)) {
+            soundManager.playSfx(fuseUrl);
+            this.activeFuseSoundKeys.add(fuseKey);
+          }
+        }
+      }
     }
 
-    // 3. Clean up dynamites that were removed or exploded
+    // 4. Clean up dynamites that were removed or exploded
     this.fuseEmitters.forEach((handles, id) => {
       if (!currentKeys.has(id)) {
         handles.sparks.destroy();
@@ -189,7 +255,15 @@ export class DynamiteVisualManager {
       }
     });
 
-    // 4. Update and decay active explosion flash lights
+    this.activeFuseSoundKeys.forEach((fuseKey) => {
+      const rawId = fuseKey.replace('dynamite_fuse_', '');
+      if (!currentKeys.has(rawId)) {
+        soundManager?.stopLoopingSfx(fuseKey);
+        this.activeFuseSoundKeys.delete(fuseKey);
+      }
+    });
+
+    // 5. Update and decay active explosion flash lights
     if (this.explosionFlashes.length > 0 && lightingEngine) {
       this.explosionFlashes = this.explosionFlashes.filter((flash) => {
         flash.elapsed += dt;
@@ -213,6 +287,7 @@ export class DynamiteVisualManager {
    * - Volumetric smoke cloud covering the explosion radius that dissipates over a couple seconds.
    * - Explosive embers and blast wave particles.
    * - Momentary bright explosion flash light.
+   * - Detonation sound effect.
    */
   public triggerExplosion(
     position: Vector2D,
@@ -220,7 +295,9 @@ export class DynamiteVisualManager {
     particleEngine?: ParticleEngine | null,
     lightingEngine?: LightingEngine | null,
     tileSize: number = TILE_SIZE,
-    explosionId?: string
+    explosionId?: string,
+    soundUrl?: string | null,
+    soundManager?: SoundManager | null
   ): void {
     const centerPixel = {
       x: position.x * tileSize,
@@ -273,6 +350,14 @@ export class DynamiteVisualManager {
         initialIntensity: 2.4,
       });
     }
+
+    // 3. Explosion Sound Effect
+    if (soundManager) {
+      const resolvedSoundUrl = soundUrl || DEFAULT_DYNAMITE_SOUNDS.explosion?.url;
+      if (resolvedSoundUrl) {
+        soundManager.playSfx(resolvedSoundUrl, { throttleMs: 50 });
+      }
+    }
   }
 
   /**
@@ -282,27 +367,41 @@ export class DynamiteVisualManager {
     events: MiningExplosionEvent[],
     particleEngine?: ParticleEngine | null,
     lightingEngine?: LightingEngine | null,
-    tileSize: number = TILE_SIZE
+    tileSize: number = TILE_SIZE,
+    soundManager?: SoundManager | null
   ): void {
     for (const exp of events) {
+      const soundUrl =
+        exp.soundUrl ||
+        this.lastKnownDynamites.get(exp.id)?.soundEffects?.explosion?.url ||
+        DEFAULT_DYNAMITE_SOUNDS.explosion?.url;
+
       this.triggerExplosion(
         exp.position,
         exp.radius,
         particleEngine,
         lightingEngine,
         tileSize,
-        exp.id
+        exp.id,
+        soundUrl,
+        soundManager
       );
     }
   }
 
   /**
-   * Cleans up all active emitters and lights on unmount.
+   * Cleans up all active emitters, lights, and looping audio on unmount.
    */
   public destroy(
     _particleEngine?: ParticleEngine | null,
-    lightingEngine?: LightingEngine | null
+    lightingEngine?: LightingEngine | null,
+    soundManager?: SoundManager | null
   ): void {
+    this.activeFuseSoundKeys.forEach((fuseKey) => {
+      soundManager?.stopLoopingSfx(fuseKey);
+    });
+    this.activeFuseSoundKeys.clear();
+
     this.fuseEmitters.forEach((handles) => {
       handles.sparks.destroy();
       handles.flames.destroy();

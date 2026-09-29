@@ -52,11 +52,11 @@ export default function Layout() {
           <NavLink to="/users" className={navLinkClass}>Users Editor</NavLink>
         </nav>
       </div>
-      <div className="flex-grow flex flex-col">
-        <header className="h-16 bg-white border-b border-slate-200 shadow-sm flex items-center px-6">
+      <div className="flex-grow flex flex-col min-w-0 h-full overflow-hidden">
+        <header className="h-16 bg-white border-b border-slate-200 shadow-sm flex items-center px-6 shrink-0">
           <h2 className="text-lg font-semibold text-slate-700">Admin Dashboard</h2>
         </header>
-        <main className="flex-grow p-6 overflow-auto">
+        <main className="flex-grow p-6 overflow-auto flex flex-col min-h-0">
           <Outlet />
         </main>
       </div>

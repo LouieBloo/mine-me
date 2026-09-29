@@ -1,4 +1,19 @@
-import type { GearSubType, ItemType, ItemPhysicsConfig } from './types';
+import type { GearSubType, ItemType, ItemPhysicsConfig, ItemSoundEffectsConfig } from './types';
+
+export const DEFAULT_DYNAMITE_SOUNDS: ItemSoundEffectsConfig = {
+  throw: {
+    url: '/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_throw_sfx.mp3',
+    loop: false,
+  },
+  inGameEffect: {
+    url: '/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_inGameEffect_sfx.mp3',
+    loop: true,
+  },
+  explosion: {
+    url: '/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_explosion_sfx.mp3',
+    loop: false,
+  },
+};
 
 export const DEFAULT_DYNAMITE_PHYSICS_CONFIG: ItemPhysicsConfig = {
   hasPhysics: true,

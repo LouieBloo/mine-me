@@ -60,6 +60,37 @@ const inGameSpriteStorage = multer.diskStorage({
 const uploadInGameSprite = multer({ storage: inGameSpriteStorage, fileFilter });
 export const itemInGameSpriteUpload = uploadInGameSprite.single('inGameSprite');
 
+const itemSoundEffectStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, '../../../../../packages/shared/assets/sounds/items');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase() || '.mp3';
+    const slot = req.params.slot || req.query.slot;
+    const filename = slot ? `${req.params.id}_${slot}_sfx${ext}` : `${req.params.id}_sfx${ext}`;
+    cb(null, filename);
+  }
+});
+
+const audioFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedExtensions = ['.mp3', '.wav', '.ogg', '.webm', '.m4a', '.aac', '.flac'];
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (file.mimetype.startsWith('audio/') || allowedExtensions.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only audio files (.mp3, .wav, .ogg, .webm, .m4a, .aac, .flac) are allowed'));
+  }
+};
+
+const uploadSoundEffect = multer({
+  storage: itemSoundEffectStorage,
+  fileFilter: audioFileFilter,
+  limits: { fileSize: 20 * 1024 * 1024 }
+});
+export const itemSoundEffectUpload = uploadSoundEffect.single('soundEffect');
+
 export const getItems = async (req: Request, res: Response) => {
   const { skip, take, where } = getPagination(req, 'name');
   // Support filtering by type and subType via query params
@@ -288,3 +319,211 @@ export const uploadItemInGameSprite = async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message || 'Failed to upload item in-game sprite' });
   }
 };
+
+export const uploadItemSoundEffect = async (req: Request, res: Response) => {
+  try {
+    const itemId = req.params.id;
+    const slot = (req.params.slot || req.query.slot || req.body?.slot || 'throw').toString();
+    const file = req.file;
+
+    const item = await prisma.item.findUnique({ where: { id: itemId } });
+    if (!item) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No sound effect file provided' });
+      return;
+    }
+
+    const soundEffectUrl = `/assets/sounds/items/${file.filename}`;
+    const rawEffects = (item as any).soundEffects;
+    const currentSoundEffects: Record<string, any> =
+      rawEffects && typeof rawEffects === 'object' ? { ...rawEffects } : {};
+
+    const loopParam = req.body?.loop;
+    const isLooping =
+      loopParam !== undefined
+        ? loopParam === 'true' || loopParam === true
+        : currentSoundEffects[slot]?.loop ?? (slot === 'inGameEffect');
+
+    currentSoundEffects[slot] = {
+      url: soundEffectUrl,
+      loop: isLooping,
+    };
+
+    const updateData: any = {
+      soundEffects: currentSoundEffects,
+    };
+
+    if (slot === 'throw') {
+      updateData.soundEffectUrl = soundEffectUrl;
+    }
+
+    const updatedItem = await prisma.item.update({
+      where: { id: itemId },
+      data: updateData,
+      include: {
+        itemEffects: {
+          include: {
+            effect: true,
+          },
+        },
+        particleEffect: true,
+      },
+    });
+
+    const allItems = await prisma.item.findMany({
+      include: {
+        itemEffects: {
+          include: {
+            effect: true,
+          },
+        },
+        particleEffect: true,
+      },
+    });
+    await syncJson('items.json', allItems);
+
+    res.json(updatedItem);
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ error: error.message || 'Failed to upload item sound effect' });
+  }
+};
+
+export const updateItemSoundEffectSlot = async (req: Request, res: Response) => {
+  try {
+    const itemId = req.params.id;
+    const slot = req.params.slot;
+
+    if (!slot) {
+      res.status(400).json({ error: 'Slot parameter is required' });
+      return;
+    }
+
+    const item = await prisma.item.findUnique({ where: { id: itemId } });
+    if (!item) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    const rawEffects = (item as any).soundEffects;
+    const currentSoundEffects: Record<string, any> =
+      rawEffects && typeof rawEffects === 'object' ? { ...rawEffects } : {};
+
+    const { loop } = req.body;
+    if (loop !== undefined) {
+      currentSoundEffects[slot] = {
+        ...(currentSoundEffects[slot] || {}),
+        url: currentSoundEffects[slot]?.url || (slot === 'throw' ? (item as any).soundEffectUrl : null),
+        loop: Boolean(loop),
+      };
+    }
+
+    const updatedItem = await prisma.item.update({
+      where: { id: itemId },
+      data: { soundEffects: currentSoundEffects } as any,
+      include: {
+        itemEffects: {
+          include: {
+            effect: true,
+          },
+        },
+        particleEffect: true,
+      },
+    });
+
+    const allItems = await prisma.item.findMany({
+      include: {
+        itemEffects: {
+          include: {
+            effect: true,
+          },
+        },
+        particleEffect: true,
+      },
+    });
+    await syncJson('items.json', allItems);
+
+    res.json(updatedItem);
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ error: error.message || 'Failed to update sound effect slot' });
+  }
+};
+
+export const removeItemSoundEffect = async (req: Request, res: Response) => {
+  try {
+    const itemId = req.params.id;
+    const slot = (req.params.slot || req.query.slot || 'throw').toString();
+
+    const item = await prisma.item.findUnique({ where: { id: itemId } });
+    if (!item) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    const rawEffects = (item as any).soundEffects;
+    const currentSoundEffects: Record<string, any> =
+      rawEffects && typeof rawEffects === 'object' ? { ...rawEffects } : {};
+
+    const slotUrl =
+      currentSoundEffects[slot]?.url || (slot === 'throw' ? (item as any).soundEffectUrl : null);
+    if (slotUrl) {
+      const filePath = path.join(__dirname, '../../../../../packages/shared', slotUrl);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (e) {
+          console.warn('Could not remove sound effect file:', e);
+        }
+      }
+    }
+
+    currentSoundEffects[slot] = {
+      url: null,
+      loop: currentSoundEffects[slot]?.loop ?? (slot === 'inGameEffect'),
+    };
+
+    const updateData: any = {
+      soundEffects: currentSoundEffects,
+    };
+
+    if (slot === 'throw') {
+      updateData.soundEffectUrl = null;
+    }
+
+    const updatedItem = await prisma.item.update({
+      where: { id: itemId },
+      data: updateData,
+      include: {
+        itemEffects: {
+          include: {
+            effect: true,
+          },
+        },
+        particleEffect: true,
+      },
+    });
+
+    const allItems = await prisma.item.findMany({
+      include: {
+        itemEffects: {
+          include: {
+            effect: true,
+          },
+        },
+        particleEffect: true,
+      },
+    });
+    await syncJson('items.json', allItems);
+
+    res.json(updatedItem);
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ error: error.message || 'Failed to remove item sound effect' });
+  }
+};
+

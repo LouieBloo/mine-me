@@ -41,8 +41,8 @@ export default function Inventory() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 flex-1 flex flex-col min-h-0">
+      <div className="flex justify-between items-center shrink-0">
         <div>
           <h2 className="text-3xl font-black text-slate-800 tracking-tight text-center uppercase">INVENTORY</h2>
           <p className="text-slate-500 font-medium">Manage and review player inventory items.</p>
@@ -54,8 +54,14 @@ export default function Inventory() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
-        {loading ? <LoadingSpinner size={60} /> : <DataGrid rowData={items} columnDefs={columnDefs} entityName="inventory-items" />}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col min-h-[400px]">
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <LoadingSpinner size={60} />
+          </div>
+        ) : (
+          <DataGrid rowData={items} columnDefs={columnDefs} entityName="inventory-items" />
+        )}
       </div>
     </div>
   );

@@ -32,3 +32,18 @@ export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   bgmVolume: DEFAULT_BGM_VOLUME,
   sfxVolume: DEFAULT_SFX_VOLUME,
 };
+
+export type ItemSoundSlot = 'throw' | 'inGameEffect' | 'explosion';
+
+export interface SoundEffectSlotConfig {
+  url?: string | null;
+  loop?: boolean;
+}
+
+export interface ItemSoundEffectsConfig {
+  throw?: SoundEffectSlotConfig;
+  inGameEffect?: SoundEffectSlotConfig;
+  explosion?: SoundEffectSlotConfig;
+  [key: string]: SoundEffectSlotConfig | undefined;
+}
+

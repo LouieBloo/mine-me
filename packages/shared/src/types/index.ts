@@ -1,5 +1,7 @@
 import type { ParticleEffect } from './particles';
 import type { MouseActionTriggerMode } from './mining';
+import type { ItemSoundEffectsConfig } from './sound';
+export * from './sound';
 
 export type CharacterClass = 'Warrior' | 'Mage' | 'Rogue';
 export type Profession = 'Mining' | 'Herbalism' | 'Farming' | 'Lumberjack' | 'Chemistry' | 'Blacksmithing';
@@ -144,6 +146,8 @@ export interface GameItem {
   iconUrl?: string | null;
   gearImageUrl?: string | null;
   inGameSpriteUrl?: string | null;
+  soundEffectUrl?: string | null;
+  soundEffects?: ItemSoundEffectsConfig | null;
   isStartingPiece?: boolean;
   experience?: number;
   combatScore?: number;

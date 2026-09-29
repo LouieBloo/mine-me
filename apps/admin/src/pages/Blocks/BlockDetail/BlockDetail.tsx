@@ -4,6 +4,7 @@ import { useApi } from '../../../hooks/useApi';
 import { useToast } from '../../../contexts/ToastContext';
 import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
 import BlockTextureUpload from './BlockTextureUpload';
+import BlockSoundEffectUpload from './BlockSoundEffectUpload/BlockSoundEffectUpload';
 import { DropTableEditor } from '../../../components/DropTableEditor/DropTableEditor';
 import type { MiningBlockConfig, DropTable } from '@mine-me/shared';
 import './BlockDetail.css';
@@ -276,6 +277,12 @@ export default function BlockDetail() {
         <div className="space-y-8">
           <BlockTextureUpload
             block={block}
+            onUploadSuccess={(updated) => setBlock(updated)}
+          />
+          <BlockSoundEffectUpload
+            blockId={block.id}
+            soundEffectUrl={block.soundEffectUrl}
+            blockName={block.name}
             onUploadSuccess={(updated) => setBlock(updated)}
           />
         </div>

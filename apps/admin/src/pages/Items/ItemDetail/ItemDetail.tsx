@@ -3,10 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../contexts/ToastContext';
 import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../../hooks/useApi';
+import { ItemSoundProfileRegistry } from '@mine-me/shared';
 import type { ItemType } from '@mine-me/shared/types';
 import ItemIconUpload from './ItemIconUpload';
 import ItemGearUpload from './ItemGearUpload';
 import ItemInGameSpriteUpload from './ItemInGameSpriteUpload/ItemInGameSpriteUpload';
+import ItemSoundEffectUpload from './ItemSoundEffectUpload/ItemSoundEffectUpload';
 import ItemColliderEditor from '../../../components/ItemColliderEditor/ItemColliderEditor';
 import './ItemDetail.css';
 
@@ -550,6 +552,19 @@ export default function ItemDetail() {
             gearImageUrl={data.gearImageUrl}
             onUploadSuccess={(updatedItem) => setData(updatedItem)}
           />
+          {(() => {
+            const soundProfile = ItemSoundProfileRegistry.getProfile(data.subType);
+            if (!soundProfile) return null;
+            return (
+              <ItemSoundEffectUpload
+                itemId={id!}
+                profile={soundProfile}
+                soundEffects={data.soundEffects}
+                soundEffectUrl={data.soundEffectUrl}
+                onUploadSuccess={(updatedItem) => setData(updatedItem)}
+              />
+            );
+          })()}
         </div>
       )}
     </div>

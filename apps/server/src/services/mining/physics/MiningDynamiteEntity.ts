@@ -1,11 +1,13 @@
 import { MiningPhysicsBody, type MiningCollisionGrid } from './MiningPhysicsBody';
-import type { Vector2D, MiningRigidWorld, DynamiteBodyOptions, ItemPhysicsConfig } from '@mine-me/shared';
+import type { Vector2D, MiningRigidWorld, DynamiteBodyOptions, ItemPhysicsConfig, ItemSoundEffectsConfig } from '@mine-me/shared';
 import * as planck from 'planck';
 
 export class MiningDynamiteEntity extends MiningPhysicsBody {
   public readonly id: string;
   public readonly physicsConfig?: ItemPhysicsConfig;
   public readonly explosionRadius?: number;
+  public readonly itemId?: string;
+  public readonly soundEffects?: ItemSoundEffectsConfig | null;
   public fuseRemainingSeconds: number;
   public hasExploded: boolean = false;
   public angle: number = 0;
@@ -62,6 +64,8 @@ export class MiningDynamiteEntity extends MiningPhysicsBody {
     this.id = id;
     this.physicsConfig = options?.physicsConfig;
     this.explosionRadius = options?.explosionRadius;
+    this.itemId = options?.itemId;
+    this.soundEffects = options?.soundEffects;
     this._position = { ...initialPosition };
     this._velocity = { ...initialVelocity };
     this._hasGravity = true;

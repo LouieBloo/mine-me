@@ -725,7 +725,8 @@ describe('useMiningTicker - Torch Preview Lighting', () => {
         expect.any(Number),
         undefined,
         null,
-        expect.any(Number)
+        expect.any(Number),
+        undefined
       );
 
       unmount();

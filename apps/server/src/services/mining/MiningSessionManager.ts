@@ -151,7 +151,13 @@ export class MiningSessionManager {
             id: d.id,
             position: { x: d.position.x, y: d.position.y },
             velocity: { x: d.velocity.x, y: d.velocity.y },
+            angle: d.angle,
+            angularVelocity: d.angularVelocity,
             fuseRemainingSeconds: d.fuseRemainingSeconds,
+            physicsConfig: d.physicsConfig,
+            explosionRadius: d.explosionRadius,
+            itemId: d.itemId,
+            soundEffects: d.soundEffects,
           }))
         : undefined,
     };

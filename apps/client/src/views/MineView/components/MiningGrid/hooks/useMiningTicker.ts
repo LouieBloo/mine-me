@@ -8,6 +8,7 @@ import type { SpotLight } from '../../../../../components/game/lighting/SpotLigh
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
 import type { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
+import type { SoundManager } from '../../../../../services/sound';
 import {
   MINING_CONFIG,
   MINING_TILE_WORLD_PIXELS,
@@ -63,6 +64,7 @@ export interface UseMiningTickerOptions {
   miningTargetRef?: React.MutableRefObject<MiningPosition | null>;
   blockTexturesRef?: React.MutableRefObject<Map<number, Texture>>;
   sessionState?: MiningSessionClientState;
+  soundManager?: SoundManager | null;
 }
 
 export function useMiningTicker({
@@ -99,6 +101,7 @@ export function useMiningTicker({
   miningTargetRef,
   blockTexturesRef,
   sessionState,
+  soundManager,
 }: UseMiningTickerOptions) {
   const animTimeRef = useRef<number>(0);
 
@@ -345,13 +348,14 @@ export function useMiningTicker({
         );
       }
 
-      // Update dynamite particle effects (fuse sparks & flame) and illumination (fuse PointLight)
+      // Update dynamite particle effects (fuse sparks & flame), illumination (fuse PointLight), and fuse audio
       dynamiteVisualManagerRef?.current?.update(
         activeDynamitesRef?.current || [],
         dt,
         particleEngineRef?.current,
         lightingEngineRef?.current,
-        TILE_SIZE
+        TILE_SIZE,
+        soundManager
       );
 
       miningProfiler.startSection('Reticle');

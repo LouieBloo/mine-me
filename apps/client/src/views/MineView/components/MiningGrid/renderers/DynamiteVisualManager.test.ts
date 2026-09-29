@@ -302,4 +302,148 @@ describe('DynamiteVisualManager', () => {
       );
     });
   });
+
+  describe('dynamite sound effects', () => {
+    let mockSoundManager: any;
+
+    beforeEach(() => {
+      mockSoundManager = {
+        playSfx: vi.fn(),
+        playLoopingSfx: vi.fn(),
+        stopLoopingSfx: vi.fn(),
+        stopAllLoopingSfx: vi.fn(),
+      };
+    });
+
+    it('plays remote throw sound when new dynamite appears and was not thrown locally', () => {
+      const dyn: MiningActiveDynamite = {
+        id: 'dyn-remote-1',
+        position: { x: 5, y: 5 },
+        velocity: { x: 2, y: -4 },
+        fuseRemainingSeconds: 4,
+        soundEffects: {
+          throw: { url: '/assets/sounds/items/custom_throw.mp3', loop: false },
+        },
+      };
+
+      manager.update([dyn], 0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager);
+
+      expect(mockSoundManager.playSfx).toHaveBeenCalledWith('/assets/sounds/items/custom_throw.mp3');
+    });
+
+    it('suppresses throw sound when dynamite was just thrown locally', () => {
+      const dyn: MiningActiveDynamite = {
+        id: 'dyn-local-1',
+        position: { x: 5, y: 5 },
+        velocity: { x: 2, y: -4 },
+        fuseRemainingSeconds: 4,
+        soundEffects: {
+          throw: { url: '/assets/sounds/items/custom_throw.mp3', loop: false },
+        },
+      };
+
+      manager.recordLocalThrow();
+      manager.update([dyn], 0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager);
+
+      expect(mockSoundManager.playSfx).not.toHaveBeenCalledWith('/assets/sounds/items/custom_throw.mp3');
+    });
+
+    it('plays looping inGameEffect fuse sound while dynamite is active and stops it when exploded', () => {
+      const dyn: MiningActiveDynamite = {
+        id: 'dyn-fuse-1',
+        position: { x: 5, y: 5 },
+        velocity: { x: 0, y: 0 },
+        fuseRemainingSeconds: 3.5,
+        soundEffects: {
+          inGameEffect: { url: '/assets/sounds/items/fuse_loop.mp3', loop: true },
+        },
+      };
+
+      // 1. Dynamite active -> starts looping fuse sound
+      manager.update([dyn], 0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager);
+      expect(mockSoundManager.playLoopingSfx).toHaveBeenCalledWith(
+        'dynamite_fuse_dyn-fuse-1',
+        '/assets/sounds/items/fuse_loop.mp3'
+      );
+
+      // 2. Dynamite explodes/despawns -> stops looping fuse sound
+      manager.update([], 0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager);
+      expect(mockSoundManager.stopLoopingSfx).toHaveBeenCalledWith('dynamite_fuse_dyn-fuse-1');
+    });
+
+    it('plays explosion sound when triggerExplosion or handleExplosionEvents is called', () => {
+      manager.triggerExplosion(
+        { x: 10, y: 15 },
+        7,
+        mockParticleEngine,
+        mockLightingEngine,
+        64,
+        'exp-boom',
+        '/assets/sounds/items/custom_boom.mp3',
+        mockSoundManager
+      );
+
+      expect(mockSoundManager.playSfx).toHaveBeenCalledWith(
+        '/assets/sounds/items/custom_boom.mp3',
+        expect.objectContaining({ throttleMs: 50 })
+      );
+
+      const event: MiningExplosionEvent = {
+        id: 'exp-event-1',
+        position: { x: 20, y: 25 },
+        radius: 7,
+        soundUrl: '/assets/sounds/items/event_boom.mp3',
+      };
+
+      manager.handleExplosionEvents(
+        [event],
+        mockParticleEngine,
+        mockLightingEngine,
+        64,
+        mockSoundManager
+      );
+
+      expect(mockSoundManager.playSfx).toHaveBeenCalledWith(
+        '/assets/sounds/items/event_boom.mp3',
+        expect.objectContaining({ throttleMs: 50 })
+      );
+    });
+
+    it('stops active looping fuse sounds on destroy', () => {
+      const dyn: MiningActiveDynamite = {
+        id: 'dyn-cleanup',
+        position: { x: 5, y: 5 },
+        velocity: { x: 0, y: 0 },
+        fuseRemainingSeconds: 2,
+        soundEffects: {
+          inGameEffect: { url: '/assets/sounds/items/fuse.mp3', loop: true },
+        },
+      };
+
+      manager.update([dyn], 0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager);
+      expect(mockSoundManager.playLoopingSfx).toHaveBeenCalled();
+
+      manager.destroy(mockParticleEngine, mockLightingEngine, mockSoundManager);
+      expect(mockSoundManager.stopLoopingSfx).toHaveBeenCalledWith('dynamite_fuse_dyn-cleanup');
+    });
+
+    it('resolves sound configuration from setCustomItems registry', () => {
+      DynamiteVisualManager.setCustomItems([
+        {
+          id: 'item-custom-dyn',
+          subType: 'DYNAMITE',
+          soundEffects: {
+            throw: { url: '/assets/sounds/items/registered_throw.mp3', loop: false },
+            inGameEffect: { url: '/assets/sounds/items/registered_fuse.mp3', loop: true },
+            explosion: { url: '/assets/sounds/items/registered_boom.mp3', loop: false },
+          },
+        },
+      ]);
+
+      const config = DynamiteVisualManager.getItemSoundConfig('item-custom-dyn');
+      expect(config?.throw?.url).toBe('/assets/sounds/items/registered_throw.mp3');
+      expect(config?.inGameEffect?.url).toBe('/assets/sounds/items/registered_fuse.mp3');
+      expect(config?.explosion?.url).toBe('/assets/sounds/items/registered_boom.mp3');
+    });
+  });
 });

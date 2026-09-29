@@ -1,0 +1,17 @@
+.item-sound-effect-upload {
+  position: relative;
+}
+
+.item-sound-effect-upload audio {
+  outline: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.04));
+  border-radius: 8px;
+}
+
+.item-sound-effect-upload input[type="checkbox"] {
+  accent-color: #d97706; /* amber-600 */
+}
+
+.item-sound-effect-upload button {
+  transition: all 0.15s ease-in-out;
+}

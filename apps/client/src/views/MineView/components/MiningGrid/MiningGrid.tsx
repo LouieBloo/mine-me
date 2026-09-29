@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { usePixiStage } from '../../../../components/game/PixiStageContext/PixiStageContext';
 import { type GearLayerDescriptor } from '../../../../components/game/sprites';
 import {
@@ -12,6 +12,7 @@ import {
   MiningTileType,
   MINING_CONFIG,
   DEFAULT_PARTICLE_EFFECTS,
+  DEFAULT_DYNAMITE_SOUNDS,
   getAssetUrl,
   canTileBeDamaged,
   type MiningActiveDynamite,
@@ -22,6 +23,7 @@ import {
 import { PointLight } from '../../../../components/game/lighting/PointLight';
 import type { EmitterHandle } from '../../../../components/game/particles/ParticleEngine';
 import { useSocket } from '../../../../contexts/SocketContext';
+import { useSound } from '../../../../contexts/SoundContext';
 import { notificationService } from '../../../../services/notificationService';
 import { MiningMouseController } from './input/MiningMouseController';
 import { TorchPlacementAction, LadderPlacementAction, ThrowableItemAction } from './input/MouseAction';
@@ -76,6 +78,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 }) => {
   const { app } = usePixiStage();
   const { onEvent, sendGameEvent } = useSocket();
+  const { soundManager } = useSound();
 
   const onVisionChangeRef = useRef(onVisionChange);
   onVisionChangeRef.current = onVisionChange;
@@ -117,6 +120,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const dynamiteVisualManagerRef = useRef<DynamiteVisualManager>(new DynamiteVisualManager());
   const droppedItemsRef = useRef<MiningDroppedItem[]>([]);
   const lastDamageParticleTimeRef = useRef<Map<string, number>>(new Map());
+  const lastWeaponSoundTimeRef = useRef<number>(0);
 
   // Smooth rendering lerp position references
   const currentRenderPosRef = useRef<Vector2D>({
@@ -138,6 +142,57 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         subType: inv.item.subType as any,
       }));
   }, [playerState.inventory?.items]);
+
+  // Weapon derivation for in-game mining sound effect
+  const equippedWeapon = useMemo(() => {
+    // 1. Check playerState.gear.weapon
+    if (playerState.gear?.weapon) {
+      return playerState.gear.weapon;
+    }
+    // 2. Check playerState.inventory.items
+    if (playerState.inventory?.items) {
+      const items = playerState.inventory.items;
+      const equipped = items.find(
+        (inv) => inv.equipped && inv.item?.type === 'GEAR' && inv.item?.subType?.toUpperCase() === 'WEAPON'
+      );
+      if (equipped?.item) return equipped.item;
+      const anyWeapon = items.find(
+        (inv) => inv.item?.type === 'GEAR' && inv.item?.subType?.toUpperCase() === 'WEAPON'
+      );
+      if (anyWeapon?.item) return anyWeapon.item;
+      const pickaxeItem = items.find(
+        (inv) => inv.item?.name?.toLowerCase().includes('pickaxe')
+      );
+      if (pickaxeItem?.item) return pickaxeItem.item;
+    }
+    return null;
+  }, [playerState.gear?.weapon, playerState.inventory?.items]);
+
+  const [resolvedSoundUrl, setResolvedSoundUrl] = useState<string | null>(
+    equippedWeapon?.soundEffectUrl ?? null
+  );
+
+  useEffect(() => {
+    if (equippedWeapon?.soundEffectUrl) {
+      setResolvedSoundUrl(equippedWeapon.soundEffectUrl);
+      return;
+    }
+    // Fallback: If weapon has an ID but local state lacked soundEffectUrl, query public items
+    if (equippedWeapon?.id) {
+      fetch(getAssetUrl('/api/public/items?type=GEAR'))
+        .then((res) => (res.ok ? res.json() : []))
+        .then((items: any[]) => {
+          const found = items.find((i: any) => i.id === equippedWeapon.id);
+          if (found?.soundEffectUrl) {
+            setResolvedSoundUrl(found.soundEffectUrl);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [equippedWeapon?.id, equippedWeapon?.soundEffectUrl]);
+
+  const weaponSoundUrlRef = useRef<string | null>(resolvedSoundUrl);
+  weaponSoundUrlRef.current = resolvedSoundUrl;
 
   // Pixi Scene, Camera, Lighting & Asset Loading Hook
   const {
@@ -165,6 +220,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     flashlightRef,
     particleEngineRef,
     blockParticleConfigsRef,
+    blockSoundsRef,
   } = useMiningScene({
     app,
     initialSessionState,
@@ -177,6 +233,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
   const torchEmittersRef = useRef<Map<string, EmitterHandle>>(new Map());
   const blockEmittersRef = useRef<Map<string, EmitterHandle>>(new Map());
+  const lastBlockSoundTimeRef = useRef<Map<string, number>>(new Map());
+  const recentExplosionsRef = useRef<{ x: number; y: number; radius: number; time: number }[]>([]);
 
   // Attach canvas to MouseController and sync camera
   useEffect(() => {
@@ -309,6 +367,14 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
                 itemId: targetItem?.id,
               } as any);
               if (res.success) {
+                const throwSoundUrl =
+                  targetItem?.soundEffects?.throw?.url ||
+                  targetItem?.soundEffectUrl ||
+                  DEFAULT_DYNAMITE_SOUNDS.throw?.url;
+                if (throwSoundUrl) {
+                  soundManager.playSfx(throwSoundUrl);
+                }
+                dynamiteVisualManagerRef.current.recordLocalThrow();
                 onDynamiteThrown?.();
                 return true;
               } else {
@@ -467,8 +533,18 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           payload.explosions,
           particleEngineRef.current,
           lightingEngineRef.current,
-          TILE_SIZE
+          TILE_SIZE,
+          soundManager
         );
+        const expNow = performance.now();
+        for (const exp of payload.explosions) {
+          recentExplosionsRef.current.push({
+            x: exp.position.x,
+            y: exp.position.y,
+            radius: exp.radius,
+            time: expNow,
+          });
+        }
       }
 
       // Update remote players
@@ -490,6 +566,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       if (payload.revealedTiles && payload.revealedTiles.length > 0) {
         const grid = gridRef.current;
         const now = performance.now();
+        recentExplosionsRef.current = recentExplosionsRef.current.filter((e) => now - e.time < 600);
 
         // Helper to locate hit position, prioritizing the user's cursor if targeted
         const getHitPosition = (tileX: number, tileY: number) => {
@@ -520,29 +597,68 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         for (const rt of payload.revealedTiles) {
           const prevTile = grid[rt.y]?.[rt.x];
           if (prevTile) {
-            const wasDamaged = rt.damageStage !== undefined && rt.damageStage > (prevTile.damageStage || 0);
-            const wasDestroyed = prevTile.type !== MiningTileType.EMPTY && rt.type === MiningTileType.EMPTY;
+            // A tile can only take damage or be destroyed if it was ALREADY revealed
+            const wasDamaged = prevTile.revealed && rt.damageStage !== undefined && rt.damageStage > (prevTile.damageStage || 0);
+            const wasDestroyed = prevTile.revealed && prevTile.type !== MiningTileType.EMPTY && rt.type === MiningTileType.EMPTY;
             const tileKey = `${rt.x},${rt.y}`;
+
+            // Check if destroyed by an active dynamite explosion
+            const isExplosionDestroyed = recentExplosionsRef.current.some(
+              (exp) => Math.hypot(rt.x + 0.5 - exp.x, rt.y + 0.5 - exp.y) <= exp.radius + 1.2
+            );
+
+            // Weapon sound ONLY plays when the player is actively mining this specific target tile
+            const isPlayerMiningThisTile =
+              (payload.isMining || isMiningRef?.current) &&
+              miningTargetRef.current &&
+              miningTargetRef.current.x === rt.x &&
+              miningTargetRef.current.y === rt.y;
+
+            if ((wasDamaged || wasDestroyed) && isPlayerMiningThisTile) {
+              const soundUrl = weaponSoundUrlRef.current;
+              if (soundUrl) {
+                const lastSoundTime = lastWeaponSoundTimeRef.current;
+                if (now - lastSoundTime >= 100) {
+                  lastWeaponSoundTimeRef.current = now;
+                  soundManager.playSfx(soundUrl);
+                }
+              }
+            }
+
+            // Block damage/break sound only plays if NOT destroyed by an explosion
+            if ((wasDamaged || wasDestroyed) && !isExplosionDestroyed) {
+              const blockSoundUrl = blockSoundsRef.current.get(prevTile.type);
+              if (blockSoundUrl) {
+                const lastBlockSound = lastBlockSoundTimeRef.current.get(tileKey) || 0;
+                if (now - lastBlockSound >= 100) {
+                  lastBlockSoundTimeRef.current.set(tileKey, now);
+                  soundManager.playSfx(blockSoundUrl);
+                }
+              }
+            }
 
             if (particleEngineRef.current) {
               const hitPos = getHitPosition(rt.x, rt.y);
               if (wasDestroyed) {
                 // Block broke completely: trigger full break crumble
                 lastDamageParticleTimeRef.current.delete(tileKey);
+                lastBlockSoundTimeRef.current.delete(tileKey);
                 const blockEmitterId = `block_effect_${rt.x}_${rt.y}`;
                 if (blockEmittersRef.current.has(blockEmitterId)) {
                   blockEmittersRef.current.get(blockEmitterId)?.destroy();
                   blockEmittersRef.current.delete(blockEmitterId);
                 }
 
-                const prevParticleConfig = blockParticleConfigsRef.current.get(prevTile.type);
-                if (prevParticleConfig) {
-                  particleEngineRef.current.spawnBurst(prevParticleConfig, hitPos);
-                  particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
-                } else if (prevTile.type === MiningTileType.MINERAL) {
-                  particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
-                } else {
-                  particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_hit, hitPos);
+                if (!isExplosionDestroyed) {
+                  const prevParticleConfig = blockParticleConfigsRef.current.get(prevTile.type);
+                  if (prevParticleConfig) {
+                    particleEngineRef.current.spawnBurst(prevParticleConfig, hitPos);
+                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
+                  } else if (prevTile.type === MiningTileType.MINERAL) {
+                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
+                  } else {
+                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_hit, hitPos);
+                  }
                 }
               } else if (wasDamaged) {
                 // Block took damage: throttle intermediate chipping to avoid explosive multi-bursts (~4 Hz)
@@ -696,7 +812,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       blockEmittersRef.current.clear();
       dynamiteVisualManagerRef.current.destroy(
         particleEngineRef.current,
-        lightingEngineRef.current
+        lightingEngineRef.current,
+        soundManager
       );
     };
   }, [onEvent, containersReady]);
@@ -735,6 +852,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     isMiningRef,
     miningTargetRef,
     blockTexturesRef,
+    soundManager,
   });
 
   return <div className="mining-grid-container" />;

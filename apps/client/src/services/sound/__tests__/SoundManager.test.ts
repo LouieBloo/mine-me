@@ -65,4 +65,43 @@ describe('SoundManager', () => {
     manager.toggleSfx();
     expect(manager.getSettings().sfxEnabled).toBe(true);
   });
+
+  it('throttles duplicate playSfx calls for the same sound effect URL', () => {
+    const manager = SoundManager.getInstance();
+    manager.playSfx('/assets/sounds/test.mp3');
+    const second = manager.playSfx('/assets/sounds/test.mp3');
+
+    // First call plays, second within throttle window is suppressed
+    expect(second).toBeNull();
+  });
+
+  it('plays and stops looping SFX by key', () => {
+    const manager = SoundManager.getInstance();
+    const key = 'test_loop_1';
+
+    const howl1 = manager.playLoopingSfx(key, '/assets/sounds/fuse.mp3');
+    expect(howl1).toBeDefined();
+    expect(manager.isLoopingSfxPlaying(key)).toBe(true);
+
+    // Calling again returns existing playing howl
+    const howl2 = manager.playLoopingSfx(key, '/assets/sounds/fuse.mp3');
+    expect(howl2).toBe(howl1);
+
+    manager.stopLoopingSfx(key);
+    expect(manager.isLoopingSfxPlaying(key)).toBe(false);
+  });
+
+  it('stops all looping SFX', () => {
+    const manager = SoundManager.getInstance();
+    manager.playLoopingSfx('loop_a', '/assets/sounds/a.mp3');
+    manager.playLoopingSfx('loop_b', '/assets/sounds/b.mp3');
+
+    expect(manager.isLoopingSfxPlaying('loop_a')).toBe(true);
+    expect(manager.isLoopingSfxPlaying('loop_b')).toBe(true);
+
+    manager.stopAllLoopingSfx();
+
+    expect(manager.isLoopingSfxPlaying('loop_a')).toBe(false);
+    expect(manager.isLoopingSfxPlaying('loop_b')).toBe(false);
+  });
 });

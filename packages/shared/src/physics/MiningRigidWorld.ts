@@ -1,7 +1,7 @@
 import * as planck from 'planck';
 import { MINING_CONFIG, MINING_TILE_WORLD_PIXELS, type Vector2D, isTileSolid, type MiningTileType } from '../types/mining';
 import type { MiningCollisionGrid } from './MiningPhysicsBody';
-import type { ItemPhysicsConfig } from '../types';
+import type { ItemPhysicsConfig, ItemSoundEffectsConfig } from '../types';
 import { DEFAULT_DYNAMITE_PHYSICS_CONFIG } from '../constants';
 
 export interface RigidWorldConfig {
@@ -25,6 +25,8 @@ export interface DynamiteBodyOptions {
   mass?: number;
   physicsConfig?: ItemPhysicsConfig;
   explosionRadius?: number;
+  itemId?: string;
+  soundEffects?: ItemSoundEffectsConfig | null;
 }
 
 export interface RockBodyOptions {

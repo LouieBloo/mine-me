@@ -1,4 +1,4 @@
-import type { GearSubType, ItemPhysicsConfig, DropTable } from './index';
+import type { GearSubType, ItemPhysicsConfig, DropTable, ItemSoundEffectsConfig } from './index';
 import type { ParticleEffect } from './particles';
 
 // ============================================================================
@@ -105,6 +105,7 @@ export interface MiningBlockConfig {
   name: string;
   description?: string | null;
   textureUrl?: string | null;
+  soundEffectUrl?: string | null;
   mineTimeMs: number;
   staminaCost: number;
   idleParticleEffectId?: string | null;
@@ -369,6 +370,8 @@ export interface MiningActiveDynamite {
   fuseRemainingSeconds: number;
   physicsConfig?: ItemPhysicsConfig;
   explosionRadius?: number;
+  itemId?: string;
+  soundEffects?: ItemSoundEffectsConfig | null;
 }
 
 /**
@@ -494,6 +497,7 @@ export interface MiningExplosionEvent {
   id: string;
   position: Vector2D;
   radius: number;
+  soundUrl?: string | null;
 }
 
 /**

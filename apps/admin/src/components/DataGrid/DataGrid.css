@@ -17,6 +17,27 @@
     --ag-header-column-separator-display: block;
     --ag-header-column-separator-color: #e2e8f0;
     --ag-border-radius: 12px;
+    height: 100%;
+    width: 100%;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+}
+
+.nvg-admin-grid .ag-root-wrapper {
+    border-radius: 12px;
+    border: none;
+    height: 100% !important;
+    width: 100%;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.nvg-admin-grid .ag-root-wrapper-body {
+    flex: 1 1 auto;
+    height: 100%;
 }
 
 .ag-header-cell-label {

@@ -54,6 +54,7 @@ export function useMiningScene({
   const tileGraphicsMap = useRef<Map<string, Graphics>>(new Map());
   const tileSpritesMap = useRef<Map<string, Sprite>>(new Map());
   const blockTexturesRef = useRef<Map<number, Texture>>(new Map());
+  const blockSoundsRef = useRef<Map<number, string>>(new Map());
   const blockParticleConfigsRef = useRef<Map<MiningTileType, ParticleEffectConfig>>(
     new Map([
       [MiningTileType.COPPERIUM, DEFAULT_PARTICLE_EFFECTS.fairy_sparkle],
@@ -253,6 +254,12 @@ export function useMiningScene({
                 blockParticleConfigsRef.current.delete(tileType);
               }
 
+              if (blk.soundEffectUrl) {
+                blockSoundsRef.current.set(tileType, getAssetUrl(blk.soundEffectUrl));
+              } else {
+                blockSoundsRef.current.delete(tileType);
+              }
+
               if (blk.textureUrl) {
                 const p = Assets.load(getAssetUrl(blk.textureUrl))
                   .then((tex) => {
@@ -341,6 +348,19 @@ export function useMiningScene({
         }
       } catch (err) {
         console.warn('[MiningGrid] Could not load dynamic particle effects:', err);
+      }
+
+      // Fetch dynamic item sound and visual profiles from API
+      try {
+        const itemsRes = await fetch(getAssetUrl('/api/public/items'));
+        if (itemsRes.ok) {
+          const items = await itemsRes.json();
+          if (Array.isArray(items)) {
+            DynamiteVisualManager.setCustomItems(items);
+          }
+        }
+      } catch (err) {
+        console.warn('[MiningGrid] Could not load dynamic items:', err);
       }
 
       // Always load Torch and Ladder tile textures
@@ -483,5 +503,6 @@ export function useMiningScene({
     flashlightRef,
     particleEngineRef,
     blockParticleConfigsRef,
+    blockSoundsRef,
   };
 }
