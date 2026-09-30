@@ -2,12 +2,14 @@ import { useEffect, useRef } from 'react';
 import type { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import type { ModularCharacterSprite } from '../../../../../components/game/sprites';
 import type { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
+import type { MiningMobRenderer } from '../renderers/MiningMobRenderer';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
 import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
 import type { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
+import type { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
 import type { SoundManager } from '../../../../../services/sound';
 import {
   MINING_CONFIG,
@@ -41,6 +43,7 @@ export interface UseMiningTickerOptions {
   playerFacingDirRef: React.MutableRefObject<Vector2D>;
   playerSpriteRef: React.RefObject<ModularCharacterSprite | null>;
   remotePlayerRendererRef?: React.RefObject<MiningRemotePlayerRenderer | null>;
+  mobRendererRef?: React.RefObject<MiningMobRenderer | null>;
   activeFallingRocksRef: React.MutableRefObject<ActiveFallingRock[]>;
   fallingRockGraphicsMap: React.MutableRefObject<Map<string, Sprite | Graphics>>;
   dynamitesContainerRef?: React.RefObject<Container | null>;
@@ -48,6 +51,7 @@ export interface UseMiningTickerOptions {
   dynamiteGraphicsMap?: React.MutableRefObject<Map<string, Sprite | Graphics>>;
   dynamiteTextureRef?: React.RefObject<Texture | null>;
   dynamiteVisualManagerRef?: React.RefObject<DynamiteVisualManager | null>;
+  droppedItemVisualManagerRef?: React.RefObject<DroppedItemVisualManager | null>;
   droppedItemsRef?: React.MutableRefObject<MiningDroppedItem[]>;
   reticleGraphicsRef?: React.RefObject<Graphics | null>;
   mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
@@ -78,6 +82,7 @@ export function useMiningTicker({
   playerFacingDirRef,
   playerSpriteRef,
   remotePlayerRendererRef,
+  mobRendererRef,
   activeFallingRocksRef,
   fallingRockGraphicsMap,
   dynamitesContainerRef,
@@ -85,6 +90,7 @@ export function useMiningTicker({
   dynamiteGraphicsMap,
   dynamiteTextureRef,
   dynamiteVisualManagerRef,
+  droppedItemVisualManagerRef,
   droppedItemsRef,
   reticleGraphicsRef,
   mouseControllerRef,
@@ -304,6 +310,12 @@ export function useMiningTicker({
         remotePlayerRendererRef.current.tick(dt);
       }
 
+      miningProfiler.startSection('Active Mobs');
+      // Update and interpolate active mobs
+      if (mobRendererRef?.current) {
+        mobRendererRef.current.tick(dt);
+      }
+
       miningProfiler.startSection('Falling Rocks');
       // Render active falling rocks in continuous space with rock texture/sprite
       if (fallingRocksContainer) {
@@ -356,6 +368,15 @@ export function useMiningTicker({
         lightingEngineRef?.current,
         TILE_SIZE,
         soundManager
+      );
+
+      // Update dropped item dynamic lights (PointLight or SpotLight) and particle emitters
+      droppedItemVisualManagerRef?.current?.update(
+        droppedItemsRef?.current || [],
+        dt,
+        particleEngineRef?.current,
+        lightingEngineRef?.current,
+        TILE_SIZE
       );
 
       miningProfiler.startSection('Reticle');
@@ -735,6 +756,10 @@ export function useMiningTicker({
       }
       lightingEngineRef.current?.removeLight('torch_preview');
       dynamiteVisualManagerRef?.current?.destroy(
+        particleEngineRef?.current,
+        lightingEngineRef?.current
+      );
+      droppedItemVisualManagerRef?.current?.destroy(
         particleEngineRef?.current,
         lightingEngineRef?.current
       );

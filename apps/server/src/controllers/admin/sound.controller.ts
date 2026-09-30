@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../index';
+import { syncJson } from '../../services/admin.service';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
@@ -116,6 +117,9 @@ export const uploadSound = async (req: Request, res: Response) => {
       }
     });
 
+    const allSounds = await prisma.sound.findMany();
+    syncJson('sounds.json', allSounds);
+
     res.status(201).json(newSound);
   } catch (err: any) {
     console.error('Error uploading sound:', err);
@@ -146,6 +150,9 @@ export const updateSound = async (req: Request, res: Response) => {
       }
     });
 
+    const allSounds = await prisma.sound.findMany();
+    syncJson('sounds.json', allSounds);
+
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to update sound' });
@@ -174,6 +181,9 @@ export const deleteSound = async (req: Request, res: Response) => {
         console.warn('Failed to delete sound file from disk:', fileErr);
       }
     }
+
+    const allSounds = await prisma.sound.findMany();
+    syncJson('sounds.json', allSounds);
 
     res.json({ message: 'Sound deleted successfully', id });
   } catch (err: any) {

@@ -222,5 +222,205 @@
     "createdAt": "2026-04-06T21:51:48.684Z",
     "updatedAt": "2026-08-19T02:49:17.707Z",
     "dropTable": null
+  },
+  {
+    "id": "cmn_mole_person_001",
+    "name": "Mole Person",
+    "level": 1,
+    "health": 40,
+    "attack": 6,
+    "defense": 2,
+    "attackPercentage": 80,
+    "defendPercentage": 20,
+    "aiType": "CHASE_AND_MINE",
+    "aiConfig": {
+      "detectionRadius": 12,
+      "attackRange": 1.2,
+      "mineRange": 1.5,
+      "jumpCooldownMs": 600,
+      "mineCooldownMs": 400,
+      "attackCooldownMs": 1000
+    },
+    "moveSpeed": 2.5,
+    "jumpForce": 6.5,
+    "miningSpeed": 1.2,
+    "abilities": [],
+    "animations": {
+      "canvas_size": [
+        1024,
+        1024
+      ],
+      "pelvis_origin": [
+        512,
+        590
+      ],
+      "tool_socket": {
+        "offset": [
+          30,
+          -105
+        ],
+        "rotation": 0.4,
+        "scale": 1
+      },
+      "hand_joint": {
+        "offset": [
+          210,
+          100
+        ]
+      },
+      "version": "2.0",
+      "parts": {
+        "head": {
+          "bbox": [
+            0,
+            0,
+            219,
+            260
+          ],
+          "file": "head.png",
+          "slot": "HEAD",
+          "width": 199,
+          "height": 240,
+          "z_index": 30,
+          "pivot_anchor": [
+            0.46,
+            0.94
+          ],
+          "offset_from_pelvis": [
+            -58,
+            -225
+          ]
+        },
+        "torso": {
+          "bbox": [
+            0,
+            0,
+            303,
+            310
+          ],
+          "file": "torso.png",
+          "slot": "CHEST",
+          "width": 303,
+          "height": 310,
+          "z_index": 20,
+          "pivot_anchor": [
+            0.5,
+            0.94
+          ],
+          "offset_from_pelvis": [
+            -25,
+            15
+          ]
+        },
+        "arm_back": {
+          "bbox": [
+            0,
+            0,
+            88,
+            260
+          ],
+          "file": "arm_back.png",
+          "slot": "GAUNTLETS",
+          "width": 88,
+          "height": 260,
+          "z_index": 5,
+          "pivot_anchor": [
+            0.52,
+            0.12
+          ],
+          "offset_from_pelvis": [
+            90,
+            -180
+          ]
+        },
+        "leg_back": {
+          "bbox": [
+            0,
+            0,
+            150,
+            380
+          ],
+          "file": "leg_back.png",
+          "slot": "BOOTS",
+          "width": 150,
+          "height": 380,
+          "z_index": 10,
+          "pivot_anchor": [
+            0.48,
+            0.05
+          ],
+          "offset_from_pelvis": [
+            35,
+            30
+          ]
+        },
+        "arm_front": {
+          "bbox": [
+            0,
+            0,
+            331,
+            210
+          ],
+          "file": "arm_front.png",
+          "slot": "WEAPON",
+          "width": 271,
+          "height": 150,
+          "z_index": 40,
+          "pivot_anchor": [
+            0.08,
+            0.18
+          ],
+          "offset_from_pelvis": [
+            -153,
+            -95
+          ]
+        },
+        "leg_front": {
+          "bbox": [
+            0,
+            0,
+            177,
+            380
+          ],
+          "file": "leg_front.png",
+          "slot": "BOOTS",
+          "width": 177,
+          "height": 380,
+          "z_index": 15,
+          "pivot_anchor": [
+            0.52,
+            0.05
+          ],
+          "offset_from_pelvis": [
+            -20,
+            60
+          ]
+        }
+      }
+    },
+    "createdAt": "2026-09-30T00:00:00.000Z",
+    "updatedAt": "2026-09-30T00:00:00.000Z",
+    "dropTable": {
+      "id": "dt_mole_person_001",
+      "solMin": 15,
+      "solMax": 35,
+      "experience": 40,
+      "mobId": "cmn_mole_person_001",
+      "characterLevelId": null,
+      "createdAt": "2026-09-30T00:00:00.000Z",
+      "updatedAt": "2026-09-30T00:00:00.000Z",
+      "items": [
+        {
+          "id": "dti_mole_copper_001",
+          "dropTableId": "dt_mole_person_001",
+          "itemId": "cmp6aexa30004idpx29gsz12l",
+          "chance": 80,
+          "minQuantity": 1,
+          "maxQuantity": 3,
+          "createdAt": "2026-09-30T00:00:00.000Z",
+          "updatedAt": "2026-09-30T00:00:00.000Z"
+        }
+      ]
+    }
   }
 ]

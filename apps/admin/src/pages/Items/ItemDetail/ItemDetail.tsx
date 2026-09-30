@@ -10,6 +10,7 @@ import ItemGearUpload from './ItemGearUpload';
 import ItemInGameSpriteUpload from './ItemInGameSpriteUpload/ItemInGameSpriteUpload';
 import ItemSoundEffectUpload from './ItemSoundEffectUpload/ItemSoundEffectUpload';
 import ItemColliderEditor from '../../../components/ItemColliderEditor/ItemColliderEditor';
+import ItemLightEffectConfig from './ItemLightEffectConfig/ItemLightEffectConfig';
 import './ItemDetail.css';
 
 interface ItemEnums {
@@ -25,9 +26,9 @@ export default function ItemDetail() {
   const navigate = useNavigate();
 
   const [data, setData] = useState<any>(isNew ? {
-    name: '', description: '', type: 'GEAR', subType: 'HEAD',
+    itemKey: '', name: '', description: '', type: 'GEAR', subType: 'HEAD',
     vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', triggerMode: 'SINGLE', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, throwable: false, experience: 0,
-    combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null, physicsConfig: null
+    combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null, physicsConfig: null, lightConfig: null
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
   const [effectsList, setEffectsList] = useState<any[]>([]);
@@ -137,7 +138,7 @@ export default function ItemDetail() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Name */}
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 md:col-span-1">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Name</label>
               <input
                 type="text"
@@ -146,6 +147,21 @@ export default function ItemDetail() {
                 className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.name ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
               />
               {errors.name && <p className="text-red-500 text-xs font-bold mt-1">{errors.name}</p>}
+            </div>
+
+            {/* Item Key (Semantic Key) */}
+            <div className="space-y-2 md:col-span-1">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                Item Key (Unique Engine Slug, Optional)
+              </label>
+              <input
+                type="text"
+                value={data.itemKey || ''}
+                placeholder="e.g. dynamite, ladder, torch"
+                onChange={(e) => { setData({ ...data, itemKey: e.target.value }); if (errors.itemKey) setErrors({ ...errors, itemKey: '' }); }}
+                className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.itemKey ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
+              />
+              {errors.itemKey && <p className="text-red-500 text-xs font-bold mt-1">{errors.itemKey}</p>}
             </div>
 
             {/* Description */}
@@ -506,6 +522,14 @@ export default function ItemDetail() {
                 item={data}
                 physicsConfig={data.physicsConfig}
                 onChange={(newPhysicsConfig) => setData({ ...data, physicsConfig: newPhysicsConfig })}
+              />
+            </div>
+
+            {/* In-Game Dropped Item Light Effect Config */}
+            <div className="md:col-span-2 pt-4 border-t border-slate-100">
+              <ItemLightEffectConfig
+                lightConfig={data.lightConfig}
+                onChange={(newLightConfig) => setData({ ...data, lightConfig: newLightConfig })}
               />
             </div>
           </div>

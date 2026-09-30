@@ -1009,6 +1009,270 @@ describe('MiningGameEngine', () => {
       expect(session.temporaryBackpack[0].itemId).toBe('gold_coin');
       expect(session.temporaryBackpack[0].quantity).toBe(10);
     });
+
+    it('spawns Sol currency drop from block with physics and picks it up into temporaryBackpack', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      vi.spyOn(engine, 'getBlockConfig').mockReturnValue({
+        id: 'block_rock',
+        typeKey: 'ROCK',
+        dropTable: {
+          items: [
+            { itemId: 'sol', chance: 100, minQuantity: 5, maxQuantity: 5 },
+          ],
+        },
+      });
+
+      engine.grid[2][5] = { type: MiningTileType.ROCK, revealed: true };
+      (engine as any).completeMiningBlock({ x: 5, y: 2 });
+
+      expect(engine.droppedItems).toHaveLength(1);
+      const dropped = engine.droppedItems[0];
+      expect(dropped.itemName).toBe('Sol');
+      expect(dropped.quantity).toBe(5);
+      expect(dropped.iconUrl).toContain('icon.png');
+      expect(dropped.inGameSpriteUrl).toBeDefined();
+      expect(dropped.particleEffectId).toBe('pe_fairy_sparkle');
+      expect(dropped.lightConfig?.enabled).toBe(true);
+      expect(dropped.lightConfig?.type).toBe('POINT');
+      expect(dropped.lightConfig?.effect).toBe('PULSE');
+
+      const initialY = dropped.position.y;
+      for (let i = 0; i < 10; i++) {
+        (engine as any).tick(0.033);
+      }
+      expect(dropped.position.y).toBeGreaterThan(initialY);
+
+      // Move player over the dropped Sol item
+      const session = engine.players.get('char-1')!;
+      session.playerBody.position = { x: dropped.position.x, y: dropped.position.y };
+      (engine as any).tick(0.033);
+
+      expect(engine.droppedItems).toHaveLength(0);
+      expect(session.temporaryBackpack).toHaveLength(1);
+      expect(session.temporaryBackpack[0].itemName).toBe('Sol');
+      expect(session.temporaryBackpack[0].quantity).toBe(5);
+      expect(session.temporaryBackpack[0].iconUrl).toContain('icon.png');
+    });
+
+    it('spawns Copperium drop with in-game sprite, fairy sparkle, and copper light', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      const mockBlockConfig = {
+        typeKey: 'COPPERIUM',
+        dropTable: {
+          items: [{ itemId: 'copperium', chance: 100, minQuantity: 1, maxQuantity: 1 }],
+        },
+      };
+      vi.spyOn(engine, 'getBlockConfig').mockReturnValue(mockBlockConfig as any);
+
+      engine.grid[2][5] = { type: MiningTileType.COPPERIUM, revealed: true };
+      (engine as any).completeMiningBlock({ x: 5, y: 2 });
+
+      expect(engine.droppedItems).toHaveLength(1);
+      const dropped = engine.droppedItems[0];
+      expect(dropped.itemName).toBe('Copperium');
+      expect(dropped.inGameSpriteUrl).toContain('cmp6aexa30004idpx29gsz12l_ingame.png');
+      expect(dropped.particleEffectId).toBe('pe_fairy_sparkle');
+      expect(dropped.lightConfig?.enabled).toBe(true);
+      expect(dropped.lightConfig?.color).toBe('#ea580c');
+      expect(dropped.lightConfig?.effect).toBe('PULSE');
+    });
+
+    it('spawns Silverium drop with in-game sprite, fairy sparkle, and silver light', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      const mockBlockConfig = {
+        typeKey: 'SILVERIUM',
+        dropTable: {
+          items: [{ itemId: 'silverium', chance: 100, minQuantity: 1, maxQuantity: 1 }],
+        },
+      };
+      vi.spyOn(engine, 'getBlockConfig').mockReturnValue(mockBlockConfig as any);
+
+      engine.grid[2][5] = { type: MiningTileType.SILVERIUM, revealed: true };
+      (engine as any).completeMiningBlock({ x: 5, y: 2 });
+
+      expect(engine.droppedItems).toHaveLength(1);
+      const dropped = engine.droppedItems[0];
+      expect(dropped.itemName).toBe('Silverium');
+      expect(dropped.inGameSpriteUrl).toContain('cmp6ammsn0006idpxgnpsnyk1_ingame.png');
+      expect(dropped.particleEffectId).toBe('pe_fairy_sparkle');
+      expect(dropped.lightConfig?.enabled).toBe(true);
+      expect(dropped.lightConfig?.color).toBe('#e2e8f0');
+      expect(dropped.lightConfig?.effect).toBe('PULSE');
+    });
+  });
+
+  describe('MiningGameEngine - Mobs & NPC System', () => {
+    it('spawns an active mob and adds it to activeMobs session map', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      const mob = engine.spawnMob(
+        {
+          id: 'mob_mole_1',
+          name: 'Mole Person',
+          health: 60,
+          attack: 15,
+          defense: 5,
+          aiType: 'CHASE_AND_MINE',
+          moveSpeed: 3.5,
+        },
+        { x: 10, y: 15 }
+      );
+
+      expect(mob).toBeDefined();
+      expect(mob.name).toBe('Mole Person');
+      expect(mob.health).toBe(60);
+      expect(engine.activeMobs.has(mob.id)).toBe(true);
+    });
+
+    it('broadcasts active mobs in mining_state_tick', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      engine.spawnMob(
+        {
+          id: 'mob_mole_1',
+          name: 'Mole Person',
+          health: 50,
+        },
+        { x: 10, y: 15 }
+      );
+
+      mockSocket.emit.mockClear();
+      (engine as any).broadcastStateTick();
+
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        'mining_state_tick',
+        expect.objectContaining({
+          mobs: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'Mole Person',
+              health: 50,
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('damages mob and spawns item drops from dropTable upon defeat', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      const mob = engine.spawnMob(
+        {
+          id: 'mob_mole_1',
+          name: 'Mole Person',
+          health: 20,
+          dropTable: {
+            solMin: 10,
+            solMax: 10,
+            items: [{ itemId: 'copper_ore', chance: 100, minQuantity: 2, maxQuantity: 2 }],
+          },
+        },
+        { x: 10, y: 15 }
+      );
+
+      // Damage mob by 25 (killing it)
+      engine.damageMob(mob.id, 25);
+
+      expect(engine.activeMobs.has(mob.id)).toBe(false);
+      // Verify drops were spawned
+      expect(engine.droppedItems.length).toBeGreaterThan(0);
+      const copperDrop = engine.droppedItems.find((d) => d.itemId === 'copper_ore');
+      expect(copperDrop).toBeDefined();
+      expect(copperDrop?.quantity).toBe(2);
+    });
+
+    it('damages active mobs when dynamite explodes within radius', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      const mob = engine.spawnMob(
+        {
+          id: 'mob_near_blast',
+          name: 'Mole Person',
+          health: 100,
+        },
+        { x: 10.5, y: 10.5 }
+      );
+
+      const fakeDynamite: any = {
+        id: 'dyn_1',
+        position: { x: 10, y: 10 },
+        explosionRadius: 3,
+      };
+
+      engine.explodeDynamite(fakeDynamite);
+
+      // Mob should have taken 50 damage from blast
+      expect(mob.health).toBe(50);
+    });
+
+    it('mob excavates targeted block when mining progress completes', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      engine.grid[15][10] = { type: MiningTileType.DIRT, revealed: true };
+
+      const mob = engine.spawnMob(
+        {
+          id: 'mob_miner',
+          name: 'Mole Person',
+          miningSpeed: 100, // 100% mining speed
+        },
+        { x: 10, y: 14 }
+      );
+
+      mob.isMining = true;
+      mob.miningTarget = { x: 10, y: 15 };
+      mob.mobBody.startMining({ x: 10, y: 15 });
+
+      // Run mining update for 1.0 second (DIRT mine time is 500ms)
+      engine.handleMobMining(mob, { x: 10, y: 15 }, 1.0);
+
+      // Tile should now be EMPTY
+      expect(engine.grid[15][10].type).toBe(MiningTileType.EMPTY);
+      expect(mob.isMining).toBe(false);
+    });
   });
 });
+
 

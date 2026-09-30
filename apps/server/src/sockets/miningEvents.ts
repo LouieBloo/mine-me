@@ -467,6 +467,8 @@ export const handleMiningExit = async (
       const clientInventory = InventoryService.mapCharacterInventory(characterWithInventory);
       broadcastStatUpdate(characterId, {
         inventory: clientInventory,
+        sol: characterWithInventory.sol,
+        lear: characterWithInventory.lear,
       });
     }
 

@@ -733,5 +733,68 @@ describe('useMiningTicker - Torch Preview Lighting', () => {
       expect(mockVisualManager.destroy).toHaveBeenCalled();
     });
   });
+
+  describe('useMiningTicker - Dropped Item Visual Effects', () => {
+    it('calls droppedItemVisualManager update each tick and destroy on unmount', () => {
+      const mockDroppedItemVisualManager = {
+        update: vi.fn(),
+        destroy: vi.fn(),
+      };
+
+      const droppedItems = [
+        {
+          id: 'drop_sol_1',
+          itemId: 'sol',
+          itemName: 'Sol',
+          iconUrl: '/assets/icons/items/sol.png',
+          quantity: 1,
+          position: { x: 4, y: 7 },
+          particleEffectId: 'pe_fairy_sparkle',
+          lightConfig: { enabled: true, type: 'POINT', effect: 'PULSE' },
+        },
+      ];
+
+      const { unmount } = renderHook(() =>
+        useMiningTicker({
+          app: mockApp,
+          playerContainerRef: { current: playerContainer },
+          gridContainerRef: { current: gridContainer },
+          fallingRocksContainerRef: { current: null },
+          currentRenderPosRef: { current: { x: 2, y: 4 } },
+          targetServerPosRef: { current: { x: 2, y: 4 } },
+          isFacingLeftRef: { current: false },
+          playerFacingDirRef: { current: { x: 1, y: 0 } },
+          playerSpriteRef: { current: null },
+          activeFallingRocksRef: { current: [] },
+          fallingRockGraphicsMap: { current: new Map() },
+          debugGraphicsRef: { current: null },
+          showDebugRef: { current: false },
+          flashlightRef: { current: null },
+          lightingEngineRef: { current: null },
+          cameraRef: { current: null },
+          playerBodyRef,
+          gridRef,
+          keysPressedRef,
+          isMiningRef,
+          miningTargetRef,
+          droppedItemVisualManagerRef: { current: mockDroppedItemVisualManager as any },
+          droppedItemsRef: { current: droppedItems as any },
+        })
+      );
+
+      tickerCallbacks[0]();
+
+      expect(mockDroppedItemVisualManager.update).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ id: 'drop_sol_1' })]),
+        expect.any(Number),
+        undefined,
+        null,
+        expect.any(Number)
+      );
+
+      unmount();
+      expect(mockDroppedItemVisualManager.destroy).toHaveBeenCalled();
+    });
+  });
 });
 

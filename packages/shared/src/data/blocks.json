@@ -10,7 +10,7 @@
     "staminaCost": 1,
     "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.321Z",
-    "updatedAt": "2026-09-22T22:54:00.847Z",
+    "updatedAt": "2026-09-29T03:06:06.491Z",
     "idleParticleEffect": null,
     "dropTable": null
   },
@@ -25,7 +25,7 @@
     "staminaCost": 1,
     "idleParticleEffectId": "pe_fairy_sparkle",
     "createdAt": "2026-09-13T00:55:27.153Z",
-    "updatedAt": "2026-09-28T23:35:49.768Z",
+    "updatedAt": "2026-09-29T03:06:06.497Z",
     "idleParticleEffect": {
       "id": "pe_fairy_sparkle",
       "name": "Fairy Sparkles",
@@ -69,7 +69,7 @@
         "spawnRadius": 30
       },
       "createdAt": "2026-09-13T01:34:00.471Z",
-      "updatedAt": "2026-09-22T22:54:00.621Z"
+      "updatedAt": "2026-09-29T03:06:06.247Z"
     },
     "dropTable": {
       "id": "cmugev18g0000qhftn66corzq",
@@ -106,9 +106,31 @@
     "staminaCost": 1,
     "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.305Z",
-    "updatedAt": "2026-09-28T23:35:58.682Z",
+    "updatedAt": "2026-09-30T01:12:33.169Z",
     "idleParticleEffect": null,
-    "dropTable": null
+    "dropTable": {
+      "id": "cmundelw90000bumvlrgt1wha",
+      "solMin": 0,
+      "solMax": 0,
+      "experience": 0,
+      "mobId": null,
+      "characterLevelId": null,
+      "miningBlockId": "block_dirt",
+      "createdAt": "2026-09-30T00:31:58.810Z",
+      "updatedAt": "2026-09-30T01:12:33.169Z",
+      "items": [
+        {
+          "id": "cmuneus9d0004z2yg3he79gq5",
+          "dropTableId": "cmundelw90000bumvlrgt1wha",
+          "itemId": "cmund29qj0000qr3nw7owbynf",
+          "chance": 10,
+          "minQuantity": 1,
+          "maxQuantity": 15,
+          "createdAt": "2026-09-30T01:12:33.169Z",
+          "updatedAt": "2026-09-30T01:12:33.169Z"
+        }
+      ]
+    }
   },
   {
     "id": "block_entrance",
@@ -121,7 +143,7 @@
     "staminaCost": 0,
     "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.325Z",
-    "updatedAt": "2026-09-22T22:54:00.858Z",
+    "updatedAt": "2026-09-29T03:06:06.504Z",
     "idleParticleEffect": null,
     "dropTable": null
   },
@@ -136,7 +158,7 @@
     "staminaCost": 1,
     "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.316Z",
-    "updatedAt": "2026-09-22T22:54:00.862Z",
+    "updatedAt": "2026-09-29T03:06:06.507Z",
     "idleParticleEffect": null,
     "dropTable": null
   },
@@ -151,7 +173,7 @@
     "staminaCost": 0,
     "idleParticleEffectId": null,
     "createdAt": "2026-08-17T03:27:35.310Z",
-    "updatedAt": "2026-09-22T22:54:00.865Z",
+    "updatedAt": "2026-09-29T03:06:06.511Z",
     "idleParticleEffect": null,
     "dropTable": null
   },
@@ -166,7 +188,7 @@
     "staminaCost": 2,
     "idleParticleEffectId": "pe_fairy_sparkle",
     "createdAt": "2026-09-13T00:55:27.158Z",
-    "updatedAt": "2026-09-25T03:41:51.932Z",
+    "updatedAt": "2026-09-29T03:06:06.515Z",
     "idleParticleEffect": {
       "id": "pe_fairy_sparkle",
       "name": "Fairy Sparkles",
@@ -210,7 +232,7 @@
         "spawnRadius": 30
       },
       "createdAt": "2026-09-13T01:34:00.471Z",
-      "updatedAt": "2026-09-22T22:54:00.621Z"
+      "updatedAt": "2026-09-29T03:06:06.247Z"
     },
     "dropTable": {
       "id": "cmugeyzrs0005qhftfmwj727y",

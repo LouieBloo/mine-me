@@ -193,7 +193,12 @@ export class MiningSessionManager {
     if (extractedItems.length > 0) {
       for (const item of extractedItems) {
         const dbItem = await prisma.item.findFirst({
-          where: { name: item.itemName },
+          where: {
+            OR: [
+              { id: item.itemId },
+              { name: item.itemName },
+            ],
+          },
         });
         if (dbItem) {
           await InventoryService.giveItemToCharacter(characterId, dbItem.id, item.quantity);

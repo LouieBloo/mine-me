@@ -4,6 +4,11 @@ import express from 'express';
 import { adminRouter } from '../src/routes/admin';
 import { DEFAULT_MINING_MAP_CONFIG } from '@mine-me/shared';
 
+export const mockSyncJson = vi.fn();
+vi.mock('../src/services/admin.service', () => ({
+  syncJson: (...args: any[]) => mockSyncJson(...args),
+}));
+
 // Mock auth middleware
 vi.mock('../src/middleware/auth', () => ({
   adminMiddleware: (req: any, res: any, next: any) => next(),
@@ -65,6 +70,7 @@ describe('Admin Mining Config API Routes', () => {
     expect(res.body.silveriumPercentage).toBe(3);
     expect(res.body.silveriumMinDepth).toBe(15);
     expect(res.body.oreClusterChance).toBe(75);
+    expect(mockSyncJson).toHaveBeenCalledWith('mining_map_config.json', expect.any(Object));
   });
 
   it('PUT /admin/mining-config updates and saves rigid body physics parameters', async () => {

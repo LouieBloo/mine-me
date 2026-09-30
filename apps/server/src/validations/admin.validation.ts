@@ -36,9 +36,10 @@ export const itemValidation = [
   body('triggerMode').optional().isIn(['SINGLE', 'HOLD']).withMessage('triggerMode must be SINGLE or HOLD'),
   body('experience').optional().isInt({ min: 0 }).withMessage('Experience must be >= 0'),
   body('combatScore').optional().isInt({ min: 0 }).withMessage('Combat Score must be >= 0'),
-  body('defenseScore').optional().isInt({ min: 0 }).withMessage('Defense Score must be >= 0'),
   body('particleEffectId').optional({ nullable: true }).isString().withMessage('particleEffectId must be a string'),
-  body('physicsConfig').optional({ nullable: true }).isObject().withMessage('physicsConfig must be an object')
+  body('physicsConfig').optional({ nullable: true }).isObject().withMessage('physicsConfig must be an object'),
+  body('lightConfig').optional({ nullable: true }).isObject().withMessage('lightConfig must be an object'),
+  body('itemKey').optional({ nullable: true }).isString().withMessage('itemKey must be a string')
 ];
 
 export const mobValidation = [

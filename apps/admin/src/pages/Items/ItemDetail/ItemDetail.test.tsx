@@ -146,10 +146,15 @@ describe('ItemDetail Page', () => {
     expect(screen.getByText(/item_pickaxe_sfx\.wav/i)).toBeInTheDocument();
   });
 
-  it('does not render Weapon Sound Effect section when item subtype is not WEAPON', async () => {
-    renderDetail('item_torch');
-    await screen.findByText('World & In-Game Properties');
-    expect(screen.queryByText(/Weapon Sound Effect/i)).not.toBeInTheDocument();
+  it('renders Item Key input and accepts value', async () => {
+    renderDetail('new');
+    expect(await screen.findByText(/Item Key/i)).toBeInTheDocument();
+
+    const itemKeyInput = screen.getByPlaceholderText(/e\.g\. dynamite, ladder, torch/i) as HTMLInputElement;
+    expect(itemKeyInput.value).toBe('');
+
+    fireEvent.change(itemKeyInput, { target: { value: 'dynamite_v2' } });
+    expect(itemKeyInput.value).toBe('dynamite_v2');
   });
 });
 

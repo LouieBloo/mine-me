@@ -33,6 +33,7 @@ import { useMiningTicker } from './hooks/useMiningTicker';
 import { MiningTileRenderer, TILE_SIZE } from './renderers/MiningTileRenderer';
 import { MiningEntityRenderer } from './renderers/MiningEntityRenderer';
 import { DynamiteVisualManager } from './renderers/DynamiteVisualManager';
+import { DroppedItemVisualManager } from './renderers/DroppedItemVisualManager';
 import { miningProfiler } from './utils/MiningProfiler';
 import './MiningGrid.css';
 
@@ -118,6 +119,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const activeFallingRocksRef = useRef<{ id: string; x: number; y: number }[]>([]);
   const activeDynamitesRef = useRef<MiningActiveDynamite[]>([]);
   const dynamiteVisualManagerRef = useRef<DynamiteVisualManager>(new DynamiteVisualManager());
+  const droppedItemVisualManagerRef = useRef<DroppedItemVisualManager>(new DroppedItemVisualManager());
   const droppedItemsRef = useRef<MiningDroppedItem[]>([]);
   const lastDamageParticleTimeRef = useRef<Map<string, number>>(new Map());
   const lastWeaponSoundTimeRef = useRef<number>(0);
@@ -216,6 +218,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     dynamiteTextureRef,
     playerSpriteRef,
     remotePlayerRendererRef,
+    mobRendererRef,
     lightingEngineRef,
     flashlightRef,
     particleEngineRef,
@@ -552,6 +555,11 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         remotePlayerRendererRef.current.updatePlayers(payload.otherPlayers);
       }
 
+      // Update active mobs
+      if (mobRendererRef?.current && payload.mobs) {
+        mobRendererRef.current.updateMobs(payload.mobs);
+      }
+
       // Update vision range if provided
       if (payload.visionRange !== undefined) {
         onVisionChangeRef.current?.(payload.visionRange);
@@ -815,6 +823,10 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         lightingEngineRef.current,
         soundManager
       );
+      droppedItemVisualManagerRef.current.destroy(
+        particleEngineRef.current,
+        lightingEngineRef.current
+      );
     };
   }, [onEvent, containersReady]);
 
@@ -830,6 +842,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     playerFacingDirRef,
     playerSpriteRef,
     remotePlayerRendererRef,
+    mobRendererRef,
     activeFallingRocksRef,
     fallingRockGraphicsMap,
     dynamitesContainerRef,
@@ -837,6 +850,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     dynamiteGraphicsMap,
     dynamiteTextureRef,
     dynamiteVisualManagerRef,
+    droppedItemVisualManagerRef,
     droppedItemsRef,
     reticleGraphicsRef,
     mouseControllerRef,

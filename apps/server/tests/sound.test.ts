@@ -6,6 +6,12 @@ import { publicRouter } from '../src/routes/public';
 import fs from 'fs';
 import path from 'path';
 
+// Mock syncJson
+export const mockSyncJson = vi.fn();
+vi.mock('../src/services/admin.service', () => ({
+  syncJson: (...args: any[]) => mockSyncJson(...args),
+}));
+
 // Mock auth middleware
 vi.mock('../src/middleware/auth', () => ({
   adminMiddleware: (req: any, res: any, next: any) => next(),
@@ -158,9 +164,11 @@ describe('Sound Admin & Public API', () => {
     expect(res.body.type).toBe('BGM');
     expect(res.body.volume).toBe(0.8);
     expect(res.body.url).toContain('/assets/sounds/');
+    expect(mockSyncJson).toHaveBeenCalledWith('sounds.json', expect.any(Array));
   });
 
   it('PUT /admin/sounds/:id - updates sound properties', async () => {
+    mockSyncJson.mockClear();
     const res = await request(app)
       .put('/admin/sounds/sound_1')
       .send({
@@ -173,12 +181,15 @@ describe('Sound Admin & Public API', () => {
     expect(res.body.name).toBe('Cave Theme Remastered');
     expect(res.body.volume).toBe(0.65);
     expect(res.body.isActive).toBe(false);
+    expect(mockSyncJson).toHaveBeenCalledWith('sounds.json', expect.any(Array));
   });
 
   it('DELETE /admin/sounds/:id - deletes sound', async () => {
+    mockSyncJson.mockClear();
     const res = await request(app).delete('/admin/sounds/sound_2');
     expect(res.status).toBe(200);
     expect(mockSounds.find(s => s.id === 'sound_2')).toBeUndefined();
+    expect(mockSyncJson).toHaveBeenCalledWith('sounds.json', expect.any(Array));
   });
 
   it('GET /api/public/sounds/bgm - returns only active BGM tracks', async () => {

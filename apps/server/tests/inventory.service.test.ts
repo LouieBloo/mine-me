@@ -13,6 +13,9 @@ vi.mock('../src/index', () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    character: {
+      update: vi.fn(),
+    },
   },
 }));
 
@@ -95,6 +98,37 @@ describe('InventoryService', () => {
         experienceGranted: 0,
         itemDetails: mockItem,
         levelUpLoot: undefined
+      });
+    });
+
+    it('should increment character sol wallet and not create inventoryItem when item type is CURRENCY', async () => {
+      const mockSolItem = {
+        id: 'sol_item_1',
+        name: 'Sol',
+        type: 'CURRENCY',
+        subType: 'SOL',
+        experience: 0,
+      };
+
+      vi.mocked(prisma.item.findUnique).mockResolvedValue(mockSolItem as any);
+      vi.mocked(prisma.character.update).mockResolvedValue({ id: 'char1', sol: 150 } as any);
+
+      const result = await InventoryService.giveItemToCharacter('char1', 'sol_item_1', 25);
+
+      expect(prisma.character.update).toHaveBeenCalledWith({
+        where: { id: 'char1' },
+        data: {
+          sol: { increment: 25 },
+        },
+      });
+      expect(prisma.inventoryItem.create).not.toHaveBeenCalled();
+      expect(prisma.inventoryItem.update).not.toHaveBeenCalled();
+
+      expect(result).toEqual({
+        quantity: 25,
+        experienceGranted: 0,
+        itemDetails: mockSolItem,
+        levelUpLoot: undefined,
       });
     });
   });

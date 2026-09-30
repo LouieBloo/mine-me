@@ -20,6 +20,10 @@ export default function MobDetail() {
           defense: 1,
           attackPercentage: 50,
           defendPercentage: 50,
+          aiType: 'CHASE_AND_MINE',
+          moveSpeed: 2.5,
+          jumpForce: 6.0,
+          miningSpeed: 1.0,
           dropTable: null,
           animations: null,
         }
@@ -114,12 +118,22 @@ export default function MobDetail() {
             />
           </svg>
         </button>
-        <div>
+        <div className="flex-1">
           <h2 className="text-3xl font-black text-slate-800 tracking-tight uppercase">
             {isNew ? 'NEW MOB' : 'MOB DETAILS'}
           </h2>
           {!isNew && <p className="text-slate-500 font-medium">ID: {id}</p>}
         </div>
+        {!isNew && (
+          <button
+            type="button"
+            onClick={() => navigate('/mob-viewer')}
+            className="cursor-pointer px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs uppercase tracking-wider transition-all flex items-center space-x-1.5 border border-indigo-200"
+          >
+            <span>👾</span>
+            <span>Open in Mob Viewer</span>
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-xl border border-slate-200">
@@ -246,6 +260,63 @@ export default function MobDetail() {
                 onChange={(e) => {
                   setData({ ...data, defendPercentage: Number(e.target.value) });
                 }}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+              />
+            </div>
+          </div>
+
+          <h3 className="text-xl font-black text-slate-800 border-b border-slate-100 pb-2 pt-2">
+            AI & Mining Behavior
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                AI Logic Type
+              </label>
+              <select
+                value={data.aiType || 'CHASE_AND_MINE'}
+                onChange={(e) => setData({ ...data, aiType: e.target.value })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 cursor-pointer"
+              >
+                <option value="CHASE_AND_MINE">CHASE_AND_MINE (Aggressive)</option>
+                <option value="PATROL">PATROL (Wander / Guard)</option>
+                <option value="FLEE">FLEE (Avoid player)</option>
+                <option value="CUSTOM">CUSTOM</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                Move Speed
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                value={data.moveSpeed ?? 2.5}
+                onChange={(e) => setData({ ...data, moveSpeed: Number(e.target.value) })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                Jump Force
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                value={data.jumpForce ?? 6.0}
+                onChange={(e) => setData({ ...data, jumpForce: Number(e.target.value) })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                Mining Speed
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                value={data.miningSpeed ?? 1.0}
+                onChange={(e) => setData({ ...data, miningSpeed: Number(e.target.value) })}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
               />
             </div>

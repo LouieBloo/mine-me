@@ -8,6 +8,14 @@ export * from './utils/stamina';
 export * from './utils/url';
 export * from './physics/MiningPhysicsBody';
 export * from './physics/MiningPlayerBody';
+export * from './physics/MiningMobBody';
 export * from './physics/MiningRigidWorld';
+export * from './gameLogic/pathfinding/MiningPathfinder';
+export * from './gameLogic/ai/BaseMobAI';
+export * from './gameLogic/ai/ChaseAndMineAI';
+export * from './gameLogic/ai/PatrolAI';
+export * from './gameLogic/ai/MobAIRegistry';
+export * from './gameLogic/abilities/BaseMobAbility';
 export * from './utils/pixiParticlesConverter';
 export * from './sound';
+

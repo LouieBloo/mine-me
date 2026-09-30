@@ -36,4 +36,24 @@ describe('TemporaryBackpack Component', () => {
     expect(screen.getByText('25')).toBeInTheDocument();
     expect(screen.getByAltText('Copper Ore')).toBeInTheDocument();
   });
+
+  it('renders Sol currency item with icon and quantity', () => {
+    const mockItems: MiningBackpackItem[] = [
+      {
+        itemId: 'cmund29qj0000qr3nw7owbynf',
+        itemName: 'Sol',
+        iconUrl: '/assets/icons/items/cmund29qj0000qr3nw7owbynf_icon.png',
+        quantity: 100,
+      },
+    ];
+
+    render(<TemporaryBackpack items={mockItems} />);
+
+    expect(screen.getByText(/100 items/i)).toBeInTheDocument();
+    expect(screen.getByText('100')).toBeInTheDocument();
+    const icon = screen.getByAltText('Sol');
+    expect(icon).toBeInTheDocument();
+    expect(icon.getAttribute('src')).toContain('/assets/icons/items/cmund29qj0000qr3nw7owbynf_icon.png');
+  });
 });
+

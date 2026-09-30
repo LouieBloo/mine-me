@@ -16,7 +16,8 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "setup": "node -e 'if (!process.version.startsWith(\"v24\")) { console.error(\"ERROR: Node v24 is required. Please run \\\"nvm use\\\" to switch to the correct version.\"); process.exit(1); }' && npm install && npm run db:setup",
-    "db:setup": "cd apps/server && npx prisma db push && npx prisma generate"
+    "db:setup": "cd apps/server && npx prisma db push && npx prisma generate && npx prisma db seed",
+    "db:seed": "cd apps/server && npx prisma db seed"
   },
   "devDependencies": {
     "turbo": "latest",

@@ -41,3 +41,16 @@ describe('DEFAULT_PARTICLE_EFFECTS dynamite presets', () => {
     expect(config.blendMode).toBe('add');
   });
 });
+
+describe('Currency and Item Type Constants', () => {
+  it('includes CURRENCY in ITEM_TYPES and defines SOL subtype', async () => {
+    const { ITEM_TYPES, ITEM_SUBTYPES, TYPE_LABELS, TYPE_COLORS, TYPE_BORDER, SUBTYPE_LABEL } = await import('../src');
+    expect(ITEM_TYPES).toContain('CURRENCY');
+    expect(ITEM_SUBTYPES.CURRENCY).toContain('SOL');
+    expect(TYPE_LABELS.CURRENCY).toBe('Currency');
+    expect(TYPE_COLORS.CURRENCY).toBe('text-amber-400');
+    expect(TYPE_BORDER.CURRENCY).toBe('border-amber-500/30');
+    expect(SUBTYPE_LABEL.SOL).toBe('Sol');
+  });
+});
+

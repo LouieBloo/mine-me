@@ -142,6 +142,11 @@ export const getItem = async (req: Request, res: Response) => {
 
 export const createItem = async (req: Request, res: Response) => {
   const { itemEffects, particleEffect, ...itemData } = req.body;
+  if ('itemKey' in itemData) {
+    itemData.itemKey = itemData.itemKey && typeof itemData.itemKey === 'string' && itemData.itemKey.trim().length > 0
+      ? itemData.itemKey.trim().toLowerCase()
+      : null;
+  }
   const item = await prisma.item.create({
     data: {
       ...itemData,
@@ -177,6 +182,11 @@ export const createItem = async (req: Request, res: Response) => {
 
 export const updateItem = async (req: Request, res: Response) => {
   const { itemEffects, particleEffect, ...itemData } = req.body;
+  if ('itemKey' in itemData) {
+    itemData.itemKey = itemData.itemKey && typeof itemData.itemKey === 'string' && itemData.itemKey.trim().length > 0
+      ? itemData.itemKey.trim().toLowerCase()
+      : null;
+  }
   const item = await prisma.item.update({
     where: { id: req.params.id },
     data: {

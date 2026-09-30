@@ -24,24 +24,34 @@ export class InventoryService {
 
     const experienceGranted = (item.experience || 0) * quantity;
 
-    // 1. Give Item to Character Inventory
-    const existing = await prisma.inventoryItem.findFirst({
-      where: { characterId, itemId }
-    });
-
-    if (existing) {
-      await prisma.inventoryItem.update({
-        where: { id: existing.id },
-        data: { quantity: { increment: quantity } }
+    // 1. Award to Character (Wallet balance for CURRENCY, inventory slot for others)
+    if ((item.type as string) === 'CURRENCY') {
+      const isLear = item.subType?.toUpperCase() === 'LEAR' || item.name?.toUpperCase() === 'LEAR';
+      await prisma.character.update({
+        where: { id: characterId },
+        data: isLear
+          ? { lear: { increment: quantity } }
+          : { sol: { increment: quantity } },
       });
     } else {
-      await prisma.inventoryItem.create({
-        data: {
-          characterId,
-          itemId,
-          quantity
-        }
+      const existing = await prisma.inventoryItem.findFirst({
+        where: { characterId, itemId }
       });
+
+      if (existing) {
+        await prisma.inventoryItem.update({
+          where: { id: existing.id },
+          data: { quantity: { increment: quantity } }
+        });
+      } else {
+        await prisma.inventoryItem.create({
+          data: {
+            characterId,
+            itemId,
+            quantity
+          }
+        });
+      }
     }
 
     let levelUpLoot: LootResult | undefined = undefined;

@@ -241,6 +241,40 @@ async function main() {
     console.log('✅ Mining blocks seeded.');
   }
 
+  // 6. Seed Sounds
+  const soundsPath = path.join(dataPath, 'sounds.json');
+  if (fs.existsSync(soundsPath)) {
+    const sounds = JSON.parse(fs.readFileSync(soundsPath, 'utf-8'));
+    for (const soundData of sounds) {
+      await prisma.sound.upsert({
+        where: { id: soundData.id },
+        update: soundData,
+        create: soundData,
+      });
+    }
+    console.log('✅ Sounds seeded.');
+  }
+
+  // 7. Seed Mining Map Config
+  const mapConfigPath = path.join(dataPath, 'mining_map_config.json');
+  if (fs.existsSync(mapConfigPath)) {
+    const mapConfig = JSON.parse(fs.readFileSync(mapConfigPath, 'utf-8'));
+    const existingActive = await prisma.miningMapConfig.findFirst({
+      where: { isActive: true },
+    });
+    if (existingActive) {
+      await prisma.miningMapConfig.update({
+        where: { id: existingActive.id },
+        data: mapConfig,
+      });
+    } else {
+      await prisma.miningMapConfig.create({
+        data: mapConfig,
+      });
+    }
+    console.log('✅ Mining map config seeded.');
+  }
+
   console.log('🎉 Seed completed successfully!');
 }
 

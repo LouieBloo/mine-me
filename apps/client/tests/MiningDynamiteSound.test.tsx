@@ -86,6 +86,8 @@ vi.mock('../src/views/MineView/components/MiningGrid/hooks/useMiningScene', () =
     dynamiteTextureRef: { current: null },
     playerSpriteRef: { current: null },
     remotePlayerRendererRef: { current: null },
+    mobsContainerRef: { current: null },
+    mobRendererRef: { current: null },
     lightingEngineRef: { current: null },
     flashlightRef: { current: null },
     particleEngineRef: { current: null },

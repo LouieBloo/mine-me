@@ -73,6 +73,7 @@ model CityMaterial {
 
 model Item {
   id              String          @id @default(cuid())
+  itemKey         String?         @unique
   name            String
   description     String
   type            ItemType
@@ -98,6 +99,7 @@ model Item {
   particleEffectId String?
   particleEffect   ParticleEffect? @relation(fields: [particleEffectId], references: [id], onDelete: SetNull)
   physicsConfig   Json?
+  lightConfig     Json?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   cityMaterials   CityMaterial[]
@@ -156,6 +158,12 @@ model Mob {
   defense          Int
   attackPercentage Int        @default(50)
   defendPercentage Int        @default(50)
+  aiType           String     @default("CHASE_AND_MINE")
+  aiConfig         Json?
+  abilities        Json?
+  moveSpeed        Float      @default(3.0)
+  jumpForce        Float      @default(6.5)
+  miningSpeed      Float      @default(50.0)
   animations       Json?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -280,6 +288,7 @@ enum ItemType {
   GEAR
   MATERIAL
   CONSUMABLE
+  CURRENCY
 }
 
 enum ItemRarity {

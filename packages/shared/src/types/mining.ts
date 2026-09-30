@@ -1,4 +1,4 @@
-import type { GearSubType, ItemPhysicsConfig, DropTable, ItemSoundEffectsConfig } from './index';
+import type { GearSubType, ItemPhysicsConfig, DropTable, ItemSoundEffectsConfig, ItemLightConfig } from './index';
 import type { ParticleEffect } from './particles';
 
 // ============================================================================
@@ -335,6 +335,8 @@ export interface MiningDroppedItem {
   inGameSpriteUrl?: string | null;
   quantity: number;
   physicsConfig?: ItemPhysicsConfig;
+  particleEffectId?: string | null;
+  lightConfig?: ItemLightConfig | null;
 }
 
 /**
@@ -430,6 +432,8 @@ export interface MiningSessionClientState {
   otherPlayers?: MiningRemotePlayer[];
   /** Active thrown dynamites in the cavern world. */
   activeDynamites?: MiningActiveDynamite[];
+  /** Active mobs/NPCs in the mining cavern. */
+  mobs?: MiningActiveMob[];
 }
 
 /**
@@ -486,8 +490,49 @@ export interface MiningStateTickPayload {
   revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
   /** Other players in the shared room during multiplayer sessions. */
   otherPlayers?: MiningRemotePlayer[];
+  /** Active mobs and NPCs navigating and interacting with the mine. */
+  mobs?: MiningActiveMob[];
   /** Current vision discovery range in tiles. */
   visionRange?: number;
+}
+
+/** Supported AI behaviors for mobs. */
+export type MobAIType = 'CHASE_AND_MINE' | 'PATROL' | 'PASSIVE' | 'STATIONARY' | 'TUNNELER';
+
+/** Configurable parameters for mob AI decisions. */
+export interface MobAIConfig {
+  aggroRange?: number;
+  attackRange?: number;
+  attackCooldownMs?: number;
+  canMine?: boolean;
+  maxJumpTiles?: number;
+  patrolRadius?: number;
+  fleeHealthThreshold?: number;
+}
+
+/** Waypoint in an A* navigation path across the mine grid. */
+export interface MiningPathWaypoint {
+  x: number;
+  y: number;
+  action: 'WALK' | 'JUMP' | 'CLIMB' | 'FALL' | 'MINE';
+}
+
+/** State of an active mob within a mining cavern session. */
+export interface MiningActiveMob {
+  id: string; // Instance ID e.g. "mob_123_1"
+  mobId: string; // Database Mob ID
+  name: string;
+  position: Vector2D;
+  velocity: Vector2D;
+  health: number;
+  maxHealth: number;
+  attack: number;
+  defense: number;
+  isFacingLeft: boolean;
+  isMining: boolean;
+  miningTarget?: MiningPosition | null;
+  animationState: 'idle' | 'walk' | 'mine' | 'attack' | 'jump' | 'damage' | 'death';
+  animations?: any;
 }
 
 /**

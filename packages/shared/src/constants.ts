@@ -61,18 +61,21 @@ export const TYPE_LABELS: Record<ItemType, string> = {
   GEAR: 'Gear',
   MATERIAL: 'Materials',
   CONSUMABLE: 'Consumables',
+  CURRENCY: 'Currency',
 };
 
 export const TYPE_COLORS: Record<ItemType, string> = {
   GEAR: 'text-yellow-400',
   MATERIAL: 'text-emerald-400',
   CONSUMABLE: 'text-indigo-400',
+  CURRENCY: 'text-amber-400',
 };
 
 export const TYPE_BORDER: Record<ItemType, string> = {
   GEAR: 'border-yellow-500/30',
   MATERIAL: 'border-emerald-500/30',
   CONSUMABLE: 'border-indigo-500/30',
+  CURRENCY: 'border-amber-500/30',
 };
 
 export const RARITY_COLORS: Record<string, string> = {
@@ -110,6 +113,8 @@ export const SUBTYPE_LABEL: Record<string, string> = {
   MINERAL: 'Mineral',
   AGRICULTURE: 'Agri',
   HERB: 'Herb',
+  // Currency
+  SOL: 'Sol',
   // Potions
   HEALTH: 'Health',
   STAMINA: 'Stamina',

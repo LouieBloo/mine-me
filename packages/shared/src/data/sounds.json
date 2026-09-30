@@ -1,0 +1,32 @@
+[
+  {
+    "id": "sound_1",
+    "name": "Cave Theme",
+    "description": "Atmospheric cave music",
+    "type": "BGM",
+    "url": "/assets/sounds/cave-theme.mp3",
+    "fileName": "cave-theme.mp3",
+    "fileSize": 1024000,
+    "mimeType": "audio/mpeg",
+    "volume": 0.7,
+    "loop": true,
+    "isActive": true,
+    "createdAt": "2026-09-29T03:06:36.562Z",
+    "updatedAt": "2026-09-29T03:06:36.562Z"
+  },
+  {
+    "id": "sound_3",
+    "name": "Disabled Track",
+    "description": "Inactive BGM",
+    "type": "BGM",
+    "url": "/assets/sounds/inactive.mp3",
+    "fileName": "inactive.mp3",
+    "fileSize": 500000,
+    "mimeType": "audio/mpeg",
+    "volume": 0.5,
+    "loop": true,
+    "isActive": false,
+    "createdAt": "2026-09-29T03:06:36.562Z",
+    "updatedAt": "2026-09-29T03:06:36.562Z"
+  }
+]

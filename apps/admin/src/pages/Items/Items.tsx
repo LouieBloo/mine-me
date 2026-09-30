@@ -31,6 +31,7 @@ export default function Items() {
 
   const columnDefs = [
     { field: 'id', headerName: 'ID', minWidth: 150 },
+    { field: 'itemKey', headerName: 'Key', minWidth: 120 },
     { field: 'name', headerName: 'Name' },
     { field: 'type', headerName: 'Type' },
     { field: 'subType', headerName: 'Sub Type' },

@@ -15,6 +15,7 @@ import ItemDetail from './pages/Items/ItemDetail/ItemDetail';
 import MapEditor from './pages/MapEditor/MapEditor';
 import CharacterLevel from './pages/CharacterLevel/CharacterLevel';
 import CharacterViewer from './pages/CharacterViewer/CharacterViewer';
+import MobViewer from './pages/MobViewer/MobViewer';
 import Effects from './pages/Effects/Effects';
 import EffectDetail from './pages/Effects/EffectDetail';
 import ParticleEffects from './pages/ParticleEffects/ParticleEffects';
@@ -92,6 +93,10 @@ const router = createBrowserRouter([
       {
         path: "mobs",
         element: <Mobs />
+      },
+      {
+        path: "mob-viewer",
+        element: <MobViewer />
       },
       {
         path: "character-viewer",

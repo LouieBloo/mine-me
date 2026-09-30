@@ -25,6 +25,11 @@ import {
   type ItemPhysicsConfig,
   type ItemSoundEffectsConfig,
   calculateThrowVelocity,
+  MiningMobBody,
+  BaseMobAI,
+  MobAIRegistry,
+  type MobAIContext,
+  type MiningActiveMob,
 } from '@mine-me/shared';
 import * as planck from 'planck';
 import {
@@ -37,6 +42,27 @@ import {
 import { MiningPlayerBody } from './physics/MiningPlayerBody';
 import { MiningRockEntity } from './physics/MiningRockEntity';
 import { MiningDynamiteEntity } from './physics/MiningDynamiteEntity';
+
+export interface MiningActiveMobSession {
+  id: string;
+  mobId: string;
+  name: string;
+  mobBody: MiningMobBody;
+  ai: BaseMobAI;
+  health: number;
+  maxHealth: number;
+  attack: number;
+  defense: number;
+  miningSpeed: number;
+  attackCooldownMs: number;
+  dropTable?: any;
+  animations?: any;
+  animationState: 'idle' | 'walk' | 'mine' | 'attack' | 'jump' | 'damage' | 'death';
+  isFacingLeft: boolean;
+  isMining: boolean;
+  miningTarget: MiningPosition | null;
+  miningProgressMs: number;
+}
 
 export interface MiningPlayerSession {
   characterId: string;
@@ -92,6 +118,9 @@ export class MiningGameEngine {
 
   public players: Map<string, MiningPlayerSession> = new Map();
   public primaryCharacterId: string = '';
+
+  public activeMobs: Map<string, MiningActiveMobSession> = new Map();
+  private mobCounter = 0;
 
   public droppedItems: MiningDroppedItem[] = [];
   public activeItemBodies: Map<string, planck.Body> = new Map();
@@ -620,7 +649,7 @@ export class MiningGameEngine {
         }
       }
       if (this.itemsCache) {
-        return this.itemsCache.find((i: any) => i.id === itemId || i.name?.toLowerCase() === itemId.toLowerCase());
+        return this.itemsCache.find((i: any) => i.id === itemId || i.itemKey === itemId || i.name?.toLowerCase() === itemId.toLowerCase());
       }
     } catch {
       // ignore
@@ -661,7 +690,7 @@ export class MiningGameEngine {
       if (tileType === MiningTileType.MINERAL) {
         dropsToSpawn.push({ itemId: 'copper_ore', quantity: 1 });
       } else if (tileType === MiningTileType.CHEST) {
-        dropsToSpawn.push({ itemId: 'gold_coin', quantity: 50 });
+        dropsToSpawn.push({ itemId: 'sol', quantity: 50 });
       }
     }
 
@@ -702,6 +731,8 @@ export class MiningGameEngine {
         inGameSpriteUrl: itemData?.inGameSpriteUrl || null,
         quantity: drop.quantity,
         physicsConfig: itemData?.physicsConfig,
+        particleEffectId: itemData?.particleEffectId || null,
+        lightConfig: itemData?.lightConfig || null,
       });
     });
 
@@ -976,6 +1007,9 @@ export class MiningGameEngine {
       }
     }
 
+    // 5.5. Update Active Mobs (AI, Physics, Mining, Combat)
+    this.updateActiveMobs(dt);
+
     // 6. Broadcast 30 Hz State Tick
     this.broadcastStateTick();
   }
@@ -1097,6 +1131,15 @@ export class MiningGameEngine {
         if (dtx * dtx + dty * dty <= radiusSq) {
           this.stopMining(session.characterId);
         }
+      }
+    }
+
+    // 2.5. Damage active mobs caught within blast radius
+    for (const mob of this.activeMobs.values()) {
+      const mdx = mob.mobBody.position.x - cx;
+      const mdy = mob.mobBody.position.y - cy;
+      if (mdx * mdx + mdy * mdy <= radiusSq) {
+        this.damageMob(mob.id, 50);
       }
     }
 
@@ -1283,6 +1326,26 @@ export class MiningGameEngine {
         });
       }
 
+      const mobsPayload: MiningActiveMob[] = [];
+      for (const mob of this.activeMobs.values()) {
+        mobsPayload.push({
+          id: mob.id,
+          mobId: mob.mobId,
+          name: mob.name,
+          position: { x: mob.mobBody.position.x, y: mob.mobBody.position.y },
+          velocity: { x: mob.mobBody.velocity.x, y: mob.mobBody.velocity.y },
+          health: mob.health,
+          maxHealth: mob.maxHealth,
+          attack: mob.attack,
+          defense: mob.defense,
+          isFacingLeft: mob.isFacingLeft,
+          isMining: mob.isMining,
+          miningTarget: mob.miningTarget || undefined,
+          animationState: mob.animationState,
+          animations: mob.animations,
+        });
+      }
+
       const payload: MiningStateTickPayload = {
         tick: this.tickCount,
         position: session.playerBody.position,
@@ -1297,6 +1360,7 @@ export class MiningGameEngine {
         explosions: explosionsToSend,
         revealedTiles: revealedToSend,
         otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
+        mobs: mobsPayload.length > 0 ? mobsPayload : undefined,
         visionRange: session.visionRange,
       };
 
@@ -1331,4 +1395,329 @@ export class MiningGameEngine {
       this.onTimeout(this.primaryCharacterId || this.roomId);
     }
   }
+
+  /**
+   * Spawns an active mob entity in the mine.
+   */
+  public spawnMob(
+    mobData: {
+      id?: string;
+      name?: string;
+      level?: number;
+      health?: number;
+      attack?: number;
+      defense?: number;
+      aiType?: string;
+      moveSpeed?: number;
+      jumpForce?: number;
+      miningSpeed?: number;
+      animations?: any;
+      dropTable?: any;
+    },
+    position?: Vector2D
+  ): MiningActiveMobSession {
+    this.mobCounter++;
+    const instanceId = `mob_${Date.now()}_${this.mobCounter}`;
+    const mobId = mobData.id || `mob_custom_${this.mobCounter}`;
+    const name = mobData.name || 'Mob';
+
+    let spawnPos = position;
+    if (!spawnPos) {
+      spawnPos = this.findValidCavernSpawnPosition();
+    }
+
+    const halfHeight = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE));
+    const mobBody = new MiningMobBody({
+      position: { x: spawnPos.x, y: spawnPos.y - halfHeight },
+      moveSpeed: mobData.moveSpeed ?? 3.0,
+      jumpForce: mobData.jumpForce ?? 6.5,
+    });
+
+    const ai = MobAIRegistry.create(mobData.aiType, mobId, instanceId);
+
+    const session: MiningActiveMobSession = {
+      id: instanceId,
+      mobId,
+      name,
+      mobBody,
+      ai,
+      health: mobData.health ?? 50,
+      maxHealth: mobData.health ?? 50,
+      attack: mobData.attack ?? 10,
+      defense: mobData.defense ?? 2,
+      miningSpeed: mobData.miningSpeed ?? 50.0,
+      attackCooldownMs: 1200,
+      dropTable: mobData.dropTable,
+      animations: mobData.animations,
+      animationState: 'idle',
+      isFacingLeft: false,
+      isMining: false,
+      miningTarget: null,
+      miningProgressMs: 0,
+    };
+
+    this.activeMobs.set(instanceId, session);
+    return session;
+  }
+
+  /**
+   * Scans procedural cavern floor tiles to locate a stable spawn position.
+   */
+  public findValidCavernSpawnPosition(): Vector2D {
+    const candidates: Vector2D[] = [];
+    for (let y = 10; y < MINING_CONFIG.GRID_HEIGHT - 3; y++) {
+      for (let x = 2; x < MINING_CONFIG.GRID_WIDTH - 2; x++) {
+        const tile = this.grid[y][x];
+        const floor = this.grid[y + 1]?.[x];
+        if (tile && tile.type === MiningTileType.EMPTY && floor && isTileSolid(floor.type)) {
+          candidates.push({ x: x + 0.5, y: y + 1.0 });
+        }
+      }
+    }
+
+    if (candidates.length > 0) {
+      const idx = Math.floor(Math.random() * candidates.length);
+      return candidates[idx];
+    }
+
+    return { x: 22.5, y: 15.0 };
+  }
+
+  /**
+   * Updates all active mobs: AI decisions, physics stepping, tile excavation, and player combat.
+   */
+  public updateActiveMobs(dt: number): void {
+    if (this.activeMobs.size === 0) return;
+
+    for (const mob of this.activeMobs.values()) {
+      if (mob.health <= 0) continue;
+
+      const aiContext: MobAIContext = {
+        mobId: mob.mobId,
+        instanceId: mob.id,
+        position: { x: mob.mobBody.position.x, y: mob.mobBody.position.y },
+        velocity: { x: mob.mobBody.velocity.x, y: mob.mobBody.velocity.y },
+        health: mob.health,
+        maxHealth: mob.maxHealth,
+        attack: mob.attack,
+        defense: mob.defense,
+        isGrounded: mob.mobBody.isGrounded,
+        isOnLadder: mob.mobBody.isOnLadder,
+        grid: this.grid,
+        players: Array.from(this.players.values()).map((p) => ({
+          characterId: p.characterId,
+          characterName: p.characterName,
+          position: { x: p.playerBody.position.x, y: p.playerBody.position.y },
+          health: 100,
+        })),
+        config: {
+          canMine: true,
+          aggroRange: 20,
+          attackRange: 1.25,
+          attackCooldownMs: mob.attackCooldownMs,
+        },
+      };
+
+      const intent = mob.ai.update(dt, aiContext);
+
+      mob.mobBody.processMovement(
+        intent.moveX,
+        intent.jump,
+        intent.climbUp,
+        intent.climbDown,
+        this.grid
+      );
+      mob.mobBody.update(dt, this.grid);
+      mob.isFacingLeft = mob.mobBody.isFacingLeft;
+
+      if (intent.isAttacking && intent.attackTargetId) {
+        mob.animationState = 'attack';
+        const targetPlayer = this.players.get(intent.attackTargetId);
+        if (targetPlayer) {
+          this.handleMobAttackPlayer(mob, targetPlayer);
+        }
+      } else if (intent.isMining && intent.miningTarget) {
+        mob.isMining = true;
+        mob.miningTarget = intent.miningTarget;
+        mob.animationState = 'mine';
+        this.handleMobMining(mob, intent.miningTarget, dt);
+      } else {
+        mob.isMining = false;
+        mob.miningTarget = null;
+        mob.animationState = intent.animationState;
+      }
+    }
+  }
+
+  /**
+   * Processes mining damage applied to a tile by an active mob.
+   */
+  public handleMobMining(mob: MiningActiveMobSession, target: MiningPosition, dt: number): void {
+    if (!isInBounds(target.x, target.y)) {
+      mob.isMining = false;
+      mob.miningTarget = null;
+      return;
+    }
+
+    const tile = this.grid[target.y][target.x];
+    if (!tile || !isTileMineable(tile.type)) {
+      mob.isMining = false;
+      mob.miningTarget = null;
+      return;
+    }
+
+    const prevStage = getDamageStage(tile);
+    const speedMultiplier = mob.miningSpeed / 100;
+    tile.damageMs = (tile.damageMs || 0) + dt * 1000 * speedMultiplier;
+    mob.miningProgressMs = tile.damageMs;
+
+    const newStage = getDamageStage(tile);
+    if (newStage !== prevStage) {
+      this.pendingRevealedTiles.push({
+        x: target.x,
+        y: target.y,
+        type: tile.type,
+        damageStage: newStage,
+      });
+    }
+
+    const requiredTime = getTileMineTime(tile.type);
+    if (tile.damageMs >= requiredTime) {
+      const previousType = tile.type;
+      tile.type = MiningTileType.EMPTY;
+      tile.revealed = true;
+      tile.damageMs = 0;
+
+      this.rigidWorld.removeTileCollider(target.x, target.y);
+      this.pendingRevealedTiles.push({
+        x: target.x,
+        y: target.y,
+        type: MiningTileType.EMPTY,
+        damageStage: 0,
+      });
+
+      this.spawnBlockDrops(target.x, target.y, previousType);
+
+      mob.isMining = false;
+      mob.miningTarget = null;
+      mob.miningProgressMs = 0;
+    }
+  }
+
+  /**
+   * Handles mob melee attack on a player.
+   */
+  public handleMobAttackPlayer(mob: MiningActiveMobSession, player: MiningPlayerSession): void {
+    const damage = Math.max(1, mob.attack);
+    if (player.socket && player.socket.connected) {
+      player.socket.emit('player_damaged', {
+        damage,
+        mobId: mob.id,
+        mobName: mob.name,
+      });
+    }
+  }
+
+  /**
+   * Applies damage to an active mob.
+   */
+  public damageMob(instanceId: string, damage: number): void {
+    const mob = this.activeMobs.get(instanceId);
+    if (!mob || mob.health <= 0) return;
+
+    mob.health -= damage;
+    mob.animationState = 'damage';
+
+    if (mob.health <= 0) {
+      this.killMob(mob);
+    }
+  }
+
+  /**
+   * Handles mob defeat: spawns drops and removes from active simulation.
+   */
+  public killMob(mob: MiningActiveMobSession): void {
+    mob.health = 0;
+    mob.animationState = 'death';
+    this.spawnMobDrops(mob);
+    this.activeMobs.delete(mob.id);
+  }
+
+  /**
+   * Spawns item drops for a defeated mob based on its configured DropTable.
+   */
+  public spawnMobDrops(mob: MiningActiveMobSession): void {
+    const dropTable = mob.dropTable;
+    const dropsToSpawn: { itemId: string; quantity: number }[] = [];
+
+    if (dropTable && Array.isArray(dropTable.items) && dropTable.items.length > 0) {
+      for (const entry of dropTable.items) {
+        const roll = Math.random() * 100;
+        if (roll <= entry.chance) {
+          const qty = Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1)) + entry.minQuantity;
+          if (qty > 0) {
+            dropsToSpawn.push({ itemId: entry.itemId, quantity: qty });
+          }
+        }
+      }
+    }
+
+    if (dropTable && (dropTable.solMin > 0 || dropTable.solMax > 0)) {
+      const minSol = dropTable.solMin || 0;
+      const maxSol = dropTable.solMax || minSol;
+      const solQty = Math.floor(Math.random() * (maxSol - minSol + 1)) + minSol;
+      if (solQty > 0) {
+        dropsToSpawn.push({ itemId: 'sol', quantity: solQty });
+      }
+    }
+
+    if (dropsToSpawn.length === 0) return;
+
+    const N = dropsToSpawn.length;
+    const tx = mob.mobBody.position.x;
+    const ty = mob.mobBody.position.y;
+
+    dropsToSpawn.forEach((drop, idx) => {
+      this.droppedItemCounter++;
+      const id = `mob_drop_${Date.now()}_${this.droppedItemCounter}_${idx}`;
+      const itemData = this.getItemData(drop.itemId);
+
+      const offsetX = N > 1 ? (idx - (N - 1) / 2) * 0.25 : 0;
+      const posX = tx + offsetX;
+      const posY = ty;
+
+      const vx = N > 1
+        ? (idx - (N - 1) / 2) * 1.5 + (Math.random() - 0.5) * 0.4
+        : (Math.random() - 0.5) * 0.5;
+      const vy = N > 1
+        ? -2.2 - Math.random() * 1.0
+        : -1.8 - Math.random() * 0.6;
+
+      const rigidBody = this.rigidWorld.createItemBody(
+        id,
+        { x: posX, y: posY },
+        { x: vx, y: vy }
+      );
+      this.activeItemBodies.set(id, rigidBody);
+
+      const droppedItem: MiningDroppedItem = {
+        id,
+        position: { x: posX, y: posY },
+        velocity: { x: vx, y: vy },
+        itemId: drop.itemId,
+        itemName: itemData?.name || drop.itemId,
+        iconUrl: itemData?.iconUrl || null,
+        inGameSpriteUrl: itemData?.inGameSpriteUrl || null,
+        quantity: drop.quantity,
+        physicsConfig: itemData?.physicsConfig,
+        particleEffectId: itemData?.particleEffectId || null,
+        lightConfig: itemData?.lightConfig || null,
+      };
+
+      this.droppedItems.push(droppedItem);
+    });
+
+    this.droppedItemsDirty = true;
+  }
 }
+

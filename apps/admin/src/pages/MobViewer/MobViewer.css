@@ -1,0 +1,22 @@
+.mob-viewer-page {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.mob-viewer-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.mob-viewer-card:hover {
+  transform: translateY(-2px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

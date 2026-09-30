@@ -1,5 +1,6 @@
 import { prisma } from '../index';
 import { DEFAULT_MINING_MAP_CONFIG, type MiningMapConfigData } from '@mine-me/shared';
+import { syncJson } from './admin.service';
 
 let cachedConfig: MiningMapConfigData | null = null;
 
@@ -130,6 +131,8 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     rockGravityScale: saved.rockGravityScale,
     rockRestitution: saved.rockRestitution,
   };
+
+  syncJson('mining_map_config.json', payload);
 
   return cachedConfig;
 }

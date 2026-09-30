@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Application, Container, Graphics, Sprite, TilingSprite, Assets, Texture } from 'pixi.js';
 import { ModularCharacterSprite, type GearLayerDescriptor } from '../../../../../components/game/sprites';
 import { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
+import { MiningMobRenderer } from '../renderers/MiningMobRenderer';
 import { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
 import { SpotLight } from '../../../../../components/game/lighting/SpotLight';
@@ -70,6 +71,8 @@ export function useMiningScene({
   const playerSpriteRef = useRef<ModularCharacterSprite | null>(null);
   const otherPlayersContainerRef = useRef<Container | null>(null);
   const remotePlayerRendererRef = useRef<MiningRemotePlayerRenderer | null>(null);
+  const mobsContainerRef = useRef<Container | null>(null);
+  const mobRendererRef = useRef<MiningMobRenderer | null>(null);
   const lightingEngineRef = useRef<LightingEngine | null>(null);
   const flashlightRef = useRef<SpotLight | null>(null);
   const particleEngineRef = useRef<ParticleEngine | null>(null);
@@ -98,6 +101,7 @@ export function useMiningScene({
     const fallingRocksContainer = new Container();
     const droppedItemsContainer = new Container();
     const dynamitesContainer = new Container();
+    const mobsContainer = new Container();
     const otherPlayersContainer = new Container();
     const playerContainer = new Container();
     const particlesContainer = new Container();
@@ -134,6 +138,7 @@ export function useMiningScene({
     gridContainer.addChild(fallingRocksContainer);
     gridContainer.addChild(droppedItemsContainer);
     gridContainer.addChild(dynamitesContainer);
+    gridContainer.addChild(mobsContainer);
     gridContainer.addChild(reticleContainer);
     gridContainer.addChild(otherPlayersContainer);
     gridContainer.addChild(playerContainer);
@@ -147,6 +152,7 @@ export function useMiningScene({
     fallingRocksContainerRef.current = fallingRocksContainer;
     droppedItemsContainerRef.current = droppedItemsContainer;
     dynamitesContainerRef.current = dynamitesContainer;
+    mobsContainerRef.current = mobsContainer;
     otherPlayersContainerRef.current = otherPlayersContainer;
     playerContainerRef.current = playerContainer;
     particlesContainerRef.current = particlesContainer;
@@ -158,6 +164,12 @@ export function useMiningScene({
     remotePlayerRendererRef.current = remotePlayerRenderer;
     if (initialSessionState.otherPlayers) {
       remotePlayerRenderer.updatePlayers(initialSessionState.otherPlayers);
+    }
+
+    const mobRenderer = new MiningMobRenderer(mobsContainer);
+    mobRendererRef.current = mobRenderer;
+    if (initialSessionState.mobs) {
+      mobRenderer.updateMobs(initialSessionState.mobs);
     }
 
     setContainersReady(true);
@@ -351,11 +363,13 @@ export function useMiningScene({
       }
 
       // Fetch dynamic item sound and visual profiles from API
+      let dynamicItems: any[] = [];
       try {
         const itemsRes = await fetch(getAssetUrl('/api/public/items'));
         if (itemsRes.ok) {
           const items = await itemsRes.json();
           if (Array.isArray(items)) {
+            dynamicItems = items;
             DynamiteVisualManager.setCustomItems(items);
           }
         }
@@ -363,8 +377,11 @@ export function useMiningScene({
         console.warn('[MiningGrid] Could not load dynamic items:', err);
       }
 
-      // Always load Torch and Ladder tile textures
-      const torchTileUrl = getAssetUrl('/assets/icons/items/cmt4m445e0000xx0vdu7ve6q0_icon.png');
+      // Always load Torch and Ladder tile textures dynamically from item definitions
+      const torchItem = dynamicItems.find(
+        (i) => i.itemKey === 'torch' || i.subType?.toUpperCase() === 'TORCH' || i.name?.toLowerCase().includes('torch')
+      );
+      const torchTileUrl = getAssetUrl(torchItem?.iconUrl || torchItem?.inGameSpriteUrl || '/assets/icons/items/cmt4m445e0000xx0vdu7ve6q0_icon.png');
       const torchPromise = Assets.load(torchTileUrl)
         .then((texture) => {
           blockTexturesRef.current.set(MiningTileType.TORCH, texture);
@@ -375,7 +392,10 @@ export function useMiningScene({
         });
       blockPromises.push(torchPromise);
 
-      const ladderAlwaysTileUrl = getAssetUrl('/assets/icons/items/cmts2w7ql0000ji8t408x8rci_icon.png');
+      const ladderItem = dynamicItems.find(
+        (i) => i.itemKey === 'ladder' || i.subType?.toUpperCase() === 'LADDER' || i.name?.toLowerCase().includes('ladder')
+      );
+      const ladderAlwaysTileUrl = getAssetUrl(ladderItem?.iconUrl || ladderItem?.inGameSpriteUrl || '/assets/mining/block_entrance-block.png');
       const ladderAlwaysPromise = Assets.load(ladderAlwaysTileUrl)
         .then((texture) => {
           blockTexturesRef.current.set(MiningTileType.LADDER, texture);
@@ -390,8 +410,11 @@ export function useMiningScene({
       const sprite = new ModularCharacterSprite(playerContainer);
       playerSpriteRef.current = sprite;
 
-      // Load dynamite icon texture for thrown dynamite rendering
-      const dynamiteIconUrl = getAssetUrl('/assets/icons/items/cmtz702uk0001nu7bn2tidnx0_icon.png');
+      // Load dynamite icon texture dynamically for thrown dynamite rendering
+      const dynamiteItem = dynamicItems.find(
+        (i) => i.itemKey === 'dynamite' || i.subType?.toUpperCase() === 'DYNAMITE' || i.name?.toLowerCase().includes('dynamite')
+      );
+      const dynamiteIconUrl = getAssetUrl(dynamiteItem?.iconUrl || dynamiteItem?.inGameSpriteUrl || '/assets/icons/items/cmtz702uk0001nu7bn2tidnx0_icon.png');
       Assets.load(dynamiteIconUrl)
         .then((texture) => {
           dynamiteTextureRef.current = texture;
@@ -450,6 +473,10 @@ export function useMiningScene({
         remotePlayerRendererRef.current.destroy();
         remotePlayerRendererRef.current = null;
       }
+      if (mobRendererRef.current) {
+        mobRendererRef.current.destroy();
+        mobRendererRef.current = null;
+      }
       if (playerSpriteRef.current) {
         playerSpriteRef.current.destroy();
         playerSpriteRef.current = null;
@@ -499,6 +526,8 @@ export function useMiningScene({
     dynamiteTextureRef,
     playerSpriteRef,
     remotePlayerRendererRef,
+    mobsContainerRef,
+    mobRendererRef,
     lightingEngineRef,
     flashlightRef,
     particleEngineRef,

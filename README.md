@@ -73,11 +73,16 @@ PORT=4000
 *Note: The React apps (`client` and `admin`) do not require environment variables for local development at this stage, as they are configured to proxy or connect directly to the local server.*
 
 ### 3. Database Setup (Prisma)
-Before running the server, you must generate the Prisma client and push the schema to your database.
+Before running the server, push the schema, generate the Prisma client, and seed the database with all core game definitions (items, blocks, cities, mobs, particle effects, sounds, and map configs):
 ```bash
+# From project root:
+npm run db:setup
+
+# Or manually:
 cd apps/server
 npx prisma db push
 npx prisma generate
+npx prisma db seed
 ```
 
 ---

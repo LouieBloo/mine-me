@@ -1,0 +1,48 @@
+.item-light-config-card {
+  border-radius: 1rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.item-light-preview-box {
+  background: #090d16;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #1e293b;
+}
+
+.item-light-glow-disk {
+  border-radius: 9999px;
+  pointer-events: none;
+  transition: width 0.15s ease, height 0.15s ease, opacity 0.15s ease;
+}
+
+@keyframes light-pulse-anim {
+  0%, 100% {
+    transform: scale(0.92);
+    opacity: var(--min-opacity, 0.4);
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: var(--max-opacity, 0.9);
+  }
+}
+
+@keyframes light-flicker-anim {
+  0% { transform: scale(1); opacity: var(--base-opacity, 0.7); }
+  25% { transform: scale(0.96); opacity: calc(var(--base-opacity, 0.7) * 0.85); }
+  50% { transform: scale(1.04); opacity: calc(var(--base-opacity, 0.7) * 1.15); }
+  75% { transform: scale(0.98); opacity: calc(var(--base-opacity, 0.7) * 0.9); }
+  100% { transform: scale(1); opacity: var(--base-opacity, 0.7); }
+}
+
+.item-light-anim-pulse {
+  animation: light-pulse-anim var(--pulse-dur, 2s) infinite ease-in-out;
+}
+
+.item-light-anim-flicker {
+  animation: light-flicker-anim var(--flicker-dur, 0.3s) infinite steps(4);
+}

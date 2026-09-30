@@ -35,7 +35,9 @@ export default function Mobs() {
     { field: 'level', headerName: 'Level' },
     { field: 'health', headerName: 'Health' },
     { field: 'attack', headerName: 'Atk' },
-    { field: 'defense', headerName: 'Def' }
+    { field: 'defense', headerName: 'Def' },
+    { field: 'aiType', headerName: 'AI Type' },
+    { field: 'moveSpeed', headerName: 'Speed' }
   ];
 
   return (
@@ -45,11 +47,19 @@ export default function Mobs() {
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">MOBS</h2>
           <p className="text-slate-500 font-medium">Manage enemy NPCs and mob types.</p>
         </div>
-        <button 
-          onClick={() => navigate('/mobs/new')}
-          className="cursor-pointer px-4 py-2 bg-slate-900 text-white font-bold rounded shadow hover:bg-slate-800 transition-all">
-          + Add Mob
-        </button>
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={() => navigate('/mob-viewer')}
+            className="cursor-pointer px-4 py-2 bg-indigo-600 text-white font-bold rounded shadow hover:bg-indigo-700 transition-all flex items-center space-x-1.5 text-sm">
+            <span>👾</span>
+            <span>Mob Viewer</span>
+          </button>
+          <button 
+            onClick={() => navigate('/mobs/new')}
+            className="cursor-pointer px-4 py-2 bg-slate-900 text-white font-bold rounded shadow hover:bg-slate-800 transition-all">
+            + Add Mob
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col min-h-[400px]">

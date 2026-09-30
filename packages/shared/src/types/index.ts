@@ -85,20 +85,22 @@ export interface CharacterStatUpdate {
 
 export type ItemRarity = 'LOW' | 'MEDIUM' | 'RARE' | 'VERY_RARE';
 
-export type ItemType = 'GEAR' | 'MATERIAL' | 'CONSUMABLE';
+export type ItemType = 'GEAR' | 'MATERIAL' | 'CONSUMABLE' | 'CURRENCY';
 
 export type GearSubType = 'HEAD' | 'SHOULDERS' | 'CHEST' | 'GAUNTLETS' | 'LEGGINGS' | 'BOOTS' | 'WEAPON';
 export type MaterialSubType = 'LUMBER' | 'MINERAL' | 'AGRICULTURE' | 'HERB';
 export type ConsumableSubType = 'POTION' | 'FOOD' | 'TORCH' | 'LADDER' | 'DYNAMITE' | 'OTHER';
+export type CurrencySubType = 'SOL';
 
-export type ItemSubType = GearSubType | MaterialSubType | ConsumableSubType;
+export type ItemSubType = GearSubType | MaterialSubType | ConsumableSubType | CurrencySubType;
 
-export const ITEM_TYPES: ItemType[] = ['GEAR', 'MATERIAL', 'CONSUMABLE'];
+export const ITEM_TYPES: ItemType[] = ['GEAR', 'MATERIAL', 'CONSUMABLE', 'CURRENCY'];
 
 export const ITEM_SUBTYPES: Record<ItemType, string[]> = {
   GEAR: ['HEAD', 'SHOULDERS', 'CHEST', 'GAUNTLETS', 'LEGGINGS', 'BOOTS', 'WEAPON'],
   MATERIAL: ['LUMBER', 'MINERAL', 'AGRICULTURE', 'HERB'],
   CONSUMABLE: ['POTION', 'FOOD', 'TORCH', 'LADDER', 'DYNAMITE', 'OTHER'],
+  CURRENCY: ['SOL'],
 };
 
 export const ITEM_RARITIES: ItemRarity[] = ['LOW', 'MEDIUM', 'RARE', 'VERY_RARE'];
@@ -135,8 +137,28 @@ export interface ItemPhysicsConfig {
   explosionFlashEffectId?: string;
 }
 
+export type LightType = 'POINT' | 'SPOT';
+export type LightEffectMode = 'STATIC' | 'PULSE' | 'FLICKER';
+
+export interface ItemLightConfig {
+  enabled: boolean;
+  type: LightType;
+  effect: LightEffectMode;
+  color: string;
+  radius: number;
+  intensity: number;
+  pulseSpeed?: number;
+  minIntensity?: number;
+  maxIntensity?: number;
+  flickerSpeed?: number;
+  flickerAmount?: number;
+  spotAngle?: number;
+  spotConeAngle?: number;
+}
+
 export interface GameItem {
   id: string;
+  itemKey?: string | null;
   name: string;
   description: string;
   type: ItemType;
@@ -160,6 +182,7 @@ export interface GameItem {
   particleEffect?: ParticleEffect | null;
   itemEffects?: ObjectEffects[];
   physicsConfig?: ItemPhysicsConfig | null;
+  lightConfig?: ItemLightConfig | null;
 }
 
 export interface GearItem extends GameItem {
@@ -233,6 +256,7 @@ export interface GameCity {
 }
 
 import type { SkeletonManifest } from './modularRig';
+import type { MobAIType, MobAIConfig } from './mining';
 
 export interface Mob {
   id: string;
@@ -241,6 +265,14 @@ export interface Mob {
   health: number;
   attack: number;
   defense: number;
+  attackPercentage?: number;
+  defendPercentage?: number;
+  aiType?: MobAIType;
+  aiConfig?: MobAIConfig | null;
+  abilities?: string[] | null;
+  moveSpeed?: number;
+  jumpForce?: number;
+  miningSpeed?: number;
   dropTable?: DropTable;
   animations?: SkeletonManifest | MobAtlas | null;
 }

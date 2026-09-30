@@ -47,6 +47,7 @@ export default function Layout() {
             Characters & Users
           </div>
           <NavLink to="/character-viewer" className={navLinkClass}>Character Viewer</NavLink>
+          <NavLink to="/mob-viewer" className={navLinkClass}>Mob Viewer</NavLink>
           <NavLink to="/character-levels" className={navLinkClass}>Levels Config</NavLink>
           <NavLink to="/mobs" className={navLinkClass}>Mobs Editor</NavLink>
           <NavLink to="/users" className={navLinkClass}>Users Editor</NavLink>
