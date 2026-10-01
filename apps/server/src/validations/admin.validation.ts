@@ -113,5 +113,8 @@ export const miningConfigValidation = [
   body('dynamiteFuseSeconds').optional().isFloat({ min: 0.5, max: 30 }).withMessage('Dynamite Fuse Seconds must be between 0.5 and 30'),
   body('rockGravityScale').optional().isFloat({ min: 0.1, max: 5 }).withMessage('Rock Gravity Scale must be between 0.1 and 5'),
   body('rockRestitution').optional().isFloat({ min: 0, max: 1 }).withMessage('Rock Restitution must be between 0 and 1'),
+  body('mobSpawnCount').optional().isInt({ min: 0, max: 20 }).withMessage('Mob Spawn Count must be between 0 and 20'),
+  body('mobSpawnMinDepth').optional().isInt({ min: 1, max: 40 }).withMessage('Mob Spawn Min Depth must be between 1 and 40'),
+  body('allowedMobIds').optional().isArray().withMessage('Allowed Mob IDs must be an array of strings'),
 ];
 

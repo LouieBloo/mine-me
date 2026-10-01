@@ -62,6 +62,8 @@ export interface MiningActiveMobSession {
   isMining: boolean;
   miningTarget: MiningPosition | null;
   miningProgressMs: number;
+  mineRange: number;
+  hitStunDurationMs?: number;
 }
 
 export interface MiningPlayerSession {
@@ -84,6 +86,7 @@ export interface MiningPlayerSession {
   animationState: 'idle' | 'walk' | 'mine' | 'jump' | 'climb';
   lastRevealGridPos?: MiningPosition | null;
   backpackDirty?: boolean;
+  lastAttackTimeMs?: number;
 }
 
 export interface MiningEngineOptions {
@@ -127,6 +130,8 @@ export class MiningGameEngine {
   private droppedItemCounter = 0;
   private blocksCache: any[] | null = null;
   private itemsCache: any[] | null = null;
+  private mobsCache: any[] | null = null;
+  public mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>;
 
   public maxDurationSeconds = MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
   public elapsedTimeSeconds = 0;
@@ -164,7 +169,11 @@ export class MiningGameEngine {
       rockGravityScale: options.mapConfig?.rockGravityScale,
       rockRestitution: options.mapConfig?.rockRestitution,
     });
+    this.mapConfig = options.mapConfig;
     this.rigidWorld.setGrid(this.grid);
+
+    // Automatically spawn cavern mobs if configured
+    this.populateCavernMobs();
 
     // If options included an initial character and socket, initialize player session
     if (options.characterId && options.socket) {
@@ -880,7 +889,7 @@ export class MiningGameEngine {
       session.playerBody.update(dt, this.grid);
 
       // Animation state determination
-      if (session.isMining) {
+      if (session.isMining || session.inputs.miningKey) {
         session.animationState = 'mine';
       } else if (session.playerBody.isOnLadder) {
         session.animationState = Math.abs(session.playerBody.velocity.y) > 0.1 ? 'climb' : 'idle';
@@ -947,6 +956,31 @@ export class MiningGameEngine {
           const tile = this.grid[target.y][target.x];
           if (isTileMineable(tile.type)) {
             this.startMining({ x: target.x, y: target.y }, session.characterId);
+          }
+        }
+      }
+    }
+
+    // 4.5. Player Melee Attack against Mobs
+    const nowMs = Date.now();
+    for (const session of this.players.values()) {
+      if (session.inputs.miningKey) {
+        if (!session.lastAttackTimeMs || nowMs - session.lastAttackTimeMs >= 500) {
+          const px = session.playerBody.position.x;
+          const py = session.playerBody.position.y;
+          for (const mob of this.activeMobs.values()) {
+            if (mob.health <= 0) continue;
+            const mx = mob.mobBody.position.x;
+            const my = mob.mobBody.position.y;
+            const dist = Math.hypot(mx - px, my - py);
+            if (dist <= 2.2) {
+              session.lastAttackTimeMs = nowMs;
+              this.damageMob(mob.id, 15);
+              const dir = Math.sign(mx - px) || (session.isFacingLeft ? -1 : 1);
+              mob.mobBody.velocity.x = dir * 4.0;
+              mob.mobBody.velocity.y = -3.0;
+              break;
+            }
           }
         }
       }
@@ -1274,6 +1308,32 @@ export class MiningGameEngine {
     }
   }
 
+  /**
+   * Get active mobs payload for client synchronization.
+   */
+  public getActiveMobs(): MiningActiveMob[] {
+    const mobsPayload: MiningActiveMob[] = [];
+    for (const mob of this.activeMobs.values()) {
+      mobsPayload.push({
+        id: mob.id,
+        mobId: mob.mobId,
+        name: mob.name,
+        position: { x: mob.mobBody.position.x, y: mob.mobBody.position.y },
+        velocity: { x: mob.mobBody.velocity.x, y: mob.mobBody.velocity.y },
+        health: mob.health,
+        maxHealth: mob.maxHealth,
+        attack: mob.attack,
+        defense: mob.defense,
+        isFacingLeft: mob.isFacingLeft,
+        isMining: mob.isMining,
+        miningTarget: mob.miningTarget || undefined,
+        animationState: mob.animationState,
+        animations: mob.animations,
+      });
+    }
+    return mobsPayload;
+  }
+
   private broadcastStateTick(): void {
     const fallingRocksPayload: MiningFallingRock[] | undefined =
       this.activeRocks.length > 0
@@ -1304,6 +1364,7 @@ export class MiningGameEngine {
 
     const revealedToSend = this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined;
     const explosionsToSend = this.pendingExplosions.length > 0 ? this.pendingExplosions : undefined;
+    const mobsPayload = this.getActiveMobs();
 
     for (const session of this.players.values()) {
       if (!session.socket || !session.socket.connected) continue;
@@ -1323,26 +1384,6 @@ export class MiningGameEngine {
           flashlightOn: other.flashlightOn,
           animationState: other.animationState,
           gearLayers: other.gearLayers,
-        });
-      }
-
-      const mobsPayload: MiningActiveMob[] = [];
-      for (const mob of this.activeMobs.values()) {
-        mobsPayload.push({
-          id: mob.id,
-          mobId: mob.mobId,
-          name: mob.name,
-          position: { x: mob.mobBody.position.x, y: mob.mobBody.position.y },
-          velocity: { x: mob.mobBody.velocity.x, y: mob.mobBody.velocity.y },
-          health: mob.health,
-          maxHealth: mob.maxHealth,
-          attack: mob.attack,
-          defense: mob.defense,
-          isFacingLeft: mob.isFacingLeft,
-          isMining: mob.isMining,
-          miningTarget: mob.miningTarget || undefined,
-          animationState: mob.animationState,
-          animations: mob.animations,
         });
       }
 
@@ -1411,6 +1452,8 @@ export class MiningGameEngine {
       moveSpeed?: number;
       jumpForce?: number;
       miningSpeed?: number;
+      aiConfig?: any;
+      mineRange?: number;
       animations?: any;
       dropTable?: any;
     },
@@ -1429,8 +1472,8 @@ export class MiningGameEngine {
     const halfHeight = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE));
     const mobBody = new MiningMobBody({
       position: { x: spawnPos.x, y: spawnPos.y - halfHeight },
-      moveSpeed: mobData.moveSpeed ?? 3.0,
-      jumpForce: mobData.jumpForce ?? 6.5,
+      moveSpeed: mobData.moveSpeed && mobData.moveSpeed >= 2.8 ? mobData.moveSpeed : 3.2,
+      jumpForce: mobData.jumpForce && mobData.jumpForce >= 8.0 ? mobData.jumpForce : 8.8,
     });
 
     const ai = MobAIRegistry.create(mobData.aiType, mobId, instanceId);
@@ -1445,7 +1488,10 @@ export class MiningGameEngine {
       maxHealth: mobData.health ?? 50,
       attack: mobData.attack ?? 10,
       defense: mobData.defense ?? 2,
-      miningSpeed: mobData.miningSpeed ?? 50.0,
+      miningSpeed:
+        mobData.miningSpeed !== undefined && mobData.miningSpeed <= 10
+          ? mobData.miningSpeed * 100
+          : (mobData.miningSpeed ?? 80.0),
       attackCooldownMs: 1200,
       dropTable: mobData.dropTable,
       animations: mobData.animations,
@@ -1454,6 +1500,7 @@ export class MiningGameEngine {
       isMining: false,
       miningTarget: null,
       miningProgressMs: 0,
+      mineRange: mobData.aiConfig?.mineRange ?? (mobData as any).mineRange ?? 2.0,
     };
 
     this.activeMobs.set(instanceId, session);
@@ -1463,11 +1510,13 @@ export class MiningGameEngine {
   /**
    * Scans procedural cavern floor tiles to locate a stable spawn position.
    */
-  public findValidCavernSpawnPosition(): Vector2D {
+  public findValidCavernSpawnPosition(minDepth = 5): Vector2D {
     const candidates: Vector2D[] = [];
-    for (let y = 10; y < MINING_CONFIG.GRID_HEIGHT - 3; y++) {
+    const startY = Math.max(2, minDepth);
+    for (let y = startY; y < MINING_CONFIG.GRID_HEIGHT - 3; y++) {
       for (let x = 2; x < MINING_CONFIG.GRID_WIDTH - 2; x++) {
-        const tile = this.grid[y][x];
+        if (Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= 3 && y <= 5) continue;
+        const tile = this.grid[y]?.[x];
         const floor = this.grid[y + 1]?.[x];
         if (tile && tile.type === MiningTileType.EMPTY && floor && isTileSolid(floor.type)) {
           candidates.push({ x: x + 0.5, y: y + 1.0 });
@@ -1480,7 +1529,50 @@ export class MiningGameEngine {
       return candidates[idx];
     }
 
-    return { x: 22.5, y: 15.0 };
+    return { x: 22.5, y: Math.max(15, minDepth + 5) };
+  }
+
+  /**
+   * Helper to retrieve mob definition from mobs.json.
+   */
+  public getMobData(mobId: string): any {
+    try {
+      if (!this.mobsCache) {
+        const mobsPath = path.join(__dirname, '../../../../../packages/shared/src/data/mobs.json');
+        if (fs.existsSync(mobsPath)) {
+          this.mobsCache = JSON.parse(fs.readFileSync(mobsPath, 'utf-8'));
+        }
+      }
+      if (this.mobsCache) {
+        return this.mobsCache.find(
+          (m: any) => m.id === mobId || m.name?.toLowerCase() === mobId.toLowerCase()
+        );
+      }
+    } catch {
+      // ignore
+    }
+    return undefined;
+  }
+
+  /**
+   * Automatically populates cavern chambers with hostile mobs based on map configuration.
+   */
+  public populateCavernMobs(options?: { count?: number; minDepth?: number; mobIds?: string[] }): void {
+    const mobCount = options?.count ?? this.mapConfig?.mobSpawnCount ?? 3;
+    if (mobCount <= 0) return;
+
+    const minDepth = options?.minDepth ?? this.mapConfig?.mobSpawnMinDepth ?? 5;
+    const allowedMobIds = options?.mobIds ?? this.mapConfig?.allowedMobIds ?? ['cmn_mole_person_001'];
+    if (!allowedMobIds || allowedMobIds.length === 0) return;
+
+    for (let i = 0; i < mobCount; i++) {
+      const mobId = allowedMobIds[i % allowedMobIds.length];
+      const mobDef = this.getMobData(mobId);
+      if (!mobDef) continue;
+
+      const spawnPos = this.findValidCavernSpawnPosition(minDepth);
+      this.spawnMob(mobDef, spawnPos);
+    }
   }
 
   /**
@@ -1491,6 +1583,14 @@ export class MiningGameEngine {
 
     for (const mob of this.activeMobs.values()) {
       if (mob.health <= 0) continue;
+
+      if (mob.hitStunDurationMs && mob.hitStunDurationMs > 0) {
+        mob.hitStunDurationMs -= dt * 1000;
+        mob.animationState = 'damage';
+        mob.mobBody.velocity.x *= 0.92;
+        mob.mobBody.update(dt, this.grid);
+        continue;
+      }
 
       const aiContext: MobAIContext = {
         mobId: mob.mobId,
@@ -1512,6 +1612,7 @@ export class MiningGameEngine {
         })),
         config: {
           canMine: true,
+          mineRange: mob.mineRange,
           aggroRange: 20,
           attackRange: 1.25,
           attackCooldownMs: mob.attackCooldownMs,
@@ -1537,10 +1638,25 @@ export class MiningGameEngine {
           this.handleMobAttackPlayer(mob, targetPlayer);
         }
       } else if (intent.isMining && intent.miningTarget) {
-        mob.isMining = true;
-        mob.miningTarget = intent.miningTarget;
-        mob.animationState = 'mine';
-        this.handleMobMining(mob, intent.miningTarget, dt);
+        // Enforce physical reach check before starting or continuing mob mining
+        const inReach = BaseMobAI.isWithinReach(mob.mobBody.position, intent.miningTarget, mob.mineRange);
+        if (inReach) {
+          mob.isMining = true;
+          mob.miningTarget = intent.miningTarget;
+          mob.animationState = 'mine';
+          if (intent.miningTarget.x < mob.mobBody.position.x) {
+            mob.isFacingLeft = true;
+            mob.mobBody.isFacingLeft = true;
+          } else if (intent.miningTarget.x > mob.mobBody.position.x) {
+            mob.isFacingLeft = false;
+            mob.mobBody.isFacingLeft = false;
+          }
+          this.handleMobMining(mob, intent.miningTarget, dt);
+        } else {
+          mob.isMining = false;
+          mob.miningTarget = null;
+          mob.animationState = 'walk';
+        }
       } else {
         mob.isMining = false;
         mob.miningTarget = null;
@@ -1556,6 +1672,14 @@ export class MiningGameEngine {
     if (!isInBounds(target.x, target.y)) {
       mob.isMining = false;
       mob.miningTarget = null;
+      return;
+    }
+
+    // Authoritative distance check: ensure mob is within reach of target block
+    if (!BaseMobAI.isWithinReach(mob.mobBody.position, target, mob.mineRange)) {
+      mob.isMining = false;
+      mob.miningTarget = null;
+      mob.miningProgressMs = 0;
       return;
     }
 
@@ -1627,6 +1751,7 @@ export class MiningGameEngine {
 
     mob.health -= damage;
     mob.animationState = 'damage';
+    mob.hitStunDurationMs = 250;
 
     if (mob.health <= 0) {
       this.killMob(mob);

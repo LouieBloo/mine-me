@@ -867,6 +867,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     miningTargetRef,
     blockTexturesRef,
     soundManager,
+    weaponSoundUrlRef,
   });
 
   return <div className="mining-grid-container" />;

@@ -1,6 +1,6 @@
 import { BaseMobAI, type MobAIContext, type MobActionIntent, type PlayerTargetInfo } from './BaseMobAI';
 import { MiningPathfinder } from '../pathfinding/MiningPathfinder';
-import type { MiningPathWaypoint } from '../../types/mining';
+import { isTileSolid, type MiningPathWaypoint } from '../../types/mining';
 
 /**
  * Intelligent Mob AI behavior that chases player characters through the cavern.
@@ -21,7 +21,8 @@ export class ChaseAndMineAI extends BaseMobAI {
     const aggroRange = context.config?.aggroRange ?? 20.0;
     const attackRange = context.config?.attackRange ?? 1.25;
     const canMine = context.config?.canMine ?? true;
-    const maxJumpTiles = context.config?.maxJumpTiles ?? 2;
+    const mineRange = context.config?.mineRange ?? 2.0;
+    const maxJumpTiles = context.config?.maxJumpTiles ?? 1;
     const attackCooldownSec = (context.config?.attackCooldownMs ?? 1200) / 1000;
 
     // 1. Locate nearest living player
@@ -91,17 +92,32 @@ export class ChaseAndMineAI extends BaseMobAI {
       }
     }
 
-    // 3. Path Recalculation
-    const targetTile = {
-      x: Math.round(nearestPlayer.position.x),
-      y: Math.round(nearestPlayer.position.y),
+    // Helper to check if a tile is currently solid
+    const isTileObstacle = (tx: number, ty: number): boolean => {
+      const row = context.grid[ty];
+      const tile = row ? row[tx] : undefined;
+      return tile ? isTileSolid(tile.type as any) : false;
     };
 
-    const targetMoved = !this.lastTargetPos ||
+    // 3. Path Recalculation
+    const targetTile = {
+      x: Math.floor(nearestPlayer.position.x),
+      y: Math.floor(nearestPlayer.position.y),
+    };
+
+    const currentWpAtIdx = this.path[this.currentWaypointIndex];
+    const isActivelyMining =
+      currentWpAtIdx?.action === 'MINE' &&
+      BaseMobAI.isWithinReach(context.position, currentWpAtIdx, mineRange) &&
+      isTileObstacle(currentWpAtIdx.x, currentWpAtIdx.y);
+
+    const targetMoved =
+      !this.lastTargetPos ||
       Math.abs(this.lastTargetPos.x - targetTile.x) > 1.5 ||
       Math.abs(this.lastTargetPos.y - targetTile.y) > 1.5;
 
-    if (this.pathTimer <= 0 || targetMoved || this.currentWaypointIndex >= this.path.length) {
+    // Do not interrupt an active block excavation on the periodic timer
+    if (!isActivelyMining && (this.pathTimer <= 0 || targetMoved || this.currentWaypointIndex >= this.path.length)) {
       this.path = MiningPathfinder.findPath(
         { x: context.position.x, y: context.position.y },
         targetTile,
@@ -109,14 +125,60 @@ export class ChaseAndMineAI extends BaseMobAI {
         { canMine, maxJumpTiles }
       );
       this.currentWaypointIndex = 0;
-      this.pathTimer = 0.8;
+      this.pathTimer = 1.0;
       this.lastTargetPos = targetTile;
     }
 
-    // If no path could be found, attempt direct approach towards target
+    // If the current waypoint was a MINE action and the block is now excavated (EMPTY), advance!
+    while (
+      this.currentWaypointIndex < this.path.length &&
+      this.path[this.currentWaypointIndex].action === 'MINE' &&
+      !isTileObstacle(this.path[this.currentWaypointIndex].x, this.path[this.currentWaypointIndex].y)
+    ) {
+      this.currentWaypointIndex++;
+    }
+
+    // If no path could be found or path is exhausted, attempt direct approach towards target
     if (this.path.length === 0 || this.currentWaypointIndex >= this.path.length) {
+      const dirX = Math.sign(dx);
+      const nextTileX = Math.floor(context.position.x + dirX * 0.6);
+      const currentTileY = Math.floor(context.position.y);
+      const headTileY = currentTileY - 1;
+      const isObstacleAhead = isTileObstacle(nextTileX, currentTileY);
+      const hasClearanceAboveObstacle = !isTileObstacle(nextTileX, headTileY);
+      const hasClearanceAboveHead = !isTileObstacle(Math.floor(context.position.x), headTileY);
+
+      // If grounded and facing a 1-tile block with headroom, jump over it
+      if (context.isGrounded && dirX !== 0 && isObstacleAhead && hasClearanceAboveObstacle && hasClearanceAboveHead) {
+        return {
+          moveX: dirX,
+          jump: true,
+          climbUp: false,
+          climbDown: false,
+          isMining: false,
+          miningTarget: null,
+          isAttacking: false,
+          animationState: 'jump',
+        };
+      }
+
+      if (canMine && isObstacleAhead) {
+        const inReach = BaseMobAI.isWithinReach(context.position, { x: nextTileX, y: currentTileY }, mineRange);
+        if (inReach) {
+          return {
+            moveX: 0,
+            jump: false,
+            climbUp: false,
+            climbDown: false,
+            isMining: true,
+            miningTarget: { x: nextTileX, y: currentTileY },
+            isAttacking: false,
+            animationState: 'mine',
+          };
+        }
+      }
       return {
-        moveX: Math.sign(dx),
+        moveX: dirX,
         jump: false,
         climbUp: false,
         climbDown: false,
@@ -128,22 +190,43 @@ export class ChaseAndMineAI extends BaseMobAI {
     }
 
     // 4. Follow Waypoint
-    const wp = this.path[this.currentWaypointIndex];
-    const distToWpX = wp.x - context.position.x;
-    const distToWpY = wp.y - context.position.y;
+    let wp = this.path[this.currentWaypointIndex];
 
-    // Advance waypoint if close enough
-    if (Math.abs(distToWpX) < 0.35 && Math.abs(distToWpY) < 0.5) {
-      this.currentWaypointIndex++;
-      if (this.currentWaypointIndex >= this.path.length) {
-        return defaultIntent;
+    const mobTileX = Math.floor(context.position.x);
+    const mobTileY = Math.floor(context.position.y);
+
+    // For non-MINE waypoints, advance once mob reaches the tile
+    if (wp.action !== 'MINE') {
+      const reached = mobTileX === wp.x && Math.abs(mobTileY - wp.y) <= 1;
+      if (reached) {
+        this.currentWaypointIndex++;
+        if (this.currentWaypointIndex >= this.path.length) {
+          return defaultIntent;
+        }
+        wp = this.path[this.currentWaypointIndex];
       }
     }
 
-    const currentWp = this.path[this.currentWaypointIndex] || wp;
+    const currentWp = wp;
 
     switch (currentWp.action) {
-      case 'MINE':
+      case 'MINE': {
+        const inReach = BaseMobAI.isWithinReach(context.position, currentWp, mineRange);
+        if (!inReach) {
+          // Walk towards the block until within mining reach
+          const moveDir = Math.sign(currentWp.x + 0.5 - context.position.x);
+          return {
+            moveX: moveDir,
+            jump: false,
+            climbUp: false,
+            climbDown: false,
+            isMining: false,
+            miningTarget: null,
+            isAttacking: false,
+            animationState: 'walk',
+          };
+        }
+
         return {
           moveX: 0,
           jump: false,
@@ -154,10 +237,11 @@ export class ChaseAndMineAI extends BaseMobAI {
           isAttacking: false,
           animationState: 'mine',
         };
+      }
 
       case 'JUMP':
         return {
-          moveX: Math.sign(currentWp.x - context.position.x),
+          moveX: Math.sign(currentWp.x + 0.5 - context.position.x),
           jump: context.isGrounded,
           climbUp: false,
           climbDown: false,
@@ -169,7 +253,7 @@ export class ChaseAndMineAI extends BaseMobAI {
 
       case 'CLIMB':
         return {
-          moveX: 0,
+          moveX: Math.sign(currentWp.x + 0.5 - context.position.x) * 0.5,
           jump: false,
           climbUp: currentWp.y < context.position.y,
           climbDown: currentWp.y > context.position.y,
@@ -181,7 +265,7 @@ export class ChaseAndMineAI extends BaseMobAI {
 
       case 'FALL':
         return {
-          moveX: Math.sign(currentWp.x - context.position.x),
+          moveX: Math.sign(currentWp.x + 0.5 - context.position.x),
           jump: false,
           climbUp: false,
           climbDown: false,
@@ -192,17 +276,31 @@ export class ChaseAndMineAI extends BaseMobAI {
         };
 
       case 'WALK':
-      default:
+      default: {
+        const moveDir = Math.sign(currentWp.x + 0.5 - context.position.x);
+        let shouldJump = false;
+        if (context.isGrounded && moveDir !== 0) {
+          const aheadX = Math.floor(context.position.x + moveDir * 0.55);
+          const currentY = Math.floor(context.position.y);
+          const headY = currentY - 1;
+          const isObstacleAhead = isTileObstacle(aheadX, currentY);
+          const hasClearanceAboveObstacle = !isTileObstacle(aheadX, headY);
+          const hasClearanceAboveHead = !isTileObstacle(Math.floor(context.position.x), headY);
+          if (isObstacleAhead && hasClearanceAboveObstacle && hasClearanceAboveHead) {
+            shouldJump = true;
+          }
+        }
         return {
-          moveX: Math.sign(currentWp.x - context.position.x),
-          jump: false,
+          moveX: moveDir,
+          jump: shouldJump,
           climbUp: false,
           climbDown: false,
           isMining: false,
           miningTarget: null,
           isAttacking: false,
-          animationState: 'walk',
+          animationState: shouldJump ? 'jump' : 'walk',
         };
+      }
     }
   }
 }

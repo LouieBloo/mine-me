@@ -505,6 +505,7 @@ export interface MobAIConfig {
   attackRange?: number;
   attackCooldownMs?: number;
   canMine?: boolean;
+  mineRange?: number;
   maxJumpTiles?: number;
   patrolRadius?: number;
   fleeHealthThreshold?: number;
@@ -577,6 +578,10 @@ export interface MiningMapConfigData {
   dynamiteFuseSeconds?: number;
   rockGravityScale?: number;
   rockRestitution?: number;
+  /** Hostile NPC / Mob Spawning */
+  mobSpawnCount?: number;
+  mobSpawnMinDepth?: number;
+  allowedMobIds?: string[];
 }
 
 export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
@@ -605,4 +610,7 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   dynamiteFuseSeconds: 4.0,
   rockGravityScale: 1.2,
   rockRestitution: 0.1,
+  mobSpawnCount: 3,
+  mobSpawnMinDepth: 5,
+  allowedMobIds: ['cmn_mole_person_001'],
 };

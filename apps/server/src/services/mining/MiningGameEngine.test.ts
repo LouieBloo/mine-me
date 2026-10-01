@@ -1272,6 +1272,227 @@ describe('MiningGameEngine', () => {
       expect(engine.grid[15][10].type).toBe(MiningTileType.EMPTY);
       expect(mob.isMining).toBe(false);
     });
+
+    it('normalizes mob miningSpeed multiplier and excavates dirt block in under 1 second', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+        mapConfig: { mobSpawnCount: 0 },
+      });
+
+      engine.grid[15][10] = { type: MiningTileType.DIRT, revealed: true };
+
+      // Spawn with 1.2 multiplier format
+      const mob = engine.spawnMob(
+        {
+          id: 'mob_mole_speed',
+          name: 'Mole Person',
+          miningSpeed: 1.2,
+        },
+        { x: 10, y: 14 }
+      );
+
+      // Should be normalized to 120%
+      expect(mob.miningSpeed).toBe(120);
+
+      mob.isMining = true;
+      mob.miningTarget = { x: 10, y: 15 };
+
+      // Dirt block mine time is 500ms. At 120% speed, 0.5s = 600ms damage -> breaks!
+      engine.handleMobMining(mob, { x: 10, y: 15 }, 0.5);
+
+      expect(engine.grid[15][10].type).toBe(MiningTileType.EMPTY);
+      expect(mob.isMining).toBe(false);
+    });
+
+    it('getActiveMobs returns correctly formatted mob payloads', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+        mapConfig: { mobSpawnCount: 0 },
+      });
+
+      const mob = engine.spawnMob(
+        {
+          id: 'mob_mole_test',
+          name: 'Mole Person',
+          health: 75,
+          attack: 12,
+        },
+        { x: 12, y: 18 }
+      );
+
+      const activeMobs = engine.getActiveMobs();
+      expect(activeMobs.length).toBe(1);
+      expect(activeMobs[0].id).toBe(mob.id);
+      expect(activeMobs[0].name).toBe('Mole Person');
+      expect(activeMobs[0].health).toBe(75);
+      expect(activeMobs[0].attack).toBe(12);
+    });
+
+    it('populates cavern mobs respecting mapConfig count and minDepth', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+        mapConfig: {
+          mobSpawnCount: 2,
+          mobSpawnMinDepth: 5,
+          allowedMobIds: ['cmn_mole_person_001'],
+        },
+      });
+
+      // Mobs should have been populated
+      const activeMobs = engine.getActiveMobs();
+      expect(activeMobs.length).toBe(2);
+      for (const mob of activeMobs) {
+        expect(mob.position.y).toBeGreaterThanOrEqual(4.5); // standing in depth >= 5
+        expect(mob.name).toBe('Mole Person');
+      }
+    });
+
+    it('damages nearby mob with player pickaxe swing and inflicts knockback', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+        mapConfig: { mobSpawnCount: 0 },
+      });
+
+      // Carve out an open cavern corridor at y=10 with floor at y=11
+      for (let x = 8; x <= 16; x++) {
+        engine.grid[10][x] = { type: MiningTileType.EMPTY, revealed: true };
+        engine.grid[11][x] = { type: MiningTileType.DIRT, revealed: true };
+      }
+
+      // Position player at (10, 10.5) and ensure grounded stance
+      engine.playerBody.position = { x: 10, y: 10.5 };
+      engine.playerBody.velocity = { x: 0, y: 0 };
+      engine.playerBody.isGrounded = true;
+
+      // Spawn mob right next to player at (10.8, 10.5)
+      const mob = engine.spawnMob(
+        {
+          id: 'mob_close',
+          name: 'Mole Person',
+          health: 50,
+        },
+        { x: 10.8, y: 10.5 }
+      );
+
+      // Player swings pickaxe with miningKey
+      engine.handleInput({
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+        miningKey: true,
+        sequence: 1,
+      });
+
+      // Run a tick to process player melee combat (section 4.5)
+      (engine as any).tick(0.033);
+
+      // Mob should take 15 damage
+      expect(mob.health).toBe(35);
+      // Mob should have received knockback velocity away from player
+      expect(mob.mobBody.velocity.x).toBeGreaterThan(0);
+      // Player animation state should be 'mine'
+      const session = engine.primarySession;
+      expect(session?.animationState).toBe('mine');
+    });
+
+    it('sets player animationState to mine when swinging in empty air without target', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      engine.handleInput({
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+        miningKey: true,
+        sequence: 1,
+      });
+
+      (engine as any).tick(0.033);
+      expect(engine.primarySession?.animationState).toBe('mine');
+    });
+
+    it('safeguards mob jumpForce to at least 8.8 for 1-tile obstacle jumping', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      const mob = engine.spawnMob({
+        id: 'mole_1',
+        name: 'Mole',
+        jumpForce: 6.5, // Legacy/low config
+      });
+
+      expect(mob.mobBody.jumpForce).toBeGreaterThanOrEqual(8.8);
+    });
+
+    it('rejects mob mining when target tile is beyond mob reach', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Spawn mob at (5, 5)
+      const mob = engine.spawnMob(
+        { id: 'mole_dist', name: 'Mole' },
+        { x: 5, y: 5 }
+      );
+
+      // Block is far away at (20, 20)
+      engine.grid[20][20] = { type: MiningTileType.DIRT, revealed: true };
+
+      // Attempt to mine block across the map
+      engine.handleMobMining(mob, { x: 20, y: 20 }, 0.033);
+
+      expect(mob.isMining).toBe(false);
+      expect(mob.miningTarget).toBeNull();
+      // Block should not take damage
+      expect(engine.grid[20][20].damageMs).toBeUndefined();
+    });
+
+    it('allows mob mining when target tile is within reach', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Spawn mob at (5.5, 5.5)
+      const mob = engine.spawnMob(
+        { id: 'mole_near', name: 'Mole', miningSpeed: 100 },
+        { x: 5.5, y: 5.5 }
+      );
+
+      // Block is immediately adjacent at (6, 5)
+      engine.grid[5][6] = { type: MiningTileType.DIRT, revealed: true };
+
+      engine.handleMobMining(mob, { x: 6, y: 5 }, 0.033);
+
+      expect(engine.grid[5][6].damageMs).toBeGreaterThan(0);
+    });
   });
 });
 

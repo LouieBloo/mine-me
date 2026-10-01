@@ -69,6 +69,7 @@ export interface UseMiningTickerOptions {
   blockTexturesRef?: React.MutableRefObject<Map<number, Texture>>;
   sessionState?: MiningSessionClientState;
   soundManager?: SoundManager | null;
+  weaponSoundUrlRef?: React.MutableRefObject<string | null>;
 }
 
 export function useMiningTicker({
@@ -108,8 +109,11 @@ export function useMiningTicker({
   blockTexturesRef,
   sessionState,
   soundManager,
+  weaponSoundUrlRef,
 }: UseMiningTickerOptions) {
   const animTimeRef = useRef<number>(0);
+  const lastSwingTimeRef = useRef<number>(0);
+  const lastSwingSoundTimeRef = useRef<number>(0);
 
   useEffect(() => {
     if (!app) return;
@@ -290,8 +294,23 @@ export function useMiningTicker({
 
       miningProfiler.startSection('Sprites & Anim');
       // Update modular sprite animation with predicted velocities
+      const isMiningKeyDown = Boolean(keysPressedRef?.current?.miningKey);
+      const nowMs = performance.now();
+      if (isMiningKeyDown || isMining) {
+        lastSwingTimeRef.current = nowMs;
+      }
+      const isSwinging = isMining || isMiningKeyDown || (nowMs - lastSwingTimeRef.current < 260);
+
+      // Play tool swing SFX periodically while actively swinging
+      if (isSwinging && soundManager && weaponSoundUrlRef?.current) {
+        if (nowMs - lastSwingSoundTimeRef.current >= 380) {
+          lastSwingSoundTimeRef.current = nowMs;
+          soundManager.playSfx(weaponSoundUrlRef.current);
+        }
+      }
+
       if (playerSpriteRef.current) {
-        if (isMining) {
+        if (isSwinging) {
           playerSpriteRef.current.setState('mine');
         } else if (playerBody) {
           // Horizontal movement drives the walking animation stride.

@@ -261,6 +261,10 @@ model MiningMapConfig {
   dynamiteFuseSeconds Float    @default(4.0)
   rockGravityScale    Float    @default(1.2)
   rockRestitution     Float    @default(0.1)
+  // Hostile NPC / Mob Spawning Settings
+  mobSpawnCount       Int      @default(3)
+  mobSpawnMinDepth    Int      @default(5)
+  allowedMobIds       Json?
   isActive            Boolean  @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

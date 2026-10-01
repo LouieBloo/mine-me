@@ -40,6 +40,7 @@ export class MiningSessionManager {
     mode: 'singleplayer' | 'multiplayer' = 'singleplayer',
     characterName?: string,
     gearLayers?: MiningGearLayer[],
+    mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>,
   ): MiningGameEngine {
     const targetRoomId = mode === 'multiplayer' ? DEFAULT_MULTIPLAYER_ROOM_ID : `solo_${characterId}`;
     const prevRoomId = this.playerToRoom.get(characterId);
@@ -64,6 +65,7 @@ export class MiningSessionManager {
         roomId: targetRoomId,
         gameMode: mode,
         cityId,
+        mapConfig,
         onTimeout: (roomId) => {
           this.cleanupRoom(roomId);
         },
@@ -131,6 +133,8 @@ export class MiningSessionManager {
       }
     }
 
+    const activeMobs = engine.getActiveMobs();
+
     return {
       grid: toClientGrid(engine.grid),
       position: {
@@ -160,6 +164,7 @@ export class MiningSessionManager {
             soundEffects: d.soundEffects,
           }))
         : undefined,
+      mobs: activeMobs.length > 0 ? activeMobs : undefined,
     };
   }
 

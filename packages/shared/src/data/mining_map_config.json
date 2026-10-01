@@ -25,5 +25,10 @@
   "dynamiteFuseSeconds": 4,
   "rockGravityScale": 1.2,
   "rockRestitution": 0.1,
+  "mobSpawnCount": 3,
+  "mobSpawnMinDepth": 5,
+  "allowedMobIds": [
+    "cmn_mole_person_001"
+  ],
   "isActive": true
 }

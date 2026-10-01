@@ -98,6 +98,21 @@ describe('Admin Mining Config API Routes', () => {
     expect(res.body.rockRestitution).toBe(0.2);
   });
 
+  it('PUT /admin/mining-config updates and saves mob spawning parameters', async () => {
+    const res = await request(app)
+      .put('/admin/mining-config')
+      .send({
+        mobSpawnCount: 4,
+        mobSpawnMinDepth: 6,
+        allowedMobIds: ['cmn_mole_person_001'],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.mobSpawnCount).toBe(4);
+    expect(res.body.mobSpawnMinDepth).toBe(6);
+    expect(res.body.allowedMobIds).toEqual(['cmn_mole_person_001']);
+  });
+
   it('PUT /admin/mining-config rejects invalid values out of bounds', async () => {
     const res = await request(app)
       .put('/admin/mining-config')

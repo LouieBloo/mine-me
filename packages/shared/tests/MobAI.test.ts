@@ -164,6 +164,121 @@ describe('MobAI System', () => {
       expect(intent.isMining).toBe(true);
       expect(intent.miningTarget).toEqual({ x: 6, y: 9 });
       expect(intent.animationState).toBe('mine');
+
+      // Now simulate block breaking (becoming EMPTY)
+      grid[9][6] = { type: MiningTileType.EMPTY };
+      const intentAfterBreak = ai.update(0.1, context);
+      // Waypoint should advance and mob should move forward into opened space
+      expect(intentAfterBreak.isMining).toBe(false);
+      expect(intentAfterBreak.moveX).toBeGreaterThan(0);
+      expect(intentAfterBreak.animationState).toBe('walk');
+    });
+
+    it('advances waypoints with floating point physics coordinates on ground', () => {
+      const ai = new ChaseAndMineAI('mob_1', 'inst_1');
+      const context: MobAIContext = {
+        mobId: 'mob_1',
+        instanceId: 'inst_1',
+        position: { x: 5.5, y: 9.5625 }, // Resting on floor at y=10
+        velocity: { x: 0, y: 0 },
+        health: 50,
+        maxHealth: 50,
+        attack: 10,
+        defense: 2,
+        isGrounded: true,
+        isOnLadder: false,
+        grid,
+        players: [
+          {
+            characterId: 'char_ahead',
+            position: { x: 8.5, y: 9.5625 },
+            health: 100,
+          },
+        ],
+        config: { aggroRange: 20 },
+      };
+
+      const intent = ai.update(0.1, context);
+      // Mob should walk towards player
+      expect(intent.moveX).toBeGreaterThan(0);
+      expect(intent.animationState).toBe('walk');
+    });
+
+    it('jumps over a 1-tile obstacle when facing it with headroom', () => {
+      // Place solid block at x=6, y=9 with open space above at y=8
+      grid[9][6] = { type: MiningTileType.DIRT };
+      grid[8][6] = { type: MiningTileType.EMPTY };
+      grid[8][5] = { type: MiningTileType.EMPTY };
+
+      const ai = new ChaseAndMineAI('mob_1', 'inst_1');
+      const context: MobAIContext = {
+        mobId: 'mob_1',
+        instanceId: 'inst_1',
+        position: { x: 5.6, y: 9 }, // Right in front of x=6
+        velocity: { x: 0, y: 0 },
+        health: 50,
+        maxHealth: 50,
+        attack: 10,
+        defense: 2,
+        isGrounded: true,
+        isOnLadder: false,
+        grid,
+        players: [
+          {
+            characterId: 'char_ahead',
+            position: { x: 8, y: 9 },
+            health: 100,
+          },
+        ],
+        config: { aggroRange: 20, canMine: false },
+      };
+
+      const intent = ai.update(0.1, context);
+      expect(intent.jump).toBe(true);
+      expect(intent.moveX).toBeGreaterThan(0);
+      expect(intent.animationState).toBe('jump');
+    });
+
+    it('walks towards a distant MINE waypoint and does not emit isMining until within reach', () => {
+      // Build a solid wall at x=15 to block direct walking
+      grid[9][15] = { type: MiningTileType.DIRT };
+      grid[8][15] = { type: MiningTileType.DIRT };
+
+      const ai = new ChaseAndMineAI('mob_1', 'inst_1');
+
+      const context: MobAIContext = {
+        mobId: 'mob_1',
+        instanceId: 'inst_1',
+        position: { x: 10, y: 9 }, // 5 tiles away from wall at x=15
+        velocity: { x: 0, y: 0 },
+        health: 50,
+        maxHealth: 50,
+        attack: 10,
+        defense: 2,
+        isGrounded: true,
+        isOnLadder: false,
+        grid,
+        players: [{ characterId: 'p1', position: { x: 16, y: 9 }, health: 100 }],
+        config: { aggroRange: 20, mineRange: 1.85, canMine: true },
+      };
+
+      const intent = ai.update(0.1, context);
+      // Mob must WALK towards the wall first, NOT start mining it from 5 tiles away!
+      expect(intent.isMining).toBe(false);
+      expect(intent.miningTarget).toBeNull();
+      expect(intent.moveX).toBe(1);
+      expect(intent.animationState).toBe('walk');
+
+      // Now position mob right in front of the wall at x=14.0 (distance 1.5 tiles <= 1.85 reach)
+      const nearContext: MobAIContext = {
+        ...context,
+        position: { x: 14.0, y: 9 },
+      };
+      const nearAi = new ChaseAndMineAI('mob_1', 'inst_2');
+      const intentInReach = nearAi.update(0.1, nearContext);
+      expect(intentInReach.isMining).toBe(true);
+      expect(intentInReach.miningTarget).toEqual({ x: 15, y: 9 });
+      expect(intentInReach.animationState).toBe('mine');
     });
   });
 

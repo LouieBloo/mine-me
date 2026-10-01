@@ -46,10 +46,28 @@ export class MiningPathfinder {
     const canClimbLadders = options?.canClimbLadders ?? true;
     const maxSearchDepth = options?.maxSearchDepth ?? 600;
 
-    const sx = Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.round(start.x)));
-    const sy = Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.round(start.y)));
-    const gx = Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.round(target.x)));
-    const gy = Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.round(target.y)));
+    const checkSolid = (x: number, y: number): boolean => {
+      if (x < 0 || x >= MINING_CONFIG.GRID_WIDTH) return true;
+      if (y >= MINING_CONFIG.GRID_HEIGHT) return true;
+      if (y < 0) return false;
+      const row = grid[y];
+      const tile = row ? row[x] : undefined;
+      return tile ? isTileSolid(tile.type as any) : false;
+    };
+
+    let sx = Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.floor(start.x)));
+    let sy = Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.floor(start.y)));
+    let gx = Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.floor(target.x)));
+    let gy = Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.floor(target.y)));
+
+    // Ensure start node is not accidentally snapped into solid floor
+    if (checkSolid(sx, sy) && sy > 0 && !checkSolid(sx, sy - 1)) {
+      sy--;
+    }
+    // Ensure goal node is not inside solid floor
+    if (checkSolid(gx, gy) && gy > 0 && !checkSolid(gx, gy - 1)) {
+      gy--;
+    }
 
     if (sx === gx && sy === gy) {
       return [];

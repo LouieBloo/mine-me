@@ -9,6 +9,7 @@ import {
   CharacterModEngine,
 } from '@mine-me/shared';
 import { miningSessionManager } from '../services/mining/MiningSessionManager';
+import { getActiveMiningConfig } from '../services/miningConfig.service';
 
 // ============================================================================
 // Real-Time 30 Hz Mining Mini-Game Event Handlers
@@ -72,6 +73,11 @@ export const handleMiningStart = async (
     // Ensure client has latest authoritative inventory upon entering mine
     broadcastStatUpdate(characterId, { inventory: clientInventory });
 
+    const activeConfig = await getActiveMiningConfig().catch((err) => {
+      console.warn('[Mining] Failed to load active mining config, falling back to defaults:', err);
+      return undefined;
+    });
+
     const mode = payload?.mode ?? 'singleplayer';
     const engine = miningSessionManager.createSession(
       characterId,
@@ -82,6 +88,7 @@ export const handleMiningStart = async (
       mode,
       character.name,
       gearLayers,
+      activeConfig,
     );
     const sessionState = miningSessionManager.buildClientState(engine, characterId);
 

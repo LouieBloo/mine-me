@@ -44,6 +44,9 @@ export async function getActiveMiningConfig(): Promise<MiningMapConfigData> {
         dynamiteFuseSeconds: config.dynamiteFuseSeconds,
         rockGravityScale: config.rockGravityScale,
         rockRestitution: config.rockRestitution,
+        mobSpawnCount: (config as any).mobSpawnCount ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnCount,
+        mobSpawnMinDepth: (config as any).mobSpawnMinDepth ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnMinDepth,
+        allowedMobIds: ((config as any).allowedMobIds as string[]) ?? DEFAULT_MINING_MAP_CONFIG.allowedMobIds,
       };
       return cachedConfig;
     }
@@ -87,6 +90,9 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     dynamiteFuseSeconds: data.dynamiteFuseSeconds ?? existing?.dynamiteFuseSeconds ?? DEFAULT_MINING_MAP_CONFIG.dynamiteFuseSeconds ?? 4.0,
     rockGravityScale: data.rockGravityScale ?? existing?.rockGravityScale ?? DEFAULT_MINING_MAP_CONFIG.rockGravityScale ?? 1.2,
     rockRestitution: data.rockRestitution ?? existing?.rockRestitution ?? DEFAULT_MINING_MAP_CONFIG.rockRestitution ?? 0.1,
+    mobSpawnCount: data.mobSpawnCount ?? (existing as any)?.mobSpawnCount ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnCount ?? 3,
+    mobSpawnMinDepth: data.mobSpawnMinDepth ?? (existing as any)?.mobSpawnMinDepth ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnMinDepth ?? 5,
+    allowedMobIds: data.allowedMobIds ?? ((existing as any)?.allowedMobIds as string[]) ?? DEFAULT_MINING_MAP_CONFIG.allowedMobIds ?? ['cmn_mole_person_001'],
     isActive: true,
   };
 
@@ -130,6 +136,9 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     dynamiteFuseSeconds: saved.dynamiteFuseSeconds,
     rockGravityScale: saved.rockGravityScale,
     rockRestitution: saved.rockRestitution,
+    mobSpawnCount: (saved as any).mobSpawnCount,
+    mobSpawnMinDepth: (saved as any).mobSpawnMinDepth,
+    allowedMobIds: ((saved as any).allowedMobIds as string[]) ?? undefined,
   };
 
   syncJson('mining_map_config.json', payload);

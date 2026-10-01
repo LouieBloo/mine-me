@@ -236,14 +236,14 @@
     "aiConfig": {
       "detectionRadius": 12,
       "attackRange": 1.2,
-      "mineRange": 1.5,
+      "mineRange": 2.0,
       "jumpCooldownMs": 600,
       "mineCooldownMs": 400,
       "attackCooldownMs": 1000
     },
-    "moveSpeed": 2.5,
-    "jumpForce": 6.5,
-    "miningSpeed": 1.2,
+    "moveSpeed": 3.2,
+    "jumpForce": 8.8,
+    "miningSpeed": 80.0,
     "abilities": [],
     "animations": {
       "canvas_size": [

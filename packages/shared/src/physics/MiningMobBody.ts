@@ -37,8 +37,8 @@ export class MiningMobBody extends MiningPhysicsBody {
       mass: options.mass ?? 1.0,
     });
 
-    this.moveSpeed = options.moveSpeed ?? 3.0;
-    this.jumpForce = options.jumpForce ?? 6.5;
+    this.moveSpeed = options.moveSpeed ?? 3.2;
+    this.jumpForce = options.jumpForce ?? 8.8;
     this.climbSpeed = options.climbSpeed ?? 3.0;
   }
 

@@ -53,4 +53,28 @@ export abstract class BaseMobAI {
    * Evaluates environment context and determines the mob's desired action intent for this tick.
    */
   public abstract update(dt: number, context: MobAIContext): MobActionIntent;
+
+  /**
+   * Helper to check if a position is within mining/interaction reach of a target tile.
+   */
+  public static isWithinReach(
+    pos: Vector2D,
+    target: MiningPosition,
+    reach: number = 2.0
+  ): boolean {
+    const dx = Math.abs(target.x + 0.5 - pos.x);
+    const dy = Math.abs(target.y + 0.5 - pos.y);
+    return dx <= reach && dy <= reach;
+  }
+
+  /**
+   * Helper to check if a tile on the grid is solid obstacle.
+   */
+  public static isTileObstacle(grid: MiningCollisionGrid, tx: number, ty: number): boolean {
+    const row = grid[ty];
+    const tile = row ? row[tx] : undefined;
+    if (!tile) return false;
+    // Empty (0) and Entrance (1) are not obstacles
+    return tile.type !== 0 && tile.type !== 1;
+  }
 }
