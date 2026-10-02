@@ -1,6 +1,14 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
 import { ModularEntitySprite } from '../../../../../components/game/sprites';
-import { MINING_CONFIG, type MiningActiveMob, type MiningPosition, type Vector2D } from '@mine-me/shared';
+import {
+  MINING_CONFIG,
+  type MiningActiveMob,
+  type MiningPosition,
+  type Vector2D,
+  MobSoundProfileRegistry,
+  MINING_SPATIAL_AUDIO_PRESETS,
+} from '@mine-me/shared';
+import type { SoundManager } from '../../../../../services/sound';
 import { TILE_SIZE } from './MiningTileRenderer';
 
 export interface MobInstance {
@@ -9,7 +17,6 @@ export interface MobInstance {
   name: string;
   container: Container;
   sprite: ModularEntitySprite;
-  nameplate: Text;
   healthBar: Graphics;
   targetPos: Vector2D;
   currentPos: Vector2D;
@@ -20,18 +27,26 @@ export interface MobInstance {
   isMining: boolean;
   miningTarget?: MiningPosition | null;
   isLoaded: boolean;
+  lastDigSoundTime: number;
+  lastIdleSoundTime: number;
 }
 
 /**
  * Manages Pixi rendering, skeletal sprite instances, position interpolation,
- * health bars, and nameplates for active NPCs/mobs in the mining grid.
+ * health bars, and spatial audio for active NPCs/mobs in the mining grid.
  */
 export class MiningMobRenderer {
   private parentContainer: Container;
   private mobs: Map<string, MobInstance> = new Map();
+  private soundManager: SoundManager | null = null;
 
-  constructor(parentContainer: Container) {
+  constructor(parentContainer: Container, soundManager?: SoundManager | null) {
     this.parentContainer = parentContainer;
+    this.soundManager = soundManager || null;
+  }
+
+  public setSoundManager(sm: SoundManager | null): void {
+    this.soundManager = sm;
   }
 
   public getMobCount(): number {
@@ -62,6 +77,8 @@ export class MiningMobRenderer {
       }
     }
 
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
     // 2. Add or update active mobs
     for (const mobData of activeMobs) {
       let instance = this.mobs.get(mobData.id);
@@ -70,23 +87,6 @@ export class MiningMobRenderer {
         const mobContainer = new Container();
         mobContainer.x = mobData.position.x * TILE_SIZE;
         mobContainer.y = mobData.position.y * TILE_SIZE;
-
-        const nameplate = new Text({
-          text: mobData.name || 'Mob',
-          style: {
-            fontFamily: 'Inter, system-ui, sans-serif',
-            fontSize: 9,
-            fontWeight: 'bold',
-            fill: '#f87171',
-            stroke: {
-              color: '#450a0a',
-              width: 2.5,
-            },
-          },
-        });
-        nameplate.anchor.set(0.5, 1);
-        nameplate.position.set(0, -22);
-        mobContainer.addChild(nameplate);
 
         const healthBar = new Graphics();
         this.drawHealthBar(healthBar, mobData.health, mobData.maxHealth);
@@ -102,7 +102,6 @@ export class MiningMobRenderer {
           name: mobData.name,
           container: mobContainer,
           sprite,
-          nameplate,
           healthBar,
           targetPos: { ...mobData.position },
           currentPos: { ...mobData.position },
@@ -113,6 +112,8 @@ export class MiningMobRenderer {
           isMining: mobData.isMining,
           miningTarget: mobData.miningTarget,
           isLoaded: false,
+          lastDigSoundTime: 0,
+          lastIdleSoundTime: now + Math.random() * 3000,
         };
 
         this.mobs.set(mobData.id, instance);
@@ -148,6 +149,25 @@ export class MiningMobRenderer {
         instance.isMining = mobData.isMining;
         instance.miningTarget = mobData.miningTarget;
 
+        // Mob took damage
+        if (mobData.health < instance.health) {
+          const profile = MobSoundProfileRegistry.getProfile(instance.mobId);
+          const damageSound = profile?.getSlot('damage')?.defaultUrl;
+          if (damageSound && this.soundManager) {
+            const soundPos = { x: instance.currentPos.x + 0.5, y: instance.currentPos.y + 0.5 };
+            if (typeof this.soundManager.playPositionalSfx === 'function') {
+              this.soundManager.playPositionalSfx(damageSound, soundPos, {
+                spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_DAMAGE,
+              });
+            } else {
+              this.soundManager.playSfx(damageSound, {
+                position: soundPos,
+                spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_DAMAGE,
+              });
+            }
+          }
+        }
+
         if (instance.health !== mobData.health || instance.maxHealth !== mobData.maxHealth) {
           instance.health = mobData.health;
           instance.maxHealth = mobData.maxHealth;
@@ -159,13 +179,22 @@ export class MiningMobRenderer {
 
   /**
    * Draw miniature health bar above mob's head.
+   * Only rendered if the mob has taken damage and is still alive.
    */
   private drawHealthBar(graphics: Graphics, health: number, maxHealth: number): void {
     graphics.clear();
-    const barWidth = 26;
-    const barHeight = 3;
+
+    // 1. Healthbar only renders if mob has taken damage and is alive
+    if (health >= maxHealth || health <= 0) {
+      graphics.visible = false;
+      return;
+    }
+    graphics.visible = true;
+
+    const barWidth = 28;
+    const barHeight = 4;
     const x = -barWidth / 2;
-    const y = -18;
+    const y = -50; // Positioned cleanly above the mob's head
 
     // Background track
     graphics.rect(x, y, barWidth, barHeight);
@@ -185,10 +214,15 @@ export class MiningMobRenderer {
   }
 
   /**
-   * Per-frame smooth interpolation and animation update for all mobs.
+   * Per-frame smooth interpolation, animation update, and audio triggers for all mobs.
    */
-  public tick(dt: number): void {
+  public tick(dt: number, soundManager?: SoundManager | null): void {
+    if (soundManager !== undefined) {
+      this.soundManager = soundManager;
+    }
+
     const smoothFactor = Math.min(1.0, 1 - Math.exp(-24 * dt));
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
     for (const instance of this.mobs.values()) {
       instance.currentPos.x += (instance.targetPos.x - instance.currentPos.x) * smoothFactor;
@@ -201,6 +235,53 @@ export class MiningMobRenderer {
         instance.sprite.setFlipped(instance.isFacingLeft);
         instance.sprite.setState(instance.animationState as any);
         instance.sprite.update(dt);
+      }
+
+      // Audio triggers
+      if (this.soundManager) {
+        const profile = MobSoundProfileRegistry.getProfile(instance.mobId);
+        const soundPos = { x: instance.currentPos.x + 0.5, y: instance.currentPos.y + 0.5 };
+
+        // 1. Digging / Clawing sound
+        const isCurrentlyMining = instance.isMining || instance.animationState === 'mine';
+        if (isCurrentlyMining) {
+          if (now - instance.lastDigSoundTime >= 360) {
+            instance.lastDigSoundTime = now;
+            const digSound = profile?.getSlot('dig')?.defaultUrl;
+            if (digSound) {
+              if (typeof this.soundManager.playPositionalSfx === 'function') {
+                this.soundManager.playPositionalSfx(digSound, soundPos, {
+                  spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_DIGGING,
+                });
+              } else {
+                this.soundManager.playSfx(digSound, {
+                  position: soundPos,
+                  spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_DIGGING,
+                });
+              }
+            }
+          }
+        }
+
+        // 2. Ambient idle snuffle sound
+        if (instance.animationState === 'idle' && !isCurrentlyMining) {
+          if (now - instance.lastIdleSoundTime >= 6500) {
+            instance.lastIdleSoundTime = now + (Math.random() * 2000 - 1000);
+            const idleSound = profile?.getSlot('idle')?.defaultUrl;
+            if (idleSound) {
+              if (typeof this.soundManager.playPositionalSfx === 'function') {
+                this.soundManager.playPositionalSfx(idleSound, soundPos, {
+                  spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_IDLE,
+                });
+              } else {
+                this.soundManager.playSfx(idleSound, {
+                  position: soundPos,
+                  spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_IDLE,
+                });
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -216,9 +297,62 @@ export class MiningMobRenderer {
     }
   }
 
+  /**
+   * Render debug hitboxes, collision boxes, and reach indicators for all active mobs.
+   */
+  public renderDebugHitboxes(debugGraphics: Graphics, tileSize: number = TILE_SIZE): void {
+    const colliderPixelW = (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE) * tileSize;
+    const colliderPixelH = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE) * tileSize;
+
+    for (const instance of this.mobs.values()) {
+      const mobX = instance.currentPos.x * tileSize;
+      const mobY = instance.currentPos.y * tileSize;
+
+      // 1. AABB Collider Box (Red outline + translucent red fill)
+      debugGraphics.rect(
+        mobX - colliderPixelW / 2,
+        mobY - colliderPixelH / 2,
+        colliderPixelW,
+        colliderPixelH
+      );
+      debugGraphics.stroke({ width: 2, color: 0xef4444, alpha: 0.9 });
+      debugGraphics.fill({ color: 0xef4444, alpha: 0.15 });
+
+      // 2. Ground / Foot Contact Line (Dark red)
+      const feetY = mobY + colliderPixelH / 2;
+      debugGraphics.moveTo(mobX - colliderPixelW / 2, feetY);
+      debugGraphics.lineTo(mobX + colliderPixelW / 2, feetY);
+      debugGraphics.stroke({ width: 2, color: 0xdc2626, alpha: 1 });
+
+      // 3. Center Origin Point (Bright red dot)
+      debugGraphics.circle(mobX, mobY, 3);
+      debugGraphics.fill({ color: 0xf87171, alpha: 1 });
+
+      // 4. Facing Direction Indicator (Yellow line pointing forward)
+      const dirX = instance.isFacingLeft ? -1 : 1;
+      debugGraphics.moveTo(mobX, mobY);
+      debugGraphics.lineTo(mobX + dirX * (colliderPixelW / 2 + 8), mobY);
+      debugGraphics.stroke({ width: 2, color: 0xfacc15, alpha: 0.95 });
+
+      // 5. Mining Target Highlight & Line
+      if (instance.isMining && instance.miningTarget) {
+        const targetX = instance.miningTarget.x * tileSize;
+        const targetY = instance.miningTarget.y * tileSize;
+        debugGraphics.rect(targetX, targetY, tileSize, tileSize);
+        debugGraphics.stroke({ width: 2, color: 0xf97316, alpha: 0.9 });
+        debugGraphics.fill({ color: 0xf97316, alpha: 0.15 });
+
+        debugGraphics.moveTo(mobX, mobY);
+        debugGraphics.lineTo(targetX + tileSize / 2, targetY + tileSize / 2);
+        debugGraphics.stroke({ width: 1.5, color: 0xf97316, alpha: 0.75 });
+      }
+    }
+  }
+
   public destroy(): void {
     for (const [id, instance] of this.mobs) {
       this.removeMob(id, instance);
     }
   }
 }
+

@@ -16,9 +16,11 @@ import {
   getAssetUrl,
   canTileBeDamaged,
   type MiningActiveDynamite,
+  type MiningActiveProjectile,
   type MiningDroppedItem,
   type MiningBackpackItem,
   type GameItem,
+  MINING_SPATIAL_AUDIO_PRESETS,
 } from '@mine-me/shared';
 import { PointLight } from '../../../../components/game/lighting/PointLight';
 import type { EmitterHandle } from '../../../../components/game/particles/ParticleEngine';
@@ -26,7 +28,7 @@ import { useSocket } from '../../../../contexts/SocketContext';
 import { useSound } from '../../../../contexts/SoundContext';
 import { notificationService } from '../../../../services/notificationService';
 import { MiningMouseController } from './input/MiningMouseController';
-import { TorchPlacementAction, LadderPlacementAction, ThrowableItemAction } from './input/MouseAction';
+import { TorchPlacementAction, LadderPlacementAction, ThrowableItemAction, ShootWeaponAction } from './input/MouseAction';
 import { useMiningInput } from './hooks/useMiningInput';
 import { useMiningScene } from './hooks/useMiningScene';
 import { useMiningTicker } from './hooks/useMiningTicker';
@@ -34,6 +36,7 @@ import { MiningTileRenderer, TILE_SIZE } from './renderers/MiningTileRenderer';
 import { MiningEntityRenderer } from './renderers/MiningEntityRenderer';
 import { DynamiteVisualManager } from './renderers/DynamiteVisualManager';
 import { DroppedItemVisualManager } from './renderers/DroppedItemVisualManager';
+import { ProjectileVisualManager } from './renderers/ProjectileVisualManager';
 import { miningProfiler } from './utils/MiningProfiler';
 import './MiningGrid.css';
 
@@ -56,6 +59,7 @@ interface MiningGridProps {
   onToggleDebug?: () => void;
   onVisionChange?: (newVision: number) => void;
   onBackpackChange?: (newBackpack: MiningBackpackItem[]) => void;
+  onWeaponAmmoChange?: (ammo: { current: number; max: number; isReloading: boolean; weaponName?: string; weaponIconUrl?: string | null } | null) => void;
 }
 
 export const MiningGrid: React.FC<MiningGridProps> = ({
@@ -76,6 +80,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onToggleDebug,
   onVisionChange,
   onBackpackChange,
+  onWeaponAmmoChange,
 }) => {
   const { app } = usePixiStage();
   const { onEvent, sendGameEvent } = useSocket();
@@ -116,11 +121,26 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     }
   }, [showDebug]);
 
+  // Synchronize audio listener position with local player position
+  useEffect(() => {
+    soundManager.setListenerPosition?.(playerBodyRef.current.position);
+    return () => {
+      soundManager.setListenerPosition?.(null);
+    };
+  }, [soundManager]);
+
   const activeFallingRocksRef = useRef<{ id: string; x: number; y: number }[]>([]);
   const activeDynamitesRef = useRef<MiningActiveDynamite[]>([]);
+  const activeProjectilesRef = useRef<MiningActiveProjectile[]>([]);
   const dynamiteVisualManagerRef = useRef<DynamiteVisualManager>(new DynamiteVisualManager());
+  const projectileVisualManagerRef = useRef<ProjectileVisualManager>(new ProjectileVisualManager());
   const droppedItemVisualManagerRef = useRef<DroppedItemVisualManager>(new DroppedItemVisualManager());
   const droppedItemsRef = useRef<MiningDroppedItem[]>([]);
+  const weaponAmmoStateRef = useRef<{ current: number; max: number; isReloading: boolean }>({
+    current: 6,
+    max: 6,
+    isReloading: false,
+  });
   const lastDamageParticleTimeRef = useRef<Map<string, number>>(new Map());
   const lastWeaponSoundTimeRef = useRef<number>(0);
 
@@ -216,6 +236,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     fallingRockGraphicsMap,
     dynamiteGraphicsMap,
     dynamiteTextureRef,
+    projectilesContainerRef,
+    projectileGraphicsMap,
+    bulletTextureRef,
     playerSpriteRef,
     remotePlayerRendererRef,
     mobRendererRef,
@@ -392,6 +415,90 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           },
         })
       );
+    } else if (equippedWeapon?.shootsProjectiles || (equippedWeapon as any)?.projectileConfig) {
+      const weapon = equippedWeapon;
+      if (!weapon) return;
+      const projConfig = (weapon as any)?.projectileConfig || {
+        magazineSize: 6,
+        fireRate: 2.5,
+        reloadTime: 1.5,
+      };
+      const fireRate = projConfig.fireRate ?? 2.5;
+
+      mouseController.setActiveAction(
+        new ShootWeaponAction({
+          name: `shoot_${weapon.name.toLowerCase().replace(/\s+/g, '_')}`,
+          weaponItemId: weapon.id,
+          fireRate,
+          onShoot: async (target) => {
+            const playerPos = playerBodyRef.current.position;
+            const muzzlePos = {
+              x: playerPos.x,
+              y: playerPos.y - 0.45,
+            };
+            const angle = Math.atan2(target.y - muzzlePos.y, target.x - muzzlePos.x);
+
+            const gunshotSound =
+              (weapon as any)?.soundEffects?.shoot?.url ||
+              weapon.soundEffectUrl ||
+              '/assets/sounds/items/revolver_shot.wav';
+
+            // Immediate local visual and audio feedback
+            projectileVisualManagerRef.current.triggerLocalShot(
+              muzzlePos,
+              angle,
+              gunshotSound,
+              particleEngineRef.current,
+              lightingEngineRef.current,
+              soundManager
+            );
+
+            // Optimistically deduct 1 round locally
+            if (weaponAmmoStateRef.current.current > 0) {
+              weaponAmmoStateRef.current.current--;
+              if (weaponAmmoStateRef.current.current === 0) {
+                weaponAmmoStateRef.current.isReloading = true;
+              }
+              onWeaponAmmoChange?.({
+                ...weaponAmmoStateRef.current,
+                weaponName: weapon.name,
+                weaponIconUrl: weapon.iconUrl,
+              });
+            }
+
+            try {
+              const res: any = await sendGameEvent({
+                type: 'mining_shoot',
+                target,
+                weaponItemId: weapon.id,
+              } as any);
+
+              if (res && res.remainingAmmo !== undefined) {
+                weaponAmmoStateRef.current = {
+                  current: res.remainingAmmo,
+                  max: projConfig.magazineSize ?? 6,
+                  isReloading: Boolean(res.isReloading),
+                };
+                onWeaponAmmoChange?.({
+                  ...weaponAmmoStateRef.current,
+                  weaponName: weapon.name,
+                  weaponIconUrl: weapon.iconUrl,
+                });
+              }
+
+              if (res && !res.success) {
+                if (res.isReloading) {
+                  soundManager.playSfx?.('/assets/sounds/items/revolver_reload.wav');
+                }
+              }
+              return true;
+            } catch (err: any) {
+              console.error('[MiningGrid] mining_shoot error:', err);
+              return false;
+            }
+          },
+        })
+      );
     } else {
       mouseController.setActiveAction(null);
       lightingEngineRef.current?.removeLight('torch_preview');
@@ -406,13 +513,73 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     isThrowingDynamite,
     isThrowingItem,
     activeThrowableItem,
+    equippedWeapon,
     sendGameEvent,
     onTorchPlaced,
     onLadderPlaced,
     onDynamiteThrown,
+    onWeaponAmmoChange,
     containersReady,
     playerState?.inventory?.items,
   ]);
+
+  // Handle manual weapon reload
+  const handleWeaponReload = async () => {
+    if (!equippedWeapon) return;
+    const weapon = equippedWeapon;
+    try {
+      const reloadSoundUrl =
+        (weapon as any)?.soundEffects?.reload?.url ||
+        '/assets/sounds/items/revolver_reload.wav';
+      soundManager.playSfx?.(reloadSoundUrl);
+
+      const res: any = await sendGameEvent({
+        type: 'mining_reload',
+        weaponItemId: weapon.id,
+      } as any);
+
+      if (res?.success) {
+        weaponAmmoStateRef.current = {
+          current: res.remainingAmmo ?? 0,
+          max: (weapon as any)?.projectileConfig?.magazineSize ?? 6,
+          isReloading: Boolean(res.isReloading),
+        };
+        onWeaponAmmoChange?.({
+          ...weaponAmmoStateRef.current,
+          weaponName: weapon.name,
+          weaponIconUrl: weapon.iconUrl,
+        });
+      }
+    } catch (err: any) {
+      console.error('[MiningGrid] mining_reload error:', err);
+    }
+  };
+
+  // Sync initial weapon ammo on weapon change
+  useEffect(() => {
+    if (!equippedWeapon) {
+      onWeaponAmmoChange?.(null);
+      return;
+    }
+    const weapon = equippedWeapon;
+    if (weapon.shootsProjectiles || (weapon as any).projectileConfig) {
+      const magSize = (weapon as any).projectileConfig?.magazineSize ?? 6;
+      weaponAmmoStateRef.current = {
+        current: magSize,
+        max: magSize,
+        isReloading: false,
+      };
+      onWeaponAmmoChange?.({
+        current: magSize,
+        max: magSize,
+        isReloading: false,
+        weaponName: weapon.name,
+        weaponIconUrl: weapon.iconUrl,
+      });
+    } else {
+      onWeaponAmmoChange?.(null);
+    }
+  }, [equippedWeapon?.id, equippedWeapon?.shootsProjectiles, onWeaponAmmoChange]);
 
   // Real-time Input Controls Hook
   const { keysPressedRef } = useMiningInput({
@@ -427,6 +594,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     zoom,
     onZoomChange,
     onVisionChange,
+    onReload: handleWeaponReload,
   });
 
   // Initial Full-Grid Render & Initial Dynamic Tile Lights
@@ -525,10 +693,23 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       targetServerPosRef.current = payload.position;
       isMiningRef.current = payload.isMining;
       miningTargetRef.current = payload.miningTarget ?? null;
+      soundManager.setListenerPosition?.(playerBodyRef.current?.position ?? payload.position);
       activeFallingRocksRef.current = payload.fallingRocks
         ? payload.fallingRocks.map((r) => ({ id: r.id, x: r.position.x, y: r.position.y }))
         : [];
       activeDynamitesRef.current = payload.activeDynamites || [];
+      activeProjectilesRef.current = payload.activeProjectiles || [];
+
+      // Process gunshots if received in server tick
+      if (payload.gunshots && payload.gunshots.length > 0) {
+        projectileVisualManagerRef.current.handleGunshotEvents(
+          payload.gunshots,
+          playerState?.id,
+          particleEngineRef.current,
+          lightingEngineRef.current,
+          soundManager
+        );
+      }
 
       // Process explosions if received in server tick
       if (payload.explosions && payload.explosions.length > 0) {
@@ -640,7 +821,17 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
                 const lastBlockSound = lastBlockSoundTimeRef.current.get(tileKey) || 0;
                 if (now - lastBlockSound >= 100) {
                   lastBlockSoundTimeRef.current.set(tileKey, now);
-                  soundManager.playSfx(blockSoundUrl);
+                  const soundPos = { x: rt.x + 0.5, y: rt.y + 0.5 };
+                  if (typeof soundManager.playPositionalSfx === 'function') {
+                    soundManager.playPositionalSfx(blockSoundUrl, soundPos, {
+                      spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING,
+                    });
+                  } else {
+                    soundManager.playSfx(blockSoundUrl, {
+                      position: soundPos,
+                      spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING,
+                    });
+                  }
                 }
               }
             }
@@ -850,6 +1041,11 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     dynamiteGraphicsMap,
     dynamiteTextureRef,
     dynamiteVisualManagerRef,
+    projectilesContainerRef,
+    activeProjectilesRef,
+    projectileGraphicsMap,
+    bulletTextureRef,
+    projectileVisualManagerRef,
     droppedItemVisualManagerRef,
     droppedItemsRef,
     reticleGraphicsRef,

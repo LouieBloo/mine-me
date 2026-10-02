@@ -28,5 +28,50 @@
     "isActive": false,
     "createdAt": "2026-09-29T03:06:36.562Z",
     "updatedAt": "2026-09-29T03:06:36.562Z"
+  },
+  {
+    "id": "sfx_mole_dig_001",
+    "name": "Mole Person Digging",
+    "description": "Rapid claw whoosh and subterranean dig sound",
+    "type": "SFX",
+    "url": "/assets/sounds/cmn_mole_person_dig.mp3",
+    "fileName": "cmn_mole_person_dig.mp3",
+    "fileSize": 36954,
+    "mimeType": "audio/mpeg",
+    "volume": 0.85,
+    "loop": false,
+    "isActive": true,
+    "createdAt": "2026-10-01T17:50:00.000Z",
+    "updatedAt": "2026-10-01T17:50:00.000Z"
+  },
+  {
+    "id": "sfx_mole_idle_001",
+    "name": "Mole Person Idle",
+    "description": "Blind subterranean mole snuffle and breath whoosh",
+    "type": "SFX",
+    "url": "/assets/sounds/cmn_mole_person_idle.mp3",
+    "fileName": "cmn_mole_person_idle.mp3",
+    "fileSize": 57624,
+    "mimeType": "audio/mpeg",
+    "volume": 0.7,
+    "loop": false,
+    "isActive": true,
+    "createdAt": "2026-10-01T17:50:00.000Z",
+    "updatedAt": "2026-10-01T17:50:00.000Z"
+  },
+  {
+    "id": "sfx_mole_damage_001",
+    "name": "Mole Person Damage",
+    "description": "Heavy impact whoosh and damage reaction sound",
+    "type": "SFX",
+    "url": "/assets/sounds/cmn_mole_person_damage.mp3",
+    "fileName": "cmn_mole_person_damage.mp3",
+    "fileSize": 84296,
+    "mimeType": "audio/mpeg",
+    "volume": 0.9,
+    "loop": false,
+    "isActive": true,
+    "createdAt": "2026-10-01T17:50:00.000Z",
+    "updatedAt": "2026-10-01T17:50:00.000Z"
   }
 ]

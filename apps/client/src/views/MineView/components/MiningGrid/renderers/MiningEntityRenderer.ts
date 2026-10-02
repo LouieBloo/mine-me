@@ -1,5 +1,5 @@
 import { Assets, Graphics, Sprite, Texture, type Container } from 'pixi.js';
-import { getAssetUrl, type MiningDroppedItem, type MiningActiveDynamite } from '@mine-me/shared';
+import { getAssetUrl, type MiningDroppedItem, type MiningActiveDynamite, type MiningActiveProjectile } from '@mine-me/shared';
 import { TILE_SIZE } from './MiningTileRenderer';
 
 export interface ActiveFallingRock {
@@ -212,6 +212,74 @@ export class MiningEntityRenderer {
         dynamitesContainer.removeChild(view);
         view.destroy();
         dynamiteGraphicsMap.delete(id);
+      }
+    });
+  }
+
+  /**
+   * Render and update active flying projectiles (bullets) in world pixel coordinates.
+   */
+  public static updateActiveProjectiles(
+    projectilesContainer: Container,
+    activeProjectiles: MiningActiveProjectile[],
+    projectileGraphicsMap: Map<string, Sprite | Graphics>,
+    tileSize: number = TILE_SIZE,
+    bulletTexture?: Texture | null
+  ): void {
+    const activeKeys = new Set<string>();
+
+    for (const proj of activeProjectiles) {
+      activeKeys.add(proj.id);
+      let view = projectileGraphicsMap.get(proj.id);
+
+      if (bulletTexture) {
+        if (!view || !(view instanceof Sprite)) {
+          if (view) {
+            projectilesContainer.removeChild(view);
+            view.destroy();
+          }
+          const sprite = new Sprite(bulletTexture);
+          sprite.anchor.set(0.5);
+          sprite.width = tileSize * 0.45;
+          sprite.height = tileSize * 0.18;
+          projectilesContainer.addChild(sprite);
+          view = sprite;
+          projectileGraphicsMap.set(proj.id, view);
+        } else if (view.texture !== bulletTexture) {
+          view.texture = bulletTexture;
+        }
+      } else {
+        if (!view || view instanceof Sprite) {
+          if (view) {
+            projectilesContainer.removeChild(view);
+            view.destroy();
+          }
+          const graphics = new Graphics();
+          // Glowing bullet capsule: gold body with incandescent tip
+          graphics.roundRect(-7, -2.5, 14, 5, 2);
+          graphics.fill(0xf59e0b);
+          graphics.rect(4, -1.5, 3, 3);
+          graphics.fill(0xfef08a);
+          projectilesContainer.addChild(graphics);
+          view = graphics;
+          projectileGraphicsMap.set(proj.id, view);
+        }
+      }
+
+      // Position in world pixel coordinates
+      view.x = proj.position.x * tileSize;
+      view.y = proj.position.y * tileSize;
+      if (typeof proj.angle === 'number') {
+        view.rotation = proj.angle;
+      }
+    }
+
+    // Clean up projectiles that hit or expired
+    projectileGraphicsMap.forEach((view, id) => {
+      if (!activeKeys.has(id)) {
+        projectilesContainer.removeChild(view);
+        view.destroy();
+        projectileGraphicsMap.delete(id);
       }
     });
   }

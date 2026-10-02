@@ -485,6 +485,10 @@ export interface MiningStateTickPayload {
   droppedItems?: MiningDroppedItem[];
   fallingRocks?: MiningFallingRock[];
   activeDynamites?: MiningActiveDynamite[];
+  /** Projectiles actively simulated in flight (e.g. revolver bullets). */
+  activeProjectiles?: MiningActiveProjectile[];
+  /** Gunshot muzzle flash and audio events triggered during this tick. */
+  gunshots?: MiningGunshotEvent[];
   /** Explosions that detonated during this simulation tick. */
   explosions?: MiningExplosionEvent[];
   revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
@@ -543,6 +547,36 @@ export interface MiningExplosionEvent {
   id: string;
   position: Vector2D;
   radius: number;
+  soundUrl?: string | null;
+}
+
+/**
+ * Real-time projectile entity flying through the cavern (e.g. revolver bullet).
+ */
+export interface MiningActiveProjectile {
+  id: string;
+  characterId?: string;
+  itemId?: string;
+  position: Vector2D;
+  velocity: Vector2D;
+  angle: number;
+  speed?: number;
+  damage?: number;
+  spriteUrl?: string | null;
+}
+
+/**
+ * Event emitted when a projectile weapon fires in the cavern world.
+ */
+export interface MiningGunshotEvent {
+  id: string;
+  characterId: string;
+  position: Vector2D;
+  muzzlePosition?: Vector2D;
+  target?: Vector2D;
+  direction?: Vector2D;
+  angle?: number;
+  weaponItemId?: string;
   soundUrl?: string | null;
 }
 

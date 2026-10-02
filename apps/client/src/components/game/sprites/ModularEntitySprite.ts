@@ -354,23 +354,48 @@ export class ModularEntitySprite extends BaseSprite {
       this.armFrontNode.rotation = -stride * 0.35;
       this.armBackNode.rotation = stride * 0.35;
     } else if (this.animState === 'mine') {
-      // Mining tool swing cycle
-      const swingFreq = 6.0;
-      const progress = (this.animTime * swingFreq) % (Math.PI * 2);
-      const swing = Math.sin(progress);
+      if (this.manifest?.miningStyle === 'hands') {
+        // Dual-hand rapid claw digging animation
+        const digFreq = 9.0;
+        const swingFront = Math.sin(this.animTime * digFreq);
+        const swingBack = Math.sin(this.animTime * digFreq + Math.PI);
 
-      this.armFrontNode.y = baseArmFront.y;
-      this.armBackNode.y = baseArmBack.y;
-      this.armFrontNode.rotation = -0.6 + swing * 1.2;
-      this.torsoNode.rotation = swing > 0 ? 0.12 : -0.05;
-      this.torsoNode.y = baseTorso.y + (swing > 0 ? 6 : -2);
-      this.headNode.y = baseHead.y;
-      this.headNode.rotation = swing * 0.1;
+        this.armFrontNode.x = baseArmFront.x + Math.cos(this.animTime * digFreq) * 16;
+        this.armBackNode.x = baseArmBack.x + Math.cos(this.animTime * digFreq + Math.PI) * 16;
+        this.armFrontNode.y = baseArmFront.y + Math.abs(swingFront) * 8;
+        this.armBackNode.y = baseArmBack.y + Math.abs(swingBack) * 8;
+        this.armFrontNode.rotation = -0.15 + swingFront * 0.65;
+        this.armBackNode.rotation = -0.15 + swingBack * 0.65;
 
-      this.legFrontNode.y = baseLegFront.y;
-      this.legBackNode.y = baseLegBack.y;
-      this.legFrontNode.rotation = 0.1;
-      this.legBackNode.rotation = -0.15;
+        this.torsoNode.rotation = 0.16 + Math.sin(this.animTime * digFreq * 2) * 0.04;
+        this.torsoNode.y = baseTorso.y + 4 + Math.sin(this.animTime * digFreq * 2) * 3;
+        this.headNode.y = baseHead.y + 2;
+        this.headNode.rotation = 0.14 + Math.sin(this.animTime * digFreq) * 0.06;
+
+        this.legFrontNode.y = baseLegFront.y;
+        this.legBackNode.y = baseLegBack.y;
+        this.legFrontNode.rotation = 0.15;
+        this.legBackNode.rotation = -0.2;
+      } else {
+        // Mining tool swing cycle
+        const swingFreq = 6.0;
+        const progress = (this.animTime * swingFreq) % (Math.PI * 2);
+        const swing = Math.sin(progress);
+
+        this.armFrontNode.y = baseArmFront.y;
+        this.armBackNode.y = baseArmBack.y;
+        this.armFrontNode.rotation = -0.6 + swing * 1.2;
+        this.torsoNode.rotation = swing > 0 ? 0.12 : -0.05;
+        this.torsoNode.y = baseTorso.y + (swing > 0 ? 6 : -2);
+        this.headNode.y = baseHead.y;
+        this.headNode.rotation = swing * 0.1;
+
+        this.legFrontNode.y = baseLegFront.y;
+        this.legBackNode.y = baseLegBack.y;
+        this.legFrontNode.rotation = 0.1;
+        this.legBackNode.rotation = -0.15;
+      }
+
     } else if (this.animState === 'attack') {
       // Melee attack swing
       const attackFreq = 7.5;

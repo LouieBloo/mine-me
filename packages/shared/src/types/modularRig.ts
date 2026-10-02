@@ -25,8 +25,10 @@ export interface SkeletonManifest {
   pelvis_origin: [number, number];
   hand_joint?: SkeletonHandJointDef;
   tool_socket?: SkeletonToolSocketDef;
+  miningStyle?: 'tool' | 'hands';
   parts: Record<string, SkeletonPartDef>;
 }
+
 
 export type ModularAnimationState = 'idle' | 'walk' | 'mine' | 'attack' | 'damage' | 'death';
 

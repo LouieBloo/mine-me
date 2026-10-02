@@ -1,5 +1,221 @@
 [
   {
+    "id": "cmn_mole_person_001",
+    "name": "Mole Person",
+    "level": 1,
+    "health": 40,
+    "attack": 6,
+    "defense": 2,
+    "attackPercentage": 80,
+    "defendPercentage": 20,
+    "aiType": "CHASE_AND_MINE",
+    "aiConfig": {
+      "mineRange": 1.1,
+      "attackRange": 1.1,
+      "jumpCooldownMs": 600,
+      "mineCooldownMs": 400,
+      "detectionRadius": 12,
+      "attackCooldownMs": 1000
+    },
+    "abilities": [],
+    "moveSpeed": 1,
+    "jumpForce": 6.5,
+    "miningSpeed": 0.25,
+    "sounds": {
+      "dig": {
+        "url": "/assets/sounds/cmn_mole_person_dig.mp3",
+        "loop": false
+      },
+      "idle": {
+        "url": "/assets/sounds/cmn_mole_person_idle.mp3",
+        "loop": false
+      },
+      "damage": {
+        "url": "/assets/sounds/cmn_mole_person_damage.mp3",
+        "loop": false
+      }
+    },
+    "animations": {
+      "version": "2.0",
+      "miningStyle": "hands",
+      "canvas_size": [
+        1024,
+        1024
+      ],
+      "pelvis_origin": [
+        512,
+        590
+      ],
+      "hand_joint": {
+        "offset": [
+          50,
+          80
+        ]
+      },
+      "tool_socket": {
+        "scale": 0,
+        "offset": [
+          0,
+          0
+        ],
+        "rotation": 0
+      },
+      "parts": {
+        "arm_back": {
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/arm_back.png",
+          "width": 140,
+          "height": 270,
+          "bbox": [
+            0,
+            0,
+            140,
+            270
+          ],
+          "pivot_anchor": [
+            0.2,
+            0.2
+          ],
+          "offset_from_pelvis": [
+            22,
+            -145
+          ],
+          "z_index": 5,
+          "slot": "GAUNTLETS"
+        },
+        "leg_back": {
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/leg_back.png",
+          "width": 175,
+          "height": 290,
+          "bbox": [
+            0,
+            0,
+            175,
+            290
+          ],
+          "pivot_anchor": [
+            0.5,
+            0.05
+          ],
+          "offset_from_pelvis": [
+            -25,
+            -12
+          ],
+          "z_index": 10,
+          "slot": "BOOTS"
+        },
+        "leg_front": {
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/leg_front.png",
+          "width": 190,
+          "height": 290,
+          "bbox": [
+            0,
+            0,
+            190,
+            290
+          ],
+          "pivot_anchor": [
+            0.5,
+            0.05
+          ],
+          "offset_from_pelvis": [
+            30,
+            -5
+          ],
+          "z_index": 15,
+          "slot": "BOOTS"
+        },
+        "torso": {
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/torso.png",
+          "width": 300,
+          "height": 310,
+          "bbox": [
+            0,
+            0,
+            300,
+            310
+          ],
+          "pivot_anchor": [
+            0.5,
+            0.94
+          ],
+          "offset_from_pelvis": [
+            0,
+            0
+          ],
+          "z_index": 20,
+          "slot": "CHEST"
+        },
+        "head": {
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/head.png",
+          "width": 220,
+          "height": 240,
+          "bbox": [
+            0,
+            0,
+            220,
+            240
+          ],
+          "pivot_anchor": [
+            0.28,
+            0.88
+          ],
+          "offset_from_pelvis": [
+            55,
+            -161
+          ],
+          "z_index": 30,
+          "slot": "HEAD"
+        },
+        "arm_front": {
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/arm_front.png",
+          "width": 280,
+          "height": 160,
+          "bbox": [
+            0,
+            0,
+            280,
+            160
+          ],
+          "pivot_anchor": [
+            0.18,
+            0.25
+          ],
+          "offset_from_pelvis": [
+            -20,
+            -150
+          ],
+          "z_index": 40,
+          "slot": "WEAPON"
+        }
+      }
+    },
+    "createdAt": "2026-09-30T00:00:00.000Z",
+    "updatedAt": "2026-09-30T00:00:00.000Z",
+    "dropTable": {
+      "id": "dt_mole_person_001",
+      "solMin": 15,
+      "solMax": 35,
+      "experience": 40,
+      "mobId": "cmn_mole_person_001",
+      "characterLevelId": null,
+      "miningBlockId": null,
+      "createdAt": "2026-09-30T01:45:50.264Z",
+      "updatedAt": "2026-10-02T00:01:15.809Z",
+      "items": [
+        {
+          "id": "cmuq76t5s000913q1muwo7lnn",
+          "dropTableId": "dt_mole_person_001",
+          "itemId": "cmp6aexa30004idpx29gsz12l",
+          "chance": 80,
+          "minQuantity": 1,
+          "maxQuantity": 3,
+          "createdAt": "2026-10-02T00:01:15.809Z",
+          "updatedAt": "2026-10-02T00:01:15.809Z"
+        }
+      ]
+    }
+  },
+  {
     "id": "cmn1zb9op0000ihw4mgknuvlr",
     "name": "Mario",
     "level": 1,
@@ -8,6 +224,12 @@
     "defense": 1,
     "attackPercentage": 80,
     "defendPercentage": 20,
+    "aiType": "CHASE_AND_MINE",
+    "aiConfig": null,
+    "abilities": null,
+    "moveSpeed": 3,
+    "jumpForce": 6.5,
+    "miningSpeed": 50,
     "animations": {
       "url": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_sprite.png",
       "atlasUrl": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_atlas.json"
@@ -21,8 +243,9 @@
       "experience": 10,
       "mobId": "cmn1zb9op0000ihw4mgknuvlr",
       "characterLevelId": null,
+      "miningBlockId": null,
       "createdAt": "2026-06-22T00:13:19.086Z",
-      "updatedAt": "2026-08-17T04:06:41.128Z",
+      "updatedAt": "2026-09-30T01:45:50.239Z",
       "items": [
         {
           "id": "cmq1lerzw0009q7ocoeo29j4r",
@@ -32,7 +255,7 @@
           "minQuantity": 1,
           "maxQuantity": 1,
           "createdAt": "2026-06-22T00:13:19.102Z",
-          "updatedAt": "2026-08-17T04:06:41.132Z"
+          "updatedAt": "2026-09-30T01:45:50.243Z"
         },
         {
           "id": "cmq1lerzw000aq7oce69fyvsp",
@@ -42,7 +265,7 @@
           "minQuantity": 1,
           "maxQuantity": 1,
           "createdAt": "2026-06-22T00:13:19.124Z",
-          "updatedAt": "2026-08-17T04:06:41.137Z"
+          "updatedAt": "2026-09-30T01:45:50.248Z"
         },
         {
           "id": "cmq1lerzw000bq7ocy6t8mssb",
@@ -52,7 +275,7 @@
           "minQuantity": 1,
           "maxQuantity": 1,
           "createdAt": "2026-06-22T00:13:19.137Z",
-          "updatedAt": "2026-08-17T04:06:41.140Z"
+          "updatedAt": "2026-09-30T01:45:50.251Z"
         }
       ]
     }
@@ -66,6 +289,12 @@
     "defense": 5,
     "attackPercentage": 90,
     "defendPercentage": 10,
+    "aiType": "CHASE_AND_MINE",
+    "aiConfig": null,
+    "abilities": null,
+    "moveSpeed": 3,
+    "jumpForce": 6.5,
+    "miningSpeed": 50,
     "animations": {
       "parts": {
         "head": {
@@ -222,205 +451,5 @@
     "createdAt": "2026-04-06T21:51:48.684Z",
     "updatedAt": "2026-08-19T02:49:17.707Z",
     "dropTable": null
-  },
-  {
-    "id": "cmn_mole_person_001",
-    "name": "Mole Person",
-    "level": 1,
-    "health": 40,
-    "attack": 6,
-    "defense": 2,
-    "attackPercentage": 80,
-    "defendPercentage": 20,
-    "aiType": "CHASE_AND_MINE",
-    "aiConfig": {
-      "detectionRadius": 12,
-      "attackRange": 1.2,
-      "mineRange": 2.0,
-      "jumpCooldownMs": 600,
-      "mineCooldownMs": 400,
-      "attackCooldownMs": 1000
-    },
-    "moveSpeed": 3.2,
-    "jumpForce": 8.8,
-    "miningSpeed": 80.0,
-    "abilities": [],
-    "animations": {
-      "canvas_size": [
-        1024,
-        1024
-      ],
-      "pelvis_origin": [
-        512,
-        590
-      ],
-      "tool_socket": {
-        "offset": [
-          30,
-          -105
-        ],
-        "rotation": 0.4,
-        "scale": 1
-      },
-      "hand_joint": {
-        "offset": [
-          210,
-          100
-        ]
-      },
-      "version": "2.0",
-      "parts": {
-        "head": {
-          "bbox": [
-            0,
-            0,
-            219,
-            260
-          ],
-          "file": "head.png",
-          "slot": "HEAD",
-          "width": 199,
-          "height": 240,
-          "z_index": 30,
-          "pivot_anchor": [
-            0.46,
-            0.94
-          ],
-          "offset_from_pelvis": [
-            -58,
-            -225
-          ]
-        },
-        "torso": {
-          "bbox": [
-            0,
-            0,
-            303,
-            310
-          ],
-          "file": "torso.png",
-          "slot": "CHEST",
-          "width": 303,
-          "height": 310,
-          "z_index": 20,
-          "pivot_anchor": [
-            0.5,
-            0.94
-          ],
-          "offset_from_pelvis": [
-            -25,
-            15
-          ]
-        },
-        "arm_back": {
-          "bbox": [
-            0,
-            0,
-            88,
-            260
-          ],
-          "file": "arm_back.png",
-          "slot": "GAUNTLETS",
-          "width": 88,
-          "height": 260,
-          "z_index": 5,
-          "pivot_anchor": [
-            0.52,
-            0.12
-          ],
-          "offset_from_pelvis": [
-            90,
-            -180
-          ]
-        },
-        "leg_back": {
-          "bbox": [
-            0,
-            0,
-            150,
-            380
-          ],
-          "file": "leg_back.png",
-          "slot": "BOOTS",
-          "width": 150,
-          "height": 380,
-          "z_index": 10,
-          "pivot_anchor": [
-            0.48,
-            0.05
-          ],
-          "offset_from_pelvis": [
-            35,
-            30
-          ]
-        },
-        "arm_front": {
-          "bbox": [
-            0,
-            0,
-            331,
-            210
-          ],
-          "file": "arm_front.png",
-          "slot": "WEAPON",
-          "width": 271,
-          "height": 150,
-          "z_index": 40,
-          "pivot_anchor": [
-            0.08,
-            0.18
-          ],
-          "offset_from_pelvis": [
-            -153,
-            -95
-          ]
-        },
-        "leg_front": {
-          "bbox": [
-            0,
-            0,
-            177,
-            380
-          ],
-          "file": "leg_front.png",
-          "slot": "BOOTS",
-          "width": 177,
-          "height": 380,
-          "z_index": 15,
-          "pivot_anchor": [
-            0.52,
-            0.05
-          ],
-          "offset_from_pelvis": [
-            -20,
-            60
-          ]
-        }
-      }
-    },
-    "createdAt": "2026-09-30T00:00:00.000Z",
-    "updatedAt": "2026-09-30T00:00:00.000Z",
-    "dropTable": {
-      "id": "dt_mole_person_001",
-      "solMin": 15,
-      "solMax": 35,
-      "experience": 40,
-      "mobId": "cmn_mole_person_001",
-      "characterLevelId": null,
-      "createdAt": "2026-09-30T00:00:00.000Z",
-      "updatedAt": "2026-09-30T00:00:00.000Z",
-      "items": [
-        {
-          "id": "dti_mole_copper_001",
-          "dropTableId": "dt_mole_person_001",
-          "itemId": "cmp6aexa30004idpx29gsz12l",
-          "chance": 80,
-          "minQuantity": 1,
-          "maxQuantity": 3,
-          "createdAt": "2026-09-30T00:00:00.000Z",
-          "updatedAt": "2026-09-30T00:00:00.000Z"
-        }
-      ]
-    }
   }
 ]

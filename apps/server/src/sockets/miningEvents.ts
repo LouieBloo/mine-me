@@ -6,6 +6,7 @@ import {
   type GameEventResult,
   type MiningInputPayload,
   type MiningInteractPayload,
+  type Vector2D,
   CharacterModEngine,
 } from '@mine-me/shared';
 import { miningSessionManager } from '../services/mining/MiningSessionManager';
@@ -438,6 +439,65 @@ export const handleMiningThrowDynamite = async (
 };
 
 export const handleMiningThrowItem = handleMiningThrowDynamite;
+
+/**
+ * Handler: mining_shoot
+ * Fires a projectile from character's weapon towards target coordinates.
+ * Authoritative: Validates ammo, magazine, cooldown, creates Planck.js projectile.
+ */
+export const handleMiningShoot = async (
+  io: Server,
+  socket: Socket,
+  payload: { target: Vector2D; itemId?: string }
+): Promise<GameEventResult> => {
+  const characterId = socket.data.characterId;
+  if (!characterId) return { success: false, error: 'No character selected.' };
+
+  const engine = miningSessionManager.getSession(characterId);
+  if (!engine) return { success: false, error: 'No active mining session.' };
+
+  if (!payload?.target) {
+    return { success: false, error: 'Target position is required.' };
+  }
+
+  const result = engine.shootProjectile(characterId, payload.target, payload.itemId);
+  if (!result.success) {
+    return { success: false, error: result.error || 'Failed to shoot weapon.' };
+  }
+
+  return {
+    success: true,
+    data: {
+      remainingAmmo: result.remainingAmmo,
+      isReloading: result.isReloading,
+    },
+  };
+};
+
+/**
+ * Handler: mining_reload
+ * Initiates authoritative weapon reload for character.
+ */
+export const handleMiningReload = async (
+  io: Server,
+  socket: Socket,
+): Promise<GameEventResult> => {
+  const characterId = socket.data.characterId;
+  if (!characterId) return { success: false, error: 'No character selected.' };
+
+  const engine = miningSessionManager.getSession(characterId);
+  if (!engine) return { success: false, error: 'No active mining session.' };
+
+  const result = engine.reloadWeapon(characterId);
+  return {
+    success: result.success,
+    error: result.error,
+    data: {
+      remainingAmmo: result.remainingAmmo,
+      isReloading: result.isReloading,
+    },
+  };
+};
 
 /**
  * Handler: mining_exit

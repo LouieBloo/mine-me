@@ -64,6 +64,15 @@ export const MineView: React.FC = () => {
     setShowDebug((prev) => !prev);
   }, []);
 
+  // Equipped Weapon Ammo State
+  const [weaponAmmo, setWeaponAmmo] = useState<{
+    current: number;
+    max: number;
+    isReloading: boolean;
+    weaponName?: string;
+    weaponIconUrl?: string | null;
+  } | null>(null);
+
   // Torch, Ladder and Dynamite/Throwable Placement Mode State from QuickAccessContext
   const { isPlacingTorch, isPlacingLadder, isThrowingDynamite, isThrowingItem, activeThrowableItem, selectSlot } = useQuickAccess();
 
@@ -304,6 +313,7 @@ export const MineView: React.FC = () => {
             onToggleDebug={handleToggleDebug}
             onVisionChange={handleVisionChange}
             onBackpackChange={handleBackpackChange}
+            onWeaponAmmoChange={setWeaponAmmo}
           />
         </PixiStageProvider>
       )}
@@ -321,6 +331,7 @@ export const MineView: React.FC = () => {
           onZoomChange={handleZoomChange}
           showDebug={showDebug}
           onToggleDebug={handleToggleDebug}
+          weaponAmmo={weaponAmmo}
         />
       )}
 

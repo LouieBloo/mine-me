@@ -156,6 +156,20 @@ export interface ItemLightConfig {
   spotConeAngle?: number;
 }
 
+export interface ItemProjectileConfig {
+  shootsProjectiles?: boolean;
+  magazineSize: number;
+  fireRate: number;
+  reloadTime?: number;
+  projectileSpeed?: number;
+  projectileGravityScale?: number;
+  projectileItemId?: string;
+  damage?: number;
+  maxLifetime?: number;
+  muzzleFlashEffectId?: string;
+  smokeEffectId?: string;
+}
+
 export interface GameItem {
   id: string;
   itemKey?: string | null;
@@ -178,6 +192,8 @@ export interface GameItem {
   canBeClimbed?: boolean;
   throwable?: boolean;
   triggerMode?: MouseActionTriggerMode;
+  shootsProjectiles?: boolean;
+  projectileConfig?: ItemProjectileConfig | null;
   particleEffectId?: string | null;
   particleEffect?: ParticleEffect | null;
   itemEffects?: ObjectEffects[];

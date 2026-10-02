@@ -671,6 +671,53 @@ describe('useMiningTicker - Torch Preview Lighting', () => {
       // Rock circle collider & dropped item circle collider rendered
       expect(mockG.circle).toHaveBeenCalled();
     });
+
+    it('calls mobRenderer.renderDebugHitboxes when showDebug is enabled', () => {
+      const mockG: any = {
+        clear: vi.fn(),
+        rect: vi.fn().mockReturnThis(),
+        stroke: vi.fn().mockReturnThis(),
+        moveTo: vi.fn().mockReturnThis(),
+        lineTo: vi.fn().mockReturnThis(),
+        circle: vi.fn().mockReturnThis(),
+        fill: vi.fn().mockReturnThis(),
+      };
+
+      const mockMobRenderer = {
+        tick: vi.fn(),
+        renderDebugHitboxes: vi.fn(),
+      };
+
+      renderHook(() =>
+        useMiningTicker({
+          app: mockApp,
+          playerContainerRef: { current: playerContainer },
+          gridContainerRef: { current: gridContainer },
+          fallingRocksContainerRef: { current: null },
+          currentRenderPosRef: { current: { x: 2, y: 4 } },
+          targetServerPosRef: { current: { x: 2, y: 4 } },
+          isFacingLeftRef: { current: false },
+          playerFacingDirRef: { current: { x: 1, y: 0 } },
+          playerSpriteRef: { current: null },
+          mobRendererRef: { current: mockMobRenderer as any },
+          activeFallingRocksRef: { current: [] },
+          fallingRockGraphicsMap: { current: new Map() },
+          debugGraphicsRef: { current: mockG },
+          showDebugRef: { current: true },
+          flashlightRef: { current: null },
+          lightingEngineRef: { current: null },
+          cameraRef: { current: null },
+          playerBodyRef,
+          gridRef,
+          keysPressedRef,
+          isMiningRef,
+          miningTargetRef,
+        })
+      );
+
+      tickerCallbacks[0]();
+      expect(mockMobRenderer.renderDebugHitboxes).toHaveBeenCalledWith(mockG, expect.any(Number));
+    });
   });
 
   describe('useMiningTicker - Dynamite Visual Effects', () => {

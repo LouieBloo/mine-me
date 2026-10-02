@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import type { SoundSettings } from '@mine-me/shared';
-import { soundManager, SoundManager } from '../services/sound';
+import type { SoundSettings, Vector2D } from '@mine-me/shared';
+import { soundManager, SoundManager, type PlaySfxOptions } from '../services/sound';
 
 interface SoundContextType {
   settings: SoundSettings;
@@ -12,7 +12,9 @@ interface SoundContextType {
   toggleSfx: () => void;
   setBgmVolume: (volume: number) => void;
   setSfxVolume: (volume: number) => void;
-  playSfx: (url: string, volumeScale?: number) => void;
+  playSfx: (url: string, volumeScale?: number | PlaySfxOptions) => void;
+  playPositionalSfx: (url: string, position: Vector2D, options?: PlaySfxOptions) => void;
+  setListenerPosition: (pos: Vector2D | null) => void;
   startSessionBgm: () => void;
   isSettingsOpen: boolean;
   openSettings: () => void;
@@ -50,7 +52,10 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     toggleSfx: () => soundManager.toggleSfx(),
     setBgmVolume: (vol: number) => soundManager.setBgmVolume(vol),
     setSfxVolume: (vol: number) => soundManager.setSfxVolume(vol),
-    playSfx: (url: string, volumeScale?: number) => soundManager.playSfx(url, volumeScale),
+    playSfx: (url: string, volumeScale?: number | PlaySfxOptions) => soundManager.playSfx(url, volumeScale),
+    playPositionalSfx: (url: string, position: Vector2D, options?: PlaySfxOptions) =>
+      soundManager.playPositionalSfx(url, position, options),
+    setListenerPosition: (pos: Vector2D | null) => soundManager.setListenerPosition(pos),
     startSessionBgm: () => soundManager.startSessionBgm(),
     isSettingsOpen,
     openSettings: () => setIsSettingsOpen(true),
@@ -80,7 +85,10 @@ export const useSound = (): SoundContextType => {
       toggleSfx: () => soundManager.toggleSfx(),
       setBgmVolume: (vol: number) => soundManager.setBgmVolume(vol),
       setSfxVolume: (vol: number) => soundManager.setSfxVolume(vol),
-      playSfx: (url: string, scale?: number) => soundManager.playSfx(url, scale),
+      playSfx: (url: string, scale?: number | PlaySfxOptions) => soundManager.playSfx(url, scale),
+      playPositionalSfx: (url: string, position: Vector2D, options?: PlaySfxOptions) =>
+        soundManager.playPositionalSfx(url, position, options),
+      setListenerPosition: (pos: Vector2D | null) => soundManager.setListenerPosition(pos),
       startSessionBgm: () => soundManager.startSessionBgm(),
       isSettingsOpen: false,
       openSettings: () => {},

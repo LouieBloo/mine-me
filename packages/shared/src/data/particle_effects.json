@@ -314,5 +314,52 @@
     },
     "createdAt": "2026-09-22T22:50:00.000Z",
     "updatedAt": "2026-09-22T22:50:00.000Z"
+  },
+  {
+    "id": "pe_gun_muzzle_flash",
+    "name": "Gun Muzzle Flash",
+    "description": "Snappy incandescent muzzle flash burst when firing a firearm.",
+    "type": "BURST",
+    "config": {
+      "emitterType": "burst",
+      "burstCount": 14,
+      "lifetime": { "min": 0.05, "max": 0.14 },
+      "speed": { "min": 60, "max": 200 },
+      "angle": { "min": 0, "max": 360 },
+      "gravity": { "x": 0, "y": 0 },
+      "friction": 0.90,
+      "scale": { "start": 1.2, "end": 0.15 },
+      "color": { "start": "#fef08a", "end": "#f97316" },
+      "alpha": { "start": 1, "end": 0 },
+      "blendMode": "add",
+      "shape": "spark",
+      "spawnRadius": 4
+    },
+    "createdAt": "2026-10-01T20:00:00.000Z",
+    "updatedAt": "2026-10-01T20:00:00.000Z"
+  },
+  {
+    "id": "pe_gun_smoke",
+    "name": "Gun Barrel Smoke",
+    "description": "Soft expanding powder smoke trailing from the barrel after a gunshot.",
+    "type": "BURST",
+    "config": {
+      "emitterType": "burst",
+      "burstCount": 8,
+      "lifetime": { "min": 0.4, "max": 0.75 },
+      "speed": { "min": 15, "max": 50 },
+      "angle": { "min": 210, "max": 330 },
+      "gravity": { "x": 0, "y": -25 },
+      "friction": 0.94,
+      "scale": { "start": 0.7, "end": 2.2 },
+      "color": { "start": "#e5e7eb", "end": "#4b5563" },
+      "alpha": { "start": 0.65, "end": 0 },
+      "blendMode": "normal",
+      "shape": "smoke",
+      "spawnRadius": 5,
+      "turbulence": 12
+    },
+    "createdAt": "2026-10-01T20:00:00.000Z",
+    "updatedAt": "2026-10-01T20:00:00.000Z"
   }
 ]

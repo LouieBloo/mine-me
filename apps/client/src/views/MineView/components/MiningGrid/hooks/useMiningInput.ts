@@ -16,6 +16,7 @@ export interface UseMiningInputOptions {
   zoom: number;
   onZoomChange?: (zoom: number) => void;
   onVisionChange?: (newVision: number) => void;
+  onReload?: () => void;
 }
 
 export function useMiningInput({
@@ -30,7 +31,10 @@ export function useMiningInput({
   zoom,
   onZoomChange,
   onVisionChange,
+  onReload,
 }: UseMiningInputOptions) {
+  const onReloadRef = useRef(onReload);
+  onReloadRef.current = onReload;
   const onToggleDebugRef = useRef(onToggleDebug);
   onToggleDebugRef.current = onToggleDebug;
   const onVisionChangeRef = useRef(onVisionChange);
@@ -197,6 +201,8 @@ export function useMiningInput({
             }
           })
           ?.catch?.(() => {});
+      } else if (key === 'r' && isKeyDown && !e.repeat) {
+        onReloadRef.current?.();
       }
 
       if (changed) {

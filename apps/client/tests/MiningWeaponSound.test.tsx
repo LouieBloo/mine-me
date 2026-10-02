@@ -5,10 +5,14 @@ import { MiningGrid } from '../src/views/MineView/components/MiningGrid/MiningGr
 import { MiningTileType, type MiningSessionClientState, type PlayerState } from '@mine-me/shared';
 
 const mockPlaySfx = vi.fn();
+const mockPlayPositionalSfx = vi.fn();
+const mockSetListenerPosition = vi.fn();
 
 vi.mock('../src/services/sound', () => ({
   soundManager: {
     playSfx: mockPlaySfx,
+    playPositionalSfx: mockPlayPositionalSfx,
+    setListenerPosition: mockSetListenerPosition,
     startSessionBgm: vi.fn(),
     stopBgm: vi.fn(),
     getSettings: vi.fn().mockReturnValue({ bgmEnabled: true, sfxEnabled: true, bgmVolume: 70, sfxVolume: 90 }),
@@ -23,8 +27,12 @@ vi.mock('../src/contexts/SoundContext', () => ({
   useSound: () => ({
     soundManager: {
       playSfx: mockPlaySfx,
+      playPositionalSfx: mockPlayPositionalSfx,
+      setListenerPosition: mockSetListenerPosition,
     },
     playSfx: mockPlaySfx,
+    playPositionalSfx: mockPlayPositionalSfx,
+    setListenerPosition: mockSetListenerPosition,
   }),
 }));
 
@@ -121,6 +129,8 @@ describe('Mining Weapon Sound Effect Playback', () => {
   beforeEach(() => {
     eventListeners = {};
     mockPlaySfx.mockClear();
+    mockPlayPositionalSfx.mockClear();
+    mockSetListenerPosition.mockClear();
     mockBlockSounds = new Map();
   });
 
@@ -289,7 +299,11 @@ describe('Mining Weapon Sound Effect Playback', () => {
       });
     });
 
-    expect(mockPlaySfx).toHaveBeenCalledWith('/assets/sounds/blocks/dirt_sfx.wav');
+    expect(mockPlayPositionalSfx).toHaveBeenCalledWith(
+      '/assets/sounds/blocks/dirt_sfx.wav',
+      { x: 1.5, y: 0.5 },
+      expect.objectContaining({ spatial: expect.anything() })
+    );
   });
 
   it('plays block damage sound effect when block is destroyed', () => {
@@ -317,7 +331,11 @@ describe('Mining Weapon Sound Effect Playback', () => {
       });
     });
 
-    expect(mockPlaySfx).toHaveBeenCalledWith('/assets/sounds/blocks/dirt_sfx.wav');
+    expect(mockPlayPositionalSfx).toHaveBeenCalledWith(
+      '/assets/sounds/blocks/dirt_sfx.wav',
+      { x: 1.5, y: 0.5 },
+      expect.objectContaining({ spatial: expect.anything() })
+    );
   });
 
   it('does NOT play block destroyed sound when revealing a previously unrevealed tile (falling into caverns)', () => {
@@ -424,5 +442,52 @@ describe('Mining Weapon Sound Effect Playback', () => {
     });
 
     expect(mockPlaySfx).not.toHaveBeenCalled();
+  });
+
+  it('plays positional block sound when a mob mines a block', () => {
+    mockBlockSounds.set(MiningTileType.DIRT, '/assets/sounds/blocks/dirt_sfx.wav');
+    const playerState = createPlayerState(null);
+
+    render(
+      <MiningGrid
+        sessionState={baseSessionState}
+        playerState={playerState}
+        onExit={vi.fn()}
+      />
+    );
+
+    // Mob mines tile at (1, 1); player is at (0, 0)
+    act(() => {
+      eventListeners['mining_state_tick']?.({
+        tick: 9,
+        position: { x: 0, y: 0 },
+        velocity: { x: 0, y: 0 },
+        isMining: false,
+        miningTarget: null,
+        mobs: [
+          {
+            id: 'mob-mole-1',
+            mobId: 'cmn_mole_person_001',
+            position: { x: 1, y: 1 },
+            isMining: true,
+            miningTarget: { x: 1, y: 1 },
+          },
+        ],
+        revealedTiles: [
+          { x: 1, y: 1, type: MiningTileType.DIRT, damageStage: 1 },
+        ],
+      });
+    });
+
+    expect(mockPlayPositionalSfx).toHaveBeenCalledWith(
+      '/assets/sounds/blocks/dirt_sfx.wav',
+      { x: 1.5, y: 1.5 },
+      expect.objectContaining({
+        spatial: expect.objectContaining({
+          maxDistance: 16,
+          minDistance: 2,
+        }),
+      })
+    );
   });
 });

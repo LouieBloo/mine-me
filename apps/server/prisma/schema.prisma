@@ -100,6 +100,8 @@ model Item {
   particleEffect   ParticleEffect? @relation(fields: [particleEffectId], references: [id], onDelete: SetNull)
   physicsConfig   Json?
   lightConfig     Json?
+  shootsProjectiles Boolean       @default(false)
+  projectileConfig Json?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   cityMaterials   CityMaterial[]

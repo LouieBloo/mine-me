@@ -1,0 +1,30 @@
+.item-projectile-config-card {
+  position: relative;
+  transition: all 0.2s ease-in-out;
+}
+
+.item-projectile-config-card input[type="number"]::-webkit-inner-spin-button,
+.item-projectile-config-card input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.item-projectile-config-card input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.22s ease-out forwards;
+}

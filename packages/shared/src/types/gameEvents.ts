@@ -174,6 +174,12 @@ export interface MiningIncreaseVisionPayload extends GameEventBase {
   amount?: number;
 }
 
+export interface MiningShootPayload extends GameEventBase {
+  type: 'mining_shoot';
+  target: Vector2D;
+  itemId?: string;
+}
+
 // ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
@@ -190,6 +196,7 @@ export type GameEventPayload =
   | MiningPlaceTorchPayload
   | MiningThrowDynamitePayload
   | MiningThrowItemPayload
+  | MiningShootPayload
   | MiningIncreaseVisionPayload
   | MiningMovePayload
   | MiningMineStartPayload

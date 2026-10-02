@@ -10,6 +10,7 @@ import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
 import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
 import type { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
 import type { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
+import type { ProjectileVisualManager } from '../renderers/ProjectileVisualManager';
 import type { SoundManager } from '../../../../../services/sound';
 import {
   MINING_CONFIG,
@@ -20,6 +21,7 @@ import {
   type MiningInputState,
   type MiningPosition,
   type MiningActiveDynamite,
+  type MiningActiveProjectile,
   type MiningDroppedItem,
   MiningPlayerBody,
   MiningTileType,
@@ -51,6 +53,11 @@ export interface UseMiningTickerOptions {
   dynamiteGraphicsMap?: React.MutableRefObject<Map<string, Sprite | Graphics>>;
   dynamiteTextureRef?: React.RefObject<Texture | null>;
   dynamiteVisualManagerRef?: React.RefObject<DynamiteVisualManager | null>;
+  projectilesContainerRef?: React.RefObject<Container | null>;
+  activeProjectilesRef?: React.MutableRefObject<MiningActiveProjectile[]>;
+  projectileGraphicsMap?: React.MutableRefObject<Map<string, Sprite | Graphics>>;
+  bulletTextureRef?: React.RefObject<Texture | null>;
+  projectileVisualManagerRef?: React.RefObject<ProjectileVisualManager | null>;
   droppedItemVisualManagerRef?: React.RefObject<DroppedItemVisualManager | null>;
   droppedItemsRef?: React.MutableRefObject<MiningDroppedItem[]>;
   reticleGraphicsRef?: React.RefObject<Graphics | null>;
@@ -91,6 +98,11 @@ export function useMiningTicker({
   dynamiteGraphicsMap,
   dynamiteTextureRef,
   dynamiteVisualManagerRef,
+  projectilesContainerRef,
+  activeProjectilesRef,
+  projectileGraphicsMap,
+  bulletTextureRef,
+  projectileVisualManagerRef,
   droppedItemVisualManagerRef,
   droppedItemsRef,
   reticleGraphicsRef,
@@ -223,6 +235,7 @@ export function useMiningTicker({
             playerBody.position.y += reconcileY * reconcileFactor;
           }
         }
+        soundManager?.setListenerPosition(playerBody.position);
 
         currentPos.x = playerBody.position.x;
         currentPos.y = playerBody.position.y;
@@ -332,7 +345,7 @@ export function useMiningTicker({
       miningProfiler.startSection('Active Mobs');
       // Update and interpolate active mobs
       if (mobRendererRef?.current) {
-        mobRendererRef.current.tick(dt);
+        mobRendererRef.current.tick(dt, soundManager);
       }
 
       miningProfiler.startSection('Falling Rocks');
@@ -378,6 +391,32 @@ export function useMiningTicker({
           dynamiteTextureRef?.current
         );
       }
+
+      // Update active flying projectiles (bullets)
+      const projectilesContainer = projectilesContainerRef?.current;
+      if (projectilesContainer && activeProjectilesRef?.current && projectileGraphicsMap?.current) {
+        // Step active projectiles forward locally between server snapshot ticks for high-speed continuous motion
+        for (const proj of activeProjectilesRef.current) {
+          if (proj.velocity) {
+            proj.position.x += proj.velocity.x * dt;
+            proj.position.y += proj.velocity.y * dt;
+          }
+        }
+
+        MiningEntityRenderer.updateActiveProjectiles(
+          projectilesContainer,
+          activeProjectilesRef.current,
+          projectileGraphicsMap.current,
+          TILE_SIZE,
+          bulletTextureRef?.current
+        );
+      }
+
+      // Update projectile visual effects (muzzle flash lights fadeout)
+      projectileVisualManagerRef?.current?.update(
+        dt,
+        lightingEngineRef?.current
+      );
 
       // Update dynamite particle effects (fuse sparks & flame), illumination (fuse PointLight), and fuse audio
       dynamiteVisualManagerRef?.current?.update(
@@ -560,7 +599,21 @@ export function useMiningTicker({
           // 5. Mining Reach Radius (Yellow circle for block excavation reach)
           const reachPixelRadius = (MINING_CONFIG.PLAYER_MINING_REACH ?? 1.85) * TILE_SIZE;
           debugGraphics.circle(playerPixelX, playerPixelY, reachPixelRadius);
-          debugGraphics.stroke({ width: 1.5, color: 0xeab308, alpha: 0.5 });
+          debugGraphics.stroke({ width: 1.5, color: 0xeab308, alpha: 0.35 });
+
+          // 5b. Melee Attack Swing Arc (Terraria-style directional swing cone in pointing direction)
+          const aimDir = playerFacingDirRef.current || { x: isFacingLeftRef.current ? -1 : 1, y: 0 };
+          const aimAngle = Math.atan2(aimDir.y, aimDir.x);
+          const halfSpread = (72.5 * Math.PI) / 180; // ~145° total swing sweep
+          const swingRadius = 2.2 * TILE_SIZE;
+          const arcStartAngle = aimAngle - halfSpread;
+          const arcEndAngle = aimAngle + halfSpread;
+
+          debugGraphics.moveTo?.(playerPixelX, playerPixelY);
+          debugGraphics.arc?.(playerPixelX, playerPixelY, swingRadius, arcStartAngle, arcEndAngle);
+          debugGraphics.closePath?.();
+          debugGraphics.stroke?.({ width: 1.5, color: 0xf59e0b, alpha: 0.75 });
+          debugGraphics.fill?.({ color: 0xf59e0b, alpha: 0.08 });
 
           // 6. Highlight currently mining target block if active
           if (isMining && miningTarget) {
@@ -699,6 +752,11 @@ export function useMiningTicker({
                 debugGraphics.fill({ color: 0x10b981, alpha: 0.2 });
               }
             }
+          }
+
+          // 11. Active Mob Colliders & Hitboxes
+          if (mobRendererRef?.current) {
+            mobRendererRef.current.renderDebugHitboxes(debugGraphics, TILE_SIZE);
           }
         }
       }

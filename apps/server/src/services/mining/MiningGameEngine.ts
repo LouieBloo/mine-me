@@ -18,6 +18,8 @@ import {
   type MiningRemotePlayer,
   type MiningStateTickPayload,
   type MiningExplosionEvent,
+  type MiningActiveProjectile,
+  type MiningGunshotEvent,
   type Vector2D,
   MiningRigidWorld,
   DEFAULT_DYNAMITE_PHYSICS_CONFIG,
@@ -42,6 +44,7 @@ import {
 import { MiningPlayerBody } from './physics/MiningPlayerBody';
 import { MiningRockEntity } from './physics/MiningRockEntity';
 import { MiningDynamiteEntity } from './physics/MiningDynamiteEntity';
+import { MiningProjectileEntity } from './physics/MiningProjectileEntity';
 
 export interface MiningActiveMobSession {
   id: string;
@@ -118,6 +121,18 @@ export class MiningGameEngine {
 
   public activeDynamites: MiningDynamiteEntity[] = [];
   private dynamiteCounter = 0;
+
+  public activeProjectiles: MiningProjectileEntity[] = [];
+  public playerWeaponAmmo: Map<string, {
+    currentAmmo: number;
+    maxAmmo: number;
+    isReloading: boolean;
+    reloadTimer: number;
+    reloadDuration: number;
+    lastShotTime: number;
+    fireRate: number;
+  }> = new Map();
+  private pendingGunshots: MiningGunshotEvent[] = [];
 
   public players: Map<string, MiningPlayerSession> = new Map();
   public primaryCharacterId: string = '';
@@ -870,6 +885,202 @@ export class MiningGameEngine {
   }
 
   /**
+   * Fires a bullet projectile from a character's position towards target coordinates.
+   * Server-authoritative magazine check, cooldown / fire-rate tracking, and Planck.js projectile creation.
+   */
+  public shootProjectile(
+    characterId: string,
+    target: Vector2D,
+    weaponItemId?: string
+  ): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
+    const session = this.players.get(characterId);
+    if (!session) return { success: false, error: 'Player session not found.' };
+
+    const now = Date.now();
+
+    // 1. Get weapon definition from items.json or item cache
+    let weaponItem = weaponItemId ? this.getItemData(weaponItemId) : undefined;
+    if (!weaponItem) {
+      if (this.itemsCache) {
+        weaponItem = this.itemsCache.find((it: any) => it.shootsProjectiles === true);
+      } else {
+        weaponItem = this.getItemData('revolver_6shooter');
+      }
+    }
+
+    const projConfig = weaponItem?.projectileConfig || {
+      magazineSize: 6,
+      fireRate: 2.5,
+      reloadTime: 1.5,
+      projectileSpeed: 28.0,
+      projectileGravityScale: 0.05,
+      damage: 35,
+    };
+
+    const maxAmmo = projConfig.magazineSize ?? 6;
+    const fireRate = projConfig.fireRate ?? 2.5;
+    const minCooldownMs = 1000 / fireRate;
+    const reloadDuration = projConfig.reloadTime ?? 1.5;
+
+    // 2. Retrieve or initialize character weapon ammo state
+    let ammoState = this.playerWeaponAmmo.get(characterId);
+    if (!ammoState) {
+      ammoState = {
+        currentAmmo: maxAmmo,
+        maxAmmo,
+        isReloading: false,
+        reloadTimer: 0,
+        reloadDuration,
+        lastShotTime: 0,
+        fireRate,
+      };
+      this.playerWeaponAmmo.set(characterId, ammoState);
+    }
+
+    // 3. Check if reloading
+    if (ammoState.isReloading) {
+      return {
+        success: false,
+        error: 'Reloading weapon...',
+        remainingAmmo: 0,
+        isReloading: true,
+      };
+    }
+
+    // 4. Check fire rate cooldown
+    if (now - ammoState.lastShotTime < minCooldownMs) {
+      return {
+        success: false,
+        error: 'Fire rate limited.',
+        remainingAmmo: ammoState.currentAmmo,
+        isReloading: false,
+      };
+    }
+
+    // 5. Check if empty cylinder -> initiate reload
+    if (ammoState.currentAmmo <= 0) {
+      ammoState.isReloading = true;
+      ammoState.reloadTimer = reloadDuration;
+      return {
+        success: false,
+        error: 'Out of ammo! Reloading...',
+        remainingAmmo: 0,
+        isReloading: true,
+      };
+    }
+
+    // 6. Deduct 1 shot
+    ammoState.currentAmmo--;
+    ammoState.lastShotTime = now;
+
+    // If cylinder is now empty, immediately begin reload countdown
+    if (ammoState.currentAmmo === 0) {
+      ammoState.isReloading = true;
+      ammoState.reloadTimer = reloadDuration;
+    }
+
+    // 7. Calculate firing launch vector
+    const startX = session.playerBody.position.x;
+    const startY = session.playerBody.position.y - 0.45;
+
+    const dx = target.x - startX;
+    const dy = target.y - startY;
+    const dist = Math.hypot(dx, dy) || 1.0;
+    const dirX = dx / dist;
+    const dirY = dy / dist;
+
+    const speed = projConfig.projectileSpeed ?? 28.0;
+    const initialVel: Vector2D = {
+      x: dirX * speed,
+      y: dirY * speed,
+    };
+
+    const muzzleDist = 0.55;
+    const muzzlePos: Vector2D = {
+      x: startX + dirX * muzzleDist,
+      y: startY + dirY * muzzleDist,
+    };
+
+    const projectileId = `proj_${characterId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    let bulletSpriteUrl: string | null = '/assets/sprites/items/gun_bullet_ingame.png';
+    if (projConfig.projectileItemId) {
+      const bulletItem = this.getItemData(projConfig.projectileItemId);
+      if (bulletItem?.inGameSpriteUrl) {
+        bulletSpriteUrl = bulletItem.inGameSpriteUrl;
+      }
+    }
+
+    const projectile = new MiningProjectileEntity(
+      projectileId,
+      characterId,
+      muzzlePos,
+      initialVel,
+      {
+        damage: projConfig.damage ?? 35,
+        itemId: projConfig.projectileItemId,
+        spriteUrl: bulletSpriteUrl,
+        gravityScale: projConfig.projectileGravityScale ?? 0.05,
+      },
+      this.rigidWorld
+    );
+
+    this.activeProjectiles.push(projectile);
+
+    // 8. Record gunshot event for muzzle flash, smoke, light, and audio
+    const soundUrl = weaponItem?.soundEffects?.shoot?.url || weaponItem?.soundEffectUrl || '/assets/sounds/items/revolver_shot.wav';
+
+    this.pendingGunshots.push({
+      id: `shot_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      characterId,
+      position: muzzlePos,
+      target,
+      direction: { x: dirX, y: dirY },
+      soundUrl,
+    });
+
+    return {
+      success: true,
+      remainingAmmo: ammoState.currentAmmo,
+      isReloading: ammoState.isReloading,
+    };
+  }
+
+  /**
+   * Manually trigger reload for a character's equipped projectile weapon.
+   */
+  public reloadWeapon(characterId: string): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
+    const session = this.players.get(characterId);
+    if (!session) return { success: false, error: 'Player session not found.' };
+
+    let ammoState = this.playerWeaponAmmo.get(characterId);
+    if (!ammoState) {
+      ammoState = {
+        currentAmmo: 6,
+        maxAmmo: 6,
+        isReloading: false,
+        reloadTimer: 0,
+        reloadDuration: 1.5,
+        lastShotTime: 0,
+        fireRate: 2.5,
+      };
+      this.playerWeaponAmmo.set(characterId, ammoState);
+    }
+
+    if (ammoState.isReloading) {
+      return { success: true, remainingAmmo: 0, isReloading: true };
+    }
+
+    if (ammoState.currentAmmo >= ammoState.maxAmmo) {
+      return { success: false, error: 'Magazine is already full.', remainingAmmo: ammoState.currentAmmo, isReloading: false };
+    }
+
+    ammoState.isReloading = true;
+    ammoState.reloadTimer = ammoState.reloadDuration;
+    return { success: true, remainingAmmo: 0, isReloading: true };
+  }
+
+  /**
    * Main 30 Hz simulation tick execution.
    */
   private tick(dt: number): void {
@@ -931,6 +1142,9 @@ export class MiningGameEngine {
     // 3.5. Dynamite continuous physics & fuse countdown simulation
     this.updateActiveDynamites(dt);
 
+    // 3.6. Projectiles continuous physics, collision detection & ammo reloading
+    this.updateActiveProjectiles(dt);
+
     // 4. Validate & trigger mining actions for each player
     for (const session of this.players.values()) {
       const canMineStance = session.playerBody.isGrounded || session.playerBody.isOnLadder;
@@ -961,25 +1175,64 @@ export class MiningGameEngine {
       }
     }
 
-    // 4.5. Player Melee Attack against Mobs
+    // 4.5. Player Melee Attack against Mobs (Terraria-style directional swing cone)
     const nowMs = Date.now();
+    const MELEE_SWING_REACH = 2.2; // Maximum melee strike reach in tiles
+
     for (const session of this.players.values()) {
       if (session.inputs.miningKey) {
-        if (!session.lastAttackTimeMs || nowMs - session.lastAttackTimeMs >= 500) {
+        if (!session.lastAttackTimeMs || nowMs - session.lastAttackTimeMs >= 400) {
+          session.lastAttackTimeMs = nowMs;
+
           const px = session.playerBody.position.x;
           const py = session.playerBody.position.y;
+
+          // Determine normalized aim direction vector pointing towards cursor
+          let aimX = session.aimDirection?.x ?? (session.isFacingLeft ? -1 : 1);
+          let aimY = session.aimDirection?.y ?? 0;
+          const aimLen = Math.hypot(aimX, aimY);
+          if (aimLen > 0.001) {
+            aimX /= aimLen;
+            aimY /= aimLen;
+          } else {
+            aimX = session.isFacingLeft ? -1 : 1;
+            aimY = 0;
+          }
+
           for (const mob of this.activeMobs.values()) {
             if (mob.health <= 0) continue;
             const mx = mob.mobBody.position.x;
             const my = mob.mobBody.position.y;
-            const dist = Math.hypot(mx - px, my - py);
-            if (dist <= 2.2) {
-              session.lastAttackTimeMs = nowMs;
+            const dx = mx - px;
+            const dy = my - py;
+            const dist = Math.hypot(dx, dy);
+
+            // 1. Must be within melee swing reach
+            if (dist > MELEE_SWING_REACH) continue;
+
+            // 2. Terraria-style directional swing arc check:
+            // A swing covers a ~145° forward sweep centered along the cursor aim vector.
+            // cos(72.5°) ≈ 0.30.
+            const toMobX = dist > 0.001 ? dx / dist : aimX;
+            const toMobY = dist > 0.001 ? dy / dist : aimY;
+            const dot = aimX * toMobX + aimY * toMobY;
+
+            // 3. Alternatively check if the cursor is explicitly targeting the tile occupied by the mob
+            const targetTileX = session.miningTarget?.x;
+            const targetTileY = session.miningTarget?.y;
+            const isNearTargetTile =
+              targetTileX !== undefined &&
+              targetTileY !== undefined &&
+              Math.abs(mx - (targetTileX + 0.5)) <= 0.85 &&
+              Math.abs(my - (targetTileY + 0.5)) <= 0.85;
+
+            if (dot >= 0.30 || isNearTargetTile) {
               this.damageMob(mob.id, 15);
-              const dir = Math.sign(mx - px) || (session.isFacingLeft ? -1 : 1);
-              mob.mobBody.velocity.x = dir * 4.0;
-              mob.mobBody.velocity.y = -3.0;
-              break;
+              // Knockback pushes mob away along the strike direction with upward pop
+              const kbDirX = Math.sign(dx) || Math.sign(aimX) || (session.isFacingLeft ? -1 : 1);
+              mob.mobBody.velocity.x = kbDirX * 4.5;
+              mob.mobBody.velocity.y = -3.2; // Terraria-style upward pop
+              mob.mobBody.isGrounded = false;
             }
           }
         }
@@ -1101,6 +1354,74 @@ export class MiningGameEngine {
 
     // Remove exploded dynamites from the active game world
     this.activeDynamites = this.activeDynamites.filter((d) => !d.hasExploded);
+  }
+
+  /**
+   * Update active flying projectiles, step Planck physics, check tile & mob impact.
+   */
+  private updateActiveProjectiles(dt: number): void {
+    // 1. Advance reload timers for all characters
+    for (const [charId, ammo] of this.playerWeaponAmmo.entries()) {
+      if (ammo.isReloading) {
+        ammo.reloadTimer -= dt;
+        if (ammo.reloadTimer <= 0) {
+          ammo.isReloading = false;
+          ammo.reloadTimer = 0;
+          ammo.currentAmmo = ammo.maxAmmo;
+        }
+      }
+    }
+
+    if (this.activeProjectiles.length === 0) return;
+
+    for (const proj of this.activeProjectiles) {
+      proj.update(dt, this.grid);
+
+      if (proj.hasHit) continue;
+
+      // 2. Check collision against active mobs
+      for (const mob of this.activeMobs.values()) {
+        if (mob.health > 0 && mob.animationState !== 'death') {
+          const mobX = mob.mobBody.position.x;
+          const mobY = mob.mobBody.position.y;
+          const dist = Math.hypot(proj.position.x - mobX, proj.position.y - mobY);
+          if (dist < 0.7) {
+            proj.hasHit = true;
+            proj.hitMobId = mob.id;
+            this.damageMob(mob.id, proj.damage);
+            proj.cleanup();
+            break;
+          }
+        }
+      }
+
+      // 3. Tile hit handling (if hit a destructible tile, apply damage)
+      if (proj.hitTile) {
+        const { x, y } = proj.hitTile;
+        if (isInBounds(x, y)) {
+          const tile = this.grid[y][x];
+          if (tile && isTileMineable(tile.type)) {
+            tile.damageMs = (tile.damageMs || 0) + proj.damage * 10;
+            const newStage = getDamageStage(tile);
+            const requiredTime = getTileMineTime(tile.type);
+            if (tile.damageMs >= requiredTime) {
+              const miner = this.players.get(proj.characterId);
+              this.completeMiningBlock({ x, y }, miner ? [miner] : []);
+            } else {
+              this.pendingRevealedTiles.push({
+                x,
+                y,
+                type: tile.type,
+                damageStage: newStage,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Clean up hit or expired projectiles
+    this.activeProjectiles = this.activeProjectiles.filter((p) => !p.hasHit);
   }
 
   /**
@@ -1362,8 +1683,23 @@ export class MiningGameEngine {
           }))
         : undefined;
 
+    const projectilesPayload: MiningActiveProjectile[] | undefined =
+      this.activeProjectiles.length > 0
+        ? this.activeProjectiles.map((p) => ({
+            id: p.id,
+            characterId: p.characterId,
+            position: { x: p.position.x, y: p.position.y },
+            velocity: { x: p.velocity.x, y: p.velocity.y },
+            angle: p.angle,
+            damage: p.damage,
+            itemId: p.itemId,
+            spriteUrl: p.spriteUrl,
+          }))
+        : undefined;
+
     const revealedToSend = this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined;
     const explosionsToSend = this.pendingExplosions.length > 0 ? this.pendingExplosions : undefined;
+    const gunshotsToSend = this.pendingGunshots.length > 0 ? this.pendingGunshots : undefined;
     const mobsPayload = this.getActiveMobs();
 
     for (const session of this.players.values()) {
@@ -1398,6 +1734,8 @@ export class MiningGameEngine {
         droppedItems: this.droppedItemsDirty ? this.droppedItems : undefined,
         fallingRocks: fallingRocksPayload,
         activeDynamites: dynamitesPayload,
+        activeProjectiles: projectilesPayload,
+        gunshots: gunshotsToSend,
         explosions: explosionsToSend,
         revealedTiles: revealedToSend,
         otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
@@ -1413,6 +1751,7 @@ export class MiningGameEngine {
     this.droppedItemsDirty = false;
     this.pendingRevealedTiles = [];
     this.pendingExplosions = [];
+    this.pendingGunshots = [];
   }
 
   /**

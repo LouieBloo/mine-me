@@ -104,4 +104,61 @@ describe('SoundManager', () => {
     expect(manager.isLoopingSfxPlaying('loop_a')).toBe(false);
     expect(manager.isLoopingSfxPlaying('loop_b')).toBe(false);
   });
+
+  it('manages listener position correctly', () => {
+    const manager = SoundManager.getInstance();
+    expect(manager.getListenerPosition()).toBeNull();
+
+    manager.setListenerPosition({ x: 10, y: 15 });
+    expect(manager.getListenerPosition()).toEqual({ x: 10, y: 15 });
+
+    manager.setListenerPosition(null);
+    expect(manager.getListenerPosition()).toBeNull();
+  });
+
+  it('drops positional SFX beyond maxDistance without playing', () => {
+    const manager = SoundManager.getInstance();
+    manager.setListenerPosition({ x: 0, y: 0 });
+
+    // Sound at (25, 0) is 25 tiles away; default maxDistance is 16 tiles
+    const howl = manager.playSfx('/assets/sounds/far_mob_mine.mp3', {
+      position: { x: 25, y: 0 },
+      throttleMs: 0,
+    });
+
+    expect(howl).toBeNull();
+  });
+
+  it('plays positional SFX within audible range with volume attenuation', () => {
+    const manager = SoundManager.getInstance();
+    manager.setListenerPosition({ x: 0, y: 0 });
+
+    // Sound at (6, 0) is 6 tiles away, well within maxDistance (16 tiles)
+    const howl = manager.playPositionalSfx('/assets/sounds/near_mob_mine.mp3', { x: 6, y: 0 }, {
+      throttleMs: 0,
+      spatial: { minDistance: 2, maxDistance: 16 },
+    });
+
+    expect(howl).not.toBeNull();
+  });
+
+  it('updates looping sound volume when listener moves', () => {
+    const manager = SoundManager.getInstance();
+    manager.setListenerPosition({ x: 0, y: 0 });
+
+    const key = 'test_spatial_loop';
+    const howl = manager.playLoopingSfx(key, '/assets/sounds/fuse_loop.mp3', {
+      position: { x: 5, y: 0 },
+      spatial: { minDistance: 2, maxDistance: 16 },
+    });
+
+    expect(howl).toBeDefined();
+
+    // Moving listener further away attenuates volume
+    manager.setListenerPosition({ x: 14, y: 0 });
+    // Moving beyond max distance
+    manager.setListenerPosition({ x: 30, y: 0 });
+
+    manager.stopLoopingSfx(key);
+  });
 });

@@ -45,6 +45,14 @@ export interface ItemBodyOptions {
   angularDamping?: number;
 }
 
+export interface ProjectileBodyOptions {
+  gravityScale?: number;
+  restitution?: number;
+  friction?: number;
+  density?: number;
+  itemId?: string;
+}
+
 export interface RigidEntityData {
   id: string;
   type: 'dynamite' | 'rock' | 'projectile' | 'item';
@@ -345,6 +353,40 @@ export class MiningRigidWorld {
     });
 
     const data: RigidEntityData = { id, type: 'item' };
+    body.setUserData(data);
+
+    return body;
+  }
+
+  /**
+   * Creates a dynamic rigid body for high-speed projectiles (e.g. revolver bullets).
+   * Uses continuous collision detection (bullet: true) to prevent tunneling through tiles.
+   */
+  public createProjectileBody(
+    id: string,
+    position: Vector2D,
+    velocity: Vector2D,
+    options?: ProjectileBodyOptions
+  ): planck.Body {
+    const body = this.world.createBody({
+      type: 'dynamic',
+      position: planck.Vec2(position.x, position.y),
+      linearVelocity: planck.Vec2(velocity.x, velocity.y),
+      bullet: true,
+      gravityScale: options?.gravityScale ?? 0,
+      linearDamping: 0.0,
+      angularDamping: 0.0,
+      fixedRotation: true,
+    });
+
+    body.createFixture({
+      shape: planck.Circle(0.12),
+      density: options?.density ?? 1.0,
+      restitution: options?.restitution ?? 0.1,
+      friction: options?.friction ?? 0.2,
+    });
+
+    const data: RigidEntityData = { id, type: 'projectile' };
     body.setUserData(data);
 
     return body;

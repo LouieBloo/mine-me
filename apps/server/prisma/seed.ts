@@ -164,7 +164,7 @@ async function main() {
   // 3. Seed Mobs
   const mobs = JSON.parse(fs.readFileSync(path.join(dataPath, 'mobs.json'), 'utf-8'));
   for (const mobData of mobs) {
-    const { dropTable, dungeonLevelMobs, ...mobRoot } = mobData;
+    const { dropTable, dungeonLevelMobs, sounds, ...mobRoot } = mobData;
     await prisma.mob.upsert({
       where: { id: mobRoot.id },
       update: mobRoot,

@@ -11,6 +11,7 @@ import ItemInGameSpriteUpload from './ItemInGameSpriteUpload/ItemInGameSpriteUpl
 import ItemSoundEffectUpload from './ItemSoundEffectUpload/ItemSoundEffectUpload';
 import ItemColliderEditor from '../../../components/ItemColliderEditor/ItemColliderEditor';
 import ItemLightEffectConfig from './ItemLightEffectConfig/ItemLightEffectConfig';
+import ItemProjectileConfig from './ItemProjectileConfig/ItemProjectileConfig';
 import './ItemDetail.css';
 
 interface ItemEnums {
@@ -28,11 +29,13 @@ export default function ItemDetail() {
   const [data, setData] = useState<any>(isNew ? {
     itemKey: '', name: '', description: '', type: 'GEAR', subType: 'HEAD',
     vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', triggerMode: 'SINGLE', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, throwable: false, experience: 0,
-    combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null, physicsConfig: null, lightConfig: null
+    combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null, physicsConfig: null, lightConfig: null,
+    shootsProjectiles: false, projectileConfig: null
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
   const [effectsList, setEffectsList] = useState<any[]>([]);
   const [particleEffectsList, setParticleEffectsList] = useState<any[]>([]);
+  const [allItemsList, setAllItemsList] = useState<any[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,12 +47,14 @@ export default function ItemDetail() {
     Promise.all([
       fetchWithAuth('/api/admin/item-enums').then(res => res.json()),
       fetchWithAuth('/api/admin/effects').then(res => res.json()),
-      fetchWithAuth('/api/admin/particle-effects').then(res => res.json())
+      fetchWithAuth('/api/admin/particle-effects').then(res => res.json()),
+      fetchWithAuth('/api/admin/items').then(res => res.json()).catch(() => [])
     ])
-      .then(([enumsJson, effectsJson, particleEffectsJson]) => {
+      .then(([enumsJson, effectsJson, particleEffectsJson, itemsJson]) => {
         setEnums(enumsJson);
         setEffectsList(effectsJson);
         setParticleEffectsList(Array.isArray(particleEffectsJson) ? particleEffectsJson : []);
+        setAllItemsList(Array.isArray(itemsJson) ? itemsJson : []);
         if (isNew) setLoading(false);
       })
       .catch(err => {
@@ -530,6 +535,17 @@ export default function ItemDetail() {
               <ItemLightEffectConfig
                 lightConfig={data.lightConfig}
                 onChange={(newLightConfig) => setData({ ...data, lightConfig: newLightConfig })}
+              />
+            </div>
+
+            {/* Shoots Projectiles Config Panel */}
+            <div className="md:col-span-2 pt-4 border-t border-slate-100">
+              <ItemProjectileConfig
+                shootsProjectiles={Boolean(data.shootsProjectiles)}
+                projectileConfig={data.projectileConfig}
+                availableItems={allItemsList}
+                onToggleShootsProjectiles={(shoots) => setData({ ...data, shootsProjectiles: shoots })}
+                onChangeConfig={(newProjConfig) => setData({ ...data, projectileConfig: newProjConfig })}
               />
             </div>
           </div>

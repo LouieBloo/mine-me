@@ -2,9 +2,12 @@ import { Howl, Howler } from 'howler';
 import {
   type SoundSettings,
   type SoundTrack,
+  type SpatialAudioConfig,
+  type Vector2D,
   DEFAULT_BGM_VOLUME,
   DEFAULT_SFX_VOLUME,
   DEFAULT_SOUND_SETTINGS,
+  calculateSpatialAudio,
   getAssetUrl,
 } from '@mine-me/shared';
 import { SoundChannel } from './SoundChannel';
@@ -15,6 +18,23 @@ const STORAGE_KEY = 'nvg_sound_settings';
 export interface PlaySfxOptions {
   volumeScale?: number;
   throttleMs?: number;
+  position?: Vector2D;
+  spatial?: SpatialAudioConfig;
+  listenerPosition?: Vector2D;
+}
+
+export interface PlayLoopingSfxOptions {
+  volumeScale?: number;
+  position?: Vector2D;
+  spatial?: SpatialAudioConfig;
+}
+
+interface LoopingSfxEntry {
+  howl: Howl;
+  baseVolumeScale: number;
+  effectiveVolumeScale: number;
+  position?: Vector2D;
+  spatial?: SpatialAudioConfig;
 }
 
 export class SoundManager {
@@ -31,6 +51,7 @@ export class SoundManager {
   private sfxCache: Map<string, Howl> = new Map();
   private sfxLastPlayTimes: Map<string, number> = new Map();
   private recentSfxTimes: number[] = [];
+  private listenerPosition: Vector2D | null = null;
   private static readonly DEFAULT_THROTTLE_MS = 75;
   private static readonly MAX_CONCURRENT_BURST = 4;
   private static readonly BURST_WINDOW_MS = 60;
@@ -50,6 +71,25 @@ export class SoundManager {
       SoundManager.instance = new SoundManager();
     }
     return SoundManager.instance;
+  }
+
+  /**
+   * Updates listener (player) position used for spatial audio falloff and stereo panning.
+   */
+  public setListenerPosition(pos: Vector2D | null): void {
+    if (!pos) {
+      this.listenerPosition = null;
+    } else {
+      this.listenerPosition = { x: pos.x, y: pos.y };
+    }
+    this.updateLoopingSfxVolumes();
+  }
+
+  /**
+   * Gets current listener (player) position, or null if unassigned.
+   */
+  public getListenerPosition(): Vector2D | null {
+    return this.listenerPosition ? { ...this.listenerPosition } : null;
   }
 
   /**
@@ -232,8 +272,9 @@ export class SoundManager {
   }
 
   /**
-   * Plays a single-shot sound effect on the SFX channel with built-in deduplication
-   * and burst protection so mass block breaks never blow out audio.
+   * Plays a single-shot sound effect on the SFX channel with built-in deduplication,
+   * burst protection, and optional spatial distance falloff / stereo panning.
+   * If a source position is provided and is beyond max hearing distance, returns null without playing.
    */
   public playSfx(srcUrl: string, optionsOrVolume: number | PlaySfxOptions = 1.0): Howl | null {
     if (!this.sfxChannel.isEnabled() || this.sfxChannel.getVolume() <= 0) {
@@ -245,9 +286,28 @@ export class SoundManager {
         ? { volumeScale: optionsOrVolume }
         : optionsOrVolume;
 
-    const volumeScale = options.volumeScale ?? 1.0;
-    const throttleMs = options.throttleMs ?? SoundManager.DEFAULT_THROTTLE_MS;
+    let volumeScale = options.volumeScale ?? 1.0;
+    let pan = 0.0;
 
+    // Apply spatial falloff and stereo panning if a source position is given
+    if (options.position) {
+      const listener = options.listenerPosition ?? this.listenerPosition;
+      if (listener) {
+        const spatial = calculateSpatialAudio(listener, options.position, options.spatial);
+        if (!spatial.isAudible) {
+          // Beyond max hearing distance: do not play or allocate sound
+          return null;
+        }
+        volumeScale *= spatial.volumeScale;
+        pan = spatial.pan;
+      }
+    }
+
+    if (volumeScale <= 0) {
+      return null;
+    }
+
+    const throttleMs = options.throttleMs ?? SoundManager.DEFAULT_THROTTLE_MS;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
     // 1. Per-sound throttle (suppress duplicate instances of the same sound within throttleMs)
@@ -295,22 +355,72 @@ export class SoundManager {
 
     this.sfxChannel.register(howl, volumeScale);
     howl.play();
+
+    if (pan !== 0 && typeof (howl as any).stereo === 'function') {
+      try {
+        (howl as any).stereo(pan);
+      } catch {}
+    }
+
     return howl;
   }
 
-  private loopingSfx: Map<string, { howl: Howl; volumeScale: number }> = new Map();
+  /**
+   * Convenience method to play a sound at a specific 2D position with distance falloff.
+   */
+  public playPositionalSfx(
+    srcUrl: string,
+    position: Vector2D,
+    options?: PlaySfxOptions
+  ): Howl | null {
+    return this.playSfx(srcUrl, {
+      ...options,
+      position,
+    });
+  }
+
+  private loopingSfx: Map<string, LoopingSfxEntry> = new Map();
 
   /**
-   * Plays a continuous looping sound effect on the SFX channel under a unique key.
-   * Subsequent calls with the same key will return the existing playing Howl without re-triggering.
+   * Plays a continuous looping sound effect on the SFX channel under a unique key,
+   * supporting optional spatial attenuation and stereo panning.
    */
-  public playLoopingSfx(key: string, srcUrl: string, volumeScale: number = 1.0): Howl | null {
+  public playLoopingSfx(
+    key: string,
+    srcUrl: string,
+    optionsOrVolume: number | PlayLoopingSfxOptions = 1.0
+  ): Howl | null {
     if (!this.sfxChannel.isEnabled() || this.sfxChannel.getVolume() <= 0) {
       return null;
     }
 
+    const options: PlayLoopingSfxOptions =
+      typeof optionsOrVolume === 'number'
+        ? { volumeScale: optionsOrVolume }
+        : optionsOrVolume;
+
+    const baseVolumeScale = options.volumeScale ?? 1.0;
+    let effectiveVolumeScale = baseVolumeScale;
+    let pan = 0.0;
+
+    if (options.position && this.listenerPosition) {
+      const spatial = calculateSpatialAudio(this.listenerPosition, options.position, options.spatial);
+      effectiveVolumeScale = spatial.isAudible ? baseVolumeScale * spatial.volumeScale : 0;
+      pan = spatial.pan;
+    }
+
     const existing = this.loopingSfx.get(key);
     if (existing) {
+      existing.baseVolumeScale = baseVolumeScale;
+      existing.effectiveVolumeScale = effectiveVolumeScale;
+      existing.position = options.position;
+      existing.spatial = options.spatial;
+      existing.howl.volume(this.sfxChannel.getEffectiveVolume() * effectiveVolumeScale);
+      if (pan !== 0 && typeof (existing.howl as any).stereo === 'function') {
+        try {
+          (existing.howl as any).stereo(pan);
+        } catch {}
+      }
       return existing.howl;
     }
 
@@ -322,7 +432,7 @@ export class SoundManager {
     const howl = new Howl({
       src: [fullUrl],
       loop: true,
-      volume: this.sfxChannel.getEffectiveVolume() * volumeScale,
+      volume: this.sfxChannel.getEffectiveVolume() * effectiveVolumeScale,
       onloaderror: (_id, err) => {
         console.warn(`[SoundManager] Failed to load looping SFX "${fullUrl}":`, err);
       },
@@ -334,10 +444,77 @@ export class SoundManager {
       },
     });
 
-    this.sfxChannel.register(howl, volumeScale);
+    this.sfxChannel.register(howl, effectiveVolumeScale);
     howl.play();
-    this.loopingSfx.set(key, { howl, volumeScale });
+
+    if (pan !== 0 && typeof (howl as any).stereo === 'function') {
+      try {
+        (howl as any).stereo(pan);
+      } catch {}
+    }
+
+    this.loopingSfx.set(key, {
+      howl,
+      baseVolumeScale,
+      effectiveVolumeScale,
+      position: options.position,
+      spatial: options.spatial,
+    });
     return howl;
+  }
+
+  /**
+   * Updates position and recalculates volume/pan for an active looping sound.
+   */
+  public updateLoopingSfxPosition(
+    key: string,
+    position: Vector2D,
+    spatial?: SpatialAudioConfig
+  ): void {
+    const entry = this.loopingSfx.get(key);
+    if (!entry) return;
+
+    entry.position = position;
+    if (spatial) entry.spatial = spatial;
+
+    if (!this.listenerPosition) {
+      entry.effectiveVolumeScale = entry.baseVolumeScale;
+      entry.howl.volume(this.sfxChannel.getEffectiveVolume() * entry.effectiveVolumeScale);
+      return;
+    }
+
+    const calc = calculateSpatialAudio(this.listenerPosition, position, entry.spatial);
+    entry.effectiveVolumeScale = calc.isAudible ? entry.baseVolumeScale * calc.volumeScale : 0;
+    entry.howl.volume(this.sfxChannel.getEffectiveVolume() * entry.effectiveVolumeScale);
+
+    if (typeof (entry.howl as any).stereo === 'function') {
+      try {
+        (entry.howl as any).stereo(calc.pan);
+      } catch {}
+    }
+  }
+
+  /**
+   * Recalculates volume and panning for all active spatial looping sounds when listener moves.
+   */
+  private updateLoopingSfxVolumes(): void {
+    if (this.loopingSfx.size === 0) return;
+
+    for (const [, entry] of this.loopingSfx.entries()) {
+      if (!entry.position) continue;
+      if (!this.listenerPosition) {
+        entry.effectiveVolumeScale = entry.baseVolumeScale;
+      } else {
+        const calc = calculateSpatialAudio(this.listenerPosition, entry.position, entry.spatial);
+        entry.effectiveVolumeScale = calc.isAudible ? entry.baseVolumeScale * calc.volumeScale : 0;
+        if (typeof (entry.howl as any).stereo === 'function') {
+          try {
+            (entry.howl as any).stereo(calc.pan);
+          } catch {}
+        }
+      }
+      entry.howl.volume(this.sfxChannel.getEffectiveVolume() * entry.effectiveVolumeScale);
+    }
   }
 
   /**

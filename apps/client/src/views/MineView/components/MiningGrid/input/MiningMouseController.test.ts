@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MiningMouseController } from './MiningMouseController';
-import { TorchPlacementAction, LadderPlacementAction, DynamiteThrowAction, ThrowableItemAction } from './MouseAction';
+import { TorchPlacementAction, LadderPlacementAction, DynamiteThrowAction, ThrowableItemAction, ShootWeaponAction } from './MouseAction';
 import { MiningTileType, MouseActionTriggerMode, type MiningClientTile } from '@mine-me/shared';
 
 describe('MiningMouseController and MouseAction', () => {
@@ -707,6 +707,37 @@ describe('MiningMouseController and MouseAction', () => {
       const closeDx = closeTrajectory[1].x - closeTrajectory[0].x;
       const farDx = farTrajectory[1].x - farTrajectory[0].x;
       expect(closeDx).toBeLessThan(farDx);
+    });
+  });
+
+  describe('ShootWeaponAction', () => {
+    it('initializes with fireRate, cooldownMs, and freeAim reticle', () => {
+      const onShoot = vi.fn();
+      const action = new ShootWeaponAction({
+        weaponItemId: 'cmn_revolver_6shooter',
+        fireRate: 4.0,
+        onShoot,
+      });
+
+      expect(action.weaponItemId).toBe('cmn_revolver_6shooter');
+      expect(action.fireRate).toBe(4.0);
+      expect(action.cooldownMs).toBe(250);
+
+      const style = action.getReticleStyle({ x: 12.3, y: 8.7 }, { x: 5, y: 5 }, mockGrid);
+      expect(style.isFreeAim).toBe(true);
+      expect(style.isValid).toBe(true);
+      expect(style.color).toBe(0xf97316);
+    });
+
+    it('executes shot callback with continuous target coordinates', async () => {
+      const onShoot = vi.fn().mockResolvedValue(true);
+      const action = new ShootWeaponAction({ onShoot });
+
+      const target = { x: 14.75, y: 9.25 };
+      const success = await action.execute(target);
+
+      expect(success).toBe(true);
+      expect(onShoot).toHaveBeenCalledWith(target);
     });
   });
 });

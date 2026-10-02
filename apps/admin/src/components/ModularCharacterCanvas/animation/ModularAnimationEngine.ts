@@ -30,7 +30,8 @@ export class ModularAnimationEngine {
     nodes: CharacterJointNodes,
     state: ModularAnimationState,
     animTime: number,
-    baseOffsets: JointBaseOffsets
+    baseOffsets: JointBaseOffsets,
+    miningStyle?: 'tool' | 'hands'
   ): void {
     if (
       !nodes.torso ||
@@ -90,22 +91,48 @@ export class ModularAnimationEngine {
       nodes.armFront.rotation = -stride * 0.35;
       nodes.armBack.rotation = stride * 0.35;
     } else if (state === 'mine') {
-      const swingFreq = 6.0;
-      const progress = (animTime * swingFreq) % (Math.PI * 2);
-      const swing = Math.sin(progress);
+      if (miningStyle === 'hands') {
+        // Dual-hand rapid claw digging animation: alternating front and back claw strokes
+        const digFreq = 9.0;
+        const swingFront = Math.sin(animTime * digFreq);
+        const swingBack = Math.sin(animTime * digFreq + Math.PI);
 
-      nodes.armFront.y = baseOffsets.armFront.y;
-      nodes.armBack.y = baseOffsets.armBack.y;
-      nodes.armFront.rotation = -0.6 + swing * 1.2;
-      nodes.torso.rotation = swing > 0 ? 0.12 : -0.05;
-      nodes.torso.y = baseOffsets.torso.y + (swing > 0 ? 6 : -2);
-      nodes.head.y = baseOffsets.head.y;
-      nodes.head.rotation = swing * 0.1;
+        nodes.armFront.x = baseOffsets.armFront.x + Math.cos(animTime * digFreq) * 16;
+        nodes.armBack.x = baseOffsets.armBack.x + Math.cos(animTime * digFreq + Math.PI) * 16;
+        nodes.armFront.y = baseOffsets.armFront.y + Math.abs(swingFront) * 8;
+        nodes.armBack.y = baseOffsets.armBack.y + Math.abs(swingBack) * 8;
+        nodes.armFront.rotation = -0.15 + swingFront * 0.65;
+        nodes.armBack.rotation = -0.15 + swingBack * 0.65;
 
-      nodes.legFront.y = baseOffsets.legFront.y;
-      nodes.legBack.y = baseOffsets.legBack.y;
-      nodes.legFront.rotation = 0.1;
-      nodes.legBack.rotation = -0.15;
+        // Hunched forward body language while digging into rock
+        nodes.torso.rotation = 0.16 + Math.sin(animTime * digFreq * 2) * 0.04;
+        nodes.torso.y = baseOffsets.torso.y + 4 + Math.sin(animTime * digFreq * 2) * 3;
+        nodes.head.y = baseOffsets.head.y + 2;
+        nodes.head.rotation = 0.14 + Math.sin(animTime * digFreq) * 0.06;
+
+        nodes.legFront.y = baseOffsets.legFront.y;
+        nodes.legBack.y = baseOffsets.legBack.y;
+        nodes.legFront.rotation = 0.15;
+        nodes.legBack.rotation = -0.2;
+      } else {
+        const swingFreq = 6.0;
+        const progress = (animTime * swingFreq) % (Math.PI * 2);
+        const swing = Math.sin(progress);
+
+        nodes.armFront.y = baseOffsets.armFront.y;
+        nodes.armBack.y = baseOffsets.armBack.y;
+        nodes.armFront.rotation = -0.6 + swing * 1.2;
+        nodes.torso.rotation = swing > 0 ? 0.12 : -0.05;
+        nodes.torso.y = baseOffsets.torso.y + (swing > 0 ? 6 : -2);
+        nodes.head.y = baseOffsets.head.y;
+        nodes.head.rotation = swing * 0.1;
+
+        nodes.legFront.y = baseOffsets.legFront.y;
+        nodes.legBack.y = baseOffsets.legBack.y;
+        nodes.legFront.rotation = 0.1;
+        nodes.legBack.rotation = -0.15;
+      }
+
     } else if (state === 'attack') {
       const attackFreq = 7.5;
       const progress = (animTime * attackFreq) % (Math.PI * 2);

@@ -427,3 +427,66 @@ export class DynamiteThrowAction extends ThrowableItemAction {
     });
   }
 }
+
+export interface ShootWeaponActionConfig {
+  name?: string;
+  weaponItemId?: string;
+  fireRate?: number;
+  triggerMode?: MouseActionTriggerMode;
+  onShoot: (target: Vector2D) => Promise<boolean> | boolean;
+}
+
+/**
+ * Action for firing projectile weapons (e.g. 6-shooter revolver).
+ * Uses free-aim crosshairs targeting sub-tile continuous world coordinates.
+ */
+export class ShootWeaponAction extends BaseMouseAction {
+  protected onShoot: (target: Vector2D) => Promise<boolean> | boolean;
+  public readonly weaponItemId?: string;
+  public readonly fireRate: number;
+
+  constructor(config: ShootWeaponActionConfig) {
+    const fireRate = config.fireRate ?? 2.5;
+    const cooldownMs = Math.round(1000 / fireRate);
+    super({
+      name: config.name || 'shoot_weapon',
+      triggerMode: config.triggerMode ?? MouseActionTriggerMode.SINGLE,
+      cooldownMs,
+      isContinuous: false,
+    });
+    this.onShoot = config.onShoot;
+    this.weaponItemId = config.weaponItemId;
+    this.fireRate = fireRate;
+  }
+
+  public canExecute(
+    _target: MiningPosition | Vector2D,
+    _playerPos: Vector2D,
+    _grid: MiningClientTile[][]
+  ): boolean {
+    return true;
+  }
+
+  public async execute(
+    target: MiningPosition | Vector2D,
+    _playerPos?: Vector2D
+  ): Promise<boolean> {
+    return this.onShoot(target as Vector2D);
+  }
+
+  public getReticleStyle(
+    _target: MiningPosition | Vector2D,
+    _playerPos: Vector2D,
+    _grid: MiningClientTile[][]
+  ): ReticleStyle {
+    return {
+      color: 0xf97316,
+      alpha: 0.9,
+      strokeColor: 0xea580c,
+      isValid: true,
+      showPreview: false,
+      isFreeAim: true,
+    };
+  }
+}
+

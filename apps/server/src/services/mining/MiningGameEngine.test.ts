@@ -1242,6 +1242,114 @@ describe('MiningGameEngine', () => {
       expect(mob.health).toBe(50);
     });
 
+    it('hits mobs in pointing direction with melee swing (Terraria style)', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Carve out empty corridor with floor at y=11
+      for (let y = 8; y <= 10; y++) {
+        for (let x = 8; x <= 16; x++) {
+          engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+        }
+      }
+      for (let x = 8; x <= 16; x++) {
+        engine.grid[11][x] = { type: MiningTileType.DIRT, revealed: true };
+      }
+
+      const session = (engine as any).players.get('char-1');
+      session.playerBody.position = { x: 10, y: 10 };
+
+      // Spawn mob in front of player to the right at x=11.5, y=10 (distance 1.5)
+      const mob = engine.spawnMob(
+        { id: 'mob_in_front', name: 'Mole Person', health: 40 },
+        { x: 11.5, y: 10 }
+      );
+
+      // Player aims to the right and swings
+      session.inputs = { miningKey: true, isFacingLeft: false };
+      session.aimDirection = { x: 1, y: 0 };
+      session.isFacingLeft = false;
+
+      (engine as any).tick(0.033);
+
+      expect(mob.health).toBe(25); // 40 - 15 = 25
+      expect(mob.mobBody.velocity.x).toBeGreaterThan(0); // Knockback to the right
+      expect(mob.mobBody.velocity.y).toBeLessThan(0); // Upward pop
+    });
+
+    it('does not hit mobs when pointing in the opposite direction (behind player)', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Carve out empty corridor with floor at y=11
+      for (let y = 8; y <= 10; y++) {
+        for (let x = 8; x <= 16; x++) {
+          engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+        }
+      }
+
+      const session = (engine as any).players.get('char-1');
+      session.playerBody.position = { x: 10, y: 10 };
+
+      // Mob is behind player to the left at x=8.5, y=10 (distance 1.5)
+      const mob = engine.spawnMob(
+        { id: 'mob_behind', name: 'Mole Person', health: 40 },
+        { x: 8.5, y: 10 }
+      );
+
+      // Player points to the right and swings
+      session.inputs = { miningKey: true, isFacingLeft: false };
+      session.aimDirection = { x: 1, y: 0 };
+      session.isFacingLeft = false;
+
+      (engine as any).tick(0.033);
+
+      // Mob was behind the swing arc, so it must NOT be damaged
+      expect(mob.health).toBe(40);
+    });
+
+    it('does not hit mobs when pointing upward while mob is directly to the right', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Carve out empty corridor with floor at y=11
+      for (let y = 8; y <= 10; y++) {
+        for (let x = 8; x <= 16; x++) {
+          engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+        }
+      }
+
+      const session = (engine as any).players.get('char-1');
+      session.playerBody.position = { x: 10, y: 10 };
+
+      // Mob is to the right at x=11.5, y=10
+      const mob = engine.spawnMob(
+        { id: 'mob_right', name: 'Mole Person', health: 40 },
+        { x: 11.5, y: 10 }
+      );
+
+      // Player points directly upward and swings
+      session.inputs = { miningKey: true };
+      session.aimDirection = { x: 0, y: -1 };
+
+      (engine as any).tick(0.033);
+
+      // Mob was outside the upward swing cone (90° away, dot = 0 < 0.30)
+      expect(mob.health).toBe(40);
+    });
+
     it('mob excavates targeted block when mining progress completes', () => {
       const engine = new MiningGameEngine({
         characterId: 'char-1',

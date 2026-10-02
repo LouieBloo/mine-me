@@ -143,4 +143,60 @@ describe('MiningEntityRenderer', () => {
       expect(sprite?.y).toBe(6 * 64);
     });
   });
+
+  describe('updateActiveProjectiles', () => {
+    it('creates and positions Graphics fallback for flying bullets', () => {
+      const projectiles = [
+        {
+          id: 'proj-1',
+          characterId: 'char-1',
+          position: { x: 10.5, y: 7.2 },
+          velocity: { x: 28, y: 0 },
+          angle: 0.25,
+          damage: 35,
+        },
+      ];
+      const viewsMap = new Map<string, Sprite | Graphics>();
+
+      MiningEntityRenderer.updateActiveProjectiles(container, projectiles, viewsMap, 64);
+
+      expect(viewsMap.size).toBe(1);
+      const view = viewsMap.get('proj-1');
+      expect(view).toBeInstanceOf(Graphics);
+      expect(view?.x).toBe(10.5 * 64);
+      expect(view?.y).toBe(7.2 * 64);
+      expect(view?.rotation).toBe(0.25);
+      expect(container.children.length).toBe(1);
+
+      // Clean up when bullet hits tile and is removed
+      MiningEntityRenderer.updateActiveProjectiles(container, [], viewsMap, 64);
+      expect(viewsMap.size).toBe(0);
+      expect(container.children.length).toBe(0);
+    });
+
+    it('renders Sprite when bulletTexture is provided', () => {
+      const projectiles = [
+        {
+          id: 'proj-2',
+          characterId: 'char-1',
+          position: { x: 14, y: 9 },
+          velocity: { x: 28, y: 2 },
+          angle: 0.1,
+          damage: 35,
+        },
+      ];
+      const viewsMap = new Map<string, Sprite | Graphics>();
+      const mockTexture = Texture.WHITE;
+
+      MiningEntityRenderer.updateActiveProjectiles(container, projectiles, viewsMap, 64, mockTexture);
+
+      expect(viewsMap.size).toBe(1);
+      const sprite = viewsMap.get('proj-2');
+      expect(sprite).toBeInstanceOf(Sprite);
+      expect((sprite as Sprite).texture).toBe(mockTexture);
+      expect(sprite?.x).toBe(14 * 64);
+      expect(sprite?.y).toBe(9 * 64);
+      expect(sprite?.rotation).toBe(0.1);
+    });
+  });
 });

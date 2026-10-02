@@ -440,7 +440,7 @@ export function useModularCanvasScene({
             legBack: getOffset('leg_back', { x: 35, y: -55 }),
           };
 
-          ModularAnimationEngine.updateJoints(nodes, currentAnimState, animTime, baseOffsets);
+          ModularAnimationEngine.updateJoints(nodes, currentAnimState, animTime, baseOffsets, manifest?.miningStyle);
 
           if (nodes.debugLayer) {
             ModularDebugRenderer.renderDebug(nodes.debugLayer, nodes, partSpritesRef.current, {

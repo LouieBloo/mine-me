@@ -39,7 +39,9 @@ export const itemValidation = [
   body('particleEffectId').optional({ nullable: true }).isString().withMessage('particleEffectId must be a string'),
   body('physicsConfig').optional({ nullable: true }).isObject().withMessage('physicsConfig must be an object'),
   body('lightConfig').optional({ nullable: true }).isObject().withMessage('lightConfig must be an object'),
-  body('itemKey').optional({ nullable: true }).isString().withMessage('itemKey must be a string')
+  body('itemKey').optional({ nullable: true }).isString().withMessage('itemKey must be a string'),
+  body('shootsProjectiles').optional().isBoolean().withMessage('shootsProjectiles must be a boolean'),
+  body('projectileConfig').optional({ nullable: true }).isObject().withMessage('projectileConfig must be an object')
 ];
 
 export const mobValidation = [
