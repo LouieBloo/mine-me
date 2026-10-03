@@ -94,6 +94,54 @@ describe('MiningEntityRenderer', () => {
     expect(container.children.length).toBe(0);
   });
 
+  it('respects inGameScale when rendering dropped items and scales sprite dimensions', () => {
+    const droppedItems: MiningDroppedItem[] = [
+      {
+        id: 'drop-scale-default',
+        itemId: 'ore_iron',
+        itemName: 'Iron Ore',
+        iconUrl: null,
+        quantity: 1,
+        position: { x: 1, y: 1 },
+      },
+      {
+        id: 'drop-scale-large',
+        itemId: 'big_boulder',
+        itemName: 'Big Boulder',
+        iconUrl: null,
+        quantity: 1,
+        position: { x: 3, y: 3 },
+        inGameScale: 2.0,
+      },
+      {
+        id: 'drop-scale-small',
+        itemId: 'tiny_gem',
+        itemName: 'Tiny Gem',
+        iconUrl: null,
+        quantity: 1,
+        position: { x: 5, y: 5 },
+        inGameScale: 0.5,
+      },
+    ];
+    const spritesMap = new Map<string, Sprite | Graphics>();
+
+    MiningEntityRenderer.updateDroppedItems(container, droppedItems, spritesMap, 64);
+
+    expect(spritesMap.size).toBe(3);
+    expect(spritesMap.get('drop-scale-default')).toBeInstanceOf(Graphics);
+    expect(spritesMap.get('drop-scale-large')).toBeInstanceOf(Graphics);
+    expect(spritesMap.get('drop-scale-small')).toBeInstanceOf(Graphics);
+
+    // Also test sprite dynamic scaling update when existing view is a Sprite
+    const mockSprite = new Sprite(Texture.WHITE);
+    spritesMap.set('drop-scale-large', mockSprite);
+    MiningEntityRenderer.updateDroppedItems(container, droppedItems, spritesMap, 64);
+
+    // Base size is 64 * 0.5 = 32. With inGameScale 2.0, size = 64
+    expect(mockSprite.width).toBe(64);
+    expect(mockSprite.height).toBe(64);
+  });
+
   describe('updateActiveDynamites', () => {
     it('renders fallback graphics for active dynamites and updates world coordinates', () => {
       const dynamites: MiningActiveDynamite[] = [
@@ -142,6 +190,28 @@ describe('MiningEntityRenderer', () => {
       expect(sprite?.x).toBe(8 * 64);
       expect(sprite?.y).toBe(6 * 64);
     });
+
+    it('respects inGameScale when rendering active dynamites and scales dimensions', () => {
+      const dynamites: MiningActiveDynamite[] = [
+        {
+          id: 'dyn-scaled',
+          position: { x: 3, y: 3 },
+          velocity: { x: 0, y: 0 },
+          fuseRemainingSeconds: 2.0,
+          inGameScale: 0.5,
+        },
+      ];
+      const viewsMap = new Map<string, Sprite | Graphics>();
+      const mockTexture = Texture.WHITE;
+
+      MiningEntityRenderer.updateActiveDynamites(container, dynamites, viewsMap, 64, mockTexture);
+
+      const sprite = viewsMap.get('dyn-scaled') as Sprite;
+      expect(sprite).toBeDefined();
+      // Base size: 64 * 0.5 = 32. With inGameScale 0.5, targetSize = 16
+      expect(sprite.width).toBe(16);
+      expect(sprite.height).toBe(16);
+    });
   });
 
   describe('updateActiveProjectiles', () => {
@@ -156,13 +226,13 @@ describe('MiningEntityRenderer', () => {
           damage: 35,
         },
       ];
-      const viewsMap = new Map<string, Sprite | Graphics>();
+      const viewsMap = new Map<string, Container>();
 
       MiningEntityRenderer.updateActiveProjectiles(container, projectiles, viewsMap, 64);
 
       expect(viewsMap.size).toBe(1);
       const view = viewsMap.get('proj-1');
-      expect(view).toBeInstanceOf(Graphics);
+      expect(view).toBeInstanceOf(Container);
       expect(view?.x).toBe(10.5 * 64);
       expect(view?.y).toBe(7.2 * 64);
       expect(view?.rotation).toBe(0.25);
@@ -185,18 +255,85 @@ describe('MiningEntityRenderer', () => {
           damage: 35,
         },
       ];
-      const viewsMap = new Map<string, Sprite | Graphics>();
+      const viewsMap = new Map<string, Container>();
       const mockTexture = Texture.WHITE;
 
       MiningEntityRenderer.updateActiveProjectiles(container, projectiles, viewsMap, 64, mockTexture);
 
       expect(viewsMap.size).toBe(1);
-      const sprite = viewsMap.get('proj-2');
-      expect(sprite).toBeInstanceOf(Sprite);
-      expect((sprite as Sprite).texture).toBe(mockTexture);
-      expect(sprite?.x).toBe(14 * 64);
-      expect(sprite?.y).toBe(9 * 64);
-      expect(sprite?.rotation).toBe(0.1);
+      const view = viewsMap.get('proj-2');
+      expect(view).toBeInstanceOf(Container);
+      expect(view?.children.some((c) => c instanceof Sprite)).toBe(true);
+      expect(view?.x).toBe(14 * 64);
+      expect(view?.y).toBe(9 * 64);
+      expect(view?.rotation).toBe(0.1);
+    });
+
+    it('updates view alpha when proj.alpha is provided during impact fadeout', () => {
+      const projectiles = [
+        {
+          id: 'proj-fade',
+          position: { x: 5, y: 5 },
+          velocity: { x: 0, y: 0 },
+          angle: 0,
+          alpha: 0.5,
+        },
+      ];
+      const viewsMap = new Map<string, Container>();
+
+      MiningEntityRenderer.updateActiveProjectiles(container, projectiles, viewsMap, 64);
+      const view = viewsMap.get('proj-fade');
+      expect(view?.alpha).toBeCloseTo(0.5);
+    });
+
+    it('respects inGameScale when rendering flying projectiles (e.g. shrunk bullet round)', () => {
+      const projectiles = [
+        {
+          id: 'proj-shrunk-bullet',
+          position: { x: 6, y: 4 },
+          velocity: { x: 28, y: 0 },
+          angle: 0,
+          inGameScale: 0.4,
+        },
+        {
+          id: 'proj-default-bullet',
+          position: { x: 7, y: 4 },
+          velocity: { x: 28, y: 0 },
+          angle: 0,
+        },
+      ];
+      const viewsMap = new Map<string, Container>();
+
+      MiningEntityRenderer.updateActiveProjectiles(container, projectiles, viewsMap, 64, null, 1.0);
+
+      const shrunkView = viewsMap.get('proj-shrunk-bullet');
+      expect(shrunkView).toBeDefined();
+      expect(shrunkView?.scale.x).toBeCloseTo(0.4);
+      expect(shrunkView?.scale.y).toBeCloseTo(0.4);
+
+      const defaultView = viewsMap.get('proj-default-bullet');
+      expect(defaultView).toBeDefined();
+      expect(defaultView?.scale.x).toBeCloseTo(1.0);
+      expect(defaultView?.scale.y).toBeCloseTo(1.0);
+    });
+
+    it('uses fallback defaultScale when proj.inGameScale is omitted', () => {
+      const projectiles = [
+        {
+          id: 'proj-fallback',
+          position: { x: 8, y: 4 },
+          velocity: { x: 28, y: 0 },
+          angle: 0,
+        },
+      ];
+      const viewsMap = new Map<string, Container>();
+
+      MiningEntityRenderer.updateActiveProjectiles(container, projectiles, viewsMap, 64, null, 0.4);
+
+      const view = viewsMap.get('proj-fallback');
+      expect(view).toBeDefined();
+      expect(view?.scale.x).toBeCloseTo(0.4);
+      expect(view?.scale.y).toBeCloseTo(0.4);
     });
   });
 });

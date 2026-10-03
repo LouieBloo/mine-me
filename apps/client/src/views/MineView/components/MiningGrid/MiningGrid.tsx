@@ -1,43 +1,34 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { usePixiStage } from '../../../../components/game/PixiStageContext/PixiStageContext';
 import { type GearLayerDescriptor } from '../../../../components/game/sprites';
 import {
   type MiningSessionClientState,
   type PlayerState,
-  type MiningStateTickPayload,
   type Vector2D,
   type MiningClientTile,
   type MiningPosition,
   MiningPlayerBody,
-  MiningTileType,
-  MINING_CONFIG,
-  DEFAULT_PARTICLE_EFFECTS,
-  DEFAULT_DYNAMITE_SOUNDS,
   getAssetUrl,
-  canTileBeDamaged,
   type MiningActiveDynamite,
   type MiningActiveProjectile,
   type MiningDroppedItem,
   type MiningBackpackItem,
   type GameItem,
-  MINING_SPATIAL_AUDIO_PRESETS,
 } from '@mine-me/shared';
-import { PointLight } from '../../../../components/game/lighting/PointLight';
 import type { EmitterHandle } from '../../../../components/game/particles/ParticleEngine';
 import { useSocket } from '../../../../contexts/SocketContext';
 import { useSound } from '../../../../contexts/SoundContext';
-import { notificationService } from '../../../../services/notificationService';
 import { MiningMouseController } from './input/MiningMouseController';
-import { TorchPlacementAction, LadderPlacementAction, ThrowableItemAction, ShootWeaponAction } from './input/MouseAction';
 import { useMiningInput } from './hooks/useMiningInput';
 import { useMiningScene } from './hooks/useMiningScene';
+import { useMiningActions } from './hooks/useMiningActions';
+import { useMiningAmbientEffects } from './hooks/useMiningAmbientEffects';
+import { useMiningStateSync } from './hooks/useMiningStateSync';
 import { useMiningTicker } from './hooks/useMiningTicker';
-import { MiningTileRenderer, TILE_SIZE } from './renderers/MiningTileRenderer';
-import { MiningEntityRenderer } from './renderers/MiningEntityRenderer';
+import { TILE_SIZE } from './renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from './renderers/DynamiteVisualManager';
 import { DroppedItemVisualManager } from './renderers/DroppedItemVisualManager';
 import { ProjectileVisualManager } from './renderers/ProjectileVisualManager';
-import { miningProfiler } from './utils/MiningProfiler';
 import './MiningGrid.css';
 
 interface MiningGridProps {
@@ -86,12 +77,6 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const { onEvent, sendGameEvent } = useSocket();
   const { soundManager } = useSound();
 
-  const onVisionChangeRef = useRef(onVisionChange);
-  onVisionChangeRef.current = onVisionChange;
-
-  const onBackpackChangeRef = useRef(onBackpackChange);
-  onBackpackChangeRef.current = onBackpackChange;
-
   // Authoritative in-memory grid ref (avoids React state thrashing and 5,000-tile clones)
   const gridRef = useRef<MiningClientTile[][]>(
     initialSessionState.grid.map((row) => row.map((tile) => ({ ...tile })))
@@ -136,13 +121,6 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const projectileVisualManagerRef = useRef<ProjectileVisualManager>(new ProjectileVisualManager());
   const droppedItemVisualManagerRef = useRef<DroppedItemVisualManager>(new DroppedItemVisualManager());
   const droppedItemsRef = useRef<MiningDroppedItem[]>([]);
-  const weaponAmmoStateRef = useRef<{ current: number; max: number; isReloading: boolean }>({
-    current: 6,
-    max: 6,
-    isReloading: false,
-  });
-  const lastDamageParticleTimeRef = useRef<Map<string, number>>(new Map());
-  const lastWeaponSoundTimeRef = useRef<number>(0);
 
   // Smooth rendering lerp position references
   const currentRenderPosRef = useRef<Vector2D>({
@@ -165,13 +143,11 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       }));
   }, [playerState.inventory?.items]);
 
-  // Weapon derivation for in-game mining sound effect
+  // Weapon derivation for in-game mining sound effect & projectile shooting
   const equippedWeapon = useMemo(() => {
-    // 1. Check playerState.gear.weapon
     if (playerState.gear?.weapon) {
       return playerState.gear.weapon;
     }
-    // 2. Check playerState.inventory.items
     if (playerState.inventory?.items) {
       const items = playerState.inventory.items;
       const equipped = items.find(
@@ -189,32 +165,6 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     }
     return null;
   }, [playerState.gear?.weapon, playerState.inventory?.items]);
-
-  const [resolvedSoundUrl, setResolvedSoundUrl] = useState<string | null>(
-    equippedWeapon?.soundEffectUrl ?? null
-  );
-
-  useEffect(() => {
-    if (equippedWeapon?.soundEffectUrl) {
-      setResolvedSoundUrl(equippedWeapon.soundEffectUrl);
-      return;
-    }
-    // Fallback: If weapon has an ID but local state lacked soundEffectUrl, query public items
-    if (equippedWeapon?.id) {
-      fetch(getAssetUrl('/api/public/items?type=GEAR'))
-        .then((res) => (res.ok ? res.json() : []))
-        .then((items: any[]) => {
-          const found = items.find((i: any) => i.id === equippedWeapon.id);
-          if (found?.soundEffectUrl) {
-            setResolvedSoundUrl(found.soundEffectUrl);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [equippedWeapon?.id, equippedWeapon?.soundEffectUrl]);
-
-  const weaponSoundUrlRef = useRef<string | null>(resolvedSoundUrl);
-  weaponSoundUrlRef.current = resolvedSoundUrl;
 
   // Pixi Scene, Camera, Lighting & Asset Loading Hook
   const {
@@ -239,6 +189,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     projectilesContainerRef,
     projectileGraphicsMap,
     bulletTextureRef,
+    bulletScaleRef,
+    dynamicItemsRef,
     playerSpriteRef,
     remotePlayerRendererRef,
     mobRendererRef,
@@ -259,8 +211,6 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
   const torchEmittersRef = useRef<Map<string, EmitterHandle>>(new Map());
   const blockEmittersRef = useRef<Map<string, EmitterHandle>>(new Map());
-  const lastBlockSoundTimeRef = useRef<Map<string, number>>(new Map());
-  const recentExplosionsRef = useRef<{ x: number; y: number; radius: number; time: number }[]>([]);
 
   // Attach canvas to MouseController and sync camera
   useEffect(() => {
@@ -279,309 +229,38 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     mouseControllerRef.current.setGrid(gridRef.current);
   }, []);
 
-  // Configure Active Mouse Action (Torch or Ladder Placement)
-  useEffect(() => {
-    const mouseController = mouseControllerRef.current;
-    if (isPlacingTorch) {
-      const torchItem = playerState?.inventory?.items?.find(
-        (inv: any) =>
-          inv.item?.subType?.toUpperCase() === 'TORCH' ||
-          inv.item?.name?.toLowerCase().includes('torch')
-      )?.item;
-
-      mouseController.setActiveAction(
-        new TorchPlacementAction(async (target) => {
-          try {
-            const res = await sendGameEvent({ type: 'mining_place_torch', target });
-            if (res.success) {
-              const tile = gridRef.current[target.y]?.[target.x];
-              if (tile) {
-                tile.type = MiningTileType.TORCH;
-                tile.revealed = true;
-                tile.damageStage = 0;
-              }
-              const tilesContainer = tilesContainerRef.current;
-              if (tilesContainer && containersReady) {
-                MiningTileRenderer.updateRevealedTiles(
-                  tilesContainer,
-                  [{ x: target.x, y: target.y, type: MiningTileType.TORCH }],
-                  gridRef.current,
-                  blockTexturesRef.current,
-                  tileGraphicsMap.current,
-                  tileSpritesMap.current,
-                  TILE_SIZE
-                );
-              }
-              onTorchPlaced?.();
-              return true;
-            } else {
-              notificationService.error('Cannot Place Torch', res.error || 'Invalid placement position.');
-              return false;
-            }
-          } catch (err: any) {
-            console.error('[MiningGrid] mining_place_torch error:', err);
-            notificationService.error('Error', err.message || 'Failed to place torch.');
-            return false;
-          }
-        }, torchItem?.triggerMode)
-      );
-    } else if (isPlacingLadder) {
-      const ladderItem = playerState?.inventory?.items?.find(
-        (inv: any) =>
-          inv.item?.subType?.toUpperCase() === 'LADDER' ||
-          inv.item?.name?.toLowerCase().includes('ladder')
-      )?.item;
-
-      mouseController.setActiveAction(
-        new LadderPlacementAction(async (target) => {
-          try {
-            const res = await sendGameEvent({ type: 'mining_place_ladder', target });
-            if (res.success) {
-              const tile = gridRef.current[target.y]?.[target.x];
-              if (tile) {
-                tile.type = MiningTileType.LADDER;
-                tile.revealed = true;
-                tile.damageStage = 0;
-              }
-              const tilesContainer = tilesContainerRef.current;
-              if (tilesContainer && containersReady) {
-                MiningTileRenderer.updateRevealedTiles(
-                  tilesContainer,
-                  [{ x: target.x, y: target.y, type: MiningTileType.LADDER }],
-                  gridRef.current,
-                  blockTexturesRef.current,
-                  tileGraphicsMap.current,
-                  tileSpritesMap.current,
-                  TILE_SIZE
-                );
-              }
-              onLadderPlaced?.();
-              return true;
-            } else {
-              notificationService.error('Cannot Place Ladder', res.error || 'Invalid placement position.');
-              return false;
-            }
-          } catch (err: any) {
-            console.error('[MiningGrid] mining_place_ladder error:', err);
-            notificationService.error('Error', err.message || 'Failed to place ladder.');
-            return false;
-          }
-        }, ladderItem?.triggerMode)
-      );
-    } else if (isThrowingItem || isThrowingDynamite) {
-      const targetItem =
-        activeThrowableItem ||
-        playerState?.inventory?.items?.find(
-          (inv: any) =>
-            inv.item?.throwable === true ||
-            inv.item?.subType?.toUpperCase() === 'DYNAMITE' ||
-            inv.item?.name?.toLowerCase().includes('dynamite')
-        )?.item;
-
-      mouseController.setActiveAction(
-        new ThrowableItemAction({
-          name: targetItem ? `throw_${targetItem.name.toLowerCase().replace(/\s+/g, '_')}` : 'throw_dynamite',
-          itemId: targetItem?.id,
-          physicsConfig: (targetItem as any)?.physicsConfig,
-          triggerMode: targetItem?.triggerMode,
-          onThrow: async (target, forceRatio) => {
-            try {
-              const res = await sendGameEvent({
-                type: 'mining_throw_dynamite',
-                target,
-                forceRatio,
-                itemId: targetItem?.id,
-              } as any);
-              if (res.success) {
-                const throwSoundUrl =
-                  targetItem?.soundEffects?.throw?.url ||
-                  targetItem?.soundEffectUrl ||
-                  DEFAULT_DYNAMITE_SOUNDS.throw?.url;
-                if (throwSoundUrl) {
-                  soundManager.playSfx(throwSoundUrl);
-                }
-                dynamiteVisualManagerRef.current.recordLocalThrow();
-                onDynamiteThrown?.();
-                return true;
-              } else {
-                notificationService.error('Cannot Throw Item', res.error || 'Failed to throw item.');
-                return false;
-              }
-            } catch (err: any) {
-              console.error('[MiningGrid] mining_throw_dynamite error:', err);
-              notificationService.error('Error', err.message || 'Failed to throw item.');
-              return false;
-            }
-          },
-        })
-      );
-    } else if (equippedWeapon?.shootsProjectiles || (equippedWeapon as any)?.projectileConfig) {
-      const weapon = equippedWeapon;
-      if (!weapon) return;
-      const projConfig = (weapon as any)?.projectileConfig || {
-        magazineSize: 6,
-        fireRate: 2.5,
-        reloadTime: 1.5,
-      };
-      const fireRate = projConfig.fireRate ?? 2.5;
-
-      mouseController.setActiveAction(
-        new ShootWeaponAction({
-          name: `shoot_${weapon.name.toLowerCase().replace(/\s+/g, '_')}`,
-          weaponItemId: weapon.id,
-          fireRate,
-          onShoot: async (target) => {
-            const playerPos = playerBodyRef.current.position;
-            const muzzlePos = {
-              x: playerPos.x,
-              y: playerPos.y - 0.45,
-            };
-            const angle = Math.atan2(target.y - muzzlePos.y, target.x - muzzlePos.x);
-
-            const gunshotSound =
-              (weapon as any)?.soundEffects?.shoot?.url ||
-              weapon.soundEffectUrl ||
-              '/assets/sounds/items/revolver_shot.wav';
-
-            // Immediate local visual and audio feedback
-            projectileVisualManagerRef.current.triggerLocalShot(
-              muzzlePos,
-              angle,
-              gunshotSound,
-              particleEngineRef.current,
-              lightingEngineRef.current,
-              soundManager
-            );
-
-            // Optimistically deduct 1 round locally
-            if (weaponAmmoStateRef.current.current > 0) {
-              weaponAmmoStateRef.current.current--;
-              if (weaponAmmoStateRef.current.current === 0) {
-                weaponAmmoStateRef.current.isReloading = true;
-              }
-              onWeaponAmmoChange?.({
-                ...weaponAmmoStateRef.current,
-                weaponName: weapon.name,
-                weaponIconUrl: weapon.iconUrl,
-              });
-            }
-
-            try {
-              const res: any = await sendGameEvent({
-                type: 'mining_shoot',
-                target,
-                weaponItemId: weapon.id,
-              } as any);
-
-              if (res && res.remainingAmmo !== undefined) {
-                weaponAmmoStateRef.current = {
-                  current: res.remainingAmmo,
-                  max: projConfig.magazineSize ?? 6,
-                  isReloading: Boolean(res.isReloading),
-                };
-                onWeaponAmmoChange?.({
-                  ...weaponAmmoStateRef.current,
-                  weaponName: weapon.name,
-                  weaponIconUrl: weapon.iconUrl,
-                });
-              }
-
-              if (res && !res.success) {
-                if (res.isReloading) {
-                  soundManager.playSfx?.('/assets/sounds/items/revolver_reload.wav');
-                }
-              }
-              return true;
-            } catch (err: any) {
-              console.error('[MiningGrid] mining_shoot error:', err);
-              return false;
-            }
-          },
-        })
-      );
-    } else {
-      mouseController.setActiveAction(null);
-      lightingEngineRef.current?.removeLight('torch_preview');
-    }
-
-    return () => {
-      lightingEngineRef.current?.removeLight('torch_preview');
-    };
-  }, [
+  // Configure Active Mouse Actions (Torch, Ladder, Throwables, Shooting, Weapon Sounds & Reload)
+  const { weaponSoundUrlRef, weaponAmmoStateRef, handleWeaponReload } = useMiningActions({
+    playerState,
+    equippedWeapon,
+    mouseControllerRef,
+    gridRef,
+    playerBodyRef,
+    tilesContainerRef,
+    containersReady,
+    blockTexturesRef,
+    tileGraphicsMap,
+    tileSpritesMap,
+    dynamiteVisualManagerRef,
+    projectileVisualManagerRef,
+    activeProjectilesRef,
+    particleEngineRef,
+    lightingEngineRef,
+    dynamicItemsRef,
+    soundManager,
+    sendGameEvent,
     isPlacingTorch,
+    onTorchPlaced,
     isPlacingLadder,
+    onLadderPlaced,
     isThrowingDynamite,
     isThrowingItem,
     activeThrowableItem,
-    equippedWeapon,
-    sendGameEvent,
-    onTorchPlaced,
-    onLadderPlaced,
     onDynamiteThrown,
     onWeaponAmmoChange,
-    containersReady,
-    playerState?.inventory?.items,
-  ]);
+  });
 
-  // Handle manual weapon reload
-  const handleWeaponReload = async () => {
-    if (!equippedWeapon) return;
-    const weapon = equippedWeapon;
-    try {
-      const reloadSoundUrl =
-        (weapon as any)?.soundEffects?.reload?.url ||
-        '/assets/sounds/items/revolver_reload.wav';
-      soundManager.playSfx?.(reloadSoundUrl);
-
-      const res: any = await sendGameEvent({
-        type: 'mining_reload',
-        weaponItemId: weapon.id,
-      } as any);
-
-      if (res?.success) {
-        weaponAmmoStateRef.current = {
-          current: res.remainingAmmo ?? 0,
-          max: (weapon as any)?.projectileConfig?.magazineSize ?? 6,
-          isReloading: Boolean(res.isReloading),
-        };
-        onWeaponAmmoChange?.({
-          ...weaponAmmoStateRef.current,
-          weaponName: weapon.name,
-          weaponIconUrl: weapon.iconUrl,
-        });
-      }
-    } catch (err: any) {
-      console.error('[MiningGrid] mining_reload error:', err);
-    }
-  };
-
-  // Sync initial weapon ammo on weapon change
-  useEffect(() => {
-    if (!equippedWeapon) {
-      onWeaponAmmoChange?.(null);
-      return;
-    }
-    const weapon = equippedWeapon;
-    if (weapon.shootsProjectiles || (weapon as any).projectileConfig) {
-      const magSize = (weapon as any).projectileConfig?.magazineSize ?? 6;
-      weaponAmmoStateRef.current = {
-        current: magSize,
-        max: magSize,
-        isReloading: false,
-      };
-      onWeaponAmmoChange?.({
-        current: magSize,
-        max: magSize,
-        isReloading: false,
-        weaponName: weapon.name,
-        weaponIconUrl: weapon.iconUrl,
-      });
-    } else {
-      onWeaponAmmoChange?.(null);
-    }
-  }, [equippedWeapon?.id, equippedWeapon?.shootsProjectiles, onWeaponAmmoChange]);
-
-  // Real-time Input Controls Hook
+  // Real-time Input Controls Hook (Keyboard movement, debug toggle, camera zoom, flashlight toggle, weapon reload)
   const { keysPressedRef } = useMiningInput({
     sendGameEvent,
     playerSpriteRef,
@@ -597,429 +276,62 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     onReload: handleWeaponReload,
   });
 
-  // Initial Full-Grid Render & Initial Dynamic Tile Lights
-  useEffect(() => {
-    const tilesContainer = tilesContainerRef.current;
-    if (!tilesContainer || !containersReady) return;
-
-    MiningTileRenderer.renderGrid(
-      tilesContainer,
-      gridRef.current,
-      blockTexturesRef.current,
-      tileGraphicsMap.current,
-      tileSpritesMap.current,
-      TILE_SIZE
-    );
-
-    const lightingEngine = lightingEngineRef.current;
-    if (lightingEngine) {
-      lightingEngine.updateGrid(gridRef.current, true);
-
-      gridRef.current.forEach((row, y) => {
-        row.forEach((tile, x) => {
-          const chestLightId = `chest_${x}_${y}`;
-          const torchLightId = `torch_${x}_${y}`;
-
-          if (tile.revealed && tile.type === MiningTileType.CHEST) {
-            if (!lightingEngine.getLight(chestLightId)) {
-              lightingEngine.addLight(
-                new PointLight(
-                  chestLightId,
-                  { x: x + 0.5, y: y + 0.5 },
-                  0xfbbf24,
-                  0.9,
-                  2.0,
-                  { pulse: { speed: 3.2, minIntensity: 0.5, maxIntensity: 1.0 } }
-                )
-              );
-            }
-          }
-
-          if (tile.revealed && tile.type === MiningTileType.TORCH) {
-            if (!lightingEngine.getLight(torchLightId)) {
-              lightingEngine.addLight(
-                new PointLight(
-                  torchLightId,
-                  { x: x + 0.446, y: y + 0.35 },
-                  0xf59e0b,
-                  1.25,
-                  MINING_CONFIG.TORCH_RADIUS,
-                  {
-                    flicker: {
-                      speed: MINING_CONFIG.TORCH_FLICKER_SPEED,
-                      amount: MINING_CONFIG.TORCH_FLICKER_AMOUNT,
-                    },
-                  }
-                )
-              );
-            }
-            if (particleEngineRef.current && !torchEmittersRef.current.has(torchLightId)) {
-              const emitter = particleEngineRef.current.addEmitter(
-                DEFAULT_PARTICLE_EFFECTS.torch_flame,
-                { x: (x + 0.446) * TILE_SIZE, y: (y + 0.28) * TILE_SIZE }
-              );
-              torchEmittersRef.current.set(torchLightId, emitter);
-            }
-          }
-
-          // Ambient block particle effects from dynamic config (NO LIGHT)
-          const particleConfig = tile.revealed ? blockParticleConfigsRef.current.get(tile.type) : undefined;
-          if (particleConfig && particleEngineRef.current) {
-            const blockEmitterId = `block_effect_${x}_${y}`;
-            if (!blockEmittersRef.current.has(blockEmitterId)) {
-              const emitter = particleEngineRef.current.addEmitter(
-                particleConfig,
-                { x: (x + 0.5) * TILE_SIZE, y: (y + 0.5) * TILE_SIZE }
-              );
-              blockEmittersRef.current.set(blockEmitterId, emitter);
-            }
-          }
-        });
-      });
-    }
-
-    return () => {
-      torchEmittersRef.current.forEach((emitter) => emitter.destroy());
-      torchEmittersRef.current.clear();
-      blockEmittersRef.current.forEach((emitter) => emitter.destroy());
-      blockEmittersRef.current.clear();
-    };
-  }, [containersReady, tileTextureLoaded]);
+  // Initial Full-Grid Render & Initial Dynamic Ambient Tile Lights/Emitters
+  useMiningAmbientEffects({
+    containersReady,
+    tileTextureLoaded,
+    tilesContainerRef,
+    gridRef,
+    blockTexturesRef,
+    tileGraphicsMap,
+    tileSpritesMap,
+    lightingEngineRef,
+    particleEngineRef,
+    blockParticleConfigsRef,
+    torchEmittersRef,
+    blockEmittersRef,
+  });
 
   // Real-time 30 Hz server ticks subscription (updates refs & graphics incrementally with ZERO React re-renders)
-  useEffect(() => {
-    const cleanup = onEvent('mining_state_tick', (payload: MiningStateTickPayload) => {
-      const tickStart = performance.now();
-      targetServerPosRef.current = payload.position;
-      isMiningRef.current = payload.isMining;
-      miningTargetRef.current = payload.miningTarget ?? null;
-      soundManager.setListenerPosition?.(playerBodyRef.current?.position ?? payload.position);
-      activeFallingRocksRef.current = payload.fallingRocks
-        ? payload.fallingRocks.map((r) => ({ id: r.id, x: r.position.x, y: r.position.y }))
-        : [];
-      activeDynamitesRef.current = payload.activeDynamites || [];
-      activeProjectilesRef.current = payload.activeProjectiles || [];
-
-      // Process gunshots if received in server tick
-      if (payload.gunshots && payload.gunshots.length > 0) {
-        projectileVisualManagerRef.current.handleGunshotEvents(
-          payload.gunshots,
-          playerState?.id,
-          particleEngineRef.current,
-          lightingEngineRef.current,
-          soundManager
-        );
-      }
-
-      // Process explosions if received in server tick
-      if (payload.explosions && payload.explosions.length > 0) {
-        dynamiteVisualManagerRef.current.handleExplosionEvents(
-          payload.explosions,
-          particleEngineRef.current,
-          lightingEngineRef.current,
-          TILE_SIZE,
-          soundManager
-        );
-        const expNow = performance.now();
-        for (const exp of payload.explosions) {
-          recentExplosionsRef.current.push({
-            x: exp.position.x,
-            y: exp.position.y,
-            radius: exp.radius,
-            time: expNow,
-          });
-        }
-      }
-
-      // Update remote players
-      if (remotePlayerRendererRef.current && payload.otherPlayers) {
-        remotePlayerRendererRef.current.updatePlayers(payload.otherPlayers);
-      }
-
-      // Update active mobs
-      if (mobRendererRef?.current && payload.mobs) {
-        mobRendererRef.current.updateMobs(payload.mobs);
-      }
-
-      // Update vision range if provided
-      if (payload.visionRange !== undefined) {
-        onVisionChangeRef.current?.(payload.visionRange);
-      }
-
-      // Update temporary backpack if provided
-      if (payload.temporaryBackpack) {
-        onBackpackChangeRef.current?.(payload.temporaryBackpack);
-      }
-
-      // Incremental Tile Updates
-      if (payload.revealedTiles && payload.revealedTiles.length > 0) {
-        const grid = gridRef.current;
-        const now = performance.now();
-        recentExplosionsRef.current = recentExplosionsRef.current.filter((e) => now - e.time < 600);
-
-        // Helper to locate hit position, prioritizing the user's cursor if targeted
-        const getHitPosition = (tileX: number, tileY: number) => {
-          const mouseController = mouseControllerRef.current;
-          if (mouseController) {
-            const worldMouse = mouseController.getWorldMousePosition();
-            const hoveredTile = mouseController.getHoveredTile();
-            const miningTarget = miningTargetRef.current;
-            const isTargetingThis =
-              (hoveredTile && hoveredTile.x === tileX && hoveredTile.y === tileY) ||
-              (miningTarget && miningTarget.x === tileX && miningTarget.y === tileY);
-
-            if (worldMouse && isTargetingThis) {
-              // Clamp tightly inside tile boundaries so particles originate exactly where cursor strikes
-              const minX = tileX * TILE_SIZE + 2;
-              const maxX = (tileX + 1) * TILE_SIZE - 2;
-              const minY = tileY * TILE_SIZE + 2;
-              const maxY = (tileY + 1) * TILE_SIZE - 2;
-              return {
-                x: Math.max(minX, Math.min(maxX, worldMouse.x)),
-                y: Math.max(minY, Math.min(maxY, worldMouse.y)),
-              };
-            }
-          }
-          return { x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
-        };
-
-        for (const rt of payload.revealedTiles) {
-          const prevTile = grid[rt.y]?.[rt.x];
-          if (prevTile) {
-            // A tile can only take damage or be destroyed if it was ALREADY revealed
-            const wasDamaged = prevTile.revealed && rt.damageStage !== undefined && rt.damageStage > (prevTile.damageStage || 0);
-            const wasDestroyed = prevTile.revealed && prevTile.type !== MiningTileType.EMPTY && rt.type === MiningTileType.EMPTY;
-            const tileKey = `${rt.x},${rt.y}`;
-
-            // Check if destroyed by an active dynamite explosion
-            const isExplosionDestroyed = recentExplosionsRef.current.some(
-              (exp) => Math.hypot(rt.x + 0.5 - exp.x, rt.y + 0.5 - exp.y) <= exp.radius + 1.2
-            );
-
-            // Weapon sound ONLY plays when the player is actively mining this specific target tile
-            const isPlayerMiningThisTile =
-              (payload.isMining || isMiningRef?.current) &&
-              miningTargetRef.current &&
-              miningTargetRef.current.x === rt.x &&
-              miningTargetRef.current.y === rt.y;
-
-            if ((wasDamaged || wasDestroyed) && isPlayerMiningThisTile) {
-              const soundUrl = weaponSoundUrlRef.current;
-              if (soundUrl) {
-                const lastSoundTime = lastWeaponSoundTimeRef.current;
-                if (now - lastSoundTime >= 100) {
-                  lastWeaponSoundTimeRef.current = now;
-                  soundManager.playSfx(soundUrl);
-                }
-              }
-            }
-
-            // Block damage/break sound only plays if NOT destroyed by an explosion
-            if ((wasDamaged || wasDestroyed) && !isExplosionDestroyed) {
-              const blockSoundUrl = blockSoundsRef.current.get(prevTile.type);
-              if (blockSoundUrl) {
-                const lastBlockSound = lastBlockSoundTimeRef.current.get(tileKey) || 0;
-                if (now - lastBlockSound >= 100) {
-                  lastBlockSoundTimeRef.current.set(tileKey, now);
-                  const soundPos = { x: rt.x + 0.5, y: rt.y + 0.5 };
-                  if (typeof soundManager.playPositionalSfx === 'function') {
-                    soundManager.playPositionalSfx(blockSoundUrl, soundPos, {
-                      spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING,
-                    });
-                  } else {
-                    soundManager.playSfx(blockSoundUrl, {
-                      position: soundPos,
-                      spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING,
-                    });
-                  }
-                }
-              }
-            }
-
-            if (particleEngineRef.current) {
-              const hitPos = getHitPosition(rt.x, rt.y);
-              if (wasDestroyed) {
-                // Block broke completely: trigger full break crumble
-                lastDamageParticleTimeRef.current.delete(tileKey);
-                lastBlockSoundTimeRef.current.delete(tileKey);
-                const blockEmitterId = `block_effect_${rt.x}_${rt.y}`;
-                if (blockEmittersRef.current.has(blockEmitterId)) {
-                  blockEmittersRef.current.get(blockEmitterId)?.destroy();
-                  blockEmittersRef.current.delete(blockEmitterId);
-                }
-
-                if (!isExplosionDestroyed) {
-                  const prevParticleConfig = blockParticleConfigsRef.current.get(prevTile.type);
-                  if (prevParticleConfig) {
-                    particleEngineRef.current.spawnBurst(prevParticleConfig, hitPos);
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
-                  } else if (prevTile.type === MiningTileType.MINERAL) {
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
-                  } else {
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_hit, hitPos);
-                  }
-                }
-              } else if (wasDamaged) {
-                // Block took damage: throttle intermediate chipping to avoid explosive multi-bursts (~4 Hz)
-                const lastTime = lastDamageParticleTimeRef.current.get(tileKey) || 0;
-                if (now - lastTime >= 240) {
-                  lastDamageParticleTimeRef.current.set(tileKey, now);
-                  const prevParticleConfig = blockParticleConfigsRef.current.get(prevTile.type);
-                  if (prevParticleConfig) {
-                    particleEngineRef.current.spawnBurst(prevParticleConfig, hitPos);
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
-                  } else if (prevTile.type === MiningTileType.MINERAL) {
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
-                  } else {
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_chip, hitPos);
-                  }
-                }
-              }
-            }
-
-            const canDamage = canTileBeDamaged(rt.type);
-            prevTile.type = rt.type;
-            prevTile.revealed = true;
-            prevTile.damageStage = canDamage ? (rt.damageStage ?? prevTile.damageStage ?? 0) : 0;
-          }
-        }
-
-        const tilesContainer = tilesContainerRef.current;
-        if (tilesContainer && containersReady) {
-          const tileRenderStart = performance.now();
-          MiningTileRenderer.updateRevealedTiles(
-            tilesContainer,
-            payload.revealedTiles,
-            grid,
-            blockTexturesRef.current,
-            tileGraphicsMap.current,
-            tileSpritesMap.current,
-            TILE_SIZE
-          );
-          miningProfiler.recordExternal('Tile Reveal Render', performance.now() - tileRenderStart);
-        }
-
-        // Sync lights with modified tiles
-        const lightingEngine = lightingEngineRef.current;
-        if (lightingEngine) {
-          lightingEngine.updateGrid(grid);
-
-          for (const rt of payload.revealedTiles) {
-            const { x, y } = rt;
-            const tile = grid[y]?.[x];
-            if (!tile) continue;
-
-            const chestLightId = `chest_${x}_${y}`;
-            const torchLightId = `torch_${x}_${y}`;
-            const blockEmitterId = `block_effect_${x}_${y}`;
-
-            if (tile.revealed && tile.type === MiningTileType.CHEST) {
-              if (!lightingEngine.getLight(chestLightId)) {
-                lightingEngine.addLight(
-                  new PointLight(
-                    chestLightId,
-                    { x: x + 0.5, y: y + 0.5 },
-                    0xfbbf24,
-                    0.9,
-                    2.0,
-                    { pulse: { speed: 3.2, minIntensity: 0.5, maxIntensity: 1.0 } }
-                  )
-                );
-              }
-            } else {
-              lightingEngine.removeLight(chestLightId);
-            }
-
-            if (tile.revealed && tile.type === MiningTileType.TORCH) {
-              if (!lightingEngine.getLight(torchLightId)) {
-                lightingEngine.addLight(
-                  new PointLight(
-                    torchLightId,
-                    { x: x + 0.446, y: y + 0.35 },
-                    0xf59e0b,
-                    1.25,
-                    MINING_CONFIG.TORCH_RADIUS,
-                    {
-                      flicker: {
-                        speed: MINING_CONFIG.TORCH_FLICKER_SPEED,
-                        amount: MINING_CONFIG.TORCH_FLICKER_AMOUNT,
-                      },
-                    }
-                  )
-                );
-              }
-              if (particleEngineRef.current && !torchEmittersRef.current.has(torchLightId)) {
-                const emitter = particleEngineRef.current.addEmitter(
-                  DEFAULT_PARTICLE_EFFECTS.torch_flame,
-                  { x: (x + 0.446) * TILE_SIZE, y: (y + 0.28) * TILE_SIZE }
-                );
-                torchEmittersRef.current.set(torchLightId, emitter);
-              }
-            } else {
-              lightingEngine.removeLight(torchLightId);
-              if (torchEmittersRef.current.has(torchLightId)) {
-                torchEmittersRef.current.get(torchLightId)?.destroy();
-                torchEmittersRef.current.delete(torchLightId);
-              }
-            }
-
-            // Continuous block particle effect from dynamic config (NO LIGHT)
-            const particleConfig = tile.revealed ? blockParticleConfigsRef.current.get(tile.type) : undefined;
-            if (particleConfig && particleEngineRef.current) {
-              if (!blockEmittersRef.current.has(blockEmitterId)) {
-                const emitter = particleEngineRef.current.addEmitter(
-                  particleConfig,
-                  { x: (x + 0.5) * TILE_SIZE, y: (y + 0.5) * TILE_SIZE }
-                );
-                blockEmittersRef.current.set(blockEmitterId, emitter);
-              }
-            } else {
-              if (blockEmittersRef.current.has(blockEmitterId)) {
-                blockEmittersRef.current.get(blockEmitterId)?.destroy();
-                blockEmittersRef.current.delete(blockEmitterId);
-              }
-            }
-          }
-        }
-
-        // Sync grid with mouse controller
-        mouseControllerRef.current.setGrid(grid);
-      }
-
-      // Update dropped items
-      const droppedItemsContainer = droppedItemsContainerRef.current;
-      if (payload.droppedItems) {
-        droppedItemsRef.current = payload.droppedItems;
-      }
-      if (droppedItemsContainer && containersReady && payload.droppedItems) {
-        MiningEntityRenderer.updateDroppedItems(
-          droppedItemsContainer,
-          payload.droppedItems,
-          droppedSpritesMap.current,
-          TILE_SIZE
-        );
-      }
-
-      miningProfiler.recordExternal('Socket Tick Handler', performance.now() - tickStart);
-    });
-
-    return () => {
-      cleanup();
-      torchEmittersRef.current.forEach((emitter) => emitter.destroy());
-      torchEmittersRef.current.clear();
-      blockEmittersRef.current.forEach((emitter) => emitter.destroy());
-      blockEmittersRef.current.clear();
-      dynamiteVisualManagerRef.current.destroy(
-        particleEngineRef.current,
-        lightingEngineRef.current,
-        soundManager
-      );
-      droppedItemVisualManagerRef.current.destroy(
-        particleEngineRef.current,
-        lightingEngineRef.current
-      );
-    };
-  }, [onEvent, containersReady]);
+  useMiningStateSync({
+    onEvent,
+    playerState,
+    equippedWeapon,
+    soundManager,
+    gridRef,
+    playerBodyRef,
+    targetServerPosRef,
+    isMiningRef,
+    miningTargetRef,
+    activeFallingRocksRef,
+    activeDynamitesRef,
+    activeProjectilesRef,
+    droppedItemsRef,
+    weaponAmmoStateRef,
+    weaponSoundUrlRef,
+    mouseControllerRef,
+    tilesContainerRef,
+    droppedItemsContainerRef,
+    containersReady,
+    blockTexturesRef,
+    tileGraphicsMap,
+    tileSpritesMap,
+    droppedSpritesMap,
+    remotePlayerRendererRef,
+    mobRendererRef,
+    lightingEngineRef,
+    particleEngineRef,
+    blockParticleConfigsRef,
+    blockSoundsRef,
+    torchEmittersRef,
+    blockEmittersRef,
+    dynamiteVisualManagerRef,
+    projectileVisualManagerRef,
+    droppedItemVisualManagerRef,
+    onVisionChange,
+    onBackpackChange,
+    onWeaponAmmoChange,
+  });
 
   // 60+ FPS Frame Ticker Loop Hook
   useMiningTicker({
@@ -1045,6 +357,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     activeProjectilesRef,
     projectileGraphicsMap,
     bulletTextureRef,
+    bulletScaleRef,
     projectileVisualManagerRef,
     droppedItemVisualManagerRef,
     droppedItemsRef,

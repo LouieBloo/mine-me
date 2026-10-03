@@ -132,8 +132,21 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
     expect(emittedPayload).toBeDefined();
     expect(emittedPayload.activeProjectiles).toBeDefined();
     expect(emittedPayload.activeProjectiles.length).toBeGreaterThan(0);
+    expect(emittedPayload.activeProjectiles[0].inGameScale).toBe(0.4);
     expect(emittedPayload.gunshots).toBeDefined();
     expect(emittedPayload.gunshots.length).toBe(1);
     expect(emittedPayload.gunshots[0].characterId).toBe('char-shooter-1');
+    expect(emittedPayload.weaponAmmo).toBeDefined();
+    expect(emittedPayload.weaponAmmo.current).toBe(5);
+    expect(emittedPayload.weaponAmmo.max).toBe(6);
+    expect(emittedPayload.weaponAmmo.isReloading).toBe(false);
+  });
+
+  it('inherits configured inGameScale from projectileItemId definition', () => {
+    engine.shootProjectile('char-shooter-1', { x: 25, y: 0 });
+    expect(engine.activeProjectiles.length).toBe(1);
+    const projectile = engine.activeProjectiles[0];
+    // In items.json, cmn_bullet_gun_round has inGameScale: 0.4
+    expect(projectile.inGameScale).toBe(0.4);
   });
 });

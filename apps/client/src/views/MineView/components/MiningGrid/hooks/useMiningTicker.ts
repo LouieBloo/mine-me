@@ -14,7 +14,6 @@ import type { ProjectileVisualManager } from '../renderers/ProjectileVisualManag
 import type { SoundManager } from '../../../../../services/sound';
 import {
   MINING_CONFIG,
-  MINING_TILE_WORLD_PIXELS,
   type Vector2D,
   type MiningSessionClientState,
   type MiningClientTile,
@@ -23,16 +22,17 @@ import {
   type MiningActiveDynamite,
   type MiningActiveProjectile,
   type MiningDroppedItem,
-  MiningPlayerBody,
-  MiningTileType,
-  isTileSolid,
-  DEFAULT_DYNAMITE_PHYSICS_CONFIG,
+  type MiningPlayerBody,
 } from '@mine-me/shared';
-import { MiningEntityRenderer, type ActiveFallingRock } from '../renderers/MiningEntityRenderer';
-import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
+import type { ActiveFallingRock } from '../renderers/MiningEntityRenderer';
 import { miningProfiler } from '../utils/MiningProfiler';
-
 import type { MiningMouseController } from '../input/MiningMouseController';
+
+// Frame Systems
+import { MiningPredictionSystem } from '../systems/MiningPredictionSystem';
+import { MiningLocalSimulationSystem } from '../systems/MiningLocalSimulationSystem';
+import { MiningReticleRenderer } from '../systems/MiningReticleRenderer';
+import { MiningDebugRenderer } from '../systems/MiningDebugRenderer';
 
 export interface UseMiningTickerOptions {
   app: Application | null;
@@ -57,6 +57,7 @@ export interface UseMiningTickerOptions {
   activeProjectilesRef?: React.MutableRefObject<MiningActiveProjectile[]>;
   projectileGraphicsMap?: React.MutableRefObject<Map<string, Sprite | Graphics>>;
   bulletTextureRef?: React.RefObject<Texture | null>;
+  bulletScaleRef?: React.MutableRefObject<number> | React.RefObject<number>;
   projectileVisualManagerRef?: React.RefObject<ProjectileVisualManager | null>;
   droppedItemVisualManagerRef?: React.RefObject<DroppedItemVisualManager | null>;
   droppedItemsRef?: React.MutableRefObject<MiningDroppedItem[]>;
@@ -102,6 +103,7 @@ export function useMiningTicker({
   activeProjectilesRef,
   projectileGraphicsMap,
   bulletTextureRef,
+  bulletScaleRef,
   projectileVisualManagerRef,
   droppedItemVisualManagerRef,
   droppedItemsRef,
@@ -142,7 +144,6 @@ export function useMiningTicker({
         const res = originalRender(opts);
         miningProfiler.endSection();
         if (!isOffscreen) {
-          // Main stage draw complete — marks true end of frame CPU work
           miningProfiler.endFrame();
         }
         return res;
@@ -156,8 +157,8 @@ export function useMiningTicker({
       const fallingRocksContainer = fallingRocksContainerRef.current;
       if (!playerContainer || !gridContainer) return;
 
-      const playerBody = playerBodyRef?.current;
-      const grid = gridRef?.current;
+      const playerBody = playerBodyRef?.current ?? null;
+      const grid = gridRef?.current ?? null;
       const dt = Math.min(0.05, app.ticker.deltaMS / 1000);
       animTimeRef.current += dt;
       const animTime = animTimeRef.current;
@@ -166,96 +167,32 @@ export function useMiningTicker({
       const isMining = isMiningRef?.current ?? sessionState?.isMining ?? false;
       const miningTarget = miningTargetRef?.current ?? sessionState?.miningTarget ?? null;
 
-      if (playerBody && grid) {
-        miningProfiler.startSection('Physics');
-        // 1. Client-Side Prediction: step physics immediately on client frame with active inputs
-        const inputs = keysPressedRef?.current ?? {
-          up: false,
-          down: false,
-          left: false,
-          right: false,
-          jump: false,
-          miningKey: false,
-          sequence: 0,
-        };
-        playerBody.processInputs(inputs, grid);
-        playerBody.update(dt, grid);
+      // 1. Client-Side Prediction & Server Reconciliation System
+      const inputs = keysPressedRef?.current ?? {
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+        jump: false,
+        miningKey: false,
+        sequence: 0,
+      };
 
-        miningProfiler.startSection('Reconciliation');
-        // 2. Server Reconciliation: gently nudge predicted position towards authoritative server position
-        const errX = targetPos.x - playerBody.position.x;
-        const errY = targetPos.y - playerBody.position.y;
-        const distErr = Math.hypot(errX, errY);
+      MiningPredictionSystem.update(
+        {
+          playerBody,
+          grid,
+          inputs,
+          targetPos,
+          currentPos,
+          playerContainer,
+          soundManager,
+        },
+        dt
+      );
 
-        if (distErr > 1.2) {
-          // Large mismatch (e.g. server collision snap or teleport): snap to server position
-          playerBody.position.x = targetPos.x;
-          playerBody.position.y = targetPos.y;
-        } else {
-          let reconcileX = errX;
-          let reconcileY = errY;
-
-          // When the player is colliding with a wall horizontally, the client is already flush against the wall surface.
-          // Do NOT allow delayed server packets (which are trailing behind) to pull the player away from the wall.
-          if (playerBody.collisionX) {
-            if (inputs.right && errX < 0) {
-              reconcileX = 0;
-            } else if (inputs.left && errX > 0) {
-              reconcileX = 0;
-            }
-          } else if ((inputs.left || inputs.right) && distErr < 0.8) {
-            // While actively walking in open space, allow local prediction to lead without trailing server drag
-            if (inputs.right && errX < 0) {
-              reconcileX = 0;
-            } else if (inputs.left && errX > 0) {
-              reconcileX = 0;
-            }
-          }
-
-          if (playerBody.isGrounded) {
-            // When grounded, clamp small vertical drift to prevent sub-pixel floor fighting
-            if (Math.abs(errY) < 0.05) {
-              reconcileY = 0;
-            }
-          } else if (!playerBody.isOnLadder && Math.abs(errY) < 0.8) {
-            // AIRBORNE (jumping or falling): suppress vertical reconciliation.
-            // Client and server run identical deterministic physics — the only source of
-            // errY is the 30Hz server tick trailing behind the high-frequency client prediction.
-            // Allowing reconcileY here causes the camera to oscillate/spasm during jumps
-            // and dampens apparent gravity during falls.
-            // Errors > 0.8 tiles while airborne indicate genuine desync — allow soft correction.
-            reconcileY = 0;
-          }
-
-          const reconcileFactor = Math.min(1.0, 1 - Math.exp(-12 * dt));
-          if (Math.abs(reconcileX) > 0.001) {
-            playerBody.position.x += reconcileX * reconcileFactor;
-          }
-          if (Math.abs(reconcileY) > 0.001) {
-            playerBody.position.y += reconcileY * reconcileFactor;
-          }
-        }
-        soundManager?.setListenerPosition(playerBody.position);
-
-        currentPos.x = playerBody.position.x;
-        currentPos.y = playerBody.position.y;
-
-        // Position player sprite in pixel world space
-        playerContainer.x = playerBody.position.x * TILE_SIZE;
-        playerContainer.y = playerBody.position.y * TILE_SIZE;
-      } else {
-        // Fallback smooth factor if playerBody not yet initialized
-        const smoothFactor = Math.min(1.0, 1 - Math.exp(-32 * dt));
-        const dx = targetPos.x - currentPos.x;
-        currentPos.x += dx * smoothFactor;
-        currentPos.y += (targetPos.y - currentPos.y) * smoothFactor;
-
-        playerContainer.x = currentPos.x * TILE_SIZE;
-        playerContainer.y = currentPos.y * TILE_SIZE;
-      }
-
+      // 2. Camera Tracking
       miningProfiler.startSection('Camera');
-      // Update camera viewport tracking & zoom FIRST so coordinate queries are 100% synchronized
       if (cameraRef.current) {
         cameraRef.current.setScreenSize(app.screen.width, app.screen.height);
         cameraRef.current.update({ x: playerContainer.x, y: playerContainer.y }, dt);
@@ -266,21 +203,19 @@ export function useMiningTicker({
         gridContainer.y = screenHeight / 2 - playerContainer.y;
       }
 
+      // 3. Mouse Aiming, Continuous Hover Retargeting & Character Facing direction
       miningProfiler.startSection('Mouse & Aiming');
-      // Mouse Aiming, Continuous Hover Retargeting & Character Facing direction
-      const mouseController = mouseControllerRef?.current;
+      const mouseController = mouseControllerRef?.current ?? null;
       if (mouseController) {
         mouseController.setPlayerPosition(currentPos);
         if (cameraRef?.current) {
           mouseController.setCamera(cameraRef.current);
         }
-        // Always re-evaluate what is hovered under the cursor so moving the character immediately retargets
         mouseController.update();
       }
 
       const mouseWorld = mouseController?.getWorldMousePosition();
       if (mouseWorld) {
-        // Aim headlamp and sprite facing towards the mouse cursor
         const aimDx = mouseWorld.x - playerContainer.x;
         const aimDy = mouseWorld.y - playerContainer.y;
         const aimLen = Math.hypot(aimDx, aimDy);
@@ -289,24 +224,19 @@ export function useMiningTicker({
           const aimFacingLeft = aimDx < 0;
           if (isFacingLeftRef.current !== aimFacingLeft) {
             isFacingLeftRef.current = aimFacingLeft;
-            if (playerSpriteRef.current) {
-              playerSpriteRef.current.setFlipped(aimFacingLeft);
-            }
+            playerSpriteRef.current?.setFlipped(aimFacingLeft);
           }
         }
       } else if (playerBody && Math.abs(playerBody.velocity.x) > 0.01) {
-        // Fallback to movement direction if mouse is not on screen
         const isMovingLeft = playerBody.velocity.x < 0;
         if (isFacingLeftRef.current !== isMovingLeft) {
           isFacingLeftRef.current = isMovingLeft;
-          if (playerSpriteRef.current) {
-            playerSpriteRef.current.setFlipped(isMovingLeft);
-          }
+          playerSpriteRef.current?.setFlipped(isMovingLeft);
         }
       }
 
+      // 4. Sprites & Animation
       miningProfiler.startSection('Sprites & Anim');
-      // Update modular sprite animation with predicted velocities
       const isMiningKeyDown = Boolean(keysPressedRef?.current?.miningKey);
       const nowMs = performance.now();
       if (isMiningKeyDown || isMining) {
@@ -314,7 +244,6 @@ export function useMiningTicker({
       }
       const isSwinging = isMining || isMiningKeyDown || (nowMs - lastSwingTimeRef.current < 260);
 
-      // Play tool swing SFX periodically while actively swinging
       if (isSwinging && soundManager && weaponSoundUrlRef?.current) {
         if (nowMs - lastSwingSoundTimeRef.current >= 380) {
           lastSwingSoundTimeRef.current = nowMs;
@@ -326,9 +255,6 @@ export function useMiningTicker({
         if (isSwinging) {
           playerSpriteRef.current.setState('mine');
         } else if (playerBody) {
-          // Horizontal movement drives the walking animation stride.
-          // Vertical movement while falling/jumping does NOT trigger walking leg strides;
-          // ladder climbing uses vertical velocity.
           const moveVx = playerBody.velocity.x;
           const moveVy = playerBody.isOnLadder ? playerBody.velocity.y : 0;
           playerSpriteRef.current.setMoveVelocity(moveVx, moveVy);
@@ -336,443 +262,85 @@ export function useMiningTicker({
         playerSpriteRef.current.update(dt);
       }
 
+      // 5. Remote Players & Active Mobs
       miningProfiler.startSection('Remote Players');
-      // Update and interpolate remote players in multiplayer session
       if (remotePlayerRendererRef?.current) {
         remotePlayerRendererRef.current.tick(dt);
       }
 
       miningProfiler.startSection('Active Mobs');
-      // Update and interpolate active mobs
       if (mobRendererRef?.current) {
         mobRendererRef.current.tick(dt, soundManager);
       }
 
-      miningProfiler.startSection('Falling Rocks');
-      // Render active falling rocks in continuous space with rock texture/sprite
-      if (fallingRocksContainer) {
-        if (activeFallingRocksRef.current) {
-          for (const rock of activeFallingRocksRef.current) {
-            if (typeof rock.angle === 'number') {
-              rock.angle += 2.5 * dt;
-            }
-          }
-        }
-        const rockTexture = blockTexturesRef?.current?.get(MiningTileType.ROCK);
-        MiningEntityRenderer.updateFallingRocks(
+      // 6. Local Continuous Simulation (Rocks, Dynamites, Projectiles, Item Pickups)
+      MiningLocalSimulationSystem.update(
+        {
           fallingRocksContainer,
-          activeFallingRocksRef.current,
-          fallingRockGraphicsMap.current,
-          TILE_SIZE,
-          rockTexture
-        );
-      }
-
-      miningProfiler.startSection('Dynamites');
-      const dynamitesContainer = dynamitesContainerRef?.current;
-      if (dynamitesContainer && activeDynamitesRef?.current && dynamiteGraphicsMap?.current) {
-        // Step active dynamites forward locally between server snapshot ticks for buttery smooth tumbling
-        for (const dyn of activeDynamitesRef.current) {
-          if (dyn.velocity) {
-            dyn.position.x += dyn.velocity.x * dt;
-            dyn.position.y += dyn.velocity.y * dt;
-            dyn.velocity.y += MINING_CONFIG.GRAVITY * 0.8 * dt;
-          }
-          if (typeof dyn.angularVelocity === 'number') {
-            dyn.angle = (dyn.angle ?? 0) + dyn.angularVelocity * dt;
-          }
-        }
-
-        MiningEntityRenderer.updateActiveDynamites(
-          dynamitesContainer,
-          activeDynamitesRef.current,
-          dynamiteGraphicsMap.current,
-          TILE_SIZE,
-          dynamiteTextureRef?.current
-        );
-      }
-
-      // Update active flying projectiles (bullets)
-      const projectilesContainer = projectilesContainerRef?.current;
-      if (projectilesContainer && activeProjectilesRef?.current && projectileGraphicsMap?.current) {
-        // Step active projectiles forward locally between server snapshot ticks for high-speed continuous motion
-        for (const proj of activeProjectilesRef.current) {
-          if (proj.velocity) {
-            proj.position.x += proj.velocity.x * dt;
-            proj.position.y += proj.velocity.y * dt;
-          }
-        }
-
-        MiningEntityRenderer.updateActiveProjectiles(
-          projectilesContainer,
-          activeProjectilesRef.current,
-          projectileGraphicsMap.current,
-          TILE_SIZE,
-          bulletTextureRef?.current
-        );
-      }
-
-      // Update projectile visual effects (muzzle flash lights fadeout)
-      projectileVisualManagerRef?.current?.update(
-        dt,
-        lightingEngineRef?.current
+          activeFallingRocks: activeFallingRocksRef.current,
+          fallingRockGraphicsMap: fallingRockGraphicsMap.current,
+          blockTextures: blockTexturesRef?.current,
+          dynamitesContainer: dynamitesContainerRef?.current,
+          activeDynamites: activeDynamitesRef?.current,
+          dynamiteGraphicsMap: dynamiteGraphicsMap?.current,
+          dynamiteTexture: dynamiteTextureRef?.current,
+          dynamiteVisualManager: dynamiteVisualManagerRef?.current,
+          projectilesContainer: projectilesContainerRef?.current,
+          activeProjectilesRef,
+          projectileGraphicsMap: projectileGraphicsMap?.current,
+          bulletTexture: bulletTextureRef?.current,
+          bulletScale: typeof bulletScaleRef?.current === 'number' ? bulletScaleRef.current : 1.0,
+          projectileVisualManager: projectileVisualManagerRef?.current,
+          droppedItemVisualManager: droppedItemVisualManagerRef?.current,
+          droppedItems: droppedItemsRef?.current,
+          mobRenderer: mobRendererRef?.current,
+          grid: gridRef?.current,
+          lightingEngine: lightingEngineRef?.current,
+          particleEngine: particleEngineRef?.current,
+          soundManager,
+        },
+        dt
       );
 
-      // Update dynamite particle effects (fuse sparks & flame), illumination (fuse PointLight), and fuse audio
-      dynamiteVisualManagerRef?.current?.update(
-        activeDynamitesRef?.current || [],
-        dt,
-        particleEngineRef?.current,
-        lightingEngineRef?.current,
-        TILE_SIZE,
-        soundManager
-      );
-
-      // Update dropped item dynamic lights (PointLight or SpotLight) and particle emitters
-      droppedItemVisualManagerRef?.current?.update(
-        droppedItemsRef?.current || [],
-        dt,
-        particleEngineRef?.current,
-        lightingEngineRef?.current,
-        TILE_SIZE
-      );
-
+      // 7. Reticle Rendering
       miningProfiler.startSection('Reticle');
-      // Render Reticle Hover / Placement highlight
-      const reticleGraphics = reticleGraphicsRef?.current;
-      if (reticleGraphics && mouseController) {
-        reticleGraphics.clear();
-        reticleGraphics.position.set(0, 0);
-        const reticleState = mouseController.getReticleState();
-        if (reticleState.active && reticleState.target && reticleState.style) {
-          const rx = reticleState.target.x * TILE_SIZE;
-          const ry = reticleState.target.y * TILE_SIZE;
+      MiningReticleRenderer.render({
+        reticleGraphics: reticleGraphicsRef?.current ?? null,
+        mouseController,
+        animTime,
+        isMining,
+        miningTarget,
+        blockTextures: blockTexturesRef?.current,
+      });
 
-          if (reticleState.style.isFreeAim) {
-            const isCharging = reticleState.style.isCharging;
-            const isOvercharged = reticleState.style.isOvercharged;
-            const chargeRatio = reticleState.style.chargeRatio ?? 0;
-            const trajectoryPoints = reticleState.style.trajectoryPoints;
-
-            // Aim color shifts dynamically from vibrant amber/orange to blazing red as force increases
-            let aimColor = reticleState.style.strokeColor ?? 0xef4444;
-            let aimAlpha = reticleState.style.alpha ?? 0.85;
-
-            if (isOvercharged) {
-              aimColor = 0x6b7280; // Overcharged: muted grey
-              aimAlpha = 0.4;
-            } else if (isCharging) {
-              if (chargeRatio >= 0.99) {
-                // Max force: pulsing fiery amber / neon red
-                const pulse = 0.8 + Math.sin(animTime * 20) * 0.2;
-                aimColor = 0xf59e0b;
-                aimAlpha = pulse;
-              } else if (chargeRatio > 0.5) {
-                aimColor = 0xf97316; // Orange
-                aimAlpha = 0.9;
-              } else {
-                aimColor = 0xef4444; // Red
-                aimAlpha = 0.85;
-              }
-            }
-
-            // Draw parabola when charging and not overcharged
-            if (isCharging && !isOvercharged && trajectoryPoints && trajectoryPoints.length > 1) {
-              // 1. Draw glowing parabola arc
-              reticleGraphics.beginPath();
-              reticleGraphics.moveTo(trajectoryPoints[0].x * TILE_SIZE, trajectoryPoints[0].y * TILE_SIZE);
-              for (let i = 1; i < trajectoryPoints.length; i++) {
-                reticleGraphics.lineTo(trajectoryPoints[i].x * TILE_SIZE, trajectoryPoints[i].y * TILE_SIZE);
-              }
-              // Outer subtle glow
-              reticleGraphics.stroke({ width: 4, color: aimColor, alpha: 0.3 });
-
-              // Core crisp arc
-              reticleGraphics.beginPath();
-              reticleGraphics.moveTo(trajectoryPoints[0].x * TILE_SIZE, trajectoryPoints[0].y * TILE_SIZE);
-              for (let i = 1; i < trajectoryPoints.length; i++) {
-                reticleGraphics.lineTo(trajectoryPoints[i].x * TILE_SIZE, trajectoryPoints[i].y * TILE_SIZE);
-              }
-              reticleGraphics.stroke({ width: 2, color: 0xffffff, alpha: 0.9 });
-
-              // 2. Draw spaced trajectory beads along the arc
-              for (let i = 0; i < trajectoryPoints.length; i += 2) {
-                const pt = trajectoryPoints[i];
-                const ptX = pt.x * TILE_SIZE;
-                const ptY = pt.y * TILE_SIZE;
-                reticleGraphics.beginPath();
-                reticleGraphics.circle(ptX, ptY, 2.5);
-                reticleGraphics.fill({ color: aimColor, alpha: 0.85 });
-              }
-
-              // 3. Landing/Impact marker at the end of the arc
-              const endPt = trajectoryPoints[trajectoryPoints.length - 1];
-              const endX = endPt.x * TILE_SIZE;
-              const endY = endPt.y * TILE_SIZE;
-              reticleGraphics.beginPath();
-              reticleGraphics.circle(endX, endY, 6);
-              reticleGraphics.stroke({ width: 2, color: aimColor, alpha: 0.9 });
-              reticleGraphics.beginPath();
-              reticleGraphics.circle(endX, endY, 2.5);
-              reticleGraphics.fill({ color: 0xffffff, alpha: 0.95 });
-            }
-
-            // Circular reticle around cursor
-            const ringRadius = isCharging && chargeRatio >= 0.99 ? 11 : 9;
-            reticleGraphics.beginPath();
-            reticleGraphics.circle(rx, ry, ringRadius);
-            reticleGraphics.stroke({ width: 2, color: aimColor, alpha: aimAlpha });
-
-            // Center targeting pip
-            reticleGraphics.beginPath();
-            reticleGraphics.circle(rx, ry, 2);
-            reticleGraphics.fill({ color: aimColor, alpha: aimAlpha });
-          } else {
-            reticleGraphics.rect(rx, ry, TILE_SIZE, TILE_SIZE);
-            reticleGraphics.fill({ color: reticleState.style.color, alpha: reticleState.style.alpha });
-            reticleGraphics.stroke({ width: 2, color: reticleState.style.strokeColor, alpha: 0.9 });
-
-            // If actively mining this target block, draw an inner pulsing damage frame
-            const isMiningThis =
-              isMining &&
-              miningTarget &&
-              miningTarget.x === reticleState.target.x &&
-              miningTarget.y === reticleState.target.y;
-
-            if (isMiningThis) {
-              const pulse = 0.5 + Math.sin(animTime * 15) * 0.5;
-              reticleGraphics.rect(rx + 3, ry + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-              reticleGraphics.stroke({ width: 1.5, color: 0xf59e0b, alpha: 0.4 + pulse * 0.5 });
-            }
-
-            if (reticleState.style.showPreview) {
-              const previewGlow = 0.7 + Math.sin(animTime * 8) * 0.2;
-              if (reticleState.style.previewType === 'LADDER') {
-                const ladderTex = blockTexturesRef?.current?.get(MiningTileType.LADDER);
-                MiningTileRenderer.drawLadder(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, ladderTex);
-              } else {
-                const torchTex = blockTexturesRef?.current?.get(MiningTileType.TORCH);
-                MiningTileRenderer.drawTorch(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, torchTex);
-              }
-            }
-          }
-        }
-      }
-
+      // 8. Debug Graphics
       miningProfiler.startSection('Debug Graphics');
-      // Render debug shapes for player collision box and mining reach (when enabled via B)
-      const debugGraphics = debugGraphicsRef.current;
-      if (debugGraphics) {
-        debugGraphics.clear();
+      MiningDebugRenderer.render({
+        debugGraphics: debugGraphicsRef.current,
+        showDebug: showDebugRef.current,
+        currentPos,
+        playerFacingDir: playerFacingDirRef.current,
+        isFacingLeft: isFacingLeftRef.current,
+        isMining,
+        miningTarget,
+        grid: gridRef?.current,
+        activeDynamites: activeDynamitesRef?.current,
+        activeFallingRocks: activeFallingRocksRef.current,
+        droppedItems: droppedItemsRef?.current,
+        mobRenderer: mobRendererRef?.current,
+      });
 
-        if (showDebugRef.current) {
-          const playerPixelX = currentPos.x * TILE_SIZE;
-          const playerPixelY = currentPos.y * TILE_SIZE;
-          const colliderPixelW = (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE) * TILE_SIZE;
-          const colliderPixelH = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE) * TILE_SIZE;
-
-          // 1. Current Tile Grid Outline (Blue outline of occupied tile coordinate)
-          const tileX = Math.floor(currentPos.x) * TILE_SIZE;
-          const tileY = Math.floor(currentPos.y) * TILE_SIZE;
-          debugGraphics.rect(tileX, tileY, TILE_SIZE, TILE_SIZE);
-          debugGraphics.stroke({ width: 1, color: 0x38bdf8, alpha: 0.5 });
-
-          // 2. Fall & Movement Collider (Green AABB rectangle encompassing character body)
-          debugGraphics.rect(
-            playerPixelX - colliderPixelW / 2,
-            playerPixelY - colliderPixelH / 2,
-            colliderPixelW,
-            colliderPixelH
-          );
-          debugGraphics.stroke({ width: 2, color: 0x22c55e, alpha: 0.9 });
-
-          // 3. Ground / Floor Contact Line (Red line at bottom of player collider)
-          const feetY = playerPixelY + colliderPixelH / 2;
-          debugGraphics.moveTo(playerPixelX - colliderPixelW / 2, feetY);
-          debugGraphics.lineTo(playerPixelX + colliderPixelW / 2, feetY);
-          debugGraphics.stroke({ width: 2, color: 0xef4444, alpha: 0.9 });
-
-          // 4. Center Origin Point (Cyan dot at player center coordinate)
-          debugGraphics.circle(playerPixelX, playerPixelY, 3);
-          debugGraphics.fill({ color: 0x06b6d4, alpha: 0.95 });
-
-          // 5. Mining Reach Radius (Yellow circle for block excavation reach)
-          const reachPixelRadius = (MINING_CONFIG.PLAYER_MINING_REACH ?? 1.85) * TILE_SIZE;
-          debugGraphics.circle(playerPixelX, playerPixelY, reachPixelRadius);
-          debugGraphics.stroke({ width: 1.5, color: 0xeab308, alpha: 0.35 });
-
-          // 5b. Melee Attack Swing Arc (Terraria-style directional swing cone in pointing direction)
-          const aimDir = playerFacingDirRef.current || { x: isFacingLeftRef.current ? -1 : 1, y: 0 };
-          const aimAngle = Math.atan2(aimDir.y, aimDir.x);
-          const halfSpread = (72.5 * Math.PI) / 180; // ~145° total swing sweep
-          const swingRadius = 2.2 * TILE_SIZE;
-          const arcStartAngle = aimAngle - halfSpread;
-          const arcEndAngle = aimAngle + halfSpread;
-
-          debugGraphics.moveTo?.(playerPixelX, playerPixelY);
-          debugGraphics.arc?.(playerPixelX, playerPixelY, swingRadius, arcStartAngle, arcEndAngle);
-          debugGraphics.closePath?.();
-          debugGraphics.stroke?.({ width: 1.5, color: 0xf59e0b, alpha: 0.75 });
-          debugGraphics.fill?.({ color: 0xf59e0b, alpha: 0.08 });
-
-          // 6. Highlight currently mining target block if active
-          if (isMining && miningTarget) {
-            const targetX = miningTarget.x * TILE_SIZE;
-            const targetY = miningTarget.y * TILE_SIZE;
-            debugGraphics.rect(targetX, targetY, TILE_SIZE, TILE_SIZE);
-            debugGraphics.stroke({ width: 2.5, color: 0xef4444, alpha: 0.9 });
-          }
-
-          // 7. Block Colliders (Planck static tile colliders in viewport)
-          const grid = gridRef?.current;
-          if (grid) {
-            const minTileX = Math.max(0, Math.floor(currentPos.x - 22));
-            const maxTileX = Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.ceil(currentPos.x + 22));
-            const minTileY = Math.max(0, Math.floor(currentPos.y - 18));
-            const maxTileY = Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.ceil(currentPos.y + 18));
-
-            for (let ty = minTileY; ty <= maxTileY; ty++) {
-              const row = grid[ty];
-              if (!row) continue;
-              for (let tx = minTileX; tx <= maxTileX; tx++) {
-                const tile = row[tx];
-                if (tile && isTileSolid(tile.type)) {
-                  const bx = tx * TILE_SIZE;
-                  const by = ty * TILE_SIZE;
-                  debugGraphics.rect(bx, by, TILE_SIZE, TILE_SIZE);
-                  debugGraphics.stroke({ width: 1, color: 0xf97316, alpha: 0.45 });
-                  debugGraphics.fill({ color: 0xf97316, alpha: 0.08 });
-                }
-              }
-            }
-          }
-
-          // 8. Item Colliders (Active thrown dynamites with oriented collision shapes)
-          if (activeDynamitesRef?.current && activeDynamitesRef.current.length > 0) {
-            for (const dyn of activeDynamitesRef.current) {
-              const px = dyn.position.x * TILE_SIZE;
-              const py = dyn.position.y * TILE_SIZE;
-              const angle = dyn.angle ?? 0;
-              const cfg = dyn.physicsConfig ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG;
-
-              const cos = Math.cos(angle);
-              const sin = Math.sin(angle);
-
-              const scale = TILE_SIZE / MINING_TILE_WORLD_PIXELS;
-
-              if (cfg.colliderType === 'CIRCLE') {
-                const radius = (cfg.colliderRadius ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG.colliderRadius ?? 8) * scale;
-                const ox = (cfg.colliderOffsetX ?? 0) * scale;
-                const oy = (cfg.colliderOffsetY ?? 0) * scale;
-                const cx = px + (ox * cos - oy * sin);
-                const cy = py + (ox * sin + oy * cos);
-
-                debugGraphics.circle(cx, cy, radius);
-                debugGraphics.stroke({ width: 2, color: 0x06b6d4, alpha: 0.95 });
-                debugGraphics.fill({ color: 0x06b6d4, alpha: 0.25 });
-
-                // Rotation indicator line
-                debugGraphics.moveTo(cx, cy);
-                debugGraphics.lineTo(cx + cos * radius, cy + sin * radius);
-                debugGraphics.stroke({ width: 2, color: 0x22d3ee, alpha: 1 });
-              } else {
-                // RECTANGLE collider (e.g. 32px x 10px hotdog)
-                const w = (cfg.colliderWidth ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG.colliderWidth ?? 32) * scale;
-                const h = (cfg.colliderHeight ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG.colliderHeight ?? 10) * scale;
-                const hw = w / 2;
-                const hh = h / 2;
-                const ox = (cfg.colliderOffsetX ?? 0) * scale;
-                const oy = (cfg.colliderOffsetY ?? 0) * scale;
-
-                const localCorners = [
-                  { x: ox - hw, y: oy - hh },
-                  { x: ox + hw, y: oy - hh },
-                  { x: ox + hw, y: oy + hh },
-                  { x: ox - hw, y: oy + hh },
-                ];
-
-                const worldCorners = localCorners.map((pt) => ({
-                  x: px + (pt.x * cos - pt.y * sin),
-                  y: py + (pt.x * sin + pt.y * cos),
-                }));
-
-                debugGraphics.poly(worldCorners).fill({ color: 0x38bdf8, alpha: 0.25 }).stroke({ width: 2, color: 0x38bdf8, alpha: 0.95 });
-
-                // Heading pointer line from center to top edge
-                const tipX = px + (ox * cos - (oy - hh) * sin);
-                const tipY = py + (ox * sin + (oy - hh) * cos);
-                debugGraphics.moveTo(px, py);
-                debugGraphics.lineTo(tipX, tipY);
-                debugGraphics.stroke({ width: 2, color: 0xfacc15, alpha: 0.95 });
-              }
-
-              // Center anchor point
-              debugGraphics.circle(px, py, 2.5);
-              debugGraphics.fill({ color: 0xef4444, alpha: 1 });
-            }
-          }
-
-          // 9. Falling Rock Colliders (Spherical dynamic bodies)
-          if (activeFallingRocksRef?.current && activeFallingRocksRef.current.length > 0) {
-            for (const rock of activeFallingRocksRef.current) {
-              const rx = rock.x * TILE_SIZE;
-              const ry = rock.y * TILE_SIZE;
-              const rockRadius = 0.42 * TILE_SIZE;
-              debugGraphics.circle(rx, ry, rockRadius);
-              debugGraphics.stroke({ width: 2, color: 0xa855f7, alpha: 0.9 });
-              debugGraphics.fill({ color: 0xa855f7, alpha: 0.2 });
-              debugGraphics.circle(rx, ry, 2.5);
-              debugGraphics.fill({ color: 0xc084fc, alpha: 1 });
-            }
-          }
-
-          // 10. Dropped Item Colliders (Any item on the ground that has a physicsConfig)
-          if (droppedItemsRef?.current && droppedItemsRef.current.length > 0) {
-            for (const item of droppedItemsRef.current) {
-              const cfg = item.physicsConfig;
-              if (!cfg || cfg.colliderType === 'NONE') continue;
-
-              const px = (item.position.x + 0.5) * TILE_SIZE;
-              const py = (item.position.y + 0.5) * TILE_SIZE;
-
-              if (cfg.colliderType === 'CIRCLE') {
-                const radius = cfg.colliderRadius ?? 8;
-                const ox = cfg.colliderOffsetX ?? 0;
-                const oy = cfg.colliderOffsetY ?? 0;
-                debugGraphics.circle(px + ox, py + oy, radius);
-                debugGraphics.stroke({ width: 1.5, color: 0x10b981, alpha: 0.95 }); // Emerald
-                debugGraphics.fill({ color: 0x10b981, alpha: 0.2 });
-              } else if (cfg.colliderType === 'RECTANGLE') {
-                const w = cfg.colliderWidth ?? 16;
-                const h = cfg.colliderHeight ?? 16;
-                const ox = cfg.colliderOffsetX ?? 0;
-                const oy = cfg.colliderOffsetY ?? 0;
-                debugGraphics.rect(px + ox - w / 2, py + oy - h / 2, w, h);
-                debugGraphics.stroke({ width: 1.5, color: 0x10b981, alpha: 0.95 }); // Emerald
-                debugGraphics.fill({ color: 0x10b981, alpha: 0.2 });
-              }
-            }
-          }
-
-          // 11. Active Mob Colliders & Hitboxes
-          if (mobRendererRef?.current) {
-            mobRendererRef.current.renderDebugHitboxes(debugGraphics, TILE_SIZE);
-          }
-        }
-      }
-
+      // 9. Lighting Engine & Flashlight
       miningProfiler.startSection('Lighting Engine');
-      // Update dynamic player flashlight position and beam direction (positioned at forehead / headlamp)
       const flashlight = flashlightRef.current;
       if (flashlight) {
         flashlight.setPosition(currentPos.x, currentPos.y - 0.28);
         flashlight.setDirection(playerFacingDirRef.current.x, playerFacingDirRef.current.y);
       }
 
-      // Update dynamic torch preview lighting when hovering in valid torch placement mode
       const lightingEngine = lightingEngineRef.current;
       if (lightingEngine) {
-        const reticleState = mouseControllerRef?.current?.getReticleState();
+        const reticleState = mouseController?.getReticleState();
         const isTorchPreview = Boolean(
           reticleState?.active &&
             reticleState?.target &&
@@ -814,10 +382,9 @@ export function useMiningTicker({
         }
       }
 
-      // Update and re-render lighting engine lightmap
       lightingEngineRef.current?.update(dt, currentPos, playerFacingDirRef.current);
 
-      // Update active particles (torches, block damage, magic auras)
+      // 10. Particle Engine
       particleEngineRef?.current?.update(dt);
 
       if (!renderer || !originalRender) {

@@ -1,4 +1,4 @@
-import { Assets, Graphics, Sprite, Texture, type Container } from 'pixi.js';
+import { Assets, Graphics, Sprite, Texture, Container } from 'pixi.js';
 import { getAssetUrl, type MiningDroppedItem, type MiningActiveDynamite, type MiningActiveProjectile } from '@mine-me/shared';
 import { TILE_SIZE } from './MiningTileRenderer';
 
@@ -32,9 +32,17 @@ export class MiningEntityRenderer {
       const spriteUrl = item.inGameSpriteUrl || item.iconUrl;
       const existing = droppedSpritesMap.get(key);
 
+      const itemScale = typeof item.inGameScale === 'number' && item.inGameScale > 0 ? item.inGameScale : 1.0;
+      const targetSize = tileSize * 0.5 * itemScale;
+
       if (existing) {
         existing.x = itemX;
         existing.y = itemY;
+        // Keep dimensions updated if scale changes dynamically
+        if (existing instanceof Sprite) {
+          existing.width = targetSize;
+          existing.height = targetSize;
+        }
       } else {
         if (spriteUrl) {
           const loadSprite = async () => {
@@ -43,17 +51,15 @@ export class MiningEntityRenderer {
               const texture = await Assets.load(url);
               const sprite = new Sprite(texture);
               sprite.anchor.set(0.5);
-              // Requirement 4: Half a normal tile size (0.5 * tileSize)
-              sprite.width = tileSize * 0.5;
-              sprite.height = tileSize * 0.5;
+              sprite.width = targetSize;
+              sprite.height = targetSize;
               sprite.x = itemX;
               sprite.y = itemY;
               droppedItemsContainer.addChild(sprite);
               droppedSpritesMap.set(key, sprite);
             } catch {
               const graphics = new Graphics();
-              const halfSize = tileSize * 0.5;
-              graphics.rect(-halfSize / 2, -halfSize / 2, halfSize, halfSize);
+              graphics.rect(-targetSize / 2, -targetSize / 2, targetSize, targetSize);
               graphics.fill(0xf59e0b);
               graphics.x = itemX;
               graphics.y = itemY;
@@ -64,8 +70,7 @@ export class MiningEntityRenderer {
           loadSprite();
         } else {
           const graphics = new Graphics();
-          const halfSize = tileSize * 0.5;
-          graphics.rect(-halfSize / 2, -halfSize / 2, halfSize, halfSize);
+          graphics.rect(-targetSize / 2, -targetSize / 2, targetSize, targetSize);
           graphics.fill(0xf59e0b);
           graphics.x = itemX;
           graphics.y = itemY;
@@ -161,6 +166,9 @@ export class MiningEntityRenderer {
       activeKeys.add(dynamite.id);
       let view = dynamiteGraphicsMap.get(dynamite.id);
 
+      const dynamiteScale = typeof dynamite.inGameScale === 'number' && dynamite.inGameScale > 0 ? dynamite.inGameScale : 1.0;
+      const targetSize = tileSize * 0.5 * dynamiteScale;
+
       if (dynamiteTexture) {
         if (!view || !(view instanceof Sprite)) {
           if (view) {
@@ -169,14 +177,17 @@ export class MiningEntityRenderer {
           }
           const sprite = new Sprite(dynamiteTexture);
           sprite.anchor.set(0.5);
-          // Scale sprite to match the 32px base item resolution (32 / 64 = 0.5 of a tile)
-          sprite.width = tileSize * 0.5;
-          sprite.height = tileSize * 0.5;
+          sprite.width = targetSize;
+          sprite.height = targetSize;
           dynamitesContainer.addChild(sprite);
           view = sprite;
           dynamiteGraphicsMap.set(dynamite.id, view);
-        } else if (view.texture !== dynamiteTexture) {
-          view.texture = dynamiteTexture;
+        } else {
+          view.width = targetSize;
+          view.height = targetSize;
+          if (view.texture !== dynamiteTexture) {
+            view.texture = dynamiteTexture;
+          }
         }
       } else {
         if (!view || view instanceof Sprite) {
@@ -186,11 +197,11 @@ export class MiningEntityRenderer {
           }
           const graphics = new Graphics();
           // Fallback matching the configured hotdog dimensions (32px x 10px in 64px tile space)
-          const w = (dynamite.physicsConfig?.colliderWidth ?? 32) * (tileSize / 64);
-          const h = (dynamite.physicsConfig?.colliderHeight ?? 10) * (tileSize / 64);
+          const w = (dynamite.physicsConfig?.colliderWidth ?? 32) * (tileSize / 64) * dynamiteScale;
+          const h = (dynamite.physicsConfig?.colliderHeight ?? 10) * (tileSize / 64) * dynamiteScale;
           graphics.roundRect(-w / 2, -h / 2, w, h, 2);
           graphics.fill(0xdc2626);
-          graphics.rect(w / 2, -2, 4, 4);
+          graphics.rect(w / 2, -2 * dynamiteScale, 4 * dynamiteScale, 4 * dynamiteScale);
           graphics.fill(0xf59e0b);
           dynamitesContainer.addChild(graphics);
           view = graphics;
@@ -222,48 +233,56 @@ export class MiningEntityRenderer {
   public static updateActiveProjectiles(
     projectilesContainer: Container,
     activeProjectiles: MiningActiveProjectile[],
-    projectileGraphicsMap: Map<string, Sprite | Graphics>,
+    projectileGraphicsMap: Map<string, Container>,
     tileSize: number = TILE_SIZE,
-    bulletTexture?: Texture | null
+    bulletTexture?: Texture | null,
+    defaultScale: number = 1.0
   ): void {
     const activeKeys = new Set<string>();
 
     for (const proj of activeProjectiles) {
       activeKeys.add(proj.id);
       let view = projectileGraphicsMap.get(proj.id);
+      const projScale = typeof proj.inGameScale === 'number' && proj.inGameScale > 0
+        ? proj.inGameScale
+        : (defaultScale > 0 ? defaultScale : 1.0);
 
-      if (bulletTexture) {
-        if (!view || !(view instanceof Sprite)) {
-          if (view) {
-            projectilesContainer.removeChild(view);
-            view.destroy();
-          }
+      if (!view) {
+        const bulletCompound = new Container();
+
+        // 1. Luminous golden tracer streak trailing behind bullet (high visibility)
+        const tracer = new Graphics();
+        // Warm outer streak
+        tracer.roundRect(-42, -3.5, 46, 7, 3.5);
+        tracer.fill({ color: 0xf59e0b, alpha: 0.85 });
+        // Core incandescent white-gold streak
+        tracer.roundRect(-30, -1.5, 34, 3, 1.5);
+        tracer.fill({ color: 0xfffbeb, alpha: 0.95 });
+        bulletCompound.addChild(tracer);
+
+        // 2. Bullet head sprite or glowing capsule
+        if (bulletTexture) {
           const sprite = new Sprite(bulletTexture);
           sprite.anchor.set(0.5);
-          sprite.width = tileSize * 0.45;
-          sprite.height = tileSize * 0.18;
-          projectilesContainer.addChild(sprite);
-          view = sprite;
-          projectileGraphicsMap.set(proj.id, view);
-        } else if (view.texture !== bulletTexture) {
-          view.texture = bulletTexture;
+          sprite.width = tileSize * 0.55;
+          sprite.height = tileSize * 0.24;
+          sprite.x = 4;
+          bulletCompound.addChild(sprite);
+        } else {
+          const head = new Graphics();
+          head.roundRect(-6, -3, 16, 6, 2.5);
+          head.fill(0xf59e0b);
+          head.rect(4, -2, 5, 4);
+          head.fill(0xfef08a);
+          bulletCompound.addChild(head);
         }
+
+        bulletCompound.scale.set(projScale, projScale);
+        projectilesContainer.addChild(bulletCompound);
+        view = bulletCompound;
+        projectileGraphicsMap.set(proj.id, view);
       } else {
-        if (!view || view instanceof Sprite) {
-          if (view) {
-            projectilesContainer.removeChild(view);
-            view.destroy();
-          }
-          const graphics = new Graphics();
-          // Glowing bullet capsule: gold body with incandescent tip
-          graphics.roundRect(-7, -2.5, 14, 5, 2);
-          graphics.fill(0xf59e0b);
-          graphics.rect(4, -1.5, 3, 3);
-          graphics.fill(0xfef08a);
-          projectilesContainer.addChild(graphics);
-          view = graphics;
-          projectileGraphicsMap.set(proj.id, view);
-        }
+        view.scale.set(projScale, projScale);
       }
 
       // Position in world pixel coordinates
@@ -272,13 +291,18 @@ export class MiningEntityRenderer {
       if (typeof proj.angle === 'number') {
         view.rotation = proj.angle;
       }
+      if (typeof proj.alpha === 'number') {
+        view.alpha = Math.max(0, Math.min(1, proj.alpha));
+      } else {
+        view.alpha = 1.0;
+      }
     }
 
     // Clean up projectiles that hit or expired
     projectileGraphicsMap.forEach((view, id) => {
       if (!activeKeys.has(id)) {
         projectilesContainer.removeChild(view);
-        view.destroy();
+        view.destroy({ children: true });
         projectileGraphicsMap.delete(id);
       }
     });

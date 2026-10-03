@@ -99,6 +99,9 @@ export class InventoryService {
       particleEffectId: item.particleEffectId,
       particleEffect: item.particleEffect,
       physicsConfig: item.physicsConfig,
+      lightConfig: item.lightConfig,
+      shootsProjectiles: item.shootsProjectiles,
+      projectileConfig: item.projectileConfig,
       itemEffects: (item.itemEffects || []).map((ie: any) => ({
         id: ie.id,
         itemId: ie.itemId,

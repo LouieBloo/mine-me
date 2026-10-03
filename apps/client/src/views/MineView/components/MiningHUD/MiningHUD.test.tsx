@@ -75,4 +75,30 @@ describe('MiningHUD', () => {
     expect(screen.getByText('Reload')).toBeDefined();
     expect(screen.getByText('5 / 6 ROUNDS')).toBeDefined();
   });
+
+  it('triggers onReload when clicking reload in weapon ammo HUD', () => {
+    const onReload = vi.fn();
+    render(
+      <MiningHUD
+        sessionState={mockSessionState}
+        playerState={mockPlayerState}
+        onExit={vi.fn()}
+        onAbandon={vi.fn()}
+        onRestart={vi.fn()}
+        weaponAmmo={{
+          weaponName: '6-Shooter Revolver',
+          weaponIconUrl: '/assets/icons/items/revolver_icon.png',
+          current: 3,
+          max: 6,
+          isReloading: false,
+        }}
+        onReload={onReload}
+      />
+    );
+
+    const reloadBtn = screen.getByTestId('manual-reload-btn');
+    reloadBtn.click();
+    expect(onReload).toHaveBeenCalledTimes(1);
+  });
 });
+

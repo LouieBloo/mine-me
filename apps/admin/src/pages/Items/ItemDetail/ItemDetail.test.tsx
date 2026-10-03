@@ -146,15 +146,14 @@ describe('ItemDetail Page', () => {
     expect(screen.getByText(/item_pickaxe_sfx\.wav/i)).toBeInTheDocument();
   });
 
-  it('renders Item Key input and accepts value', async () => {
-    renderDetail('new');
-    expect(await screen.findByText(/Item Key/i)).toBeInTheDocument();
+  it('renders In-Game World Scale section and allows scale adjustments', async () => {
+    renderDetail('item_torch');
+    expect(await screen.findByText(/In-Game World Scale/i)).toBeInTheDocument();
 
-    const itemKeyInput = screen.getByPlaceholderText(/e\.g\. dynamite, ladder, torch/i) as HTMLInputElement;
-    expect(itemKeyInput.value).toBe('');
-
-    fireEvent.change(itemKeyInput, { target: { value: 'dynamite_v2' } });
-    expect(itemKeyInput.value).toBe('dynamite_v2');
+    const slider = screen.getByLabelText(/Scale Multiplier/i) as HTMLInputElement;
+    expect(slider).toBeInTheDocument();
+    fireEvent.change(slider, { target: { value: '1.75' } });
+    expect(slider.value).toBe('1.75');
   });
 });
 

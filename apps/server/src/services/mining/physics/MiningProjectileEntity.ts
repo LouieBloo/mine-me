@@ -12,6 +12,7 @@ export interface ProjectileEntityOptions extends ProjectileBodyOptions {
   damage?: number;
   maxLifetime?: number;
   spriteUrl?: string | null;
+  inGameScale?: number;
 }
 
 /**
@@ -25,6 +26,7 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
   public readonly damage: number;
   public readonly maxLifetime: number;
   public readonly spriteUrl?: string | null;
+  public readonly inGameScale: number;
 
   public elapsedTime: number = 0;
   public hasHit: boolean = false;
@@ -34,6 +36,8 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
 
   public rigidBody: planck.Body | null = null;
   private rigidWorld: MiningRigidWorld | null = null;
+
+  public readonly initialPosition: Vector2D;
 
   public override get position(): Vector2D {
     return this._position;
@@ -77,7 +81,9 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
     this.damage = options?.damage ?? 35;
     this.maxLifetime = options?.maxLifetime ?? 3.0;
     this.spriteUrl = options?.spriteUrl;
+    this.inGameScale = typeof options?.inGameScale === 'number' && options.inGameScale > 0 ? options.inGameScale : 1.0;
 
+    this.initialPosition = { ...initialPosition };
     this._position = { ...initialPosition };
     this._velocity = { ...initialVelocity };
     this.angle = Math.atan2(initialVelocity.y, initialVelocity.x);
@@ -120,12 +126,12 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
       this.position.y += this.velocity.y * dt;
     }
 
-    // Boundary check
+    // Boundary check (allows open sky flight above ground up to y = -40, and wide horizontal trajectory)
     if (
-      this.position.x < -5 ||
-      this.position.x >= MINING_CONFIG.GRID_WIDTH + 5 ||
-      this.position.y < -10 ||
-      this.position.y >= MINING_CONFIG.GRID_HEIGHT + 5
+      this.position.x < -20 ||
+      this.position.x >= MINING_CONFIG.GRID_WIDTH + 20 ||
+      this.position.y < -40 ||
+      this.position.y >= MINING_CONFIG.GRID_HEIGHT + 10
     ) {
       this.hasHit = true;
       this.cleanup();
@@ -145,6 +151,20 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
         const tx = Math.floor(checkX);
         const ty = Math.floor(checkY);
 
+        // Clearance threshold from muzzle position prevents immediate self-collision with shooter's tile
+        const spawnDist = Math.hypot(
+          checkX - this.initialPosition.x,
+          checkY - this.initialPosition.y
+        );
+        if (spawnDist < 0.35) {
+          continue;
+        }
+
+        // Above ground (ty < 0) is open sky (no collision with ground or bedrock)
+        if (ty < 0) {
+          continue;
+        }
+
         if (
           ty >= 0 &&
           ty < MINING_CONFIG.GRID_HEIGHT &&
@@ -160,6 +180,13 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
             this.cleanup();
             return;
           }
+        } else if (ty >= 0) {
+          // Cavern boundary outer wall underground
+          this.hasHit = true;
+          this.position.x = Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 0.01, checkX));
+          this.position.y = Math.min(MINING_CONFIG.GRID_HEIGHT - 0.01, checkY);
+          this.cleanup();
+          return;
         }
       }
     }

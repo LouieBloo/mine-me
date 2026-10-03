@@ -242,6 +242,15 @@ export const MineView: React.FC = () => {
     setShowExitConfirmation(false);
     setShowModeModal(true);
   }, []);
+
+  // Weapon Reload Handler
+  const handleReload = useCallback(async () => {
+    try {
+      await sendGameEvent({ type: 'mining_reload' } as any);
+    } catch (err: any) {
+      console.error('[MineView] Failed to reload weapon:', err);
+    }
+  }, [sendGameEvent]);
   const xpGained = summaryLoot.reduce((sum, item) => sum + item.quantity * 5, 0);
   const mappedLootItems = (() => {
     const groupedMap: Record<string, typeof summaryLoot[number]> = {};
@@ -332,6 +341,7 @@ export const MineView: React.FC = () => {
           showDebug={showDebug}
           onToggleDebug={handleToggleDebug}
           weaponAmmo={weaponAmmo}
+          onReload={handleReload}
         />
       )}
 

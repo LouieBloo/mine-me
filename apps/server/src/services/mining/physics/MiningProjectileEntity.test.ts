@@ -112,4 +112,39 @@ describe('MiningProjectileEntity', () => {
     expect(proj.rigidBody).toBeNull();
     rigidWorld.destroy();
   });
+
+  it('allows flight in open sky above ground (y < 0) without triggering collision or boundary cleanup prematurely', () => {
+    const proj = new MiningProjectileEntity(
+      'proj-sky-1',
+      'char-1',
+      { x: 10, y: -1.0 },
+      { x: 20, y: -5 }
+    );
+
+    // Update 0.2s: moves to x=14, y=-2.0
+    proj.update(0.2, grid);
+
+    expect(proj.position.y).toBeLessThan(0);
+    expect(proj.position.x).toBeCloseTo(14, 0.5);
+    expect(proj.hasHit).toBe(false);
+  });
+
+  it('stores inGameScale when provided in options and defaults to 1.0', () => {
+    const projScaled = new MiningProjectileEntity(
+      'proj-scaled',
+      'char-1',
+      { x: 5, y: 5 },
+      { x: 10, y: 0 },
+      { inGameScale: 0.4, itemId: 'cmn_bullet_gun_round' }
+    );
+    expect(projScaled.inGameScale).toBe(0.4);
+
+    const projDefault = new MiningProjectileEntity(
+      'proj-default',
+      'char-1',
+      { x: 5, y: 5 },
+      { x: 10, y: 0 }
+    );
+    expect(projDefault.inGameScale).toBe(1.0);
+  });
 });

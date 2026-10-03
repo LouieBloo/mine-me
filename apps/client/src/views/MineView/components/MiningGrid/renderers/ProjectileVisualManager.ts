@@ -38,16 +38,17 @@ export class ProjectileVisualManager {
    */
   public triggerLocalShot(
     muzzlePos: Vector2D,
-    _angle: number,
-    soundUrl: string = '/assets/sounds/items/revolver_shot.wav',
+    angle: number,
+    soundUrl?: string | null,
     particleEngine?: ParticleEngine | null,
     lightingEngine?: LightingEngine | null,
-    soundManager?: SoundManager | null
+    soundManager?: SoundManager | null,
+    tileSize: number = 48
   ): void {
     this.recordLocalShot();
 
     // 1. Immediate local audio
-    if (soundManager) {
+    if (soundManager && soundUrl) {
       if (typeof soundManager.playPositionalSfx === 'function') {
         soundManager.playPositionalSfx(soundUrl, muzzlePos);
       } else {
@@ -55,10 +56,33 @@ export class ProjectileVisualManager {
       }
     }
 
-    // 2. Muzzle flash & smoke particles
+    // 2. Muzzle flash & smoke particles (in world pixel coordinates)
     if (particleEngine) {
-      particleEngine.spawnBurst(DEFAULT_PARTICLE_EFFECTS.gun_muzzle_flash, muzzlePos);
-      particleEngine.spawnBurst(DEFAULT_PARTICLE_EFFECTS.gun_smoke, muzzlePos);
+      const pixelPos = {
+        x: muzzlePos.x * tileSize,
+        y: muzzlePos.y * tileSize,
+      };
+
+      const angleDeg = (angle * 180) / Math.PI;
+
+      const muzzleFlashConfig = {
+        ...DEFAULT_PARTICLE_EFFECTS.gun_muzzle_flash,
+        angle: {
+          min: angleDeg - 25,
+          max: angleDeg + 25,
+        },
+      };
+
+      const smokeConfig = {
+        ...DEFAULT_PARTICLE_EFFECTS.gun_smoke,
+        angle: {
+          min: angleDeg - 35,
+          max: angleDeg + 35,
+        },
+      };
+
+      particleEngine.spawnBurst(muzzleFlashConfig, pixelPos);
+      particleEngine.spawnBurst(smokeConfig, pixelPos);
     }
 
     // 3. Dynamic momentary light source
@@ -76,7 +100,8 @@ export class ProjectileVisualManager {
     localCharacterId?: string,
     particleEngine?: ParticleEngine | null,
     lightingEngine?: LightingEngine | null,
-    soundManager?: SoundManager | null
+    soundManager?: SoundManager | null,
+    tileSize: number = 48
   ): void {
     if (!gunshots || gunshots.length === 0) return;
 
@@ -98,21 +123,35 @@ export class ProjectileVisualManager {
 
       const shotPos = shot.muzzlePosition ?? shot.position;
 
-      // Remote player gunshot: play positional audio
-      if (!isVeryRecentLocal && soundManager) {
-        const sfxUrl = shot.soundUrl || '/assets/sounds/items/revolver_shot.wav';
+      // Remote player gunshot: play positional audio if weapon has sound configured
+      if (!isVeryRecentLocal && soundManager && shot.soundUrl) {
         if (typeof soundManager.playPositionalSfx === 'function') {
-          soundManager.playPositionalSfx(sfxUrl, shotPos);
+          soundManager.playPositionalSfx(shot.soundUrl, shotPos);
         } else {
-          soundManager.playSfx(sfxUrl);
+          soundManager.playSfx(shot.soundUrl);
         }
       }
 
       // If remote player fired, spawn muzzle flash, smoke, and dynamic light for spectators
       if (!isVeryRecentLocal) {
         if (particleEngine) {
-          particleEngine.spawnBurst(DEFAULT_PARTICLE_EFFECTS.gun_muzzle_flash, shotPos);
-          particleEngine.spawnBurst(DEFAULT_PARTICLE_EFFECTS.gun_smoke, shotPos);
+          const pixelPos = {
+            x: shotPos.x * tileSize,
+            y: shotPos.y * tileSize,
+          };
+          const angle = shot.direction ? Math.atan2(shot.direction.y, shot.direction.x) : 0;
+          const angleDeg = (angle * 180) / Math.PI;
+
+          const flashConfig = {
+            ...DEFAULT_PARTICLE_EFFECTS.gun_muzzle_flash,
+            angle: { min: angleDeg - 25, max: angleDeg + 25 },
+          };
+          const smokeConfig = {
+            ...DEFAULT_PARTICLE_EFFECTS.gun_smoke,
+            angle: { min: angleDeg - 35, max: angleDeg + 35 },
+          };
+          particleEngine.spawnBurst(flashConfig, pixelPos);
+          particleEngine.spawnBurst(smokeConfig, pixelPos);
         }
 
         if (lightingEngine) {
@@ -127,15 +166,44 @@ export class ProjectileVisualManager {
    */
   private addMuzzleFlashLight(muzzlePos: Vector2D, lightingEngine: LightingEngine): void {
     const flashId = `gun_flash_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const initialIntensity = 2.2;
-    const duration = 0.16; // 160ms decay
+    const initialIntensity = 2.4;
+    const duration = 0.14; // 140ms decay
 
     const light = new PointLight(
       flashId,
       { x: muzzlePos.x, y: muzzlePos.y },
       0xfff2a3, // Brilliant white-amber muzzle flash color
       initialIntensity,
-      4.2 // Generous illumination radius
+      4.5 // Generous illumination radius
+    );
+
+    lightingEngine.addLight(light);
+    this.activeFlashes.push({
+      id: flashId,
+      light,
+      elapsed: 0,
+      duration,
+      initialIntensity,
+    });
+  }
+
+  /**
+   * Adds an instantaneous incandescent impact spark flash light at projectile impact coordinate.
+   */
+  public addImpactFlashLight(
+    impactPos: Vector2D,
+    lightingEngine: LightingEngine
+  ): void {
+    const flashId = `impact_flash_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const duration = 0.08;
+    const initialIntensity = 1.8;
+
+    const light = new PointLight(
+      flashId,
+      { x: impactPos.x, y: impactPos.y },
+      0xfbbf24,
+      initialIntensity,
+      2.5
     );
 
     lightingEngine.addLight(light);
@@ -166,6 +234,9 @@ export class ProjectileVisualManager {
       } else {
         const progress = flash.elapsed / flash.duration;
         flash.light.setIntensity(flash.initialIntensity * (1 - progress));
+        if (lightingEngine) {
+          lightingEngine.addLight(flash.light);
+        }
       }
     }
   }

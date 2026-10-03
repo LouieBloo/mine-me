@@ -70,6 +70,8 @@ export function useMiningScene({
   const projectilesContainerRef = useRef<Container | null>(null);
   const projectileGraphicsMap = useRef<Map<string, Sprite | Graphics>>(new Map());
   const bulletTextureRef = useRef<Texture | null>(null);
+  const bulletScaleRef = useRef<number>(1.0);
+  const dynamicItemsRef = useRef<any[]>([]);
 
   const playerSpriteRef = useRef<ModularCharacterSprite | null>(null);
   const otherPlayersContainerRef = useRef<Container | null>(null);
@@ -142,12 +144,12 @@ export function useMiningScene({
     gridContainer.addChild(fallingRocksContainer);
     gridContainer.addChild(droppedItemsContainer);
     gridContainer.addChild(dynamitesContainer);
-    gridContainer.addChild(projectilesContainer);
     gridContainer.addChild(mobsContainer);
-    gridContainer.addChild(reticleContainer);
     gridContainer.addChild(otherPlayersContainer);
     gridContainer.addChild(playerContainer);
+    gridContainer.addChild(projectilesContainer);
     gridContainer.addChild(particlesContainer);
+    gridContainer.addChild(reticleContainer);
     gridContainer.addChild(debugContainer);
     app.stage.addChild(gridContainer);
 
@@ -376,6 +378,7 @@ export function useMiningScene({
           const items = await itemsRes.json();
           if (Array.isArray(items)) {
             dynamicItems = items;
+            dynamicItemsRef.current = items;
             DynamiteVisualManager.setCustomItems(items);
           }
         }
@@ -429,8 +432,11 @@ export function useMiningScene({
 
       // Load bullet texture dynamically for projectile bullet rendering
       const bulletItem = dynamicItems.find(
-        (i) => i.itemKey === 'gun_bullet' || i.name?.toLowerCase().includes('bullet')
+        (i) => i.id === 'cmn_bullet_gun_round' || i.itemKey === 'gun_bullet' || i.name?.toLowerCase().includes('bullet')
       );
+      if (bulletItem && typeof bulletItem.inGameScale === 'number' && bulletItem.inGameScale > 0) {
+        bulletScaleRef.current = bulletItem.inGameScale;
+      }
       const bulletIconUrl = getAssetUrl(bulletItem?.inGameSpriteUrl || bulletItem?.iconUrl || '/assets/sprites/items/gun_bullet_ingame.png');
       Assets.load(bulletIconUrl)
         .then((texture) => {
@@ -544,6 +550,8 @@ export function useMiningScene({
     projectilesContainerRef,
     projectileGraphicsMap,
     bulletTextureRef,
+    bulletScaleRef,
+    dynamicItemsRef,
     playerSpriteRef,
     remotePlayerRendererRef,
     mobsContainerRef,

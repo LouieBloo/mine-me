@@ -41,7 +41,8 @@ export const itemValidation = [
   body('lightConfig').optional({ nullable: true }).isObject().withMessage('lightConfig must be an object'),
   body('itemKey').optional({ nullable: true }).isString().withMessage('itemKey must be a string'),
   body('shootsProjectiles').optional().isBoolean().withMessage('shootsProjectiles must be a boolean'),
-  body('projectileConfig').optional({ nullable: true }).isObject().withMessage('projectileConfig must be an object')
+  body('projectileConfig').optional({ nullable: true }).isObject().withMessage('projectileConfig must be an object'),
+  body('inGameScale').optional().isFloat({ min: 0.1, max: 5.0 }).withMessage('inGameScale must be between 0.1 and 5.0')
 ];
 
 export const mobValidation = [

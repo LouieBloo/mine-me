@@ -27,6 +27,7 @@ export interface DynamiteBodyOptions {
   explosionRadius?: number;
   itemId?: string;
   soundEffects?: ItemSoundEffectsConfig | null;
+  inGameScale?: number;
 }
 
 export interface RockBodyOptions {
@@ -51,6 +52,7 @@ export interface ProjectileBodyOptions {
   friction?: number;
   density?: number;
   itemId?: string;
+  inGameScale?: number;
 }
 
 export interface RigidEntityData {

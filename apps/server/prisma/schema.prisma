@@ -102,6 +102,7 @@ model Item {
   lightConfig     Json?
   shootsProjectiles Boolean       @default(false)
   projectileConfig Json?
+  inGameScale     Float           @default(1.0)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   cityMaterials   CityMaterial[]

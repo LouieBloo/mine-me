@@ -336,9 +336,20 @@ export class MiningMouseController {
       this.activeAction.updateCharge(performance.now());
     }
 
-    // Continuous execution for actions with HOLD trigger mode (e.g. Ladder placement)
-    if (this.isMouseDown && this.activeAction?.triggerMode === MouseActionTriggerMode.HOLD && tile) {
-      this.tryExecuteActiveAction(tile);
+    // Continuous execution for actions with HOLD trigger mode (e.g. Shooting or Ladder placement)
+    if (this.isMouseDown && this.activeAction?.triggerMode === MouseActionTriggerMode.HOLD) {
+      if (this.activeAction.isContinuous) {
+        const worldPos = this.getWorldMousePosition();
+        if (worldPos) {
+          const continuousTarget: Vector2D = {
+            x: worldPos.x / this.tileSize,
+            y: worldPos.y / this.tileSize,
+          };
+          this.tryExecuteActiveAction(continuousTarget);
+        }
+      } else if (tile) {
+        this.tryExecuteActiveAction(tile);
+      }
     }
   }
 
@@ -377,13 +388,15 @@ export class MiningMouseController {
       }
       if (this.activeAction.isContinuous) {
         const worldPos = this.getWorldMousePosition();
-        if (worldPos) {
-          const continuousTarget: Vector2D = {
-            x: worldPos.x / this.tileSize,
-            y: worldPos.y / this.tileSize,
-          };
-          await this.tryExecuteActiveAction(continuousTarget);
-        }
+        const continuousTarget: Vector2D = worldPos
+          ? {
+              x: worldPos.x / this.tileSize,
+              y: worldPos.y / this.tileSize,
+            }
+          : (tile
+              ? { x: tile.x + 0.5, y: tile.y + 0.5 }
+              : { x: this.playerPos.x + 1, y: this.playerPos.y });
+        await this.tryExecuteActiveAction(continuousTarget);
       } else if (tile) {
         await this.tryExecuteActiveAction(tile);
       }
@@ -402,8 +415,9 @@ export class MiningMouseController {
       return false;
     }
 
-    // Avoid duplicate execution on the exact same tile while held
+    // Avoid duplicate execution on the exact same tile while held (except for continuous free-aim actions)
     if (
+      !this.activeAction.isContinuous &&
       this.lastExecutedTarget &&
       this.lastExecutedTarget.x === target.x &&
       this.lastExecutedTarget.y === target.y

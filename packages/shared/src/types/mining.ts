@@ -337,6 +337,7 @@ export interface MiningDroppedItem {
   physicsConfig?: ItemPhysicsConfig;
   particleEffectId?: string | null;
   lightConfig?: ItemLightConfig | null;
+  inGameScale?: number;
 }
 
 /**
@@ -374,6 +375,7 @@ export interface MiningActiveDynamite {
   explosionRadius?: number;
   itemId?: string;
   soundEffects?: ItemSoundEffectsConfig | null;
+  inGameScale?: number;
 }
 
 /**
@@ -498,6 +500,12 @@ export interface MiningStateTickPayload {
   mobs?: MiningActiveMob[];
   /** Current vision discovery range in tiles. */
   visionRange?: number;
+  /** Authoritative weapon ammo and reload status for the character. */
+  weaponAmmo?: {
+    current: number;
+    max: number;
+    isReloading: boolean;
+  };
 }
 
 /** Supported AI behaviors for mobs. */
@@ -563,6 +571,13 @@ export interface MiningActiveProjectile {
   speed?: number;
   damage?: number;
   spriteUrl?: string | null;
+  spawnPosition?: Vector2D;
+  distanceTraveled?: number;
+  lifeTime?: number;
+  hasHit?: boolean;
+  impactTimer?: number;
+  alpha?: number;
+  inGameScale?: number;
 }
 
 /**

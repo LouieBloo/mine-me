@@ -452,7 +452,7 @@ export class ShootWeaponAction extends BaseMouseAction {
       name: config.name || 'shoot_weapon',
       triggerMode: config.triggerMode ?? MouseActionTriggerMode.SINGLE,
       cooldownMs,
-      isContinuous: false,
+      isContinuous: true,
     });
     this.onShoot = config.onShoot;
     this.weaponItemId = config.weaponItemId;

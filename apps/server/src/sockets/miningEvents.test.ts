@@ -21,7 +21,13 @@ vi.mock('../services/characterBroadcast', () => ({
 }));
 
 import { miningSessionManager } from '../services/mining/MiningSessionManager';
-import { handleMiningPlaceTorch, handleMiningPlaceLadder, handleMiningThrowDynamite } from './miningEvents';
+import {
+  handleMiningPlaceTorch,
+  handleMiningPlaceLadder,
+  handleMiningThrowDynamite,
+  handleMiningShoot,
+  handleMiningReload,
+} from './miningEvents';
 import { prisma } from '../index';
 import { MiningTileType } from '@mine-me/shared';
 
@@ -282,4 +288,57 @@ describe('handleMiningThrowDynamite', () => {
     expect(session.activeDynamites.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('handleMiningShoot', () => {
+  const mockIo = {} as any;
+  const mockSocket = {
+    connected: true,
+    data: { characterId: 'char-shoot-1' },
+    emit: vi.fn(),
+  } as any;
+
+  it('fails if no active session', async () => {
+    const res = await handleMiningShoot(mockIo, mockSocket, { target: { x: 10, y: 10 } });
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/no active mining session/i);
+  });
+
+  it('shoots projectile, decrements ammo, and returns remainingAmmo in data', async () => {
+    const session = miningSessionManager.createSession('char-shoot-1', 'city-1', mockSocket);
+    const res = await handleMiningShoot(mockIo, mockSocket, {
+      target: { x: 25, y: 10 },
+      weaponItemId: 'cmn_revolver_6shooter',
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.data).toBeDefined();
+    expect(res.data?.remainingAmmo).toBe(5);
+    expect(res.data?.isReloading).toBe(false);
+    expect(session.activeProjectiles).toHaveLength(1);
+  });
+});
+
+describe('handleMiningReload', () => {
+  const mockIo = {} as any;
+  const mockSocket = {
+    connected: true,
+    data: { characterId: 'char-reload-1' },
+    emit: vi.fn(),
+  } as any;
+
+  it('initiates weapon reload and returns status', async () => {
+    miningSessionManager.createSession('char-reload-1', 'city-1', mockSocket);
+    // Shoot once so ammo is 5/6
+    await handleMiningShoot(mockIo, mockSocket, {
+      target: { x: 25, y: 10 },
+      weaponItemId: 'cmn_revolver_6shooter',
+    });
+
+    const res = await handleMiningReload(mockIo, mockSocket);
+    expect(res.success).toBe(true);
+    expect(res.data).toBeDefined();
+    expect(res.data?.isReloading).toBe(true);
+  });
+});
+
 

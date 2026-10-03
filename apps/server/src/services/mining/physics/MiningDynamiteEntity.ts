@@ -8,6 +8,7 @@ export class MiningDynamiteEntity extends MiningPhysicsBody {
   public readonly explosionRadius?: number;
   public readonly itemId?: string;
   public readonly soundEffects?: ItemSoundEffectsConfig | null;
+  public readonly inGameScale: number;
   public fuseRemainingSeconds: number;
   public hasExploded: boolean = false;
   public angle: number = 0;
@@ -66,6 +67,7 @@ export class MiningDynamiteEntity extends MiningPhysicsBody {
     this.explosionRadius = options?.explosionRadius;
     this.itemId = options?.itemId;
     this.soundEffects = options?.soundEffects;
+    this.inGameScale = typeof options?.inGameScale === 'number' && options.inGameScale > 0 ? options.inGameScale : 1.0;
     this._position = { ...initialPosition };
     this._velocity = { ...initialVelocity };
     this._hasGravity = true;

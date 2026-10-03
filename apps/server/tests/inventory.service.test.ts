@@ -132,4 +132,57 @@ describe('InventoryService', () => {
       });
     });
   });
+
+  describe('mapItem', () => {
+    it('should map shootsProjectiles, projectileConfig, and lightConfig', () => {
+      const mockWeapon = {
+        id: 'cmn_revolver_6shooter',
+        name: '6-Shooter Revolver',
+        description: 'A classic 6-shooter',
+        type: 'GEAR',
+        subType: 'WEAPON',
+        vendorSellPrice: 60,
+        rarity: 'RARE',
+        iconUrl: '/assets/icons/items/revolver_icon.png',
+        gearImageUrl: '/assets/gear/revolver_gear.png',
+        inGameSpriteUrl: '/assets/sprites/items/revolver_ingame.png',
+        soundEffectUrl: '/assets/sounds/items/revolver_shot.wav',
+        shootsProjectiles: true,
+        projectileConfig: {
+          magazineSize: 6,
+          fireRate: 2.5,
+          reloadTime: 1.5,
+          damage: 35,
+        },
+        lightConfig: {
+          enabled: true,
+          type: 'POINT',
+          effect: 'STATIC',
+          color: '#ffffff',
+          radius: 5,
+          intensity: 1.5,
+        },
+        itemEffects: [],
+      };
+
+      const mapped = InventoryService.mapItem(mockWeapon);
+
+      expect(mapped).toBeDefined();
+      expect(mapped?.shootsProjectiles).toBe(true);
+      expect(mapped?.projectileConfig).toEqual({
+        magazineSize: 6,
+        fireRate: 2.5,
+        reloadTime: 1.5,
+        damage: 35,
+      });
+      expect(mapped?.lightConfig).toEqual({
+        enabled: true,
+        type: 'POINT',
+        effect: 'STATIC',
+        color: '#ffffff',
+        radius: 5,
+        intensity: 1.5,
+      });
+    });
+  });
 });

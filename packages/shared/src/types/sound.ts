@@ -33,7 +33,7 @@ export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   sfxVolume: DEFAULT_SFX_VOLUME,
 };
 
-export type ItemSoundSlot = 'throw' | 'inGameEffect' | 'explosion';
+export type ItemSoundSlot = 'throw' | 'inGameEffect' | 'explosion' | 'shoot' | 'reload';
 
 export interface SoundEffectSlotConfig {
   url?: string | null;
@@ -44,6 +44,8 @@ export interface ItemSoundEffectsConfig {
   throw?: SoundEffectSlotConfig;
   inGameEffect?: SoundEffectSlotConfig;
   explosion?: SoundEffectSlotConfig;
+  shoot?: SoundEffectSlotConfig;
+  reload?: SoundEffectSlotConfig;
   [key: string]: SoundEffectSlotConfig | undefined;
 }
 

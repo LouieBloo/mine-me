@@ -40,6 +40,10 @@ describe('ProjectileVisualManager', () => {
 
     // Particle check (muzzle flash & smoke)
     expect(mockParticleEngine.spawnBurst).toHaveBeenCalledTimes(2);
+    expect(mockParticleEngine.spawnBurst).toHaveBeenCalledWith(
+      expect.anything(),
+      { x: 576, y: 384 }
+    );
 
     // Light check
     expect(mockLightingEngine.addLight).toHaveBeenCalledTimes(1);
@@ -91,5 +95,31 @@ describe('ProjectileVisualManager', () => {
     // Advance another 0.10s (total 0.18s > 0.16s duration)
     manager.update(0.1, mockLightingEngine);
     expect(mockLightingEngine.removeLight).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds and decays impact flash light at collision coordinate', () => {
+    manager.addImpactFlashLight({ x: 18, y: 22 }, mockLightingEngine);
+
+    expect(mockLightingEngine.addLight).toHaveBeenCalledTimes(1);
+    const light = mockLightingEngine.addLight.mock.calls[0][0];
+    expect(light.position.x).toBe(18);
+    expect(light.position.y).toBe(22);
+
+    manager.update(0.1, mockLightingEngine);
+    expect(mockLightingEngine.removeLight).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not play sound when soundUrl is null or undefined (no hardcoded fallback)', () => {
+    manager.triggerLocalShot(
+      { x: 10, y: 10 },
+      0,
+      null,
+      mockParticleEngine,
+      mockLightingEngine,
+      mockSoundManager
+    );
+
+    expect(mockSoundManager.playPositionalSfx).not.toHaveBeenCalled();
+    expect(mockSoundManager.playSfx).not.toHaveBeenCalled();
   });
 });

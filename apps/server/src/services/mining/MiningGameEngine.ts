@@ -1,17 +1,13 @@
 import { Socket } from 'socket.io';
-import fs from 'fs';
-import path from 'path';
 import {
   MINING_CONFIG,
   MiningTileType,
-  canPlaceBuildable,
-  getTileMineTime,
   isTileMineable,
-  isTileSolid,
-  type MiningActiveDynamite,
+  getTileMineTime,
   type MiningBackpackItem,
   type MiningDroppedItem,
   type MiningFallingRock,
+  type MiningActiveDynamite,
   type MiningGearLayer,
   type MiningInputState,
   type MiningPosition,
@@ -22,15 +18,8 @@ import {
   type MiningGunshotEvent,
   type Vector2D,
   MiningRigidWorld,
-  DEFAULT_DYNAMITE_PHYSICS_CONFIG,
-  DEFAULT_DYNAMITE_SOUNDS,
   type ItemPhysicsConfig,
   type ItemSoundEffectsConfig,
-  calculateThrowVelocity,
-  MiningMobBody,
-  BaseMobAI,
-  MobAIRegistry,
-  type MobAIContext,
   type MiningActiveMob,
 } from '@mine-me/shared';
 import * as planck from 'planck';
@@ -46,51 +35,26 @@ import { MiningRockEntity } from './physics/MiningRockEntity';
 import { MiningDynamiteEntity } from './physics/MiningDynamiteEntity';
 import { MiningProjectileEntity } from './physics/MiningProjectileEntity';
 
-export interface MiningActiveMobSession {
-  id: string;
-  mobId: string;
-  name: string;
-  mobBody: MiningMobBody;
-  ai: BaseMobAI;
-  health: number;
-  maxHealth: number;
-  attack: number;
-  defense: number;
-  miningSpeed: number;
-  attackCooldownMs: number;
-  dropTable?: any;
-  animations?: any;
-  animationState: 'idle' | 'walk' | 'mine' | 'attack' | 'jump' | 'damage' | 'death';
-  isFacingLeft: boolean;
-  isMining: boolean;
-  miningTarget: MiningPosition | null;
-  miningProgressMs: number;
-  mineRange: number;
-  hitStunDurationMs?: number;
-}
+// Subsystems
+import { MiningDataManager } from './subsystems/MiningDataManager';
+import {
+  MiningPlayerManager,
+  type MiningPlayerSession,
+} from './subsystems/MiningPlayerManager';
+import { MiningBlockSubsystem } from './subsystems/MiningBlockSubsystem';
+import { MiningDropSubsystem } from './subsystems/MiningDropSubsystem';
+import { MiningRockSubsystem } from './subsystems/MiningRockSubsystem';
+import { MiningExplosiveSubsystem } from './subsystems/MiningExplosiveSubsystem';
+import {
+  MiningProjectileSubsystem,
+  type PlayerAmmoState,
+} from './subsystems/MiningProjectileSubsystem';
+import {
+  MiningMobSubsystem,
+  type MiningActiveMobSession,
+} from './subsystems/MiningMobSubsystem';
 
-export interface MiningPlayerSession {
-  characterId: string;
-  characterName: string;
-  socket: Socket;
-  playerBody: MiningPlayerBody;
-  inputs: MiningInputState;
-  miningSpeed: number | (() => number);
-  temporaryBackpack: MiningBackpackItem[];
-  gearLayers: MiningGearLayer[];
-  visionRange: number;
-  isMining: boolean;
-  miningTarget: MiningPosition | null;
-  miningProgressMs: number;
-  miningTimeMs: number;
-  isFacingLeft: boolean;
-  aimDirection: Vector2D;
-  flashlightOn: boolean;
-  animationState: 'idle' | 'walk' | 'mine' | 'jump' | 'climb';
-  lastRevealGridPos?: MiningPosition | null;
-  backpackDirty?: boolean;
-  lastAttackTimeMs?: number;
-}
+export type { MiningPlayerSession, MiningActiveMobSession, PlayerAmmoState };
 
 export interface MiningEngineOptions {
   roomId?: string;
@@ -98,16 +62,20 @@ export interface MiningEngineOptions {
   characterId?: string;
   characterName?: string;
   cityId: string;
-  socket?: Socket;
   seed?: number;
-  mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>;
+  socket?: Socket;
   miningSpeed?: number | (() => number);
   gearLayers?: MiningGearLayer[];
   maxDurationSeconds?: number;
   onTimeout?: (roomIdOrCharId: string) => void;
   onRoomEmpty?: (roomId: string) => void;
+  mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>;
 }
 
+/**
+ * Composite MiningGameEngine orchestrating physics, terrain, players, combat, and mobs.
+ * Acts as the master coordinator and backward-compatible facade for all mining subsystems.
+ */
 export class MiningGameEngine {
   public readonly roomId: string;
   public readonly gameMode: 'singleplayer' | 'multiplayer';
@@ -116,36 +84,6 @@ export class MiningGameEngine {
 
   public grid: ServerMiningGrid;
   public rigidWorld: MiningRigidWorld;
-  public activeRocks: MiningRockEntity[] = [];
-  private rockCounter = 0;
-
-  public activeDynamites: MiningDynamiteEntity[] = [];
-  private dynamiteCounter = 0;
-
-  public activeProjectiles: MiningProjectileEntity[] = [];
-  public playerWeaponAmmo: Map<string, {
-    currentAmmo: number;
-    maxAmmo: number;
-    isReloading: boolean;
-    reloadTimer: number;
-    reloadDuration: number;
-    lastShotTime: number;
-    fireRate: number;
-  }> = new Map();
-  private pendingGunshots: MiningGunshotEvent[] = [];
-
-  public players: Map<string, MiningPlayerSession> = new Map();
-  public primaryCharacterId: string = '';
-
-  public activeMobs: Map<string, MiningActiveMobSession> = new Map();
-  private mobCounter = 0;
-
-  public droppedItems: MiningDroppedItem[] = [];
-  public activeItemBodies: Map<string, planck.Body> = new Map();
-  private droppedItemCounter = 0;
-  private blocksCache: any[] | null = null;
-  private itemsCache: any[] | null = null;
-  private mobsCache: any[] | null = null;
   public mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>;
 
   public maxDurationSeconds = MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
@@ -157,17 +95,28 @@ export class MiningGameEngine {
   private intervalId: NodeJS.Timeout | null = null;
   private isStopped = false;
   private pendingRevealedTiles: { x: number; y: number; type: MiningTileType; damageStage?: number }[] = [];
-  private pendingExplosions: MiningExplosionEvent[] = [];
-  private droppedItemsDirty: boolean = true;
+
+  // Dedicated Subsystems
+  public readonly dataManager: MiningDataManager;
+  public readonly playerManager: MiningPlayerManager;
+  public readonly blockSubsystem: MiningBlockSubsystem;
+  public readonly dropSubsystem: MiningDropSubsystem;
+  public readonly rockSubsystem: MiningRockSubsystem;
+  public readonly explosiveSubsystem: MiningExplosiveSubsystem;
+  public readonly projectileSubsystem: MiningProjectileSubsystem;
+  public readonly mobSubsystem: MiningMobSubsystem;
 
   constructor(options: MiningEngineOptions) {
-    this.roomId = options.roomId ?? (options.characterId ? `solo_${options.characterId}` : `room_${Math.random().toString(36).substring(2, 9)}`);
+    this.roomId =
+      options.roomId ??
+      (options.characterId ? `solo_${options.characterId}` : `room_${Math.random().toString(36).substring(2, 9)}`);
     this.gameMode = options.gameMode ?? 'singleplayer';
     this.cityId = options.cityId;
     this.seed = options.seed ?? Math.floor(Math.random() * 2147483647);
     this.maxDurationSeconds = options.maxDurationSeconds ?? MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
     this.onTimeout = options.onTimeout;
     this.onRoomEmpty = options.onRoomEmpty;
+    this.mapConfig = options.mapConfig;
 
     // Generate authoritative grid
     this.grid = generateMiningMap({ seed: this.seed, config: options.mapConfig });
@@ -184,8 +133,17 @@ export class MiningGameEngine {
       rockGravityScale: options.mapConfig?.rockGravityScale,
       rockRestitution: options.mapConfig?.rockRestitution,
     });
-    this.mapConfig = options.mapConfig;
     this.rigidWorld.setGrid(this.grid);
+
+    // Initialize subsystems
+    this.dataManager = MiningDataManager.getInstance();
+    this.playerManager = new MiningPlayerManager(options.characterId || '');
+    this.blockSubsystem = new MiningBlockSubsystem();
+    this.dropSubsystem = new MiningDropSubsystem();
+    this.rockSubsystem = new MiningRockSubsystem();
+    this.explosiveSubsystem = new MiningExplosiveSubsystem();
+    this.projectileSubsystem = new MiningProjectileSubsystem();
+    this.mobSubsystem = new MiningMobSubsystem();
 
     // Automatically spawn cavern mobs if configured
     this.populateCavernMobs();
@@ -202,37 +160,103 @@ export class MiningGameEngine {
     }
   }
 
-  /**
-   * Add or re-attach a player to this mine room session.
-   */
-  public addPlayer(options: {
-    characterId: string;
-    characterName?: string;
-    socket: Socket;
-    miningSpeed?: number | (() => number);
-    gearLayers?: MiningGearLayer[];
-  }): MiningPlayerSession {
-    let session = this.players.get(options.characterId);
-    if (session) {
-      session.socket = options.socket;
-      if (options.miningSpeed !== undefined) session.miningSpeed = options.miningSpeed;
-      if (options.gearLayers !== undefined) session.gearLayers = options.gearLayers;
-      if (options.characterName) session.characterName = options.characterName;
-      return session;
-    }
+  // ============================================================================
+  // Backwards-Compatible Property Accessors
+  // ============================================================================
 
-    const initialPos = {
-      x: MINING_CONFIG.ENTRANCE_X,
-      y: MINING_CONFIG.ENTRANCE_Y,
-    };
-    const playerBody = new MiningPlayerBody(initialPos);
+  public get activeRocks(): MiningRockEntity[] {
+    return this.rockSubsystem.activeRocks;
+  }
+  public set activeRocks(val: MiningRockEntity[]) {
+    this.rockSubsystem.activeRocks = val;
+  }
 
-    session = {
-      characterId: options.characterId,
-      characterName: options.characterName || 'Miner',
-      socket: options.socket,
-      playerBody,
-      inputs: {
+  public get activeDynamites(): MiningDynamiteEntity[] {
+    return this.explosiveSubsystem.activeDynamites;
+  }
+  public set activeDynamites(val: MiningDynamiteEntity[]) {
+    this.explosiveSubsystem.activeDynamites = val;
+  }
+
+  public get activeProjectiles(): MiningProjectileEntity[] {
+    return this.projectileSubsystem.activeProjectiles;
+  }
+  public set activeProjectiles(val: MiningProjectileEntity[]) {
+    this.projectileSubsystem.activeProjectiles = val;
+  }
+
+  public get playerWeaponAmmo(): Map<string, PlayerAmmoState> {
+    return this.projectileSubsystem.playerWeaponAmmo;
+  }
+
+  public get players(): Map<string, MiningPlayerSession> {
+    return this.playerManager.players;
+  }
+
+  public get primaryCharacterId(): string {
+    return this.playerManager.primaryCharacterId;
+  }
+  public set primaryCharacterId(val: string) {
+    this.playerManager.primaryCharacterId = val;
+  }
+
+  public get activeMobs(): Map<string, MiningActiveMobSession> {
+    return this.mobSubsystem.activeMobs;
+  }
+
+  public get droppedItems(): MiningDroppedItem[] {
+    return this.dropSubsystem.droppedItems;
+  }
+  public set droppedItems(val: MiningDroppedItem[]) {
+    this.dropSubsystem.droppedItems = val;
+  }
+
+  public get activeItemBodies(): Map<string, planck.Body> {
+    return this.dropSubsystem.activeItemBodies;
+  }
+
+  public get primarySession(): MiningPlayerSession | undefined {
+    return this.playerManager.primarySession;
+  }
+
+  public get characterId(): string {
+    return this.playerManager.primaryCharacterId;
+  }
+
+  public get playerCount(): number {
+    return this.playerManager.playerCount;
+  }
+
+  public get playerBody(): MiningPlayerBody {
+    const s = this.primarySession;
+    if (!s) throw new Error('No active primary player session');
+    return s.playerBody;
+  }
+
+  public get position(): Vector2D {
+    return this.primarySession?.playerBody.position ?? { x: MINING_CONFIG.ENTRANCE_X, y: MINING_CONFIG.ENTRANCE_Y };
+  }
+  public set position(pos: Vector2D) {
+    if (this.primarySession) this.primarySession.playerBody.position = { ...pos };
+  }
+
+  public get velocity(): Vector2D {
+    return this.primarySession?.playerBody.velocity ?? { x: 0, y: 0 };
+  }
+  public set velocity(vel: Vector2D) {
+    if (this.primarySession) this.primarySession.playerBody.velocity = { ...vel };
+  }
+
+  public get facing(): Vector2D {
+    return this.primarySession?.aimDirection ?? { x: 1, y: 0 };
+  }
+  public set facing(f: Vector2D) {
+    if (this.primarySession) this.primarySession.aimDirection = { ...f };
+  }
+
+  public get inputs(): MiningInputState {
+    return (
+      this.primarySession?.inputs ?? {
         up: false,
         down: false,
         left: false,
@@ -240,121 +264,11 @@ export class MiningGameEngine {
         jump: false,
         miningKey: false,
         sequence: 0,
-      },
-      miningSpeed: options.miningSpeed ?? 0,
-      temporaryBackpack: [],
-      gearLayers: options.gearLayers || [],
-      visionRange: MINING_CONFIG.DEFAULT_VISION_RANGE,
-      isMining: false,
-      miningTarget: null,
-      miningProgressMs: 0,
-      miningTimeMs: 0,
-      isFacingLeft: false,
-      aimDirection: { x: 1, y: 0 },
-      flashlightOn: false,
-      animationState: 'idle',
-      lastRevealGridPos: null,
-      backpackDirty: true,
-    };
-
-    this.players.set(options.characterId, session);
-    if (!this.primaryCharacterId) {
-      this.primaryCharacterId = options.characterId;
-    }
-
-    // Reveal starting area
-    revealTiles(this.grid, { x: MINING_CONFIG.ENTRANCE_X, y: MINING_CONFIG.ENTRANCE_Y }, session.visionRange);
-
-    return session;
+      }
+    );
   }
-
-  /**
-   * Remove a player from this mine room session.
-   */
-  public removePlayer(characterId: string): { extractedItems: MiningBackpackItem[] } | null {
-    const session = this.players.get(characterId);
-    if (!session) return null;
-
-    const extractedItems = [...session.temporaryBackpack];
-    this.players.delete(characterId);
-
-    if (this.primaryCharacterId === characterId) {
-      const nextKey = this.players.keys().next().value;
-      this.primaryCharacterId = nextKey ?? '';
-    }
-
-    if (this.players.size === 0 && this.onRoomEmpty) {
-      this.onRoomEmpty(this.roomId);
-    }
-
-    return { extractedItems };
-  }
-
-  public getPlayer(characterId: string): MiningPlayerSession | undefined {
-    return this.players.get(characterId);
-  }
-
-  public get primarySession(): MiningPlayerSession | undefined {
-    return (this.primaryCharacterId ? this.players.get(this.primaryCharacterId) : undefined) ?? this.players.values().next().value;
-  }
-
-  public get characterId(): string {
-    return this.primaryCharacterId;
-  }
-
-  public get playerCount(): number {
-    return this.players.size;
-  }
-
-  // Backwards-compatible accessors targeting primary player
-  public get playerBody(): MiningPlayerBody {
-    const session = this.primarySession;
-    if (!session) {
-      return new MiningPlayerBody({ x: MINING_CONFIG.ENTRANCE_X, y: MINING_CONFIG.ENTRANCE_Y });
-    }
-    return session.playerBody;
-  }
-
-  public get position(): Vector2D {
-    return this.playerBody.position;
-  }
-
-  public set position(pos: Vector2D) {
-    this.playerBody.position = { ...pos };
-  }
-
-  public get velocity(): Vector2D {
-    return this.playerBody.velocity;
-  }
-
-  public set velocity(vel: Vector2D) {
-    this.playerBody.velocity = { ...vel };
-  }
-
-  public get facing(): Vector2D {
-    return this.playerBody.facing;
-  }
-
-  public set facing(f: Vector2D) {
-    this.playerBody.facing = { ...f };
-  }
-
-  public get inputs(): MiningInputState {
-    return this.primarySession?.inputs ?? {
-      up: false,
-      down: false,
-      left: false,
-      right: false,
-      jump: false,
-      miningKey: false,
-      sequence: 0,
-    };
-  }
-
   public set inputs(inp: MiningInputState) {
-    if (this.primarySession) {
-      this.primarySession.inputs = inp;
-    }
+    if (this.primarySession) this.primarySession.inputs = { ...inp };
   }
 
   public get temporaryBackpack(): MiningBackpackItem[] {
@@ -364,720 +278,124 @@ export class MiningGameEngine {
   public get visionRange(): number {
     return this.primarySession?.visionRange ?? MINING_CONFIG.DEFAULT_VISION_RANGE;
   }
-
   public set visionRange(val: number) {
-    if (this.primarySession) {
-      this.primarySession.visionRange = val;
-    }
-  }
-
-  /**
-   * Increases the player's view distance temporarily for this mining session,
-   * and immediately reveals newly uncovered tiles around the player.
-   */
-  public increaseVisionRange(characterId?: string, amount: number = 1): number {
-    const session = (characterId ? this.players.get(characterId) : null) ?? this.primarySession;
-    if (!session) return MINING_CONFIG.DEFAULT_VISION_RANGE;
-
-    session.visionRange = Math.max(1, Math.min(30, session.visionRange + amount));
-    session.lastRevealGridPos = null;
-
-    const currentGridPos = {
-      x: Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.round(session.playerBody.position.x))),
-      y: Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.round(session.playerBody.position.y))),
-    };
-    this.revealAndTrackTiles(currentGridPos, session.visionRange);
-    return session.visionRange;
+    if (this.primarySession) this.primarySession.visionRange = val;
   }
 
   public get isMining(): boolean {
     return this.primarySession?.isMining ?? false;
   }
-
   public set isMining(val: boolean) {
-    if (this.primarySession) {
-      this.primarySession.isMining = val;
-    }
+    if (this.primarySession) this.primarySession.isMining = val;
   }
 
   public get miningTarget(): MiningPosition | null {
     return this.primarySession?.miningTarget ?? null;
   }
-
   public set miningTarget(t: MiningPosition | null) {
-    if (this.primarySession) {
-      this.primarySession.miningTarget = t;
-    }
+    if (this.primarySession) this.primarySession.miningTarget = t;
   }
 
   public get miningProgressMs(): number {
     return this.primarySession?.miningProgressMs ?? 0;
   }
-
   public set miningProgressMs(val: number) {
-    if (this.primarySession) {
-      this.primarySession.miningProgressMs = val;
-    }
+    if (this.primarySession) this.primarySession.miningProgressMs = val;
   }
 
   public get miningTimeMs(): number {
     return this.primarySession?.miningTimeMs ?? 0;
   }
-
   public set miningTimeMs(val: number) {
-    if (this.primarySession) {
-      this.primarySession.miningTimeMs = val;
-    }
+    if (this.primarySession) this.primarySession.miningTimeMs = val;
   }
 
   public get miningSpeed(): number {
-    const session = this.primarySession;
-    if (!session) return 0;
-    if (typeof session.miningSpeed === 'function') {
-      return session.miningSpeed();
+    if (!this.primarySession) return 1.0;
+    return typeof this.primarySession.miningSpeed === 'function'
+      ? this.primarySession.miningSpeed()
+      : this.primarySession.miningSpeed;
+  }
+
+  public get isFacingLeft(): boolean {
+    return this.primarySession?.isFacingLeft ?? false;
+  }
+
+  public get animationState(): 'idle' | 'walk' | 'mine' | 'jump' | 'climb' {
+    return this.primarySession?.animationState ?? 'idle';
+  }
+
+  // ============================================================================
+  // Player Management
+  // ============================================================================
+
+  public addPlayer(options: {
+    characterId: string;
+    characterName?: string;
+    socket: Socket;
+    miningSpeed?: number | (() => number);
+    gearLayers?: MiningGearLayer[];
+  }): MiningPlayerSession {
+    const session = this.playerManager.addPlayer(options);
+    this.revealAndTrackTiles(session.playerBody.position, session.visionRange);
+    return session;
+  }
+
+  public removePlayer(characterId: string): { extractedItems: MiningBackpackItem[] } | null {
+    const res = this.playerManager.removePlayer(characterId);
+    if (this.playerManager.playerCount === 0 && this.onRoomEmpty) {
+      this.onRoomEmpty(this.roomId);
     }
-    return session.miningSpeed;
+    return res;
+  }
+
+  public getPlayer(characterId: string): MiningPlayerSession | undefined {
+    return this.playerManager.getPlayer(characterId);
+  }
+
+  public increaseVisionRange(characterId?: string, amount: number = 1): number {
+    return this.playerManager.increaseVisionRange(characterId, amount);
   }
 
   public setMiningSpeed(speed: number | (() => number), characterId?: string): void {
-    const session = characterId ? this.players.get(characterId) : this.primarySession;
-    if (session) {
-      session.miningSpeed = speed;
-      const resolved = typeof speed === 'function' ? speed() : speed;
-      if (resolved <= 0 && session.isMining) {
-        this.stopMining(session.characterId);
-      }
-    }
+    this.playerManager.setMiningSpeed(speed, characterId);
   }
 
   public setSocket(socket: Socket, characterId?: string): void {
-    const session = characterId ? this.players.get(characterId) : this.primarySession;
-    if (session) {
-      session.socket = socket;
-    }
+    this.playerManager.setSocket(socket, characterId);
   }
 
+  public handleInput(
+    characterIdOrInput: string | MiningInputState,
+    maybeInput?: MiningInputState
+  ): void {
+    this.playerManager.handleInput(characterIdOrInput, maybeInput);
+  }
+
+  // ============================================================================
+  // Simulation Loop Lifecycle
+  // ============================================================================
+
   public start(): void {
-    if (this.intervalId || this.isStopped) return;
-    const intervalMs = 1000 / MINING_CONFIG.SIMULATION_TICK_RATE_HZ;
-    const dt = 1 / MINING_CONFIG.SIMULATION_TICK_RATE_HZ;
-    this.intervalId = setInterval(() => this.tick(dt), intervalMs);
+    if (this.intervalId) return;
+    this.isStopped = false;
+    this.intervalId = setInterval(() => {
+      this.tick(1 / 30);
+    }, 1000 / 30);
   }
 
   public stop(): void {
+    this.isStopped = true;
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    this.isStopped = true;
-    for (const body of this.activeItemBodies.values()) {
-      this.rigidWorld.destroyBody(body);
-    }
-    this.activeItemBodies.clear();
-    this.rigidWorld.destroy();
-  }
-
-  public handleInput(characterIdOrInput: string | MiningInputState, maybeInput?: MiningInputState): void {
-    let charId: string;
-    let input: MiningInputState;
-
-    if (typeof characterIdOrInput === 'string') {
-      charId = characterIdOrInput;
-      input = maybeInput!;
-    } else {
-      charId = this.primaryCharacterId;
-      input = characterIdOrInput;
-    }
-
-    const session = this.players.get(charId);
-    if (!session || !input) return;
-
-    session.inputs = { ...input };
-    if (input.aimDirection && typeof input.aimDirection.x === 'number' && typeof input.aimDirection.y === 'number') {
-      session.aimDirection = { x: input.aimDirection.x, y: input.aimDirection.y };
-    }
-    if (typeof input.isFacingLeft === 'boolean') {
-      session.isFacingLeft = input.isFacingLeft;
-    } else if (input.left && !input.right) {
-      session.isFacingLeft = true;
-    } else if (input.right && !input.left) {
-      session.isFacingLeft = false;
-    }
-    if (typeof input.flashlightOn === 'boolean') {
-      session.flashlightOn = input.flashlightOn;
-    }
-  }
-
-  public startMining(target: MiningPosition, characterId?: string): boolean {
-    const session = characterId ? this.players.get(characterId) : this.primarySession;
-    if (!session) return false;
-    if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return false;
-    if (!isInBounds(target.x, target.y)) return false;
-
-    const playerSpeed = typeof session.miningSpeed === 'function' ? session.miningSpeed() : session.miningSpeed;
-    if (playerSpeed <= 0) return false;
-
-    const canMineStance = session.playerBody.isGrounded || session.playerBody.isOnLadder;
-    if (!canMineStance) return false;
-
-    const tile = this.grid[target.y][target.x];
-    if (!isTileMineable(tile.type)) return false;
-
-    // Check reach distance
-    const tileCenterX = target.x + 0.5;
-    const tileCenterY = target.y + 0.5;
-    const dx = Math.abs(tileCenterX - session.playerBody.position.x);
-    const dy = Math.abs(tileCenterY - session.playerBody.position.y);
-    if (dx > MINING_CONFIG.PLAYER_MINING_REACH || dy > MINING_CONFIG.PLAYER_MINING_REACH) {
-      return false;
-    }
-
-    session.isMining = true;
-    session.miningTarget = { x: target.x, y: target.y };
-    session.miningTimeMs = getTileMineTime(tile.type);
-    session.miningProgressMs = tile.damageMs || 0;
-
-    return true;
-  }
-
-  public stopMining(characterId?: string): void {
-    const session = characterId ? this.players.get(characterId) : this.primarySession;
-    if (!session) return;
-    session.isMining = false;
-    session.miningTarget = null;
-    session.miningProgressMs = 0;
-  }
-
-  public placeLadder(target?: MiningPosition, characterId?: string): boolean {
-    const session = characterId ? this.players.get(characterId) : this.primarySession;
-    if (!session) return false;
-
-    const x = target ? target.x : Math.floor(session.playerBody.position.x);
-    const y = target ? target.y : Math.floor(session.playerBody.position.y);
-
-    if (!isInBounds(x, y)) return false;
-
-    if (target && typeof target.x === 'number' && typeof target.y === 'number') {
-      const tileCenterX = target.x + 0.5;
-      const tileCenterY = target.y + 0.5;
-      const dx = Math.abs(tileCenterX - session.playerBody.position.x);
-      const dy = Math.abs(tileCenterY - session.playerBody.position.y);
-      if (dx > MINING_CONFIG.TORCH_PLACEMENT_REACH || dy > MINING_CONFIG.TORCH_PLACEMENT_REACH) return false;
-    }
-
-    const tile = this.grid[y][x];
-    if (tile.type === MiningTileType.ENTRANCE) return false;
-    if (!canPlaceBuildable(MiningTileType.LADDER, tile.type)) return false;
-
-    tile.type = MiningTileType.LADDER;
-    tile.revealed = true;
-    tile.damageMs = 0;
-
-    this.pendingRevealedTiles.push({
-      x,
-      y,
-      type: MiningTileType.LADDER,
-      damageStage: 0,
-    });
-
-    return true;
-  }
-
-  public placeTorch(target: MiningPosition, characterId?: string): boolean {
-    const session = characterId ? this.players.get(characterId) : this.primarySession;
-    if (!session) return false;
-    if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return false;
-    if (!isInBounds(target.x, target.y)) return false;
-
-    const tileCenterX = target.x + 0.5;
-    const tileCenterY = target.y + 0.5;
-    const dx = Math.abs(tileCenterX - session.playerBody.position.x);
-    const dy = Math.abs(tileCenterY - session.playerBody.position.y);
-    if (dx > MINING_CONFIG.TORCH_PLACEMENT_REACH || dy > MINING_CONFIG.TORCH_PLACEMENT_REACH) return false;
-
-    const tile = this.grid[target.y][target.x];
-    if (!tile.revealed) return false;
-    if (!canPlaceBuildable(MiningTileType.TORCH, tile.type)) return false;
-
-    tile.type = MiningTileType.TORCH;
-    tile.revealed = true;
-    tile.damageMs = 0;
-
-    this.pendingRevealedTiles.push({
-      x: target.x,
-      y: target.y,
-      type: MiningTileType.TORCH,
-      damageStage: 0,
-    });
-
-    return true;
-  }
-
-  /**
-   * Helper to retrieve configured dynamite item physics from items.json or defaults.
-   */
-  public getDynamiteItemPhysicsConfig(): ItemPhysicsConfig {
-    try {
-      const itemsPath = path.join(__dirname, '../../../../../packages/shared/src/data/items.json');
-      if (fs.existsSync(itemsPath)) {
-        const items = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
-        const dynamiteItem = (items as any[]).find((item: any) => item.subType === 'DYNAMITE');
-        if (dynamiteItem?.physicsConfig) {
-          return dynamiteItem.physicsConfig as ItemPhysicsConfig;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return DEFAULT_DYNAMITE_PHYSICS_CONFIG;
-  }
-
-  /**
-   * Helper to retrieve block configuration from blocks.json.
-   */
-  public getBlockConfig(tileType: MiningTileType): any {
-    try {
-      if (!this.blocksCache) {
-        const blocksPath = path.join(__dirname, '../../../../../packages/shared/src/data/blocks.json');
-        if (fs.existsSync(blocksPath)) {
-          this.blocksCache = JSON.parse(fs.readFileSync(blocksPath, 'utf-8'));
-        }
-      }
-      const typeKeyMap: Record<number, string> = {
-        [MiningTileType.DIRT]: 'DIRT',
-        [MiningTileType.ROCK]: 'ROCK',
-        [MiningTileType.MINERAL]: 'MINERAL',
-        [MiningTileType.CHEST]: 'CHEST',
-        [MiningTileType.COPPERIUM]: 'COPPERIUM',
-        [MiningTileType.SILVERIUM]: 'SILVERIUM',
-      };
-      const key = typeKeyMap[tileType];
-      if (key && this.blocksCache) {
-        return this.blocksCache.find((b: any) => b.typeKey === key);
-      }
-    } catch {
-      // ignore
-    }
-    return undefined;
-  }
-
-  /**
-   * Helper to retrieve item definition from items.json.
-   */
-  public getItemData(itemId: string): any {
-    try {
-      if (!this.itemsCache) {
-        const itemsPath = path.join(__dirname, '../../../../../packages/shared/src/data/items.json');
-        if (fs.existsSync(itemsPath)) {
-          this.itemsCache = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
-        }
-      }
-      if (this.itemsCache) {
-        return this.itemsCache.find((i: any) => i.id === itemId || i.itemKey === itemId || i.name?.toLowerCase() === itemId.toLowerCase());
-      }
-    } catch {
-      // ignore
-    }
-    return undefined;
-  }
-
-  /**
-   * Helper to retrieve configured item physics from items.json for any item.
-   */
-  public getItemPhysicsConfig(itemId: string): ItemPhysicsConfig | undefined {
-    return this.getItemData(itemId)?.physicsConfig;
-  }
-
-  /**
-   * Spawns item drops for a destroyed block based on its configured DropTable.
-   * Multiple drops are spread out horizontally and launched with an upward arc so they don't overlap.
-   */
-  public spawnBlockDrops(tx: number, ty: number, tileType: MiningTileType): void {
-    if (tileType === MiningTileType.EMPTY || tileType === MiningTileType.ENTRANCE) return;
-
-    const blockConfig = this.getBlockConfig(tileType);
-    const dropTable = blockConfig?.dropTable;
-    const dropsToSpawn: { itemId: string; quantity: number }[] = [];
-
-    if (dropTable && Array.isArray(dropTable.items) && dropTable.items.length > 0) {
-      for (const entry of dropTable.items) {
-        const roll = Math.random() * 100;
-        if (roll <= entry.chance) {
-          const qty = Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1)) + entry.minQuantity;
-          if (qty > 0) {
-            dropsToSpawn.push({ itemId: entry.itemId, quantity: qty });
-          }
-        }
-      }
-    } else {
-      // Fallback for legacy blocks without drop tables configured
-      if (tileType === MiningTileType.MINERAL) {
-        dropsToSpawn.push({ itemId: 'copper_ore', quantity: 1 });
-      } else if (tileType === MiningTileType.CHEST) {
-        dropsToSpawn.push({ itemId: 'sol', quantity: 50 });
+    for (const rock of this.rockSubsystem.activeRocks) {
+      if (rock.rigidBody) {
+        this.rigidWorld.destroyBody(rock.rigidBody);
       }
     }
-
-    if (dropsToSpawn.length === 0) return;
-
-    const N = dropsToSpawn.length;
-    dropsToSpawn.forEach((drop, idx) => {
-      this.droppedItemCounter++;
-      const id = `drop_${Date.now()}_${this.droppedItemCounter}_${idx}`;
-      const itemData = this.getItemData(drop.itemId);
-
-      // Requirement 5: Spread out multiple items so they don't overlap
-      const offsetX = N > 1 ? (idx - (N - 1) / 2) * 0.25 : 0;
-      const posX = tx + 0.5 + offsetX;
-      const posY = ty + 0.5;
-
-      const vx = N > 1
-        ? (idx - (N - 1) / 2) * 1.5 + (Math.random() - 0.5) * 0.4
-        : (Math.random() - 0.5) * 0.5;
-      const vy = N > 1
-        ? -2.2 - Math.random() * 1.0
-        : -1.8 - Math.random() * 0.6;
-
-      const rigidBody = this.rigidWorld.createItemBody(
-        id,
-        { x: posX, y: posY },
-        { x: vx, y: vy }
-      );
-      this.activeItemBodies.set(id, rigidBody);
-
-      this.droppedItems.push({
-        id,
-        position: { x: posX, y: posY },
-        velocity: { x: vx, y: vy },
-        itemId: drop.itemId,
-        itemName: itemData?.name || drop.itemId,
-        iconUrl: itemData?.iconUrl || null,
-        inGameSpriteUrl: itemData?.inGameSpriteUrl || null,
-        quantity: drop.quantity,
-        physicsConfig: itemData?.physicsConfig,
-        particleEffectId: itemData?.particleEffectId || null,
-        lightConfig: itemData?.lightConfig || null,
-      });
-    });
-
-    this.droppedItemsDirty = true;
-  }
-
-  /**
-   * Syncs Planck rigid body positions and velocities to dropped item entities during physics steps.
-   */
-  public updateDroppedItemsPhysics(): void {
-    if (this.droppedItems.length === 0 || this.activeItemBodies.size === 0) return;
-
-    for (const item of this.droppedItems) {
-      if (!item.id) continue;
-      const body = this.activeItemBodies.get(item.id);
-      if (!body) continue;
-
-      const pos = body.getPosition();
-      const vel = body.getLinearVelocity();
-      const speed = Math.hypot(vel.x, vel.y);
-
-      if (speed > 0.02 || Math.hypot(pos.x - item.position.x, pos.y - item.position.y) > 0.01) {
-        item.position = { x: pos.x, y: pos.y };
-        item.velocity = { x: vel.x, y: vel.y };
-        this.droppedItemsDirty = true;
-      }
-    }
-  }
-
-  /**
-   * Helper to retrieve configured explosion radius from items.json for any item based on effect.explodes === true.
-   * Does NOT check names, strictly checks effect.explodes === true.
-   */
-  public getItemExplosionRadius(itemId: string): number | undefined {
-    try {
-      const itemsPath = path.join(__dirname, '../../../../../packages/shared/src/data/items.json');
-      if (fs.existsSync(itemsPath)) {
-        const items = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
-        const found = (items as any[]).find((item: any) => item.id === itemId || item.name?.toLowerCase() === itemId.toLowerCase());
-        const explodeEffect = found?.itemEffects?.find((ie: any) => ie.effect?.explodes === true && ie.value > 0);
-        if (explodeEffect) {
-          return Number(explodeEffect.value);
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return undefined;
-  }
-
-  /**
-   * Helper to retrieve configured soundEffects from items.json for any item.
-   */
-  public getItemSoundEffects(itemId: string): ItemSoundEffectsConfig | undefined {
-    return this.getItemData(itemId)?.soundEffects;
-  }
-
-  /**
-   * Throw a stick of dynamite from the player's position towards target coordinates.
-   */
-  public throwDynamite(
-    characterId: string,
-    target: MiningPosition,
-    physicsConfig?: ItemPhysicsConfig,
-    forceRatio: number = 1.0,
-    explosionRadius?: number,
-    itemId?: string,
-    soundEffects?: ItemSoundEffectsConfig | null,
-  ): boolean {
-    const session = this.players.get(characterId);
-    if (!session) return false;
-
-    this.dynamiteCounter++;
-    const dynamiteId = `dynamite_${characterId}_${this.dynamiteCounter}_${Date.now()}`;
-
-    const startX = session.playerBody.position.x;
-    const startY = session.playerBody.position.y;
-
-    const config = physicsConfig ?? this.getDynamiteItemPhysicsConfig();
-    const throwPower = config.throwPower ?? this.rigidWorld.config.dynamiteThrowPower ?? 20.5;
-    const gravityScale = config.gravityScale ?? 1.0;
-
-    const initialVel = calculateThrowVelocity(
-      startX,
-      startY,
-      target.x,
-      target.y,
-      forceRatio,
-      throwPower,
-      this.rigidWorld.config.gravity,
-      gravityScale,
-      session.isFacingLeft
-    );
-    const vx = initialVel.x;
-    const vy = initialVel.y;
-
-    // Use passed explosion radius, or check item effects from items.json for dynamite
-    const resolvedExplosionRadius = explosionRadius !== undefined 
-      ? explosionRadius 
-      : this.getItemExplosionRadius(itemId ?? 'dynamite');
-
-    const resolvedSoundEffects =
-      soundEffects !== undefined
-        ? soundEffects
-        : (itemId ? this.getItemSoundEffects(itemId) : undefined) ??
-          this.getItemSoundEffects('dynamite') ??
-          DEFAULT_DYNAMITE_SOUNDS;
-
-    const dynamite = new MiningDynamiteEntity(
-      dynamiteId,
-      { x: startX, y: startY },
-      { x: vx, y: vy },
-      config.fuseSeconds ?? 4.0,
-      this.rigidWorld,
-      {
-        bounciness: config.restitution ?? 0.45,
-        friction: config.friction ?? 0.4,
-        physicsConfig: config,
-        explosionRadius: resolvedExplosionRadius,
-        itemId,
-        soundEffects: resolvedSoundEffects,
-      }
-    );
-    this.activeDynamites.push(dynamite);
-    return true;
-  }
-
-  /**
-   * Fires a bullet projectile from a character's position towards target coordinates.
-   * Server-authoritative magazine check, cooldown / fire-rate tracking, and Planck.js projectile creation.
-   */
-  public shootProjectile(
-    characterId: string,
-    target: Vector2D,
-    weaponItemId?: string
-  ): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
-    const session = this.players.get(characterId);
-    if (!session) return { success: false, error: 'Player session not found.' };
-
-    const now = Date.now();
-
-    // 1. Get weapon definition from items.json or item cache
-    let weaponItem = weaponItemId ? this.getItemData(weaponItemId) : undefined;
-    if (!weaponItem) {
-      if (this.itemsCache) {
-        weaponItem = this.itemsCache.find((it: any) => it.shootsProjectiles === true);
-      } else {
-        weaponItem = this.getItemData('revolver_6shooter');
-      }
-    }
-
-    const projConfig = weaponItem?.projectileConfig || {
-      magazineSize: 6,
-      fireRate: 2.5,
-      reloadTime: 1.5,
-      projectileSpeed: 28.0,
-      projectileGravityScale: 0.05,
-      damage: 35,
-    };
-
-    const maxAmmo = projConfig.magazineSize ?? 6;
-    const fireRate = projConfig.fireRate ?? 2.5;
-    const minCooldownMs = 1000 / fireRate;
-    const reloadDuration = projConfig.reloadTime ?? 1.5;
-
-    // 2. Retrieve or initialize character weapon ammo state
-    let ammoState = this.playerWeaponAmmo.get(characterId);
-    if (!ammoState) {
-      ammoState = {
-        currentAmmo: maxAmmo,
-        maxAmmo,
-        isReloading: false,
-        reloadTimer: 0,
-        reloadDuration,
-        lastShotTime: 0,
-        fireRate,
-      };
-      this.playerWeaponAmmo.set(characterId, ammoState);
-    }
-
-    // 3. Check if reloading
-    if (ammoState.isReloading) {
-      return {
-        success: false,
-        error: 'Reloading weapon...',
-        remainingAmmo: 0,
-        isReloading: true,
-      };
-    }
-
-    // 4. Check fire rate cooldown
-    if (now - ammoState.lastShotTime < minCooldownMs) {
-      return {
-        success: false,
-        error: 'Fire rate limited.',
-        remainingAmmo: ammoState.currentAmmo,
-        isReloading: false,
-      };
-    }
-
-    // 5. Check if empty cylinder -> initiate reload
-    if (ammoState.currentAmmo <= 0) {
-      ammoState.isReloading = true;
-      ammoState.reloadTimer = reloadDuration;
-      return {
-        success: false,
-        error: 'Out of ammo! Reloading...',
-        remainingAmmo: 0,
-        isReloading: true,
-      };
-    }
-
-    // 6. Deduct 1 shot
-    ammoState.currentAmmo--;
-    ammoState.lastShotTime = now;
-
-    // If cylinder is now empty, immediately begin reload countdown
-    if (ammoState.currentAmmo === 0) {
-      ammoState.isReloading = true;
-      ammoState.reloadTimer = reloadDuration;
-    }
-
-    // 7. Calculate firing launch vector
-    const startX = session.playerBody.position.x;
-    const startY = session.playerBody.position.y - 0.45;
-
-    const dx = target.x - startX;
-    const dy = target.y - startY;
-    const dist = Math.hypot(dx, dy) || 1.0;
-    const dirX = dx / dist;
-    const dirY = dy / dist;
-
-    const speed = projConfig.projectileSpeed ?? 28.0;
-    const initialVel: Vector2D = {
-      x: dirX * speed,
-      y: dirY * speed,
-    };
-
-    const muzzleDist = 0.55;
-    const muzzlePos: Vector2D = {
-      x: startX + dirX * muzzleDist,
-      y: startY + dirY * muzzleDist,
-    };
-
-    const projectileId = `proj_${characterId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-
-    let bulletSpriteUrl: string | null = '/assets/sprites/items/gun_bullet_ingame.png';
-    if (projConfig.projectileItemId) {
-      const bulletItem = this.getItemData(projConfig.projectileItemId);
-      if (bulletItem?.inGameSpriteUrl) {
-        bulletSpriteUrl = bulletItem.inGameSpriteUrl;
-      }
-    }
-
-    const projectile = new MiningProjectileEntity(
-      projectileId,
-      characterId,
-      muzzlePos,
-      initialVel,
-      {
-        damage: projConfig.damage ?? 35,
-        itemId: projConfig.projectileItemId,
-        spriteUrl: bulletSpriteUrl,
-        gravityScale: projConfig.projectileGravityScale ?? 0.05,
-      },
-      this.rigidWorld
-    );
-
-    this.activeProjectiles.push(projectile);
-
-    // 8. Record gunshot event for muzzle flash, smoke, light, and audio
-    const soundUrl = weaponItem?.soundEffects?.shoot?.url || weaponItem?.soundEffectUrl || '/assets/sounds/items/revolver_shot.wav';
-
-    this.pendingGunshots.push({
-      id: `shot_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      characterId,
-      position: muzzlePos,
-      target,
-      direction: { x: dirX, y: dirY },
-      soundUrl,
-    });
-
-    return {
-      success: true,
-      remainingAmmo: ammoState.currentAmmo,
-      isReloading: ammoState.isReloading,
-    };
-  }
-
-  /**
-   * Manually trigger reload for a character's equipped projectile weapon.
-   */
-  public reloadWeapon(characterId: string): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
-    const session = this.players.get(characterId);
-    if (!session) return { success: false, error: 'Player session not found.' };
-
-    let ammoState = this.playerWeaponAmmo.get(characterId);
-    if (!ammoState) {
-      ammoState = {
-        currentAmmo: 6,
-        maxAmmo: 6,
-        isReloading: false,
-        reloadTimer: 0,
-        reloadDuration: 1.5,
-        lastShotTime: 0,
-        fireRate: 2.5,
-      };
-      this.playerWeaponAmmo.set(characterId, ammoState);
-    }
-
-    if (ammoState.isReloading) {
-      return { success: true, remainingAmmo: 0, isReloading: true };
-    }
-
-    if (ammoState.currentAmmo >= ammoState.maxAmmo) {
-      return { success: false, error: 'Magazine is already full.', remainingAmmo: ammoState.currentAmmo, isReloading: false };
-    }
-
-    ammoState.isReloading = true;
-    ammoState.reloadTimer = ammoState.reloadDuration;
-    return { success: true, remainingAmmo: 0, isReloading: true };
+    this.rockSubsystem.activeRocks = [];
   }
 
   /**
@@ -1094,691 +412,273 @@ export class MiningGameEngine {
       return;
     }
 
-    // 1 & 2. Process physics, animations, and FoW for all players
-    for (const session of this.players.values()) {
-      session.playerBody.processInputs(session.inputs, this.grid);
-      session.playerBody.update(dt, this.grid);
+    // 1. Process physics, animations, FoW, and item pickups for all players
+    this.playerManager.updatePlayerPhysicsAndFoW(
+      dt,
+      this.grid,
+      (pos, vision) => this.revealAndTrackTiles(pos, vision),
+      (session) => this.dropSubsystem.checkItemPickupsForPlayer(session, this.rigidWorld)
+    );
 
-      // Animation state determination
-      if (session.isMining || session.inputs.miningKey) {
-        session.animationState = 'mine';
-      } else if (session.playerBody.isOnLadder) {
-        session.animationState = Math.abs(session.playerBody.velocity.y) > 0.1 ? 'climb' : 'idle';
-      } else if (!session.playerBody.isGrounded) {
-        session.animationState = 'jump';
-      } else if (Math.abs(session.playerBody.velocity.x) > 0.1) {
-        session.animationState = 'walk';
-      } else {
-        session.animationState = 'idle';
-      }
-
-      // FoW reveal (skip diamond scan if player has not moved to a new tile)
-      const currentGridPos = {
-        x: Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.round(session.playerBody.position.x))),
-        y: Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.round(session.playerBody.position.y))),
-      };
-      if (
-        !session.lastRevealGridPos ||
-        session.lastRevealGridPos.x !== currentGridPos.x ||
-        session.lastRevealGridPos.y !== currentGridPos.y
-      ) {
-        session.lastRevealGridPos = { ...currentGridPos };
-        this.revealAndTrackTiles(currentGridPos, session.visionRange);
-      }
-
-      // Item pickups
-      this.checkItemPickupsForPlayer(session);
-    }
-
-    // 2.5. Step Planck rigid world
+    // 2. Step Planck rigid world
     this.rigidWorld.step(dt);
 
-    // 2.6. Update dropped items physics
-    this.updateDroppedItemsPhysics();
+    // 3. Update dropped items physics
+    this.dropSubsystem.updateDroppedItemsPhysics();
 
-    // 3. Falling rocks simulation
-    this.updateFallingRocks(dt);
+    // 4. Falling rocks simulation
+    this.rockSubsystem.updateFallingRocks(
+      dt,
+      this.grid,
+      this.rigidWorld,
+      this.playerManager.players.values(),
+      (update) => this.pendingRevealedTiles.push(update)
+    );
 
-    // 3.5. Dynamite continuous physics & fuse countdown simulation
-    this.updateActiveDynamites(dt);
+    // 5. Dynamite continuous physics & fuse countdown simulation
+    this.explosiveSubsystem.updateActiveDynamites(dt, (dynamite) => {
+      this.explodeDynamite(dynamite);
+    });
 
-    // 3.6. Projectiles continuous physics, collision detection & ammo reloading
-    this.updateActiveProjectiles(dt);
-
-    // 4. Validate & trigger mining actions for each player
-    for (const session of this.players.values()) {
-      const canMineStance = session.playerBody.isGrounded || session.playerBody.isOnLadder;
-      const isTargeting = Boolean(session.inputs.miningKey && session.inputs.miningTarget);
-      const target = session.inputs.miningTarget;
-      const playerSpeed = typeof session.miningSpeed === 'function' ? session.miningSpeed() : session.miningSpeed;
-
-      if (session.isMining && session.miningTarget) {
-        const isSameTarget = target ? (session.miningTarget.x === target.x && session.miningTarget.y === target.y) : false;
-        const tileCenterX = session.miningTarget.x + 0.5;
-        const tileCenterY = session.miningTarget.y + 0.5;
-        const dx = Math.abs(tileCenterX - session.playerBody.position.x);
-        const dy = Math.abs(tileCenterY - session.playerBody.position.y);
-        const inReach = dx <= MINING_CONFIG.PLAYER_MINING_REACH && dy <= MINING_CONFIG.PLAYER_MINING_REACH;
-
-        if (!isTargeting || !isSameTarget || !canMineStance || !inReach) {
-          this.stopMining(session.characterId);
-        }
-      }
-
-      if (!session.isMining && isTargeting && target && canMineStance && playerSpeed > 0) {
-        if (isInBounds(target.x, target.y)) {
-          const tile = this.grid[target.y][target.x];
-          if (isTileMineable(tile.type)) {
-            this.startMining({ x: target.x, y: target.y }, session.characterId);
-          }
-        }
-      }
-    }
-
-    // 4.5. Player Melee Attack against Mobs (Terraria-style directional swing cone)
-    const nowMs = Date.now();
-    const MELEE_SWING_REACH = 2.2; // Maximum melee strike reach in tiles
-
-    for (const session of this.players.values()) {
-      if (session.inputs.miningKey) {
-        if (!session.lastAttackTimeMs || nowMs - session.lastAttackTimeMs >= 400) {
-          session.lastAttackTimeMs = nowMs;
-
-          const px = session.playerBody.position.x;
-          const py = session.playerBody.position.y;
-
-          // Determine normalized aim direction vector pointing towards cursor
-          let aimX = session.aimDirection?.x ?? (session.isFacingLeft ? -1 : 1);
-          let aimY = session.aimDirection?.y ?? 0;
-          const aimLen = Math.hypot(aimX, aimY);
-          if (aimLen > 0.001) {
-            aimX /= aimLen;
-            aimY /= aimLen;
+    // 6. Projectiles continuous physics, collision detection & ammo reloading
+    this.projectileSubsystem.updateActiveProjectiles(
+      dt,
+      this.grid,
+      this.activeMobs.values(),
+      (mobId, damage) => this.damageMob(mobId, damage),
+      (x, y, damage, charId) => {
+        const tile = this.grid[y][x];
+        if (tile && isTileMineable(tile.type)) {
+          tile.damageMs = (tile.damageMs || 0) + damage * 10;
+          const newStage = getDamageStage(tile);
+          const requiredTime = getTileMineTime(tile.type);
+          if (tile.damageMs >= requiredTime) {
+            const miner = this.players.get(charId);
+            this.completeMiningBlock({ x, y }, miner ? [miner] : []);
           } else {
-            aimX = session.isFacingLeft ? -1 : 1;
-            aimY = 0;
-          }
-
-          for (const mob of this.activeMobs.values()) {
-            if (mob.health <= 0) continue;
-            const mx = mob.mobBody.position.x;
-            const my = mob.mobBody.position.y;
-            const dx = mx - px;
-            const dy = my - py;
-            const dist = Math.hypot(dx, dy);
-
-            // 1. Must be within melee swing reach
-            if (dist > MELEE_SWING_REACH) continue;
-
-            // 2. Terraria-style directional swing arc check:
-            // A swing covers a ~145° forward sweep centered along the cursor aim vector.
-            // cos(72.5°) ≈ 0.30.
-            const toMobX = dist > 0.001 ? dx / dist : aimX;
-            const toMobY = dist > 0.001 ? dy / dist : aimY;
-            const dot = aimX * toMobX + aimY * toMobY;
-
-            // 3. Alternatively check if the cursor is explicitly targeting the tile occupied by the mob
-            const targetTileX = session.miningTarget?.x;
-            const targetTileY = session.miningTarget?.y;
-            const isNearTargetTile =
-              targetTileX !== undefined &&
-              targetTileY !== undefined &&
-              Math.abs(mx - (targetTileX + 0.5)) <= 0.85 &&
-              Math.abs(my - (targetTileY + 0.5)) <= 0.85;
-
-            if (dot >= 0.30 || isNearTargetTile) {
-              this.damageMob(mob.id, 15);
-              // Knockback pushes mob away along the strike direction with upward pop
-              const kbDirX = Math.sign(dx) || Math.sign(aimX) || (session.isFacingLeft ? -1 : 1);
-              mob.mobBody.velocity.x = kbDirX * 4.5;
-              mob.mobBody.velocity.y = -3.2; // Terraria-style upward pop
-              mob.mobBody.isGrounded = false;
-            }
-          }
-        }
-      }
-    }
-
-    // 5. Cooperative Mining Progress
-    // Group active miners by targeted coordinate
-    const targetMap = new Map<string, { target: MiningPosition; miners: MiningPlayerSession[] }>();
-    for (const session of this.players.values()) {
-      if (session.isMining && session.miningTarget) {
-        const key = `${session.miningTarget.x},${session.miningTarget.y}`;
-        let group = targetMap.get(key);
-        if (!group) {
-          group = { target: session.miningTarget, miners: [] };
-          targetMap.set(key, group);
-        }
-        group.miners.push(session);
-      }
-    }
-
-    for (const { target, miners } of targetMap.values()) {
-      const tile = this.grid[target.y][target.x];
-      if (!tile || !isTileMineable(tile.type)) {
-        for (const miner of miners) {
-          this.stopMining(miner.characterId);
-        }
-        continue;
-      }
-
-      const prevStage = getDamageStage(tile);
-
-      // Cooperative speed summation: combine all miners' speeds
-      const totalSpeed = miners.reduce((sum, m) => {
-        const sp = typeof m.miningSpeed === 'function' ? m.miningSpeed() : m.miningSpeed;
-        return sum + sp;
-      }, 0);
-
-      const speedMultiplier = totalSpeed / 100;
-      tile.damageMs = (tile.damageMs || 0) + dt * 1000 * speedMultiplier;
-
-      for (const miner of miners) {
-        miner.miningProgressMs = tile.damageMs;
-      }
-
-      const newStage = getDamageStage(tile);
-      if (newStage !== prevStage) {
-        this.pendingRevealedTiles.push({
-          x: target.x,
-          y: target.y,
-          type: tile.type,
-          damageStage: newStage,
-        });
-      }
-
-      const requiredTime = getTileMineTime(tile.type);
-      if (tile.damageMs >= requiredTime) {
-        this.completeMiningBlock(target, miners);
-      }
-    }
-
-    // 5.5. Update Active Mobs (AI, Physics, Mining, Combat)
-    this.updateActiveMobs(dt);
-
-    // 6. Broadcast 30 Hz State Tick
-    this.broadcastStateTick();
-  }
-
-  /**
-   * Update active falling rock entities and settle them back to grid on impact.
-   */
-  private updateFallingRocks(dt: number): void {
-    if (this.activeRocks.length === 0) return;
-
-    this.activeRocks = this.activeRocks.filter((rock) => {
-      rock.update(dt, this.grid);
-
-      // Check if rock crushed ANY active player
-      for (const session of this.players.values()) {
-        const dist = Math.hypot(rock.position.x - session.playerBody.position.x, rock.position.y - session.playerBody.position.y);
-        if (dist < 0.6 && rock.velocity.y > 2.0 && rock.totalFallenDistance > 0.5) {
-          if (session.socket && session.socket.connected) {
-            session.socket.emit('mining_event_result', {
-              success: true,
-              data: {
-                damageTaken: MINING_CONFIG.ROCK_CRUSH_DAMAGE,
-                message: 'You were hit by a falling rock!',
-              },
+            this.pendingRevealedTiles.push({
+              x,
+              y,
+              type: tile.type,
+              damageStage: newStage,
             });
           }
         }
       }
+    );
 
-      if (rock.hasSettled && rock.settledTile) {
-        const { x, y } = rock.settledTile;
-        if (isInBounds(x, y)) {
-          this.grid[y][x] = { type: MiningTileType.ROCK, revealed: true };
-          this.rigidWorld.addTileCollider(x, y);
-          this.pendingRevealedTiles.push({ x, y, type: MiningTileType.ROCK });
-        }
-        return false;
+    // 7. Validate & trigger mining actions for each player & cooperative progress
+    this.blockSubsystem.updateMiningProgress(
+      dt,
+      this.playerManager.players.values(),
+      this.grid,
+      (stageUpdate) => this.pendingRevealedTiles.push(stageUpdate),
+      (target, miners) => this.completeMiningBlock(target, miners)
+    );
+
+    // 8. Player Melee Attack against Mobs (Terraria-style directional swing cone)
+    this.playerManager.handleMeleeAttacks(this.activeMobs.values(), (mobId, damage, kbX, kbY) => {
+      this.damageMob(mobId, damage);
+      const mob = this.activeMobs.get(mobId);
+      if (mob) {
+        mob.mobBody.velocity.x = kbX;
+        mob.mobBody.velocity.y = kbY;
+        mob.mobBody.isGrounded = false;
       }
-      return true;
+    });
+
+    // 9. Update Active Mobs (AI, Physics, Mining, Combat)
+    this.mobSubsystem.updateActiveMobs(
+      dt,
+      this.grid,
+      this.playerManager.players,
+      this.rigidWorld,
+      this.dropSubsystem,
+      this.dataManager,
+      (update) => this.pendingRevealedTiles.push(update)
+    );
+
+    // 10. Broadcast 30 Hz State Tick
+    this.broadcastStateTick();
+  }
+
+  // ============================================================================
+  // Mining Block Excavation & Placement
+  // ============================================================================
+
+  public startMining(target: MiningPosition, characterId?: string): boolean {
+    const session = characterId ? this.players.get(characterId) : this.primarySession;
+    return this.blockSubsystem.startMining(target, session, this.grid);
+  }
+
+  public stopMining(characterId?: string): void {
+    const session = characterId ? this.players.get(characterId) : this.primarySession;
+    this.blockSubsystem.stopMining(session);
+  }
+
+  public placeLadder(target?: MiningPosition, characterId?: string): boolean {
+    const session = characterId ? this.players.get(characterId) : this.primarySession;
+    return this.blockSubsystem.placeLadder(target, session, this.grid, (update) => {
+      this.pendingRevealedTiles.push(update);
     });
   }
 
-  /**
-   * Update active thrown dynamites, integrate physics, count down fuses, and detonate when timer expires.
-   */
-  private updateActiveDynamites(dt: number): void {
-    if (this.activeDynamites.length === 0) return;
-
-    for (const dynamite of this.activeDynamites) {
-      dynamite.update(dt, this.grid);
-      if (dynamite.hasExploded) {
-        this.explodeDynamite(dynamite);
-      }
-    }
-
-    // Remove exploded dynamites from the active game world
-    this.activeDynamites = this.activeDynamites.filter((d) => !d.hasExploded);
-  }
-
-  /**
-   * Update active flying projectiles, step Planck physics, check tile & mob impact.
-   */
-  private updateActiveProjectiles(dt: number): void {
-    // 1. Advance reload timers for all characters
-    for (const [charId, ammo] of this.playerWeaponAmmo.entries()) {
-      if (ammo.isReloading) {
-        ammo.reloadTimer -= dt;
-        if (ammo.reloadTimer <= 0) {
-          ammo.isReloading = false;
-          ammo.reloadTimer = 0;
-          ammo.currentAmmo = ammo.maxAmmo;
-        }
-      }
-    }
-
-    if (this.activeProjectiles.length === 0) return;
-
-    for (const proj of this.activeProjectiles) {
-      proj.update(dt, this.grid);
-
-      if (proj.hasHit) continue;
-
-      // 2. Check collision against active mobs
-      for (const mob of this.activeMobs.values()) {
-        if (mob.health > 0 && mob.animationState !== 'death') {
-          const mobX = mob.mobBody.position.x;
-          const mobY = mob.mobBody.position.y;
-          const dist = Math.hypot(proj.position.x - mobX, proj.position.y - mobY);
-          if (dist < 0.7) {
-            proj.hasHit = true;
-            proj.hitMobId = mob.id;
-            this.damageMob(mob.id, proj.damage);
-            proj.cleanup();
-            break;
-          }
-        }
-      }
-
-      // 3. Tile hit handling (if hit a destructible tile, apply damage)
-      if (proj.hitTile) {
-        const { x, y } = proj.hitTile;
-        if (isInBounds(x, y)) {
-          const tile = this.grid[y][x];
-          if (tile && isTileMineable(tile.type)) {
-            tile.damageMs = (tile.damageMs || 0) + proj.damage * 10;
-            const newStage = getDamageStage(tile);
-            const requiredTime = getTileMineTime(tile.type);
-            if (tile.damageMs >= requiredTime) {
-              const miner = this.players.get(proj.characterId);
-              this.completeMiningBlock({ x, y }, miner ? [miner] : []);
-            } else {
-              this.pendingRevealedTiles.push({
-                x,
-                y,
-                type: tile.type,
-                damageStage: newStage,
-              });
-            }
-          }
-        }
-      }
-    }
-
-    // Clean up hit or expired projectiles
-    this.activeProjectiles = this.activeProjectiles.filter((p) => !p.hasHit);
-  }
-
-  /**
-   * Explodes a dynamite stick:
-   * Excavates all blocks within its configured explosion radius from epicenter, cleans up tiles,
-   * stops affected player mining, and triggers unsupported rock gravity.
-   * Nothing explodes unless an explosion effect (explodes: true) with radius > 0 is configured.
-   */
-  public explodeDynamite(dynamite: MiningDynamiteEntity): void {
-    const radius = dynamite.explosionRadius;
-    if (!radius || radius <= 0) {
-      return;
-    }
-
-    const cx = Math.round(dynamite.position.x);
-    const cy = Math.round(dynamite.position.y);
-    const radiusSq = radius * radius;
-    const affectedCols = new Set<number>();
-
-    // Queue authoritative explosion event for all clients in room
-    this.pendingExplosions.push({
-      id: dynamite.id,
-      position: { x: dynamite.position.x, y: dynamite.position.y },
-      radius,
-      soundUrl: dynamite.soundEffects?.explosion?.url ?? DEFAULT_DYNAMITE_SOUNDS.explosion?.url,
+  public placeTorch(target: MiningPosition, characterId?: string): boolean {
+    const session = characterId ? this.players.get(characterId) : this.primarySession;
+    return this.blockSubsystem.placeTorch(target, session, this.grid, (update) => {
+      this.pendingRevealedTiles.push(update);
     });
-
-    // 1. Excavate all blocks in a 7-tile radius
-    for (let dy = -radius; dy <= radius; dy++) {
-      for (let dx = -radius; dx <= radius; dx++) {
-        if (dx * dx + dy * dy <= radiusSq) {
-          const tx = cx + dx;
-          const ty = cy + dy;
-          if (isInBounds(tx, ty)) {
-            const tile = this.grid[ty][tx];
-            // Preserve cavern exit entrance
-            if (tile.type !== MiningTileType.ENTRANCE && tile.type !== MiningTileType.EMPTY) {
-              const previousType = tile.type;
-              tile.type = MiningTileType.EMPTY;
-              tile.revealed = true;
-              tile.damageMs = 0;
-              this.rigidWorld.removeTileCollider(tx, ty);
-              this.pendingRevealedTiles.push({
-                x: tx,
-                y: ty,
-                type: MiningTileType.EMPTY,
-                damageStage: 0,
-              });
-              affectedCols.add(tx);
-              this.spawnBlockDrops(tx, ty, previousType);
-            }
-          }
-        }
-      }
-    }
-
-    // 2. Interrupt any player currently mining a block inside the blast zone
-    for (const session of this.players.values()) {
-      if (session.isMining && session.miningTarget) {
-        const dtx = session.miningTarget.x - cx;
-        const dty = session.miningTarget.y - cy;
-        if (dtx * dtx + dty * dty <= radiusSq) {
-          this.stopMining(session.characterId);
-        }
-      }
-    }
-
-    // 2.5. Damage active mobs caught within blast radius
-    for (const mob of this.activeMobs.values()) {
-      const mdx = mob.mobBody.position.x - cx;
-      const mdy = mob.mobBody.position.y - cy;
-      if (mdx * mdx + mdy * mdy <= radiusSq) {
-        this.damageMob(mob.id, 50);
-      }
-    }
-
-    // 3. Trigger falling rocks above the cleared cavern columns
-    for (const col of affectedCols) {
-      let highestClearedY = cy + radius;
-      for (let y = Math.max(0, cy - radius); y <= Math.min(MINING_CONFIG.GRID_HEIGHT - 1, cy + radius); y++) {
-        if (this.grid[y][col].type === MiningTileType.EMPTY) {
-          highestClearedY = Math.min(highestClearedY, y);
-        }
-      }
-      this.checkAndTriggerFallingRocks(col, highestClearedY);
-    }
-
-    // 4. Invalidate line of sight caches so players discover newly opened cavern
-    for (const session of this.players.values()) {
-      session.lastRevealGridPos = null;
-    }
   }
 
-  /**
-   * Check tiles directly above the mined block and trigger falling rock physics if unsupported.
-   */
-  private checkAndTriggerFallingRocks(clearedX: number, clearedY: number): void {
-    for (let y = clearedY - 1; y >= 0; y--) {
-      if (this.grid[y][clearedX].type === MiningTileType.ROCK) {
-        this.grid[y][clearedX] = { type: MiningTileType.EMPTY, revealed: true };
-        this.rigidWorld.removeTileCollider(clearedX, y);
-        this.pendingRevealedTiles.push({ x: clearedX, y, type: MiningTileType.EMPTY, damageStage: 0 });
-
-        this.rockCounter++;
-        const rockId = `rock_${clearedX}_${y}_${this.rockCounter}`;
-        const rockEntity = new MiningRockEntity(rockId, clearedX, y, this.rigidWorld, {
-          gravityScale: this.rigidWorld.config.rockGravityScale,
-          restitution: this.rigidWorld.config.rockRestitution,
-        });
-        this.activeRocks.push(rockEntity);
-      } else if (isTileSolid(this.grid[y][clearedX].type)) {
-        break;
-      }
-    }
-  }
-
-  /**
-   * Complete excavation of a tile.
-   */
   private completeMiningBlock(target: MiningPosition, miners?: MiningPlayerSession[]): void {
-    const tile = this.grid[target.y][target.x];
-    if (tile.type === MiningTileType.EMPTY) return;
-    const previousType = tile.type;
-
-    // Excavate tile
-    this.grid[target.y][target.x] = { type: MiningTileType.EMPTY, revealed: true };
-    this.rigidWorld.removeTileCollider(target.x, target.y);
-    this.pendingRevealedTiles.push({ x: target.x, y: target.y, type: MiningTileType.EMPTY, damageStage: 0 });
-
-    // Invalidate last reveal positions so line-of-sight updates immediately
-    for (const p of this.players.values()) {
-      p.lastRevealGridPos = null;
-    }
-
-    // Spawn items from block's dropTable
-    this.spawnBlockDrops(target.x, target.y, previousType);
-
-    // Trigger dynamic falling rock gravity for rocks directly above
-    this.checkAndTriggerFallingRocks(target.x, target.y);
-
-    // Reset mining state for all miners involved
-    const list = miners || Array.from(this.players.values()).filter(p => p.isMining && p.miningTarget?.x === target.x && p.miningTarget?.y === target.y);
-    for (const miner of list) {
-      miner.isMining = false;
-      miner.miningTarget = null;
-      miner.miningProgressMs = 0;
-    }
-  }
-
-  /**
-   * Pick up items on the ground when player walks over them.
-   */
-  private checkItemPickupsForPlayer(session: MiningPlayerSession): void {
-    if (this.droppedItems.length === 0) return;
-
-    this.droppedItems = this.droppedItems.filter((item) => {
-      const dist = Math.hypot(session.playerBody.position.x - item.position.x, session.playerBody.position.y - item.position.y);
-      if (dist <= 0.7) {
-        if (item.id) {
-          const body = this.activeItemBodies.get(item.id);
-          if (body) {
-            this.rigidWorld.destroyBody(body);
-            this.activeItemBodies.delete(item.id);
-          }
-        }
-
-        const existing = session.temporaryBackpack.find((b) => b.itemId === item.itemId);
-        if (existing) {
-          existing.quantity += item.quantity;
-        } else {
-          session.temporaryBackpack.push({
-            itemId: item.itemId,
-            itemName: item.itemName,
-            iconUrl: item.iconUrl,
-            quantity: item.quantity,
-          });
-        }
-        session.backpackDirty = true;
-        this.droppedItemsDirty = true;
-        return false;
-      }
-      return true;
-    });
-  }
-
-  /**
-   * Reveal tiles and track newly revealed ones for the client.
-   */
-  private revealAndTrackTiles(position: MiningPosition, visionRange: number): void {
-    for (let dy = -visionRange; dy <= visionRange; dy++) {
-      for (let dx = -visionRange; dx <= visionRange; dx++) {
-        if (Math.abs(dx) + Math.abs(dy) > visionRange) continue;
-        const nx = position.x + dx;
-        const ny = position.y + dy;
-        if (isInBounds(nx, ny) && !this.grid[ny][nx].revealed) {
-          this.grid[ny][nx].revealed = true;
-          this.pendingRevealedTiles.push({
-            x: nx,
-            y: ny,
-            type: this.grid[ny][nx].type,
-            damageStage: getDamageStage(this.grid[ny][nx]),
-          });
-        }
-      }
-    }
-  }
-
-  /**
-   * Get active mobs payload for client synchronization.
-   */
-  public getActiveMobs(): MiningActiveMob[] {
-    const mobsPayload: MiningActiveMob[] = [];
-    for (const mob of this.activeMobs.values()) {
-      mobsPayload.push({
-        id: mob.id,
-        mobId: mob.mobId,
-        name: mob.name,
-        position: { x: mob.mobBody.position.x, y: mob.mobBody.position.y },
-        velocity: { x: mob.mobBody.velocity.x, y: mob.mobBody.velocity.y },
-        health: mob.health,
-        maxHealth: mob.maxHealth,
-        attack: mob.attack,
-        defense: mob.defense,
-        isFacingLeft: mob.isFacingLeft,
-        isMining: mob.isMining,
-        miningTarget: mob.miningTarget || undefined,
-        animationState: mob.animationState,
-        animations: mob.animations,
-      });
-    }
-    return mobsPayload;
-  }
-
-  private broadcastStateTick(): void {
-    const fallingRocksPayload: MiningFallingRock[] | undefined =
-      this.activeRocks.length > 0
-        ? this.activeRocks.map((r) => ({
-            id: r.id,
-            position: { x: r.position.x, y: r.position.y },
-            velocity: { x: r.velocity.x, y: r.velocity.y },
-            angle: r.angle,
-            angularVelocity: r.angularVelocity,
-          }))
-        : undefined;
-
-    const dynamitesPayload: MiningActiveDynamite[] | undefined =
-      this.activeDynamites.length > 0
-        ? this.activeDynamites.map((d) => ({
-            id: d.id,
-            position: { x: d.position.x, y: d.position.y },
-            velocity: { x: d.velocity.x, y: d.velocity.y },
-            angle: d.angle,
-            angularVelocity: d.angularVelocity,
-            fuseRemainingSeconds: d.fuseRemainingSeconds,
-            physicsConfig: d.physicsConfig,
-            explosionRadius: d.explosionRadius,
-            itemId: d.itemId,
-            soundEffects: d.soundEffects,
-          }))
-        : undefined;
-
-    const projectilesPayload: MiningActiveProjectile[] | undefined =
-      this.activeProjectiles.length > 0
-        ? this.activeProjectiles.map((p) => ({
-            id: p.id,
-            characterId: p.characterId,
-            position: { x: p.position.x, y: p.position.y },
-            velocity: { x: p.velocity.x, y: p.velocity.y },
-            angle: p.angle,
-            damage: p.damage,
-            itemId: p.itemId,
-            spriteUrl: p.spriteUrl,
-          }))
-        : undefined;
-
-    const revealedToSend = this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined;
-    const explosionsToSend = this.pendingExplosions.length > 0 ? this.pendingExplosions : undefined;
-    const gunshotsToSend = this.pendingGunshots.length > 0 ? this.pendingGunshots : undefined;
-    const mobsPayload = this.getActiveMobs();
-
-    for (const session of this.players.values()) {
-      if (!session.socket || !session.socket.connected) continue;
-
-      const otherPlayers: MiningRemotePlayer[] = [];
-      for (const other of this.players.values()) {
-        if (other.characterId === session.characterId) continue;
-        otherPlayers.push({
-          characterId: other.characterId,
-          characterName: other.characterName,
-          position: { x: other.playerBody.position.x, y: other.playerBody.position.y },
-          velocity: { x: other.playerBody.velocity.x, y: other.playerBody.velocity.y },
-          isMining: other.isMining,
-          miningTarget: other.miningTarget || undefined,
-          isFacingLeft: other.isFacingLeft,
-          aimDirection: other.aimDirection,
-          flashlightOn: other.flashlightOn,
-          animationState: other.animationState,
-          gearLayers: other.gearLayers,
+    this.blockSubsystem.completeMiningBlock(
+      target,
+      miners,
+      this.grid,
+      (pos, prevType) => {
+        this.rigidWorld.removeTileCollider(pos.x, pos.y);
+        this.pendingRevealedTiles.push({
+          x: pos.x,
+          y: pos.y,
+          type: MiningTileType.EMPTY,
+          damageStage: 0,
         });
-      }
-
-      const payload: MiningStateTickPayload = {
-        tick: this.tickCount,
-        position: session.playerBody.position,
-        velocity: session.playerBody.velocity,
-        isMining: session.isMining,
-        miningTarget: session.miningTarget || undefined,
-        miningProgressMs: session.isMining ? session.miningProgressMs : undefined,
-        temporaryBackpack: session.backpackDirty ? session.temporaryBackpack : undefined,
-        droppedItems: this.droppedItemsDirty ? this.droppedItems : undefined,
-        fallingRocks: fallingRocksPayload,
-        activeDynamites: dynamitesPayload,
-        activeProjectiles: projectilesPayload,
-        gunshots: gunshotsToSend,
-        explosions: explosionsToSend,
-        revealedTiles: revealedToSend,
-        otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
-        mobs: mobsPayload.length > 0 ? mobsPayload : undefined,
-        visionRange: session.visionRange,
-      };
-
-      session.backpackDirty = false;
-      session.socket.emit('mining_state_tick', payload);
-    }
-
-    // Clear broadcast dirty flags after emitting to all sockets
-    this.droppedItemsDirty = false;
-    this.pendingRevealedTiles = [];
-    this.pendingExplosions = [];
-    this.pendingGunshots = [];
+        this.spawnBlockDrops(pos.x, pos.y, prevType);
+        this.rockSubsystem.checkAndTriggerFallingRocks(
+          pos.x,
+          pos.y,
+          this.grid,
+          this.rigidWorld,
+          (u) => this.pendingRevealedTiles.push(u)
+        );
+      },
+      this.playerManager.players.values()
+    );
   }
 
-  /**
-   * Handle automatic session timeout when max mining duration is reached.
-   */
-  private handleSessionTimeout(): void {
-    if (this.isStopped) return;
-    console.log(`[Mining] Room ${this.roomId} timed out (${this.elapsedTimeSeconds.toFixed(1)}s elapsed)`);
-
-    for (const session of this.players.values()) {
-      if (session.socket && session.socket.connected) {
-        session.socket.emit('mining_session_timeout', {
-          message: 'Your mining expedition has reached its 15-minute time limit and ended.',
-        });
-      }
-    }
-
-    this.stop();
-
-    if (this.onTimeout) {
-      this.onTimeout(this.primaryCharacterId || this.roomId);
-    }
+  public spawnBlockDrops(tx: number, ty: number, tileType: MiningTileType): void {
+    this.dropSubsystem.spawnBlockDrops(
+      tx,
+      ty,
+      tileType,
+      (t) => this.getBlockConfig(t),
+      (id) => this.getItemData(id),
+      this.rigidWorld
+    );
   }
 
-  /**
-   * Spawns an active mob entity in the mine.
-   */
+  public updateDroppedItemsPhysics(): void {
+    this.dropSubsystem.updateDroppedItemsPhysics();
+  }
+
+  // ============================================================================
+  // Data Manager Delegations
+  // ============================================================================
+
+  public getBlockConfig(tileType: MiningTileType): any {
+    return this.dataManager.getBlockConfig(tileType);
+  }
+
+  public getItemData(itemId: string): any {
+    return this.dataManager.getItemData(itemId);
+  }
+
+  public getItemPhysicsConfig(itemId: string): ItemPhysicsConfig | undefined {
+    return this.dataManager.getItemPhysicsConfig(itemId);
+  }
+
+  public getDynamiteItemPhysicsConfig(): ItemPhysicsConfig {
+    return this.dataManager.getDynamiteItemPhysicsConfig();
+  }
+
+  public getItemExplosionRadius(itemId: string): number | undefined {
+    return this.dataManager.getItemExplosionRadius(itemId);
+  }
+
+  public getItemSoundEffects(itemId: string): ItemSoundEffectsConfig | undefined {
+    return this.dataManager.getItemSoundEffects(itemId);
+  }
+
+  public getMobData(mobId: string): any {
+    return this.dataManager.getMobData(mobId);
+  }
+
+  // ============================================================================
+  // Explosives & Combat
+  // ============================================================================
+
+  public throwDynamite(
+    characterId: string,
+    target: MiningPosition,
+    physicsConfig?: ItemPhysicsConfig,
+    forceRatio: number = 1.0,
+    explosionRadius?: number,
+    itemId?: string,
+    soundEffects?: ItemSoundEffectsConfig | null
+  ): boolean {
+    const session = this.players.get(characterId);
+    return this.explosiveSubsystem.throwDynamite(
+      session,
+      target,
+      physicsConfig,
+      forceRatio,
+      explosionRadius,
+      itemId,
+      soundEffects,
+      this.dataManager,
+      this.rigidWorld
+    );
+  }
+
+  public explodeDynamite(dynamite: MiningDynamiteEntity): void {
+    this.explosiveSubsystem.explodeDynamite(
+      dynamite,
+      this.grid,
+      this.rigidWorld,
+      this.playerManager.players.values(),
+      this.activeMobs.values(),
+      (tx, ty, prevType) => this.spawnBlockDrops(tx, ty, prevType),
+      (charId) => this.stopMining(charId),
+      (mobId, damage) => this.damageMob(mobId, damage),
+      (col, highestY) => {
+        this.rockSubsystem.checkAndTriggerFallingRocks(
+          col,
+          highestY,
+          this.grid,
+          this.rigidWorld,
+          (u) => this.pendingRevealedTiles.push(u)
+        );
+      },
+      (u) => this.pendingRevealedTiles.push(u)
+    );
+  }
+
+  public shootProjectile(
+    characterId: string,
+    target: Vector2D,
+    weaponItemId?: string
+  ): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
+    const session = this.players.get(characterId);
+    return this.projectileSubsystem.shootProjectile(
+      session,
+      target,
+      weaponItemId,
+      this.dataManager,
+      this.rigidWorld
+    );
+  }
+
+  public reloadWeapon(
+    characterId: string
+  ): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
+    const session = this.players.get(characterId);
+    return this.projectileSubsystem.reloadWeapon(characterId, session, this.dataManager);
+  }
+
+  // ============================================================================
+  // Mob Subsystem Delegations
+  // ============================================================================
+
   public spawnMob(
     mobData: {
       id?: string;
@@ -1798,390 +698,203 @@ export class MiningGameEngine {
     },
     position?: Vector2D
   ): MiningActiveMobSession {
-    this.mobCounter++;
-    const instanceId = `mob_${Date.now()}_${this.mobCounter}`;
-    const mobId = mobData.id || `mob_custom_${this.mobCounter}`;
-    const name = mobData.name || 'Mob';
-
-    let spawnPos = position;
-    if (!spawnPos) {
-      spawnPos = this.findValidCavernSpawnPosition();
-    }
-
-    const halfHeight = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE));
-    const mobBody = new MiningMobBody({
-      position: { x: spawnPos.x, y: spawnPos.y - halfHeight },
-      moveSpeed: mobData.moveSpeed && mobData.moveSpeed >= 2.8 ? mobData.moveSpeed : 3.2,
-      jumpForce: mobData.jumpForce && mobData.jumpForce >= 8.0 ? mobData.jumpForce : 8.8,
-    });
-
-    const ai = MobAIRegistry.create(mobData.aiType, mobId, instanceId);
-
-    const session: MiningActiveMobSession = {
-      id: instanceId,
-      mobId,
-      name,
-      mobBody,
-      ai,
-      health: mobData.health ?? 50,
-      maxHealth: mobData.health ?? 50,
-      attack: mobData.attack ?? 10,
-      defense: mobData.defense ?? 2,
-      miningSpeed:
-        mobData.miningSpeed !== undefined && mobData.miningSpeed <= 10
-          ? mobData.miningSpeed * 100
-          : (mobData.miningSpeed ?? 80.0),
-      attackCooldownMs: 1200,
-      dropTable: mobData.dropTable,
-      animations: mobData.animations,
-      animationState: 'idle',
-      isFacingLeft: false,
-      isMining: false,
-      miningTarget: null,
-      miningProgressMs: 0,
-      mineRange: mobData.aiConfig?.mineRange ?? (mobData as any).mineRange ?? 2.0,
-    };
-
-    this.activeMobs.set(instanceId, session);
-    return session;
+    const spawnPos = position || this.findValidCavernSpawnPosition();
+    return this.mobSubsystem.spawnMob(mobData, spawnPos);
   }
 
-  /**
-   * Scans procedural cavern floor tiles to locate a stable spawn position.
-   */
   public findValidCavernSpawnPosition(minDepth = 5): Vector2D {
-    const candidates: Vector2D[] = [];
-    const startY = Math.max(2, minDepth);
-    for (let y = startY; y < MINING_CONFIG.GRID_HEIGHT - 3; y++) {
-      for (let x = 2; x < MINING_CONFIG.GRID_WIDTH - 2; x++) {
-        if (Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= 3 && y <= 5) continue;
-        const tile = this.grid[y]?.[x];
-        const floor = this.grid[y + 1]?.[x];
-        if (tile && tile.type === MiningTileType.EMPTY && floor && isTileSolid(floor.type)) {
-          candidates.push({ x: x + 0.5, y: y + 1.0 });
-        }
-      }
-    }
-
-    if (candidates.length > 0) {
-      const idx = Math.floor(Math.random() * candidates.length);
-      return candidates[idx];
-    }
-
-    return { x: 22.5, y: Math.max(15, minDepth + 5) };
+    return this.mobSubsystem.findValidCavernSpawnPosition(this.grid, minDepth);
   }
 
-  /**
-   * Helper to retrieve mob definition from mobs.json.
-   */
-  public getMobData(mobId: string): any {
-    try {
-      if (!this.mobsCache) {
-        const mobsPath = path.join(__dirname, '../../../../../packages/shared/src/data/mobs.json');
-        if (fs.existsSync(mobsPath)) {
-          this.mobsCache = JSON.parse(fs.readFileSync(mobsPath, 'utf-8'));
-        }
-      }
-      if (this.mobsCache) {
-        return this.mobsCache.find(
-          (m: any) => m.id === mobId || m.name?.toLowerCase() === mobId.toLowerCase()
-        );
-      }
-    } catch {
-      // ignore
-    }
-    return undefined;
-  }
-
-  /**
-   * Automatically populates cavern chambers with hostile mobs based on map configuration.
-   */
   public populateCavernMobs(options?: { count?: number; minDepth?: number; mobIds?: string[] }): void {
-    const mobCount = options?.count ?? this.mapConfig?.mobSpawnCount ?? 3;
-    if (mobCount <= 0) return;
-
-    const minDepth = options?.minDepth ?? this.mapConfig?.mobSpawnMinDepth ?? 5;
-    const allowedMobIds = options?.mobIds ?? this.mapConfig?.allowedMobIds ?? ['cmn_mole_person_001'];
-    if (!allowedMobIds || allowedMobIds.length === 0) return;
-
-    for (let i = 0; i < mobCount; i++) {
-      const mobId = allowedMobIds[i % allowedMobIds.length];
-      const mobDef = this.getMobData(mobId);
-      if (!mobDef) continue;
-
-      const spawnPos = this.findValidCavernSpawnPosition(minDepth);
-      this.spawnMob(mobDef, spawnPos);
-    }
+    this.mobSubsystem.populateCavernMobs(this.grid, this.dataManager, this.mapConfig, options);
   }
 
-  /**
-   * Updates all active mobs: AI decisions, physics stepping, tile excavation, and player combat.
-   */
   public updateActiveMobs(dt: number): void {
-    if (this.activeMobs.size === 0) return;
-
-    for (const mob of this.activeMobs.values()) {
-      if (mob.health <= 0) continue;
-
-      if (mob.hitStunDurationMs && mob.hitStunDurationMs > 0) {
-        mob.hitStunDurationMs -= dt * 1000;
-        mob.animationState = 'damage';
-        mob.mobBody.velocity.x *= 0.92;
-        mob.mobBody.update(dt, this.grid);
-        continue;
-      }
-
-      const aiContext: MobAIContext = {
-        mobId: mob.mobId,
-        instanceId: mob.id,
-        position: { x: mob.mobBody.position.x, y: mob.mobBody.position.y },
-        velocity: { x: mob.mobBody.velocity.x, y: mob.mobBody.velocity.y },
-        health: mob.health,
-        maxHealth: mob.maxHealth,
-        attack: mob.attack,
-        defense: mob.defense,
-        isGrounded: mob.mobBody.isGrounded,
-        isOnLadder: mob.mobBody.isOnLadder,
-        grid: this.grid,
-        players: Array.from(this.players.values()).map((p) => ({
-          characterId: p.characterId,
-          characterName: p.characterName,
-          position: { x: p.playerBody.position.x, y: p.playerBody.position.y },
-          health: 100,
-        })),
-        config: {
-          canMine: true,
-          mineRange: mob.mineRange,
-          aggroRange: 20,
-          attackRange: 1.25,
-          attackCooldownMs: mob.attackCooldownMs,
-        },
-      };
-
-      const intent = mob.ai.update(dt, aiContext);
-
-      mob.mobBody.processMovement(
-        intent.moveX,
-        intent.jump,
-        intent.climbUp,
-        intent.climbDown,
-        this.grid
-      );
-      mob.mobBody.update(dt, this.grid);
-      mob.isFacingLeft = mob.mobBody.isFacingLeft;
-
-      if (intent.isAttacking && intent.attackTargetId) {
-        mob.animationState = 'attack';
-        const targetPlayer = this.players.get(intent.attackTargetId);
-        if (targetPlayer) {
-          this.handleMobAttackPlayer(mob, targetPlayer);
-        }
-      } else if (intent.isMining && intent.miningTarget) {
-        // Enforce physical reach check before starting or continuing mob mining
-        const inReach = BaseMobAI.isWithinReach(mob.mobBody.position, intent.miningTarget, mob.mineRange);
-        if (inReach) {
-          mob.isMining = true;
-          mob.miningTarget = intent.miningTarget;
-          mob.animationState = 'mine';
-          if (intent.miningTarget.x < mob.mobBody.position.x) {
-            mob.isFacingLeft = true;
-            mob.mobBody.isFacingLeft = true;
-          } else if (intent.miningTarget.x > mob.mobBody.position.x) {
-            mob.isFacingLeft = false;
-            mob.mobBody.isFacingLeft = false;
-          }
-          this.handleMobMining(mob, intent.miningTarget, dt);
-        } else {
-          mob.isMining = false;
-          mob.miningTarget = null;
-          mob.animationState = 'walk';
-        }
-      } else {
-        mob.isMining = false;
-        mob.miningTarget = null;
-        mob.animationState = intent.animationState;
-      }
-    }
+    this.mobSubsystem.updateActiveMobs(
+      dt,
+      this.grid,
+      this.playerManager.players,
+      this.rigidWorld,
+      this.dropSubsystem,
+      this.dataManager,
+      (u) => this.pendingRevealedTiles.push(u)
+    );
   }
 
-  /**
-   * Processes mining damage applied to a tile by an active mob.
-   */
   public handleMobMining(mob: MiningActiveMobSession, target: MiningPosition, dt: number): void {
-    if (!isInBounds(target.x, target.y)) {
-      mob.isMining = false;
-      mob.miningTarget = null;
-      return;
-    }
-
-    // Authoritative distance check: ensure mob is within reach of target block
-    if (!BaseMobAI.isWithinReach(mob.mobBody.position, target, mob.mineRange)) {
-      mob.isMining = false;
-      mob.miningTarget = null;
-      mob.miningProgressMs = 0;
-      return;
-    }
-
-    const tile = this.grid[target.y][target.x];
-    if (!tile || !isTileMineable(tile.type)) {
-      mob.isMining = false;
-      mob.miningTarget = null;
-      return;
-    }
-
-    const prevStage = getDamageStage(tile);
-    const speedMultiplier = mob.miningSpeed / 100;
-    tile.damageMs = (tile.damageMs || 0) + dt * 1000 * speedMultiplier;
-    mob.miningProgressMs = tile.damageMs;
-
-    const newStage = getDamageStage(tile);
-    if (newStage !== prevStage) {
-      this.pendingRevealedTiles.push({
-        x: target.x,
-        y: target.y,
-        type: tile.type,
-        damageStage: newStage,
-      });
-    }
-
-    const requiredTime = getTileMineTime(tile.type);
-    if (tile.damageMs >= requiredTime) {
-      const previousType = tile.type;
-      tile.type = MiningTileType.EMPTY;
-      tile.revealed = true;
-      tile.damageMs = 0;
-
-      this.rigidWorld.removeTileCollider(target.x, target.y);
-      this.pendingRevealedTiles.push({
-        x: target.x,
-        y: target.y,
-        type: MiningTileType.EMPTY,
-        damageStage: 0,
-      });
-
-      this.spawnBlockDrops(target.x, target.y, previousType);
-
-      mob.isMining = false;
-      mob.miningTarget = null;
-      mob.miningProgressMs = 0;
-    }
+    this.mobSubsystem.handleMobMining(
+      mob,
+      target,
+      dt,
+      this.grid,
+      this.rigidWorld,
+      this.dropSubsystem,
+      this.dataManager,
+      (u) => this.pendingRevealedTiles.push(u)
+    );
   }
 
-  /**
-   * Handles mob melee attack on a player.
-   */
   public handleMobAttackPlayer(mob: MiningActiveMobSession, player: MiningPlayerSession): void {
-    const damage = Math.max(1, mob.attack);
-    if (player.socket && player.socket.connected) {
-      player.socket.emit('player_damaged', {
-        damage,
-        mobId: mob.id,
-        mobName: mob.name,
-      });
-    }
+    this.mobSubsystem.handleMobAttackPlayer(mob, player);
   }
 
-  /**
-   * Applies damage to an active mob.
-   */
   public damageMob(instanceId: string, damage: number): void {
-    const mob = this.activeMobs.get(instanceId);
-    if (!mob || mob.health <= 0) return;
-
-    mob.health -= damage;
-    mob.animationState = 'damage';
-    mob.hitStunDurationMs = 250;
-
-    if (mob.health <= 0) {
-      this.killMob(mob);
-    }
+    this.mobSubsystem.damageMob(
+      instanceId,
+      damage,
+      this.rigidWorld,
+      this.dropSubsystem,
+      this.dataManager
+    );
   }
 
-  /**
-   * Handles mob defeat: spawns drops and removes from active simulation.
-   */
   public killMob(mob: MiningActiveMobSession): void {
-    mob.health = 0;
-    mob.animationState = 'death';
-    this.spawnMobDrops(mob);
-    this.activeMobs.delete(mob.id);
+    this.mobSubsystem.killMob(mob, this.rigidWorld, this.dropSubsystem, this.dataManager);
   }
 
-  /**
-   * Spawns item drops for a defeated mob based on its configured DropTable.
-   */
   public spawnMobDrops(mob: MiningActiveMobSession): void {
-    const dropTable = mob.dropTable;
-    const dropsToSpawn: { itemId: string; quantity: number }[] = [];
+    this.mobSubsystem.spawnMobDrops(mob, this.rigidWorld, this.dropSubsystem, this.dataManager);
+  }
 
-    if (dropTable && Array.isArray(dropTable.items) && dropTable.items.length > 0) {
-      for (const entry of dropTable.items) {
-        const roll = Math.random() * 100;
-        if (roll <= entry.chance) {
-          const qty = Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1)) + entry.minQuantity;
-          if (qty > 0) {
-            dropsToSpawn.push({ itemId: entry.itemId, quantity: qty });
-          }
+  public getActiveMobs(): MiningActiveMob[] {
+    return this.mobSubsystem.getActiveMobs();
+  }
+
+  // ============================================================================
+  // FoW Revelation & State Tick Broadcast
+  // ============================================================================
+
+  private revealAndTrackTiles(position: MiningPosition, visionRange: number): void {
+    const cx = Math.floor(position.x);
+    const cy = Math.floor(position.y);
+    for (let dy = -visionRange; dy <= visionRange; dy++) {
+      for (let dx = -visionRange; dx <= visionRange; dx++) {
+        if (Math.abs(dx) + Math.abs(dy) > visionRange) continue;
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (isInBounds(nx, ny) && !this.grid[ny][nx].revealed) {
+          this.grid[ny][nx].revealed = true;
+          this.pendingRevealedTiles.push({
+            x: nx,
+            y: ny,
+            type: this.grid[ny][nx].type,
+            damageStage: getDamageStage(this.grid[ny][nx]),
+          });
         }
       }
     }
+  }
 
-    if (dropTable && (dropTable.solMin > 0 || dropTable.solMax > 0)) {
-      const minSol = dropTable.solMin || 0;
-      const maxSol = dropTable.solMax || minSol;
-      const solQty = Math.floor(Math.random() * (maxSol - minSol + 1)) + minSol;
-      if (solQty > 0) {
-        dropsToSpawn.push({ itemId: 'sol', quantity: solQty });
+  private broadcastStateTick(): void {
+    const fallingRockPayloads: MiningFallingRock[] = this.activeRocks.map((r) => ({
+      id: r.id,
+      position: { x: r.position.x, y: r.position.y },
+      velocity: { x: r.velocity.x, y: r.velocity.y },
+      angle: r.angle,
+    }));
+
+    const dynamitePayloads: MiningActiveDynamite[] = this.activeDynamites.map((d) => ({
+      id: d.id,
+      position: { x: d.position.x, y: d.position.y },
+      velocity: { x: d.velocity.x, y: d.velocity.y },
+      angle: d.angle,
+      angularVelocity: d.angularVelocity,
+      fuseRemainingSeconds: d.fuseRemainingSeconds,
+      physicsConfig: d.physicsConfig,
+      itemId: d.itemId,
+      soundEffects: d.soundEffects,
+      inGameScale: d.inGameScale,
+    }));
+
+    const projectilePayloads: MiningActiveProjectile[] = this.activeProjectiles.map((p) => ({
+      id: p.id,
+      characterId: p.characterId,
+      itemId: p.itemId,
+      position: { x: p.position.x, y: p.position.y },
+      velocity: { x: p.velocity.x, y: p.velocity.y },
+      angle: p.angle,
+      damage: p.damage,
+      spriteUrl: p.spriteUrl,
+      inGameScale: p.inGameScale,
+    }));
+
+    const activeMobsPayload = this.getActiveMobs();
+    const explosionsToSend = this.explosiveSubsystem.consumePendingExplosions();
+    const gunshotsToSend = this.projectileSubsystem.consumePendingGunshots();
+
+    for (const session of this.players.values()) {
+      if (!session.socket || !session.socket.connected) continue;
+
+      const otherPlayers: MiningRemotePlayer[] = [];
+      for (const other of this.players.values()) {
+        if (other.characterId === session.characterId) continue;
+        otherPlayers.push({
+          characterId: other.characterId,
+          characterName: other.characterName,
+          position: { x: other.playerBody.position.x, y: other.playerBody.position.y },
+          velocity: { x: other.playerBody.velocity.x, y: other.playerBody.velocity.y },
+          isMining: other.isMining,
+          miningTarget: other.miningTarget ?? undefined,
+          isFacingLeft: other.isFacingLeft,
+          aimDirection: other.aimDirection,
+          flashlightOn: other.flashlightOn,
+          animationState: other.animationState,
+          gearLayers: other.gearLayers,
+        });
+      }
+
+      const ammoState = this.playerWeaponAmmo.get(session.characterId);
+      const weaponAmmoPayload = ammoState
+        ? {
+            current: ammoState.currentAmmo,
+            max: ammoState.maxAmmo,
+            isReloading: ammoState.isReloading,
+          }
+        : undefined;
+
+      const payload: MiningStateTickPayload = {
+        tick: this.tickCount,
+        position: { x: session.playerBody.position.x, y: session.playerBody.position.y },
+        velocity: { x: session.playerBody.velocity.x, y: session.playerBody.velocity.y },
+        isMining: session.isMining,
+        miningTarget: session.miningTarget ?? undefined,
+        revealedTiles: this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined,
+        fallingRocks: fallingRockPayloads.length > 0 ? fallingRockPayloads : undefined,
+        activeDynamites: dynamitePayloads.length > 0 ? dynamitePayloads : undefined,
+        activeProjectiles: projectilePayloads.length > 0 ? projectilePayloads : undefined,
+        mobs: activeMobsPayload.length > 0 ? activeMobsPayload : undefined,
+        explosions: explosionsToSend.length > 0 ? explosionsToSend : undefined,
+        gunshots: gunshotsToSend.length > 0 ? gunshotsToSend : undefined,
+        otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
+        weaponAmmo: weaponAmmoPayload,
+        droppedItems: this.dropSubsystem.droppedItemsDirty ? this.droppedItems : undefined,
+        temporaryBackpack: session.backpackDirty ? session.temporaryBackpack : undefined,
+      };
+
+      session.socket.emit('mining_state_tick', payload);
+      session.backpackDirty = false;
+    }
+
+    this.dropSubsystem.droppedItemsDirty = false;
+    this.pendingRevealedTiles = [];
+  }
+
+  private handleSessionTimeout(): void {
+    console.log(`[Mining] Room ${this.roomId} timed out (${this.elapsedTimeSeconds.toFixed(1)}s elapsed)`);
+    this.stop();
+
+    for (const session of this.players.values()) {
+      if (session.socket && session.socket.connected) {
+        session.socket.emit('mining_session_timeout', {
+          extractedItems: session.temporaryBackpack,
+          message: 'Your mining session has reached the 15-minute time limit. You have been returned to the surface with your extracted items.',
+        });
       }
     }
 
-    if (dropsToSpawn.length === 0) return;
-
-    const N = dropsToSpawn.length;
-    const tx = mob.mobBody.position.x;
-    const ty = mob.mobBody.position.y;
-
-    dropsToSpawn.forEach((drop, idx) => {
-      this.droppedItemCounter++;
-      const id = `mob_drop_${Date.now()}_${this.droppedItemCounter}_${idx}`;
-      const itemData = this.getItemData(drop.itemId);
-
-      const offsetX = N > 1 ? (idx - (N - 1) / 2) * 0.25 : 0;
-      const posX = tx + offsetX;
-      const posY = ty;
-
-      const vx = N > 1
-        ? (idx - (N - 1) / 2) * 1.5 + (Math.random() - 0.5) * 0.4
-        : (Math.random() - 0.5) * 0.5;
-      const vy = N > 1
-        ? -2.2 - Math.random() * 1.0
-        : -1.8 - Math.random() * 0.6;
-
-      const rigidBody = this.rigidWorld.createItemBody(
-        id,
-        { x: posX, y: posY },
-        { x: vx, y: vy }
-      );
-      this.activeItemBodies.set(id, rigidBody);
-
-      const droppedItem: MiningDroppedItem = {
-        id,
-        position: { x: posX, y: posY },
-        velocity: { x: vx, y: vy },
-        itemId: drop.itemId,
-        itemName: itemData?.name || drop.itemId,
-        iconUrl: itemData?.iconUrl || null,
-        inGameSpriteUrl: itemData?.inGameSpriteUrl || null,
-        quantity: drop.quantity,
-        physicsConfig: itemData?.physicsConfig,
-        particleEffectId: itemData?.particleEffectId || null,
-        lightConfig: itemData?.lightConfig || null,
-      };
-
-      this.droppedItems.push(droppedItem);
-    });
-
-    this.droppedItemsDirty = true;
+    if (this.onTimeout) {
+      this.onTimeout(this.primaryCharacterId || this.roomId);
+    }
   }
 }
-

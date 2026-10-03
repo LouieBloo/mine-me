@@ -178,6 +178,12 @@ export interface MiningShootPayload extends GameEventBase {
   type: 'mining_shoot';
   target: Vector2D;
   itemId?: string;
+  weaponItemId?: string;
+}
+
+export interface MiningReloadPayload extends GameEventBase {
+  type: 'mining_reload';
+  weaponItemId?: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -197,6 +203,7 @@ export type GameEventPayload =
   | MiningThrowDynamitePayload
   | MiningThrowItemPayload
   | MiningShootPayload
+  | MiningReloadPayload
   | MiningIncreaseVisionPayload
   | MiningMovePayload
   | MiningMineStartPayload

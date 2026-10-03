@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MiningPlayerBody, type MiningClientTile, MiningTileType } from '@mine-me/shared';
+import { MiningPlayerBody, type MiningClientTile, MiningTileType, type MiningActiveProjectile } from '@mine-me/shared';
 import { useMiningTicker } from './useMiningTicker';
 import { renderHook } from '@testing-library/react';
 
@@ -842,6 +842,201 @@ describe('useMiningTicker - Torch Preview Lighting', () => {
       unmount();
       expect(mockDroppedItemVisualManager.destroy).toHaveBeenCalled();
     });
+  });
+});
+
+describe('useMiningTicker - Projectile Flight & Visibility', () => {
+  let mockApp: any;
+  let tickerCallbacks: (() => void)[] = [];
+  let playerContainer: any;
+  let gridContainer: any;
+
+  const createMockGrid = (): MiningClientTile[][] => {
+    return Array.from({ length: 10 }, (_, y) =>
+      Array.from({ length: 10 }, () => ({
+        type: y >= 5 ? MiningTileType.DIRT : MiningTileType.EMPTY,
+        revealed: true,
+        damageStage: 0,
+      }))
+    );
+  };
+
+  beforeEach(() => {
+    tickerCallbacks = [];
+    mockApp = {
+      ticker: {
+        deltaMS: 16.67,
+        add: vi.fn((cb) => tickerCallbacks.push(cb)),
+        remove: vi.fn((cb) => {
+          tickerCallbacks = tickerCallbacks.filter((c) => c !== cb);
+        }),
+      },
+      screen: { width: 800, height: 600 },
+    };
+    playerContainer = { x: 0, y: 0 };
+    gridContainer = { x: 0, y: 0 };
+  });
+
+  it('advances client projectile position over empty tiles and maintains visibility', () => {
+    const activeProjectiles: MiningActiveProjectile[] = [
+      {
+        id: 'client_proj_1',
+        position: { x: 2, y: 2 },
+        spawnPosition: { x: 2, y: 2 },
+        velocity: { x: 10, y: 0 },
+        angle: 0,
+      },
+    ];
+    const activeProjectilesRef = { current: activeProjectiles };
+    const projectileGraphicsMap = { current: new Map() };
+    const projectilesContainer = { addChild: vi.fn(), removeChild: vi.fn(), children: [] };
+    const gridRef = { current: createMockGrid() };
+    const playerBodyRef = { current: new MiningPlayerBody({ x: 2, y: 4 }) };
+
+    renderHook(() =>
+      useMiningTicker({
+        app: mockApp,
+        playerContainerRef: { current: playerContainer },
+        gridContainerRef: { current: gridContainer },
+        fallingRocksContainerRef: { current: null },
+        currentRenderPosRef: { current: { x: 2, y: 4 } },
+        targetServerPosRef: { current: { x: 2, y: 4 } },
+        isFacingLeftRef: { current: false },
+        playerFacingDirRef: { current: { x: 1, y: 0 } },
+        playerSpriteRef: { current: null },
+        activeFallingRocksRef: { current: [] },
+        fallingRockGraphicsMap: { current: new Map() },
+        debugGraphicsRef: { current: null },
+        showDebugRef: { current: false },
+        flashlightRef: { current: null },
+        lightingEngineRef: { current: null },
+        cameraRef: { current: null },
+        playerBodyRef,
+        gridRef,
+        projectilesContainerRef: { current: projectilesContainer as any },
+        activeProjectilesRef,
+        projectileGraphicsMap,
+      })
+    );
+
+    // Run 1 frame (dt = 0.01667s)
+    tickerCallbacks[0]();
+
+    expect(activeProjectilesRef.current.length).toBe(1);
+    const proj = activeProjectilesRef.current[0];
+    expect(proj.position.x).toBeGreaterThan(2.0);
+    expect(proj.hasHit).toBeFalsy();
+  });
+
+  it('retains projectile on impact frame at collision point with impact linger rather than immediate deletion', () => {
+    // Grid has solid dirt floor at y >= 5
+    const activeProjectiles: MiningActiveProjectile[] = [
+      {
+        id: 'client_proj_hit',
+        position: { x: 2, y: 4.8 },
+        spawnPosition: { x: 2, y: 3.5 },
+        velocity: { x: 0, y: 20 }, // Moving downwards into dirt row y=5
+        angle: Math.PI / 2,
+      },
+    ];
+    const activeProjectilesRef = { current: activeProjectiles };
+    const projectileGraphicsMap = { current: new Map() };
+    const projectilesContainer = { addChild: vi.fn(), removeChild: vi.fn(), children: [] };
+    const gridRef = { current: createMockGrid() };
+    const playerBodyRef = { current: new MiningPlayerBody({ x: 2, y: 4 }) };
+
+    renderHook(() =>
+      useMiningTicker({
+        app: mockApp,
+        playerContainerRef: { current: playerContainer },
+        gridContainerRef: { current: gridContainer },
+        fallingRocksContainerRef: { current: null },
+        currentRenderPosRef: { current: { x: 2, y: 4 } },
+        targetServerPosRef: { current: { x: 2, y: 4 } },
+        isFacingLeftRef: { current: false },
+        playerFacingDirRef: { current: { x: 1, y: 0 } },
+        playerSpriteRef: { current: null },
+        activeFallingRocksRef: { current: [] },
+        fallingRockGraphicsMap: { current: new Map() },
+        debugGraphicsRef: { current: null },
+        showDebugRef: { current: false },
+        flashlightRef: { current: null },
+        lightingEngineRef: { current: null },
+        cameraRef: { current: null },
+        playerBodyRef,
+        gridRef,
+        projectilesContainerRef: { current: projectilesContainer as any },
+        activeProjectilesRef,
+        projectileGraphicsMap,
+      })
+    );
+
+    // Advance frame so bullet hits solid block
+    tickerCallbacks[0]();
+
+    // Crucial: projectile must NOT be removed from activeProjectiles on impact frame!
+    expect(activeProjectilesRef.current.length).toBe(1);
+    const proj = activeProjectilesRef.current[0];
+    expect(proj.hasHit).toBe(true);
+    expect(proj.velocity.x).toBe(0);
+    expect(proj.velocity.y).toBe(0);
+    expect(proj.impactTimer).toBeGreaterThan(0);
+    expect(proj.alpha).toBe(1.0);
+  });
+
+  it('allows projectile to fly freely through open sky above ground (y < 0) without snapping to y=0 or despawning immediately', () => {
+    // Projectile spawned above ground at y = -1.0, traveling horizontally through the sky
+    const activeProjectiles: MiningActiveProjectile[] = [
+      {
+        id: 'client_proj_sky',
+        position: { x: 2, y: -1.0 },
+        spawnPosition: { x: 2, y: -1.0 },
+        velocity: { x: 15, y: -2 }, // Shooting slightly upward into the sky
+        angle: -0.13,
+      },
+    ];
+    const activeProjectilesRef = { current: activeProjectiles };
+    const projectileGraphicsMap = { current: new Map() };
+    const projectilesContainer = { addChild: vi.fn(), removeChild: vi.fn(), children: [] };
+    const gridRef = { current: createMockGrid() };
+    const playerBodyRef = { current: new MiningPlayerBody({ x: 2, y: -0.5 }) };
+
+    renderHook(() =>
+      useMiningTicker({
+        app: mockApp,
+        playerContainerRef: { current: playerContainer },
+        gridContainerRef: { current: gridContainer },
+        fallingRocksContainerRef: { current: null },
+        currentRenderPosRef: { current: { x: 2, y: -0.5 } },
+        targetServerPosRef: { current: { x: 2, y: -0.5 } },
+        isFacingLeftRef: { current: false },
+        playerFacingDirRef: { current: { x: 1, y: 0 } },
+        playerSpriteRef: { current: null },
+        activeFallingRocksRef: { current: [] },
+        fallingRockGraphicsMap: { current: new Map() },
+        debugGraphicsRef: { current: null },
+        showDebugRef: { current: false },
+        flashlightRef: { current: null },
+        lightingEngineRef: { current: null },
+        cameraRef: { current: null },
+        playerBodyRef,
+        gridRef,
+        projectilesContainerRef: { current: projectilesContainer as any },
+        activeProjectilesRef,
+        projectileGraphicsMap,
+      })
+    );
+
+    // Advance 1 frame (dt = ~0.0167s)
+    tickerCallbacks[0]();
+
+    expect(activeProjectilesRef.current.length).toBe(1);
+    const proj = activeProjectilesRef.current[0];
+    // Projectile must remain airborne in negative y, NOT clamped to y=0 or flagged as hit
+    expect(proj.position.y).toBeLessThan(0);
+    expect(proj.position.x).toBeGreaterThan(2.0);
+    expect(proj.hasHit).toBeFalsy();
+    expect(proj.velocity.x).toBe(15);
   });
 });
 

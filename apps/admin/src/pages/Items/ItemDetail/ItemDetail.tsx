@@ -12,6 +12,7 @@ import ItemSoundEffectUpload from './ItemSoundEffectUpload/ItemSoundEffectUpload
 import ItemColliderEditor from '../../../components/ItemColliderEditor/ItemColliderEditor';
 import ItemLightEffectConfig from './ItemLightEffectConfig/ItemLightEffectConfig';
 import ItemProjectileConfig from './ItemProjectileConfig/ItemProjectileConfig';
+import ItemInGameScale from './ItemInGameScale/ItemInGameScale';
 import './ItemDetail.css';
 
 interface ItemEnums {
@@ -30,7 +31,7 @@ export default function ItemDetail() {
     itemKey: '', name: '', description: '', type: 'GEAR', subType: 'HEAD',
     vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', triggerMode: 'SINGLE', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, throwable: false, experience: 0,
     combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null, physicsConfig: null, lightConfig: null,
-    shootsProjectiles: false, projectileConfig: null
+    shootsProjectiles: false, projectileConfig: null, inGameScale: 1.0
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
   const [effectsList, setEffectsList] = useState<any[]>([]);
@@ -519,6 +520,20 @@ export default function ItemDetail() {
                   </div>
                 </label>
               </div>
+            </div>
+
+            {/* In-Game World Scale (Grow / Shrink) */}
+            <div className="md:col-span-2 pt-4 border-t border-slate-100">
+              <ItemInGameScale
+                value={typeof data.inGameScale === 'number' ? data.inGameScale : 1.0}
+                onChange={(newScale) => {
+                  setData({ ...data, inGameScale: newScale });
+                  if (errors.inGameScale) setErrors({ ...errors, inGameScale: '' });
+                }}
+                spriteUrl={data.inGameSpriteUrl || data.iconUrl}
+                itemName={data.name || 'Item'}
+                error={errors.inGameScale}
+              />
             </div>
 
             {/* 2D Collider & Rigid Body Physics Section */}

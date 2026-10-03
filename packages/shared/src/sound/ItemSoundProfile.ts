@@ -76,22 +76,38 @@ export abstract class ItemSoundProfile {
 }
 
 /**
- * Sound profile for weapon items (e.g. pickaxes, swords).
+ * Sound profile for weapon items (e.g. pickaxes, swords, revolvers).
  */
 export class WeaponSoundProfile extends ItemSoundProfile {
   public readonly subType: string = 'WEAPON';
   public readonly title: string = 'Weapon Sound Effect';
-  public readonly description: string = 'Plays in-game when using this weapon to mine blocks (MP3, WAV, OGG, WEBM)';
+  public readonly description: string = 'Configure sound effects for swinging, firing, and reloading weapons';
 
   public getSlots(): ItemSoundSlotDefinition[] {
     return [
       new ItemSoundSlotDefinition({
         slotKey: 'throw',
         label: 'Weapon Swing / Use',
-        description: 'Plays in-game when using this weapon to mine blocks',
+        description: 'Plays in-game when using this weapon to mine blocks or swing in melee',
         defaultLoop: false,
         loopToggleable: false,
         icon: '⚔️',
+      }),
+      new ItemSoundSlotDefinition({
+        slotKey: 'shoot',
+        label: 'Gunshot / Firing Sound',
+        description: 'Plays when firing projectile weapons (e.g. revolvers)',
+        defaultLoop: false,
+        loopToggleable: false,
+        icon: '🔫',
+      }),
+      new ItemSoundSlotDefinition({
+        slotKey: 'reload',
+        label: 'Reload Sound',
+        description: 'Plays when reloading firearm ammunition',
+        defaultLoop: false,
+        loopToggleable: false,
+        icon: '🔄',
       }),
     ];
   }

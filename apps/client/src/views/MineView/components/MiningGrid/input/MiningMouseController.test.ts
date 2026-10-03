@@ -729,15 +729,110 @@ describe('MiningMouseController and MouseAction', () => {
       expect(style.color).toBe(0xf97316);
     });
 
-    it('executes shot callback with continuous target coordinates', async () => {
-      const onShoot = vi.fn().mockResolvedValue(true);
-      const action = new ShootWeaponAction({ onShoot });
+    describe('triggerMode behavior in ShootWeaponAction', () => {
+      let mockCanvas: HTMLCanvasElement;
+      let mockCamera: any;
+      const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-      const target = { x: 14.75, y: 9.25 };
-      const success = await action.execute(target);
+      beforeEach(() => {
+        mockCanvas = document.createElement('canvas');
+        mockCanvas.getBoundingClientRect = () => ({
+          left: 0,
+          top: 0,
+          width: 1000,
+          height: 1000,
+          right: 1000,
+          bottom: 1000,
+          x: 0,
+          y: 0,
+          toJSON: () => {},
+        });
+        mockCamera = {
+          screenToWorld: (pos: { x: number; y: number }) => ({ x: pos.x, y: pos.y }),
+        };
+        controller.attach(mockCanvas);
+        controller.setCamera(mockCamera);
+      });
 
-      expect(success).toBe(true);
-      expect(onShoot).toHaveBeenCalledWith(target);
+      it('defaults triggerMode to SINGLE and allows dynamic override from item definition', () => {
+        const singleAction = new ShootWeaponAction({ onShoot: vi.fn() });
+        expect(singleAction.triggerMode).toBe(MouseActionTriggerMode.SINGLE);
+
+        const holdAction = new ShootWeaponAction({
+          onShoot: vi.fn(),
+          triggerMode: MouseActionTriggerMode.HOLD,
+        });
+        expect(holdAction.triggerMode).toBe(MouseActionTriggerMode.HOLD);
+      });
+
+      it('only fires once on pointerdown when triggerMode is SINGLE and does not fire repeatedly while held', async () => {
+        const onShoot = vi.fn().mockResolvedValue(true);
+        const action = new ShootWeaponAction({
+          triggerMode: MouseActionTriggerMode.SINGLE,
+          fireRate: 5, // 200ms cooldown
+          onShoot,
+        });
+
+        controller.setActiveAction(action);
+
+        // 1. Initial click
+        window.dispatchEvent(
+          new PointerEvent('pointerdown', { button: 0, clientX: 200, clientY: 200 })
+        );
+        await flushPromises();
+        expect(onShoot).toHaveBeenCalledTimes(1);
+
+        // 2. Mouse remains held down while moving or ticking update
+        window.dispatchEvent(new PointerEvent('pointermove', { clientX: 210, clientY: 200 }));
+        controller.update();
+        await flushPromises();
+        // Should NOT have fired again because triggerMode is SINGLE!
+        expect(onShoot).toHaveBeenCalledTimes(1);
+
+        // 3. Release mouse and advance past cooldown before clicking again
+        window.dispatchEvent(
+          new PointerEvent('pointerup', { button: 0, clientX: 210, clientY: 200 })
+        );
+        (controller as any).lastExecutedTime = 0;
+        window.dispatchEvent(
+          new PointerEvent('pointerdown', { button: 0, clientX: 220, clientY: 200 })
+        );
+        await flushPromises();
+        expect(onShoot).toHaveBeenCalledTimes(2);
+      });
+
+      it('fires continuously when triggerMode is HOLD while mouse is held down', async () => {
+        const onShoot = vi.fn().mockResolvedValue(true);
+        const action = new ShootWeaponAction({
+          triggerMode: MouseActionTriggerMode.HOLD,
+          fireRate: 10, // 100ms cooldown
+          onShoot,
+        });
+
+        controller.setActiveAction(action);
+
+        // 1. Initial click
+        window.dispatchEvent(
+          new PointerEvent('pointerdown', { button: 0, clientX: 200, clientY: 200 })
+        );
+        await flushPromises();
+        expect(onShoot).toHaveBeenCalledTimes(1);
+
+        // Advance performance.now past cooldown
+        const realNow = performance.now;
+        let mockTime = 1000;
+        performance.now = () => mockTime;
+        (controller as any).lastExecutedTime = 1000;
+
+        // Advance time by 150ms and trigger update
+        mockTime = 1150;
+        window.dispatchEvent(new PointerEvent('pointermove', { clientX: 205, clientY: 200 }));
+        controller.update();
+        await flushPromises();
+
+        expect(onShoot).toHaveBeenCalledTimes(2);
+        performance.now = realNow;
+      });
     });
   });
 });

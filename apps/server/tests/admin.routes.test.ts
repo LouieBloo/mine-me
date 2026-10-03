@@ -104,6 +104,40 @@ describe('Admin API Routes', () => {
        expect(res.body.dropTable.create.items.create[0].itemId).toBe('item_1');
     });
 
+    it('creates an item with custom inGameScale successfully', async () => {
+      const res = await request(app).post('/admin/items').send({
+        name: 'Huge Rock',
+        description: 'A massive boulder',
+        type: 'MATERIAL',
+        subType: 'MINERAL',
+        vendorBuyPrice: 10,
+        vendorSellPrice: 5,
+        userBuyPrice: 10,
+        userSellPrice: 5,
+        rarity: 'LOW',
+        inGameScale: 2.5
+      });
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('inGameScale', 2.5);
+    });
+
+    it('rejects inGameScale out of allowed bounds', async () => {
+      const res = await request(app).post('/admin/items').send({
+        name: 'Invalid Scale Item',
+        description: 'Too huge',
+        type: 'MATERIAL',
+        subType: 'MINERAL',
+        vendorBuyPrice: 10,
+        vendorSellPrice: 5,
+        userBuyPrice: 10,
+        userSellPrice: 5,
+        rarity: 'LOW',
+        inGameScale: 10.0
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.errors.some((err: any) => err.path === 'inGameScale')).toBe(true);
+    });
+
     it('saves skeleton configuration via PUT /admin/mobs/:id/skeleton', async () => {
       const manifest = {
         version: '2.0',

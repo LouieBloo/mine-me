@@ -199,6 +199,7 @@ export interface GameItem {
   itemEffects?: ObjectEffects[];
   physicsConfig?: ItemPhysicsConfig | null;
   lightConfig?: ItemLightConfig | null;
+  inGameScale?: number;
 }
 
 export interface GearItem extends GameItem {
