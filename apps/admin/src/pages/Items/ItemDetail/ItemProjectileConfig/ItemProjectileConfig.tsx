@@ -25,7 +25,6 @@ const DEFAULT_PROJECTILE_CONFIG: ProjectileConfigType = {
   reloadTime: 1.5,
   projectileSpeed: 28.0,
   projectileGravityScale: 0.05,
-  damage: 35,
   maxLifetime: 3.0,
   projectileItemId: '',
 };
@@ -240,28 +239,18 @@ export const ItemProjectileConfig: React.FC<ItemProjectileConfigProps> = ({
               </p>
             </div>
 
-            {/* Damage */}
-            <div className="space-y-1.5 bg-slate-950/40 border border-slate-800/80 p-3.5 rounded-xl">
+            {/* Projectile Damage Note */}
+            <div className="space-y-1.5 bg-rose-950/20 border border-rose-800/40 p-3.5 rounded-xl">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-bold text-slate-300">
-                  Impact Damage (HP)
+                <label className="text-xs font-bold text-rose-300">
+                  Weapon Damage
                 </label>
-                <span className="text-xs font-mono font-bold text-orange-400">
-                  {current.damage} DMG
+                <span className="text-[10px] font-black uppercase tracking-wider text-rose-400 bg-rose-950 px-2 py-0.5 rounded border border-rose-800/60">
+                  Gear Effect
                 </span>
               </div>
-              <input
-                type="number"
-                min="0"
-                max="10000"
-                step="1"
-                value={current.damage ?? 35}
-                onChange={(e) => update({ damage: Math.max(0, parseInt(e.target.value) || 0) })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm font-mono text-slate-200 focus:border-orange-500"
-                data-testid="damage-input"
-              />
-              <p className="text-[11px] text-slate-500">
-                Base damage dealt to mobs or mine blocks on impact
+              <p className="text-xs text-slate-300 mt-1">
+                Bullet impact damage is resolved from the firing weapon&apos;s <strong className="text-rose-300">Damage</strong> effect in the Gear Effects table above.
               </p>
             </div>
 

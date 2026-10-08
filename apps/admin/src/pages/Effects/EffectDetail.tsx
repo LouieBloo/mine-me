@@ -8,7 +8,7 @@ export default function EffectDetail() {
   const { id } = useParams<{ id: string }>();
   const isNew = id === 'new';
   const navigate = useNavigate();
-  const [data, setData] = useState<any>(isNew ? { name: '', description: '', healthGain: false, staminaGain: false, miningSpeedModifier: false, explodes: false } : null);
+  const [data, setData] = useState<any>(isNew ? { name: '', description: '', healthGain: false, staminaGain: false, miningSpeedModifier: false, damageModifier: false, explodes: false } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -159,7 +159,17 @@ export default function EffectDetail() {
                   onChange={(e) => setData({ ...data, miningSpeedModifier: e.target.checked })}
                   className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
-                Mining Speed Modifier
+                Mining Speed Modifier (Attack Speed)
+              </label>
+
+              <label className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">
+                <input
+                  type="checkbox"
+                  checked={data.damageModifier || false}
+                  onChange={(e) => setData({ ...data, damageModifier: e.target.checked })}
+                  className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Damage Modifier (Weapon / Mining Damage)
               </label>
 
               <label className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">

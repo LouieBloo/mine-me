@@ -179,6 +179,7 @@ export interface MiningShootPayload extends GameEventBase {
   target: Vector2D;
   itemId?: string;
   weaponItemId?: string;
+  muzzlePosition?: Vector2D;
 }
 
 export interface MiningReloadPayload extends GameEventBase {

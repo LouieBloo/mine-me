@@ -466,14 +466,16 @@ describe('MiningGameEngine', () => {
     expect(started).toBe(true);
     expect(engine.isMining).toBe(true);
 
-    // Run 250ms of ticks (0.25s)
-    (engine as any).tick(0.25);
-    expect(engine.miningProgressMs).toBeCloseTo(250, 0);
+    // Speed 100 = 8 swings/sec (125ms per swing), 25 damage per swing. First swing lands immediately.
+    (engine as any).tick(0.125);
+    expect(engine.miningProgressMs).toBeCloseTo(25, 0);
+    (engine as any).tick(0.125);
+    (engine as any).tick(0.125);
+    expect(engine.miningProgressMs).toBeCloseTo(75, 0);
     expect(engine.isMining).toBe(true);
 
-    // Run another 260ms of ticks (total > 500ms)
-    (engine as any).tick(0.26);
-    // Block should now be mined and turned into EMPTY
+    // 4th swing breaks the 100 HP block
+    (engine as any).tick(0.125);
     expect(engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1].type).toBe(MiningTileType.EMPTY);
     expect(engine.isMining).toBe(false);
   });
@@ -503,12 +505,12 @@ describe('MiningGameEngine', () => {
     const started = engine.startMining({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
     expect(started).toBe(true);
 
-    // At 2x speed (200%), 0.13s (130ms) -> 260ms damage
-    (engine as any).tick(0.13);
-    expect(engine.miningProgressMs).toBeCloseTo(260, 0);
-
-    // Another 0.13s -> 260ms damage (total 520ms > 500ms dirt mine time)
-    (engine as any).tick(0.13);
+    // Speed 200 = 16 swings/sec (62.5ms per swing), 25 damage per swing
+    (engine as any).tick(0.0625);
+    expect(engine.miningProgressMs).toBeCloseTo(25, 0);
+    (engine as any).tick(0.0625);
+    (engine as any).tick(0.0625);
+    (engine as any).tick(0.0625);
     expect(engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1].type).toBe(MiningTileType.EMPTY);
     expect(engine.isMining).toBe(false);
   });
@@ -532,6 +534,38 @@ describe('MiningGameEngine', () => {
     engine.setMiningSpeed(0);
     expect(engine.isMining).toBe(false);
     expect(engine.miningTarget).toBeNull();
+  });
+
+  it('correctly deals damage when miningDamage is 1', () => {
+    const engine = new MiningGameEngine({
+      characterId: 'char-1',
+      cityId: 'city-1',
+      seed: 12345,
+      miningSpeed: 25,
+      miningDamage: 1,
+      socket: mockSocket,
+    });
+    engine.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.playerBody.radius };
+    engine.playerBody.isGrounded = true;
+
+    engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
+    engine.handleInput({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      miningKey: true,
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      sequence: 1,
+    });
+
+    engine.startMining({ x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
+    expect(engine.isMining).toBe(true);
+
+    // First swing lands immediately; next after 0.5s. 2 swings at 1 dmg each => 2 damage.
+    (engine as any).tick(0.5);
+    (engine as any).tick(0.5);
+    expect(engine.miningProgressMs).toBeCloseTo(2.0, 1);
   });
 
   it('places a torch tile within 1 tile distance and verifies non-solid collision', () => {
@@ -1276,9 +1310,50 @@ describe('MiningGameEngine', () => {
 
       (engine as any).tick(0.033);
 
-      expect(mob.health).toBe(25); // 40 - 15 = 25
+      expect(mob.health).toBe(15); // 40 - 25 (dynamic baseline weapon damage) = 15
       expect(mob.mobBody.velocity.x).toBeGreaterThan(0); // Knockback to the right
       expect(mob.mobBody.velocity.y).toBeLessThan(0); // Upward pop
+    });
+
+    it('anchors the melee hit box to the weapon: hits mobs near it, ignores mobs out of reach', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      for (let y = 6; y <= 10; y++) {
+        for (let x = 6; x <= 16; x++) {
+          engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+        }
+      }
+
+      const session = (engine as any).players.get('char-1');
+      session.playerBody.position = { x: 10, y: 10 };
+
+      const near = engine.spawnMob({ id: 'mob_near', name: 'Mole Person', health: 40 }, { x: 11.2, y: 10 });
+      const far = engine.spawnMob({ id: 'mob_far', name: 'Mole Person', health: 40 }, { x: 14, y: 10 });
+      const above = engine.spawnMob({ id: 'mob_above', name: 'Mole Person', health: 40 }, { x: 10, y: 8.5 });
+
+      // Swing to the right: only the mob next to the weapon is struck
+      session.inputs = { miningKey: true, isFacingLeft: false };
+      session.aimDirection = { x: 1, y: 0 };
+      session.isFacingLeft = false;
+      (engine as any).tick(0.033);
+
+      expect(near.health).toBeLessThan(40);
+      expect(far.health).toBe(40);
+      expect(above.health).toBe(40);
+
+      // Swing straight up (after cooldown): the weapon moves with the aim direction
+      session.lastAttackTimeMs = 0;
+      session.aimDirection = { x: 0, y: -1 };
+      above.mobBody.position = { x: 10, y: 8.8 };
+      (engine as any).tick(0.033);
+
+      expect(above.health).toBeLessThan(40);
+      expect(far.health).toBe(40);
     });
 
     it('does not hit mobs when pointing in the opposite direction (behind player)', () => {
@@ -1346,8 +1421,116 @@ describe('MiningGameEngine', () => {
 
       (engine as any).tick(0.033);
 
-      // Mob was outside the upward swing cone (90° away, dot = 0 < 0.30)
+      // Mob was outside the upward swing scan
       expect(mob.health).toBe(40);
+    });
+
+    it('does not hit mobs behind a solid block when mining (obstacle shielding)', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+      });
+
+      // Player is at (10, 10.5)
+      const session = (engine as any).players.get('char-1');
+      session.playerBody.position = { x: 10, y: 10.5 };
+
+      // Set solid DIRT block at (11, 10) in front of player
+      engine.grid[10][11] = { type: MiningTileType.DIRT, revealed: true };
+
+      // Mob is behind the solid block at (12.2, 10.5)
+      const mob = engine.spawnMob(
+        { id: 'mob_behind_wall', name: 'Mole Person', health: 50 },
+        { x: 12.2, y: 10.5 }
+      );
+
+      // Player is mining the solid dirt block at (11, 10)
+      session.inputs = {
+        miningKey: true,
+        miningTarget: { x: 11, y: 10 },
+      };
+      session.aimDirection = { x: 1, y: 0 };
+
+      (engine as any).tick(0.033);
+
+      // The solid dirt block must shield the mob from damage
+      expect(mob.health).toBe(50);
+    });
+
+    it('hits an adjacent mob regardless of cursor distance, but not mobs ~2 tiles away', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        socket: mockSocket,
+        mapConfig: { mobSpawnCount: 0 },
+      });
+
+      for (let y = 8; y <= 10; y++) {
+        for (let x = 8; x <= 16; x++) {
+          engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+        }
+      }
+      for (let x = 8; x <= 16; x++) {
+        engine.grid[11][x] = { type: MiningTileType.DIRT, revealed: true };
+      }
+
+      const session = (engine as any).players.get('char-1');
+      session.playerBody.position = { x: 10, y: 10.5 };
+      session.playerBody.velocity = { x: 0, y: 0 };
+      session.playerBody.isGrounded = true;
+
+      const near = engine.spawnMob(
+        { id: 'mob_near', name: 'Mole Person', health: 50, moveSpeed: 0 },
+        { x: 11.2, y: 10.5 }
+      );
+      const far = engine.spawnMob(
+        { id: 'mob_far', name: 'Mole Person', health: 50, moveSpeed: 0 },
+        { x: 12.6, y: 10.5 }
+      );
+
+      // Weapon points right; the hit box follows the weapon, not the cursor distance
+      session.inputs = { miningKey: true };
+      session.aimDirection = { x: 1, y: 0 };
+
+      (engine as any).tick(0.033);
+
+      expect(near.health).toBe(25);
+      expect(far.health).toBe(50);
+    });
+
+    it('dynamically applies configured weapon damage (miningDamage) to melee swings', () => {
+      const engine = new MiningGameEngine({
+        characterId: 'char-1',
+        cityId: 'city-1',
+        seed: 12345,
+        miningDamage: 35, // custom dynamic weapon damage
+        socket: mockSocket,
+      });
+
+      for (let x = 8; x <= 16; x++) {
+        engine.grid[10][x] = { type: MiningTileType.EMPTY, revealed: true };
+      }
+
+      const session = (engine as any).players.get('char-1');
+      session.playerBody.position = { x: 10, y: 10.5 };
+
+      const mob = engine.spawnMob(
+        { id: 'mob_weapon_test', name: 'Mole Person', health: 100 },
+        { x: 11.2, y: 10.5 }
+      );
+
+      session.inputs = {
+        miningKey: true,
+      };
+      session.aimDirection = { x: 1, y: 0 };
+
+      (engine as any).tick(0.033);
+
+      // 100 - 35 = 65
+      expect(mob.health).toBe(65);
     });
 
     it('mob excavates targeted block when mining progress completes', () => {
@@ -1434,7 +1617,7 @@ describe('MiningGameEngine', () => {
         { x: 12, y: 18 }
       );
 
-      const activeMobs = engine.getActiveMobs();
+      const activeMobs = engine.getActiveMobs().filter((m) => m.mobId !== 'mob_target_dummy');
       expect(activeMobs.length).toBe(1);
       expect(activeMobs[0].id).toBe(mob.id);
       expect(activeMobs[0].name).toBe('Mole Person');
@@ -1456,7 +1639,7 @@ describe('MiningGameEngine', () => {
       });
 
       // Mobs should have been populated
-      const activeMobs = engine.getActiveMobs();
+      const activeMobs = engine.getActiveMobs().filter((m) => m.mobId !== 'mob_target_dummy');
       expect(activeMobs.length).toBe(2);
       for (const mob of activeMobs) {
         expect(mob.position.y).toBeGreaterThanOrEqual(4.5); // standing in depth >= 5
@@ -1507,8 +1690,8 @@ describe('MiningGameEngine', () => {
       // Run a tick to process player melee combat (section 4.5)
       (engine as any).tick(0.033);
 
-      // Mob should take 15 damage
-      expect(mob.health).toBe(35);
+      // Mob should take 25 dynamic weapon damage
+      expect(mob.health).toBe(25);
       // Mob should have received knockback velocity away from player
       expect(mob.mobBody.velocity.x).toBeGreaterThan(0);
       // Player animation state should be 'mine'

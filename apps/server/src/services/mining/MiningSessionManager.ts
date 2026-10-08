@@ -41,6 +41,7 @@ export class MiningSessionManager {
     characterName?: string,
     gearLayers?: MiningGearLayer[],
     mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>,
+    miningDamage = 25,
   ): MiningGameEngine {
     const targetRoomId = mode === 'multiplayer' ? DEFAULT_MULTIPLAYER_ROOM_ID : `solo_${characterId}`;
     const prevRoomId = this.playerToRoom.get(characterId);
@@ -83,6 +84,7 @@ export class MiningSessionManager {
       characterName,
       socket,
       miningSpeed,
+      miningDamage,
       gearLayers,
     });
 

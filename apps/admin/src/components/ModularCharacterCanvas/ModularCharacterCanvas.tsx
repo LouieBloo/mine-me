@@ -9,7 +9,7 @@ import {
   type HandJointOverride,
   type ToolSocketOverride,
 } from './hooks/useModularCanvasScene';
-import { useModularGear } from './hooks/useModularGear';
+import { useModularGear, type ModularGearItem } from './hooks/useModularGear';
 import './ModularCharacterCanvas.css';
 
 export type {
@@ -20,6 +20,8 @@ export type {
   HandJointOverride,
   ToolSocketOverride,
   CharacterAnimationState,
+  ModularGearItem,
+  GearSubType,
 };
 
 export interface ModularCharacterCanvasProps {
@@ -27,6 +29,7 @@ export interface ModularCharacterCanvasProps {
   manifestData?: SkeletonManifest | null;
   baseAssetPath?: string;
   animationState?: CharacterAnimationState;
+  aimAngle?: number;
   speedMultiplier?: number;
   isPlaying?: boolean;
   isFlipped?: boolean;
@@ -36,7 +39,7 @@ export interface ModularCharacterCanvasProps {
   showDebugBbox?: boolean;
   hiddenParts?: string[];
   highlightedPart?: string | null;
-  selectedGear?: Array<{ url: string; subType: GearSubType }>;
+  selectedGear?: ModularGearItem[];
   handJointOverride?: HandJointOverride;
   toolSocketOverride?: ToolSocketOverride;
   partOverrides?: Record<
@@ -78,12 +81,14 @@ export default function ModularCharacterCanvas({
   width = 460,
   height = 520,
   className = '',
+  aimAngle,
 }: ModularCharacterCanvasProps) {
   const { containerRef, nodesRef, loading, error } = useModularCanvasScene({
     manifestUrl,
     manifestData,
     baseAssetPath,
     animationState,
+    aimAngle,
     speedMultiplier,
     isPlaying,
     isFlipped,
@@ -104,6 +109,7 @@ export default function ModularCharacterCanvas({
   useModularGear({
     nodesRef,
     selectedGear,
+    isSceneReady: !loading,
   });
 
   return (

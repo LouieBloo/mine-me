@@ -24,7 +24,7 @@ export default function BlockDetail() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    mineTimeMs: 500,
+    health: 100,
     staminaCost: 1,
     idleParticleEffectId: '',
   });
@@ -48,7 +48,7 @@ export default function BlockDetail() {
         setFormData({
           name: data.name || '',
           description: data.description || '',
-          mineTimeMs: data.mineTimeMs ?? 500,
+          health: data.health ?? (data.mineTimeMs ? Math.round(data.mineTimeMs / 5) : 100),
           staminaCost: data.staminaCost ?? 1,
           idleParticleEffectId: data.idleParticleEffectId || '',
         });
@@ -146,16 +146,17 @@ export default function BlockDetail() {
             <div className="bg-slate-800 p-6">
               <h3 className="text-xl font-black text-white tracking-tight uppercase">Block Properties</h3>
               <p className="text-slate-400 text-xs font-bold mt-1 uppercase tracking-widest">
-                Configure mining duration and stamina costs
+                Configure block health and stamina costs
               </p>
             </div>
 
             <div className="p-8 space-y-6">
               <div className="space-y-2">
-                <label className="block text-xs font-black uppercase text-slate-600 tracking-wider">
+                <label htmlFor="name" className="block text-xs font-black uppercase text-slate-600 tracking-wider">
                   Block Name
                 </label>
                 <input
+                  id="name"
                   type="text"
                   name="name"
                   value={formData.name}
@@ -166,10 +167,11 @@ export default function BlockDetail() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-black uppercase text-slate-600 tracking-wider">
+                <label htmlFor="description" className="block text-xs font-black uppercase text-slate-600 tracking-wider">
                   Description
                 </label>
                 <textarea
+                  id="description"
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
@@ -180,26 +182,28 @@ export default function BlockDetail() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="block text-xs font-black uppercase text-slate-600 tracking-wider">
-                    Mine Time (Milliseconds)
+                  <label htmlFor="health" className="block text-xs font-black uppercase text-slate-600 tracking-wider">
+                    Block Health (HP)
                   </label>
                   <input
+                    id="health"
                     type="number"
-                    name="mineTimeMs"
-                    value={formData.mineTimeMs}
+                    name="health"
+                    value={formData.health}
                     onChange={handleChange}
                     min={0}
-                    step={50}
+                    step={10}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-800"
                   />
-                  <span className="text-[11px] text-slate-400 font-medium">0 ms for unmineable blocks</span>
+                  <span className="text-[11px] text-slate-400 font-medium">0 HP for unmineable blocks</span>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-xs font-black uppercase text-slate-600 tracking-wider">
+                  <label htmlFor="staminaCost" className="block text-xs font-black uppercase text-slate-600 tracking-wider">
                     Stamina Cost
                   </label>
                   <input
+                    id="staminaCost"
                     type="number"
                     name="staminaCost"
                     value={formData.staminaCost}

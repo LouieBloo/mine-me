@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { usePixiStage } from '../../../../components/game/PixiStageContext/PixiStageContext';
 import { type GearLayerDescriptor } from '../../../../components/game/sprites';
 import {
@@ -14,6 +14,8 @@ import {
   type MiningDroppedItem,
   type MiningBackpackItem,
   type GameItem,
+  CharacterModEngine,
+  calculateEffectiveSwingSpeed,
 } from '@mine-me/shared';
 import type { EmitterHandle } from '../../../../components/game/particles/ParticleEngine';
 import { useSocket } from '../../../../contexts/SocketContext';
@@ -132,39 +134,111 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     y: initialSessionState.position.y,
   });
 
-  // Gear layers derivation
+  const [dynamicItems, setDynamicItems] = useState<GameItem[]>([]);
+
+  useEffect(() => {
+    fetch(getAssetUrl(`/api/public/items?_t=${Date.now()}`))
+      .then((res) => (res.ok ? res.json() : []))
+      .then((items) => {
+        if (Array.isArray(items)) {
+          setDynamicItems(items);
+        }
+      })
+      .catch((err) => console.warn('[MiningGrid] Initial items fetch error:', err));
+  }, []);
+
+  // Gear layers derivation (merging live database item definitions so admin offset changes reflect immediately)
   const gearLayers: GearLayerDescriptor[] = useMemo(() => {
     if (!playerState.inventory?.items) return [];
-    return playerState.inventory.items
+    const baseLayers: GearLayerDescriptor[] = playerState.inventory.items
       .filter((inv) => inv.item.type === 'GEAR' && inv.item.gearImageUrl && inv.equipped)
-      .map((inv) => ({
-        url: getAssetUrl(inv.item.gearImageUrl),
-        subType: inv.item.subType as any,
-      }));
-  }, [playerState.inventory?.items]);
+      .map((inv) => {
+        const dbItem = dynamicItems.find(
+          (d: any) => d.id === inv.item.id || (d.itemKey && d.itemKey === inv.item.itemKey)
+        );
+        const item = dbItem ? { ...inv.item, ...dbItem } : inv.item;
+        return {
+          url: getAssetUrl(item.gearImageUrl),
+          subType: item.subType as any,
+          shootsProjectiles: Boolean(item.shootsProjectiles),
+          throwable: Boolean(item.throwable),
+          holdOffsetX: item.holdOffsetX,
+          holdOffsetY: item.holdOffsetY,
+          holdRotation: item.holdRotation,
+          muzzleOffsetX: item.muzzleOffsetX,
+          muzzleOffsetY: item.muzzleOffsetY,
+        };
+      });
+
+    // If throwing a throwable item (e.g. dynamite), show the throwable item in the character's hand
+    if ((isThrowingItem || isThrowingDynamite) && activeThrowableItem) {
+      const dbThrowable = dynamicItems.find(
+        (d: any) => d.id === activeThrowableItem.id || (d.itemKey && d.itemKey === activeThrowableItem.itemKey)
+      );
+      const item = dbThrowable ? { ...activeThrowableItem, ...dbThrowable } : activeThrowableItem;
+      const throwableImg =
+        item.gearImageUrl ||
+        item.inGameSpriteUrl ||
+        item.iconUrl;
+      if (throwableImg) {
+        const withoutWeapon = baseLayers.filter((l) => l.subType !== 'WEAPON');
+        withoutWeapon.push({
+          url: getAssetUrl(throwableImg),
+          subType: 'WEAPON',
+          shootsProjectiles: false,
+          throwable: true,
+          holdOffsetX: item.holdOffsetX,
+          holdOffsetY: item.holdOffsetY,
+          holdRotation: item.holdRotation,
+          muzzleOffsetX: item.muzzleOffsetX,
+          muzzleOffsetY: item.muzzleOffsetY,
+        });
+        return withoutWeapon;
+      }
+    }
+
+    return baseLayers;
+  }, [playerState.inventory?.items, isThrowingItem, isThrowingDynamite, activeThrowableItem, dynamicItems]);
 
   // Weapon derivation for in-game mining sound effect & projectile shooting
   const equippedWeapon = useMemo(() => {
+    let weapon: GameItem | null = null;
     if (playerState.gear?.weapon) {
-      return playerState.gear.weapon;
-    }
-    if (playerState.inventory?.items) {
+      weapon = playerState.gear.weapon;
+    } else if (playerState.inventory?.items) {
       const items = playerState.inventory.items;
       const equipped = items.find(
         (inv) => inv.equipped && inv.item?.type === 'GEAR' && inv.item?.subType?.toUpperCase() === 'WEAPON'
       );
-      if (equipped?.item) return equipped.item;
-      const anyWeapon = items.find(
-        (inv) => inv.item?.type === 'GEAR' && inv.item?.subType?.toUpperCase() === 'WEAPON'
-      );
-      if (anyWeapon?.item) return anyWeapon.item;
-      const pickaxeItem = items.find(
-        (inv) => inv.item?.name?.toLowerCase().includes('pickaxe')
-      );
-      if (pickaxeItem?.item) return pickaxeItem.item;
+      if (equipped?.item) weapon = equipped.item;
+      else {
+        const anyWeapon = items.find(
+          (inv) => inv.item?.type === 'GEAR' && inv.item?.subType?.toUpperCase() === 'WEAPON'
+        );
+        if (anyWeapon?.item) weapon = anyWeapon.item;
+        else {
+          const pickaxeItem = items.find(
+            (inv) => inv.item?.name?.toLowerCase().includes('pickaxe')
+          );
+          if (pickaxeItem?.item) weapon = pickaxeItem.item;
+        }
+      }
     }
-    return null;
-  }, [playerState.gear?.weapon, playerState.inventory?.items]);
+    if (!weapon) return null;
+    const dbItem = dynamicItems.find(
+      (d: any) => d.id === weapon!.id || (d.itemKey && d.itemKey === weapon!.itemKey)
+    );
+    return dbItem ? { ...weapon, ...dbItem } : weapon;
+  }, [playerState.gear?.weapon, playerState.inventory?.items, dynamicItems]);
+
+  // Derive effective mining swing speed (swings per second) based on weapon attack speed & mining speed attributes
+  const effectiveMiningSwingSpeed = useMemo(() => {
+    const mods = playerState.inventory?.items
+      ? CharacterModEngine.getModifications(playerState.inventory.items)
+      : undefined;
+    const miningSpeed = mods?.miningSpeed ?? (playerState.attributes as any)?.miningSpeed ?? 100;
+    return calculateEffectiveSwingSpeed(equippedWeapon, miningSpeed);
+  }, [equippedWeapon, playerState.inventory?.items, playerState.attributes]);
 
   // Pixi Scene, Camera, Lighting & Asset Loading Hook
   const {
@@ -207,6 +281,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     isFacingLeftRef,
     zoom,
     onAssetsLoaded,
+    onDynamicItemsLoaded: setDynamicItems,
   });
 
   const torchEmittersRef = useRef<Map<string, EmitterHandle>>(new Map());
@@ -233,6 +308,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const { weaponSoundUrlRef, weaponAmmoStateRef, handleWeaponReload } = useMiningActions({
     playerState,
     equippedWeapon,
+    playerSpriteRef,
+    gridContainerRef,
     mouseControllerRef,
     gridRef,
     playerBodyRef,
@@ -259,6 +336,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     onDynamiteThrown,
     onWeaponAmmoChange,
   });
+
+  const lastWeaponSoundTimeRef = useRef<number>(0);
 
   // Real-time Input Controls Hook (Keyboard movement, debug toggle, camera zoom, flashlight toggle, weapon reload)
   const { keysPressedRef } = useMiningInput({
@@ -309,6 +388,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     droppedItemsRef,
     weaponAmmoStateRef,
     weaponSoundUrlRef,
+    lastWeaponSoundTimeRef,
     mouseControllerRef,
     tilesContainerRef,
     droppedItemsContainerRef,
@@ -377,6 +457,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     blockTexturesRef,
     soundManager,
     weaponSoundUrlRef,
+    lastWeaponSoundTimeRef,
+    miningSwingSpeed: effectiveMiningSwingSpeed,
   });
 
   return <div className="mining-grid-container" />;

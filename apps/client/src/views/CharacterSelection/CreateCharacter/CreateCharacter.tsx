@@ -35,9 +35,9 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
 
     const classes = ['Warrior', 'Mage', 'Rogue'];
 
-    const gearLayers: GearLayerDescriptor[] = React.useMemo(() => {
+    const gearLayers = React.useMemo<GearLayerDescriptor[]>(() => {
         return slots
-            .map(slot => {
+            .map((slot): GearLayerDescriptor | null => {
                 const selectedId = selectedGear[slot];
                 if (!selectedId) return null;
                 const itemDef = startingGear.find(g => g.id === selectedId);
@@ -45,6 +45,13 @@ export const CreateCharacter: React.FC<Props> = ({ onCreated, onCancel }) => {
                 return {
                     url: `${import.meta.env.VITE_API_URL || ''}${itemDef.gearImageUrl}`,
                     subType: slot,
+                    shootsProjectiles: Boolean(itemDef.shootsProjectiles),
+                    throwable: Boolean(itemDef.throwable),
+                    holdOffsetX: itemDef.holdOffsetX,
+                    holdOffsetY: itemDef.holdOffsetY,
+                    holdRotation: itemDef.holdRotation,
+                    muzzleOffsetX: itemDef.muzzleOffsetX,
+                    muzzleOffsetY: itemDef.muzzleOffsetY,
                 };
             })
             .filter((layer): layer is GearLayerDescriptor => layer !== null);

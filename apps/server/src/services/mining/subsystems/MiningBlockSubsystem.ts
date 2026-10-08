@@ -3,10 +3,13 @@ import {
   MiningTileType,
   canPlaceBuildable,
   getTileMineTime,
+  getTileMaxHealth,
   isTileMineable,
   type MiningPosition,
+  type MiningBlockHitEvent,
 } from '@mine-me/shared';
 import { getDamageStage, isInBounds, type ServerMiningGrid } from '../../miningMap.service';
+import { MiningDataManager } from './MiningDataManager';
 import type { MiningPlayerSession } from './MiningPlayerManager';
 
 export interface PendingTileUpdate {
@@ -17,6 +20,14 @@ export interface PendingTileUpdate {
 }
 
 export class MiningBlockSubsystem {
+  private pendingBlockHits: MiningBlockHitEvent[] = [];
+
+  public consumePendingBlockHits(): MiningBlockHitEvent[] {
+    const hits = this.pendingBlockHits;
+    this.pendingBlockHits = [];
+    return hits;
+  }
+
   public startMining(
     target: MiningPosition,
     session: MiningPlayerSession | undefined,
@@ -47,8 +58,17 @@ export class MiningBlockSubsystem {
 
     session.isMining = true;
     session.miningTarget = { x: target.x, y: target.y };
-    session.miningTimeMs = getTileMineTime(tile.type);
-    session.miningProgressMs = tile.damageMs || 0;
+    const maxHealth = MiningDataManager.getInstance().getBlockMaxHealth(tile.type);
+    session.targetMaxHealth = maxHealth;
+    session.miningTimeMs = maxHealth;
+    session.miningProgressMs = tile.damage ?? tile.damageMs ?? 0;
+    const swingsPerSec = 2.0 * ((playerSpeed || 25) / 25);
+    const swingInterval = 1 / swingsPerSec;
+    // Honor the swing cooldown across click/release so tap-spamming can't swing faster than holding.
+    // If the cooldown already elapsed (or no prior swing), prime so the first hit lands immediately.
+    const elapsedSec =
+      session.lastSwingAtMs === undefined ? Infinity : (Date.now() - session.lastSwingAtMs) / 1000;
+    session.swingTimer = Math.min(swingInterval, Math.max(0, elapsedSec));
 
     return true;
   }
@@ -58,6 +78,7 @@ export class MiningBlockSubsystem {
     session.isMining = false;
     session.miningTarget = null;
     session.miningProgressMs = 0;
+    // swingTimer is intentionally recomputed from lastSwingAtMs on the next startMining.
   }
 
   public placeLadder(
@@ -203,17 +224,42 @@ export class MiningBlockSubsystem {
 
       const prevStage = getDamageStage(tile);
 
-      // Cooperative speed summation
-      const totalSpeed = miners.reduce((sum, m) => {
-        const sp = typeof m.miningSpeed === 'function' ? m.miningSpeed() : m.miningSpeed;
-        return sum + sp;
-      }, 0);
-
-      const speedMultiplier = totalSpeed / 100;
-      tile.damageMs = (tile.damageMs || 0) + dt * 1000 * speedMultiplier;
-
+      // Discrete per-swing damage:
+      // miningSpeed represents weapon attack speed (baseline 25 = 2.0 swings/sec).
+      // miningDamage represents damage dealt per swing (baseline 25).
+      // Damage is applied only when a swing completes, so tapping and holding deal
+      // identical damage per swing. Dirt (100 HP) takes 4 swings at baseline.
+      let damageDealt = 0;
       for (const miner of miners) {
-        miner.miningProgressMs = tile.damageMs;
+        const speed = typeof miner.miningSpeed === 'function' ? miner.miningSpeed() : (miner.miningSpeed ?? 25);
+        const damage = typeof miner.miningDamage === 'function' ? miner.miningDamage() : (miner.miningDamage ?? 25);
+        if (speed <= 0 || damage <= 0) continue;
+
+        const swingsPerSec = 2.0 * (speed / 25);
+        const swingInterval = 1 / swingsPerSec;
+
+        miner.swingTimer = (miner.swingTimer ?? swingInterval) + dt;
+        if (miner.swingTimer >= swingInterval) {
+          miner.swingTimer = miner.swingTimer % swingInterval;
+          miner.lastSwingAtMs = Date.now();
+          damageDealt += damage;
+        }
+      }
+
+      if (damageDealt > 0) {
+        tile.damage = (tile.damage || 0) + damageDealt;
+        tile.damageMs = tile.damage;
+
+        for (const miner of miners) {
+          miner.miningProgressMs = tile.damage;
+        }
+
+        this.pendingBlockHits.push({
+          x: target.x,
+          y: target.y,
+          tileType: tile.type,
+          damage: damageDealt,
+        });
       }
 
       const newStage = getDamageStage(tile);
@@ -226,8 +272,8 @@ export class MiningBlockSubsystem {
         });
       }
 
-      const requiredTime = getTileMineTime(tile.type);
-      if (tile.damageMs >= requiredTime) {
+      const maxHealth = MiningDataManager.getInstance().getBlockMaxHealth(tile.type);
+      if ((tile.damage ?? 0) >= maxHealth) {
         onBlockCompleted(target, miners);
       }
     }

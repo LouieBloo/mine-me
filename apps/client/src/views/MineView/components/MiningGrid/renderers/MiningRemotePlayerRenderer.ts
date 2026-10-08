@@ -230,6 +230,9 @@ export class MiningRemotePlayerRenderer {
       if (instance.isLoaded) {
         instance.sprite.setFlipped(instance.isFacingLeft);
         instance.sprite.setState(instance.animationState as any);
+        const localDx = instance.isFacingLeft ? -instance.currentAim.x : instance.currentAim.x;
+        const remoteAimAngle = Math.atan2(instance.currentAim.y, localDx);
+        instance.sprite.setAimAngle(remoteAimAngle);
         instance.sprite.update(dt);
       }
     }

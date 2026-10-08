@@ -27,6 +27,12 @@ vi.mock('pixi.js', () => {
       child.parent = null;
     }
     destroy = vi.fn();
+    toGlobal(pos: { x: number; y: number } = { x: 0, y: 0 }) {
+      return { x: this.x + pos.x, y: this.y + pos.y };
+    }
+    toLocal(pos: { x: number; y: number } = { x: 0, y: 0 }) {
+      return { x: pos.x - this.x, y: pos.y - this.y };
+    }
   }
 
   class MockSprite {
@@ -37,6 +43,12 @@ vi.mock('pixi.js', () => {
     parent: any = null;
     destroy = vi.fn();
     texture: any;
+    toGlobal(pos: { x: number; y: number } = { x: 0, y: 0 }) {
+      return { x: this.x + pos.x, y: this.y + pos.y };
+    }
+    toLocal(pos: { x: number; y: number } = { x: 0, y: 0 }) {
+      return { x: pos.x - this.x, y: pos.y - this.y };
+    }
     constructor(texture: any) {
       this.texture = texture;
     }
@@ -214,6 +226,63 @@ describe('ModularCharacterSprite', () => {
     ]);
 
     expect(sprite.getToolSocket()).toBeDefined();
+
+    sprite.destroy();
+  });
+
+  it('should attach weapon gear layers with category-specific alignments', async () => {
+    const sprite = new ModularCharacterSprite(parentContainer);
+    await sprite.load();
+
+    // Weapon that shoots projectiles (e.g. revolver)
+    await sprite.setGearLayers([
+      { url: '/assets/gear/revolver_gear.png', subType: 'WEAPON', shootsProjectiles: true },
+    ]);
+    expect(sprite.getToolSocket().children.length).toBeGreaterThan(0);
+
+    // Axe / Melee tool
+    await sprite.setGearLayers([
+      { url: '/assets/gear/axe_gear.png', subType: 'WEAPON' },
+    ]);
+    expect(sprite.getToolSocket().children.length).toBeGreaterThan(0);
+
+    // Throwable item (e.g. dynamite)
+    await sprite.setGearLayers([
+      { url: '/assets/icons/items/dynamite_icon.png', subType: 'WEAPON', throwable: true },
+    ]);
+    expect(sprite.getToolSocket().children.length).toBeGreaterThan(0);
+
+    sprite.destroy();
+  });
+
+  it('should apply custom holdOffsetX, holdOffsetY, and holdRotation when specified', async () => {
+    const sprite = new ModularCharacterSprite(parentContainer);
+    await sprite.load();
+
+    await sprite.setGearLayers([
+      {
+        url: '/assets/gear/revolver_gear.png',
+        subType: 'WEAPON',
+        shootsProjectiles: true,
+        holdOffsetX: 12,
+        holdOffsetY: -7,
+        holdRotation: 25,
+        muzzleOffsetX: 40,
+        muzzleOffsetY: -5,
+      },
+    ]);
+
+    const weaponSprite = sprite.getWeaponSprite();
+    expect(weaponSprite).toBeDefined();
+    expect(weaponSprite?.x).toBe(12);
+    expect(weaponSprite?.y).toBe(-7);
+    expect(weaponSprite?.rotation).toBeCloseTo((25 * Math.PI) / 180, 4);
+
+    // Muzzle world position resolution relative to parentContainer
+    const muzzlePos = sprite.getMuzzleWorldPosition(parentContainer);
+    expect(muzzlePos).toBeDefined();
+    expect(typeof muzzlePos?.x).toBe('number');
+    expect(typeof muzzlePos?.y).toBe('number');
 
     sprite.destroy();
   });

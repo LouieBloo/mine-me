@@ -164,7 +164,6 @@ export interface ItemProjectileConfig {
   projectileSpeed?: number;
   projectileGravityScale?: number;
   projectileItemId?: string;
-  damage?: number;
   maxLifetime?: number;
   muzzleFlashEffectId?: string;
   smokeEffectId?: string;
@@ -200,6 +199,11 @@ export interface GameItem {
   physicsConfig?: ItemPhysicsConfig | null;
   lightConfig?: ItemLightConfig | null;
   inGameScale?: number;
+  holdOffsetX?: number;
+  holdOffsetY?: number;
+  holdRotation?: number;
+  muzzleOffsetX?: number;
+  muzzleOffsetY?: number;
 }
 
 export interface GearItem extends GameItem {
@@ -311,6 +315,7 @@ export interface Effect {
   healthGain: boolean;
   staminaGain: boolean;
   miningSpeedModifier?: boolean;
+  damageModifier?: boolean;
   explodes?: boolean;
   createdAt: string;
   updatedAt: string;

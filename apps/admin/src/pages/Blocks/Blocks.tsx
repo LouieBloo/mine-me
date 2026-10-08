@@ -52,7 +52,7 @@ export default function Blocks() {
                   <th className="py-4 px-6">Type Key</th>
                   <th className="py-4 px-6">Name</th>
                   <th className="py-4 px-6">Description</th>
-                  <th className="py-4 px-6">Mine Time</th>
+                  <th className="py-4 px-6">Health</th>
                   <th className="py-4 px-6">Stamina Cost</th>
                   <th className="py-4 px-6 text-right">Actions</th>
                 </tr>
@@ -77,7 +77,7 @@ export default function Blocks() {
                     <td className="py-4 px-6 font-mono font-bold text-slate-700">{block.typeKey}</td>
                     <td className="py-4 px-6 font-bold text-slate-900">{block.name}</td>
                     <td className="py-4 px-6 text-slate-500 max-w-xs truncate">{block.description || '—'}</td>
-                    <td className="py-4 px-6 text-slate-600 font-semibold">{block.mineTimeMs} ms</td>
+                    <td className="py-4 px-6 text-slate-600 font-semibold">{block.health ?? block.mineTimeMs ?? '—'} HP</td>
                     <td className="py-4 px-6 text-slate-600 font-semibold">{block.staminaCost}</td>
                     <td className="py-4 px-6 text-right">
                       <button

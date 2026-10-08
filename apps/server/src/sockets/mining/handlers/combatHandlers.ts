@@ -135,7 +135,7 @@ export const handleMiningThrowItem = handleMiningThrowDynamite;
 export const handleMiningShoot = async (
   io: Server,
   socket: Socket,
-  payload: { target: Vector2D; itemId?: string; weaponItemId?: string }
+  payload: { target: Vector2D; itemId?: string; weaponItemId?: string; muzzlePosition?: Vector2D }
 ): Promise<GameEventResult> => {
   const characterId = socket.data.characterId;
   if (!characterId) return { success: false, error: 'No character selected.' };
@@ -148,7 +148,7 @@ export const handleMiningShoot = async (
   }
 
   const weaponId = payload.weaponItemId || payload.itemId;
-  const result = engine.shootProjectile(characterId, payload.target, weaponId);
+  const result = engine.shootProjectile(characterId, payload.target, weaponId, payload.muzzlePosition);
   if (!result.success) {
     return {
       success: false,

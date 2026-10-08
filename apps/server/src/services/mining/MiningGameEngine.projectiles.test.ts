@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MiningGameEngine } from './MiningGameEngine';
+import { MiningProjectileEntity } from './physics/MiningProjectileEntity';
 import { MiningTileType } from '@mine-me/shared';
 
 describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
@@ -148,5 +149,46 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
     const projectile = engine.activeProjectiles[0];
     // In items.json, cmn_bullet_gun_round has inGameScale: 0.4
     expect(projectile.inGameScale).toBe(0.4);
+  });
+
+  it('spawns projectile at specified muzzlePosition and aims directly towards target', () => {
+    const muzzlePos = { x: 22.4, y: -0.3 };
+    const target = { x: 30.0, y: 10.0 };
+    const res = engine.shootProjectile('char-shooter-1', target, undefined, muzzlePos);
+    expect(res.success).toBe(true);
+    expect(engine.activeProjectiles.length).toBe(1);
+    const projectile = engine.activeProjectiles[0];
+    expect(projectile.position.x).toBeCloseTo(muzzlePos.x, 2);
+    expect(projectile.position.y).toBeCloseTo(muzzlePos.y, 2);
+    // Velocity vector direction should match (target - muzzlePos)
+    const expectedDx = target.x - muzzlePos.x;
+    const expectedDy = target.y - muzzlePos.y;
+    const expectedAngle = Math.atan2(expectedDy, expectedDx);
+    const actualAngle = Math.atan2(projectile.velocity.y, projectile.velocity.x);
+    expect(actualAngle).toBeCloseTo(expectedAngle, 4);
+  });
+
+  it('derives projectile damage from weapon item effects and tracks weaponItemId', () => {
+    engine.shootProjectile('char-shooter-1', { x: 25, y: 0 }, 'cmn_revolver_6shooter');
+    expect(engine.activeProjectiles.length).toBe(1);
+    const projectile = engine.activeProjectiles[0];
+    expect(projectile.weaponItemId).toBe('cmn_revolver_6shooter');
+    // cmn_revolver_6shooter has Damage effect with value 35 in items.json
+    expect(projectile.damage).toBe(35);
+  });
+
+  it('lets every in-flight projectile hit mobs, not just the first one', () => {
+    const mob = engine.spawnMob({ id: 'mob_dummy_like', name: 'Dummy', health: 1000 }, { x: 10.5, y: 0 });
+    // Spawned away from the auto-spawned surface target dummy so it is the only mob in range
+    const hitPos = { x: mob.mobBody.position.x, y: mob.mobBody.position.y };
+
+    // First projectile is far from the mob and stays alive; second sits right on the mob
+    const mkProj = (id: string, pos: { x: number; y: number }) =>
+      new MiningProjectileEntity(id, 'char-shooter-1', pos, { x: 0, y: 0 }, { damage: 10 });
+    engine.activeProjectiles = [mkProj('far', { x: 5, y: -5 }), mkProj('near', hitPos)];
+
+    (engine as any).tick(0.033);
+
+    expect(mob.health).toBe(990);
   });
 });

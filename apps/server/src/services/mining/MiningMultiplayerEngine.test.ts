@@ -167,17 +167,16 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
     expect(started1).toBe(true);
     expect(started2).toBe(true);
 
-    // Run tick for 150ms (0.150s).
-    // With combined speed 200 (2.0x multiplier), progress should be 0.150 * 1000 * 2.0 = 300ms!
+    // Both miners' first swings land immediately: 2 * 25 = 50 damage (out of 100 HP dirt block)
     (engine as any).tick(0.15);
 
     const tile = engine.grid[0][target.x];
-    expect(tile.damageMs).toBeCloseTo(300, 1);
+    expect(tile.damageMs).toBeCloseTo(50, 1);
 
-    expect(p1.miningProgressMs).toBeCloseTo(300, 1);
-    expect(p2.miningProgressMs).toBeCloseTo(300, 1);
+    expect(p1.miningProgressMs).toBeCloseTo(50, 1);
+    expect(p2.miningProgressMs).toBeCloseTo(50, 1);
 
-    // Another 150ms tick: total damage = 600ms >= 500ms required, block should break!
+    // Another 150ms tick: both swing again, total 100 >= 100 HP, block should break!
     (engine as any).tick(0.15);
 
     expect(engine.grid[0][target.x].type).toBe(MiningTileType.EMPTY);

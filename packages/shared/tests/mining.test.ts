@@ -9,6 +9,7 @@ import {
   isTileSolid,
   isTileClimbable,
   isTileTransparent,
+  getTileMaxHealth,
   getTileMineTime,
   getTileParticleEffect,
 } from '../src';
@@ -104,14 +105,25 @@ describe('Mining Tile Definitions & Helpers', () => {
     });
   });
 
-  describe('getTileMineTime', () => {
-    it('returns configured mine times for mineable tiles and default for others', () => {
-      expect(getTileMineTime(MiningTileType.DIRT)).toBe(MINING_CONFIG.DIRT_MINE_TIME_MS);
-      expect(getTileMineTime(MiningTileType.MINERAL)).toBe(MINING_CONFIG.MINERAL_MINE_TIME_MS);
-      expect(getTileMineTime(MiningTileType.CHEST)).toBe(MINING_CONFIG.CHEST_MINE_TIME_MS);
-      expect(getTileMineTime(MiningTileType.COPPERIUM)).toBe(1200);
-      expect(getTileMineTime(MiningTileType.SILVERIUM)).toBe(2000);
-      expect(getTileMineTime(MiningTileType.EMPTY)).toBe(MINING_CONFIG.DIRT_MINE_TIME_MS);
+  describe('getTileMaxHealth', () => {
+    it('returns default max health for tiles when no dynamic block configs provided', () => {
+      expect(getTileMaxHealth(MiningTileType.DIRT)).toBe(100);
+      expect(getTileMaxHealth(MiningTileType.MINERAL)).toBe(300);
+      expect(getTileMaxHealth(MiningTileType.CHEST)).toBe(200);
+      expect(getTileMaxHealth(MiningTileType.COPPERIUM)).toBe(240);
+      expect(getTileMaxHealth(MiningTileType.SILVERIUM)).toBe(400);
+    });
+
+    it('dynamically prioritizes health from admin/database blockConfigs map over defaults', () => {
+      const dynamicConfigs = new Map<any, any>([
+        [MiningTileType.DIRT, { health: 75 }],
+        [MiningTileType.MINERAL, { health: 600 }],
+      ]);
+
+      expect(getTileMaxHealth(MiningTileType.DIRT, dynamicConfigs)).toBe(75);
+      expect(getTileMaxHealth(MiningTileType.MINERAL, dynamicConfigs)).toBe(600);
+      // Fallback to default for tiles not overridden in dynamicConfigs
+      expect(getTileMaxHealth(MiningTileType.CHEST, dynamicConfigs)).toBe(200);
     });
   });
 

@@ -1,5 +1,6 @@
 export * from './types';
 export * from './gameLogic/CharacterModEngine';
+export * from './gameLogic/miningSpeed';
 export * from './constants';
 export * from './utils/jwt';
 export * from './utils/city';
@@ -14,6 +15,7 @@ export * from './gameLogic/pathfinding/MiningPathfinder';
 export * from './gameLogic/ai/BaseMobAI';
 export * from './gameLogic/ai/ChaseAndMineAI';
 export * from './gameLogic/ai/PatrolAI';
+export * from './gameLogic/ai/StationaryAI';
 export * from './gameLogic/ai/MobAIRegistry';
 export * from './gameLogic/abilities/BaseMobAbility';
 export * from './utils/pixiParticlesConverter';

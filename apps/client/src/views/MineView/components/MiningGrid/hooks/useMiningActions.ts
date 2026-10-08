@@ -17,6 +17,7 @@ import type { MiningMouseController } from '../input/MiningMouseController';
 import type { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
 import type { ProjectileVisualManager } from '../renderers/ProjectileVisualManager';
 import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
+import type { ModularCharacterSprite } from '../../../../../components/game/sprites';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import type { SoundManager } from '../../../../../services/sound';
 import type { MiningPlayerBody, MiningClientTile } from '@mine-me/shared';
@@ -25,6 +26,8 @@ import type { Container, Texture, Graphics, Sprite } from 'pixi.js';
 export interface UseMiningActionsOptions {
   playerState: PlayerState;
   equippedWeapon: any;
+  playerSpriteRef?: React.RefObject<ModularCharacterSprite | null>;
+  gridContainerRef?: React.RefObject<Container | null>;
   mouseControllerRef: React.MutableRefObject<MiningMouseController>;
   gridRef: React.MutableRefObject<MiningClientTile[][]>;
   playerBodyRef: React.MutableRefObject<MiningPlayerBody>;
@@ -62,6 +65,8 @@ export interface UseMiningActionsOptions {
 export function useMiningActions({
   playerState,
   equippedWeapon,
+  playerSpriteRef,
+  gridContainerRef,
   mouseControllerRef,
   gridRef,
   playerBodyRef,
@@ -327,20 +332,39 @@ export function useMiningActions({
             }
 
             const playerPos = playerBodyRef.current.position;
-            const startX = playerPos.x;
-            const startY = playerPos.y - 0.1;
-            const dx = target.x - startX;
-            const dy = target.y - startY;
+            const gridContainer = gridContainerRef?.current;
+            const sprite = playerSpriteRef?.current;
+            const dbWeapon = dynamicItemsRef?.current?.find(
+              (i: any) => i.id === weapon.id || (i.itemKey && i.itemKey === weapon.itemKey)
+            );
+            const mOffsetX = weapon.muzzleOffsetX ?? dbWeapon?.muzzleOffsetX ?? 0;
+            const mOffsetY = weapon.muzzleOffsetY ?? dbWeapon?.muzzleOffsetY ?? 0;
+
+            let muzzlePos = {
+              x: playerPos.x,
+              y: playerPos.y - 0.45,
+            };
+
+            if (gridContainer && sprite) {
+              const muzzleLocal = sprite.getMuzzleWorldPosition(gridContainer, {
+                x: mOffsetX,
+                y: mOffsetY,
+              });
+              if (muzzleLocal) {
+                muzzlePos = {
+                  x: muzzleLocal.x / TILE_SIZE,
+                  y: muzzleLocal.y / TILE_SIZE,
+                };
+              }
+            }
+
+            // Compute bullet trajectory from muzzle launch point directly towards cursor target
+            const dx = target.x - muzzlePos.x;
+            const dy = target.y - muzzlePos.y;
             const dist = Math.hypot(dx, dy) || 1.0;
             const dirX = dx / dist;
             const dirY = dy / dist;
             const angle = Math.atan2(dy, dx);
-
-            const muzzleDist = 0.45;
-            const muzzlePos = {
-              x: startX + dirX * muzzleDist,
-              y: startY + dirY * muzzleDist,
-            };
 
             const gunshotSound =
               weapon.soundEffects?.shoot?.url ||
@@ -357,6 +381,9 @@ export function useMiningActions({
               soundManager,
               TILE_SIZE
             );
+
+            // Trigger visual kickback recoil impulse on the aiming arm
+            playerSpriteRef?.current?.triggerRecoil(0.22);
 
             const bulletSpeed = projConfig.projectileSpeed ?? 28.0;
             const clientBulletId = `client_proj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -402,6 +429,7 @@ export function useMiningActions({
                 type: 'mining_shoot',
                 target,
                 weaponItemId: weapon.id,
+                muzzlePosition: muzzlePos,
               });
 
               const ammoData = res?.data ?? res;

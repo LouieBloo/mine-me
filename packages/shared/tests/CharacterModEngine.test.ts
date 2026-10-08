@@ -23,6 +23,7 @@ describe('CharacterModEngine', () => {
       expect(mods.combatScore).toBe(0);
       expect(mods.defenseScore).toBe(0);
       expect(mods.miningSpeed).toBe(0);
+      expect(mods.miningDamage).toBe(0);
     });
 
     it('returns accumulated scores and mining speed from equipped gear with object effects', () => {
@@ -137,18 +138,94 @@ describe('CharacterModEngine', () => {
         maxStamina: 100,
       };
 
-      const mods = {
+        const mods = {
         combatScore: 10,
         defenseScore: 5,
         miningSpeed: 100,
+        miningDamage: 50,
       };
 
       const total = CharacterModEngine.calculateTotalAttributes(base, mods);
       expect(total.combatScore).toBe(25);
       expect(total.defenseScore).toBe(17);
       expect(total.miningSpeed).toBe(100);
+      expect(total.miningDamage).toBe(50);
       expect(total.health).toBe(100);
       expect(total.stamina).toBe(80);
+    });
+
+    it('accumulates stacked damage effects across multiple equipped items', () => {
+      const items = [
+        {
+          item: {
+            id: 'pickaxe1',
+            name: 'Standard Pickaxe',
+            type: 'GEAR',
+            subType: 'WEAPON',
+            combatScore: 10,
+            defenseScore: 0,
+            itemEffects: [
+              {
+                id: 'eff-speed',
+                effectId: 'eff-speed-id',
+                value: 25,
+                effect: {
+                  id: 'eff-speed-id',
+                  name: 'Mining Speed',
+                  miningSpeedModifier: true,
+                  damageModifier: false,
+                  healthGain: false,
+                  staminaGain: false,
+                },
+              },
+              {
+                id: 'eff-dmg-1',
+                effectId: 'eff-dmg-id',
+                value: 25,
+                effect: {
+                  id: 'eff-dmg-id',
+                  name: 'Damage',
+                  damageModifier: true,
+                  miningSpeedModifier: false,
+                  healthGain: false,
+                  staminaGain: false,
+                },
+              },
+            ],
+          } as unknown as GameItem,
+          equipped: true,
+        },
+        {
+          item: {
+            id: 'ring1',
+            name: 'Miner Ring',
+            type: 'GEAR',
+            subType: 'RING',
+            combatScore: 0,
+            defenseScore: 0,
+            itemEffects: [
+              {
+                id: 'eff-dmg-2',
+                effectId: 'eff-dmg-id',
+                value: 15,
+                effect: {
+                  id: 'eff-dmg-id',
+                  name: 'Damage',
+                  damageModifier: true,
+                  miningSpeedModifier: false,
+                  healthGain: false,
+                  staminaGain: false,
+                },
+              },
+            ],
+          } as unknown as GameItem,
+          equipped: true,
+        },
+      ];
+
+      const mods = CharacterModEngine.getModifications(items);
+      expect(mods.miningSpeed).toBe(25);
+      expect(mods.miningDamage).toBe(40); // 25 + 15 stacked damage!
     });
   });
 });

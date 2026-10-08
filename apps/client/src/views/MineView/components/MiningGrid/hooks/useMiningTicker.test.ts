@@ -61,6 +61,10 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
         setFlipped: vi.fn(),
         setState: vi.fn(),
         setMoveVelocity: vi.fn(),
+        setAimAngle: vi.fn(),
+        setSwingSpeed: vi.fn(),
+        getScale: vi.fn(() => 0.5),
+        getShoulderOffset: vi.fn(() => ({ x: -131, y: -68 })),
         update: vi.fn(),
       },
     };
@@ -390,6 +394,9 @@ describe('useMiningTicker - Torch Preview Lighting', () => {
         setFlipped: vi.fn(),
         setState: vi.fn(),
         setMoveVelocity: vi.fn(),
+        setAimAngle: vi.fn(),
+        getScale: vi.fn(() => 0.5),
+        getShoulderOffset: vi.fn(() => ({ x: -131, y: -68 })),
         update: vi.fn(),
       },
     };
@@ -1037,6 +1044,80 @@ describe('useMiningTicker - Projectile Flight & Visibility', () => {
     expect(proj.position.x).toBeGreaterThan(2.0);
     expect(proj.hasHit).toBeFalsy();
     expect(proj.velocity.x).toBe(15);
+  });
+
+  it('applies miningSwingSpeed to playerSprite and triggers sound at weapon attack speed interval', () => {
+    const playSfxMock = vi.fn();
+    const setListenerPositionMock = vi.fn();
+    const mockSoundManager: any = {
+      playSfx: playSfxMock,
+      setListenerPosition: setListenerPositionMock,
+    };
+    const weaponSoundUrlRef = { current: '/assets/sounds/axe_swing.mp3' };
+    const setSwingSpeedMock = vi.fn();
+    const setStateMock = vi.fn();
+    const updateMock = vi.fn();
+    const mockSprite: any = {
+      setAimAngle: vi.fn(),
+      setSwingSpeed: setSwingSpeedMock,
+      setState: setStateMock,
+      update: updateMock,
+    };
+    const playerSpriteRef = { current: mockSprite };
+    const gridRef = { current: createMockGrid() };
+    const playerBodyRef = { current: new MiningPlayerBody({ x: 2, y: 4 }) };
+    const isMiningRef = { current: true };
+
+    let mockTime = 1000;
+    const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => mockTime);
+
+    try {
+      renderHook(() =>
+        useMiningTicker({
+          app: mockApp,
+          playerContainerRef: { current: playerContainer },
+          gridContainerRef: { current: gridContainer },
+          fallingRocksContainerRef: { current: null },
+          currentRenderPosRef: { current: { x: 2, y: 4 } },
+          targetServerPosRef: { current: { x: 2, y: 4 } },
+          isFacingLeftRef: { current: false },
+          playerFacingDirRef: { current: { x: 1, y: 0 } },
+          playerSpriteRef,
+          activeFallingRocksRef: { current: [] },
+          fallingRockGraphicsMap: { current: new Map() },
+          debugGraphicsRef: { current: null },
+          showDebugRef: { current: false },
+          flashlightRef: { current: null },
+          lightingEngineRef: { current: null },
+          cameraRef: { current: null },
+          playerBodyRef,
+          gridRef,
+          isMiningRef,
+          soundManager: mockSoundManager,
+          weaponSoundUrlRef,
+          miningSwingSpeed: 2.0, // 2 swings/sec = 500ms cycle
+        })
+      );
+
+      // Frame 1 at t=1000: first swing sound should trigger
+      tickerCallbacks[0]();
+      expect(setSwingSpeedMock).toHaveBeenCalledWith(2.0);
+      expect(setStateMock).toHaveBeenCalledWith('mine');
+      expect(playSfxMock).toHaveBeenCalledTimes(1);
+      expect(playSfxMock).toHaveBeenCalledWith('/assets/sounds/axe_swing.mp3');
+
+      // Frame 2 at t=1300 (300ms later, which is < 500ms cycle): sound should NOT trigger again yet
+      mockTime = 1300;
+      tickerCallbacks[0]();
+      expect(playSfxMock).toHaveBeenCalledTimes(1);
+
+      // Frame 3 at t=1505 (505ms later >= 500ms cycle): second swing sound triggers!
+      mockTime = 1505;
+      tickerCallbacks[0]();
+      expect(playSfxMock).toHaveBeenCalledTimes(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });
 

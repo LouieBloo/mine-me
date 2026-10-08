@@ -13,6 +13,7 @@ import ItemColliderEditor from '../../../components/ItemColliderEditor/ItemColli
 import ItemLightEffectConfig from './ItemLightEffectConfig/ItemLightEffectConfig';
 import ItemProjectileConfig from './ItemProjectileConfig/ItemProjectileConfig';
 import ItemInGameScale from './ItemInGameScale/ItemInGameScale';
+import ItemHoldPreview from './ItemHoldPreview/ItemHoldPreview';
 import './ItemDetail.css';
 
 interface ItemEnums {
@@ -31,7 +32,8 @@ export default function ItemDetail() {
     itemKey: '', name: '', description: '', type: 'GEAR', subType: 'HEAD',
     vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', triggerMode: 'SINGLE', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, throwable: false, experience: 0,
     combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null, physicsConfig: null, lightConfig: null,
-    shootsProjectiles: false, projectileConfig: null, inGameScale: 1.0
+    shootsProjectiles: false, projectileConfig: null, inGameScale: 1.0,
+    holdOffsetX: 0, holdOffsetY: 0, holdRotation: 0, muzzleOffsetX: 0, muzzleOffsetY: 0
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
   const [effectsList, setEffectsList] = useState<any[]>([]);
@@ -72,7 +74,17 @@ export default function ItemDetail() {
         if (!res.ok) throw new Error('Failed to fetch item');
         return res.json();
       })
-      .then(json => { setData(json); setLoading(false); })
+      .then(json => {
+        setData({
+          ...json,
+          holdOffsetX: typeof json.holdOffsetX === 'number' ? json.holdOffsetX : 0,
+          holdOffsetY: typeof json.holdOffsetY === 'number' ? json.holdOffsetY : 0,
+          holdRotation: typeof json.holdRotation === 'number' ? json.holdRotation : 0,
+          muzzleOffsetX: typeof json.muzzleOffsetX === 'number' ? json.muzzleOffsetX : 0,
+          muzzleOffsetY: typeof json.muzzleOffsetY === 'number' ? json.muzzleOffsetY : 0,
+        });
+        setLoading(false);
+      })
       .catch(err => { toast.error(err.message); setLoading(false); });
   }, [id, isNew]);
 
@@ -307,9 +319,16 @@ export default function ItemDetail() {
             {/* Item Effects Configurator (Available for GEAR and CONSUMABLE) */}
             {(data.type === 'GEAR' || data.type === 'CONSUMABLE') && (
               <div className="space-y-4 md:col-span-2 bg-slate-50 p-6 rounded-xl border border-slate-200">
-                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                  {data.type === 'GEAR' ? 'Gear Effects & Modifiers' : 'Consumable Effects'}
-                </h4>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                    {data.type === 'GEAR' ? 'Gear Effects & Modifiers' : 'Consumable Effects'}
+                  </h4>
+                  {data.type === 'GEAR' && (
+                    <span className="text-xs text-slate-500 font-medium">
+                      Tip: Add <strong>Mining Speed</strong> for swing attack rate and <strong>Damage</strong> for damage dealt per hit.
+                    </span>
+                  )}
+                </div>
                 
                 {/* Add effect form */}
                 <div className="flex gap-4 items-end flex-wrap">
@@ -322,7 +341,7 @@ export default function ItemDetail() {
                       <option value="">-- Choose an Effect --</option>
                       {effectsList.map(eff => (
                         <option key={eff.id} value={eff.id}>
-                          {eff.name} {eff.miningSpeedModifier ? '(Mining Speed)' : ''}{eff.healthGain ? '(Health)' : ''}{eff.staminaGain ? '(Stamina)' : ''}
+                          {eff.name} {eff.miningSpeedModifier ? '(Mining Speed)' : ''}{eff.damageModifier ? '(Damage)' : ''}{eff.healthGain ? '(Health)' : ''}{eff.staminaGain ? '(Stamina)' : ''}
                         </option>
                       ))}
                     </select>
@@ -389,7 +408,9 @@ export default function ItemDetail() {
                               <span className="font-bold text-slate-800">{ie.effect?.name || 'Effect'}</span>
                               <span
                                 className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                  ie.effect?.miningSpeedModifier
+                                  ie.effect?.damageModifier
+                                    ? 'text-rose-800 bg-rose-100 border border-rose-200'
+                                    : ie.effect?.miningSpeedModifier
                                     ? 'text-amber-800 bg-amber-100 border border-amber-200'
                                     : ie.effect?.healthGain
                                     ? 'text-emerald-800 bg-emerald-100 border border-emerald-200'
@@ -398,7 +419,9 @@ export default function ItemDetail() {
                                     : 'text-slate-700 bg-slate-100 border border-slate-200'
                                 }`}
                               >
-                                {ie.effect?.miningSpeedModifier
+                                {ie.effect?.damageModifier
+                                  ? 'Damage'
+                                  : ie.effect?.miningSpeedModifier
                                   ? 'Mining Speed'
                                   : ie.effect?.healthGain
                                   ? 'Health Gain'
@@ -561,6 +584,14 @@ export default function ItemDetail() {
                 availableItems={allItemsList}
                 onToggleShootsProjectiles={(shoots) => setData({ ...data, shootsProjectiles: shoots })}
                 onChangeConfig={(newProjConfig) => setData({ ...data, projectileConfig: newProjConfig })}
+              />
+            </div>
+
+            {/* Character Hold Preview & Offsets Section */}
+            <div className="md:col-span-2 pt-4 border-t border-slate-100">
+              <ItemHoldPreview
+                item={data}
+                onChange={(updatedFields) => setData((prev: any) => ({ ...prev, ...updatedFields }))}
               />
             </div>
           </div>

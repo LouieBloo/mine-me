@@ -10,6 +10,7 @@ import * as planck from 'planck';
 
 export interface ProjectileEntityOptions extends ProjectileBodyOptions {
   damage?: number;
+  weaponItemId?: string;
   maxLifetime?: number;
   spriteUrl?: string | null;
   inGameScale?: number;
@@ -23,6 +24,7 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
   public readonly id: string;
   public readonly characterId: string;
   public readonly itemId?: string;
+  public readonly weaponItemId?: string;
   public readonly damage: number;
   public readonly maxLifetime: number;
   public readonly spriteUrl?: string | null;
@@ -78,6 +80,7 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
     this.id = id;
     this.characterId = characterId;
     this.itemId = options?.itemId;
+    this.weaponItemId = options?.weaponItemId;
     this.damage = options?.damage ?? 35;
     this.maxLifetime = options?.maxLifetime ?? 3.0;
     this.spriteUrl = options?.spriteUrl;

@@ -1,6 +1,7 @@
 import { Socket } from 'socket.io';
 import {
   MINING_CONFIG,
+  isTileSolid,
   type MiningBackpackItem,
   type MiningGearLayer,
   type MiningInputState,
@@ -8,7 +9,7 @@ import {
   type Vector2D,
 } from '@mine-me/shared';
 import { MiningPlayerBody } from '../physics/MiningPlayerBody';
-import type { ServerMiningGrid } from '../../miningMap.service';
+import { isInBounds, type ServerMiningGrid } from '../../miningMap.service';
 
 export interface MiningPlayerSession {
   characterId: string;
@@ -17,6 +18,7 @@ export interface MiningPlayerSession {
   playerBody: MiningPlayerBody;
   inputs: MiningInputState;
   miningSpeed: number | (() => number);
+  miningDamage: number | (() => number);
   temporaryBackpack: MiningBackpackItem[];
   gearLayers: MiningGearLayer[];
   visionRange: number;
@@ -24,6 +26,7 @@ export interface MiningPlayerSession {
   miningTarget: MiningPosition | null;
   miningProgressMs: number;
   miningTimeMs: number;
+  targetMaxHealth?: number;
   isFacingLeft: boolean;
   aimDirection: Vector2D;
   flashlightOn: boolean;
@@ -31,6 +34,41 @@ export interface MiningPlayerSession {
   lastRevealGridPos?: MiningPosition | null;
   backpackDirty?: boolean;
   lastAttackTimeMs?: number;
+  swingTimer?: number;
+  lastSwingAtMs?: number;
+}
+
+function isObstructedBySolidTiles(
+  grid: ServerMiningGrid,
+  px: number,
+  py: number,
+  mx: number,
+  my: number
+): boolean {
+  const dx = mx - px;
+  const dy = my - py;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 0.8) return false;
+
+  const steps = Math.ceil(dist / 0.25);
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const sampleX = px + dx * t;
+    const sampleY = py + dy * t;
+    const tx = Math.floor(sampleX);
+    const ty = Math.floor(sampleY);
+
+    if (tx === Math.floor(px) && ty === Math.floor(py)) continue;
+    if (tx === Math.floor(mx) && ty === Math.floor(my)) continue;
+
+    if (isInBounds(tx, ty)) {
+      const tile = grid[ty][tx];
+      if (tile && isTileSolid(tile.type)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export class MiningPlayerManager {
@@ -58,12 +96,14 @@ export class MiningPlayerManager {
     characterName?: string;
     socket: Socket;
     miningSpeed?: number | (() => number);
+    miningDamage?: number | (() => number);
     gearLayers?: MiningGearLayer[];
   }): MiningPlayerSession {
     let session = this.players.get(options.characterId);
     if (session) {
       session.socket = options.socket;
       if (options.miningSpeed !== undefined) session.miningSpeed = options.miningSpeed;
+      if (options.miningDamage !== undefined) session.miningDamage = options.miningDamage;
       if (options.gearLayers !== undefined) session.gearLayers = options.gearLayers;
       if (options.characterName) session.characterName = options.characterName;
       return session;
@@ -90,6 +130,7 @@ export class MiningPlayerManager {
         sequence: 0,
       },
       miningSpeed: options.miningSpeed ?? 0,
+      miningDamage: options.miningDamage ?? 25,
       temporaryBackpack: [],
       gearLayers: options.gearLayers || [],
       visionRange: MINING_CONFIG.DEFAULT_VISION_RANGE,
@@ -210,14 +251,36 @@ export class MiningPlayerManager {
 
   public handleMeleeAttacks(
     activeMobs: Iterable<{ id: string; health: number; mobBody: any }>,
-    onDamageMob: (instanceId: string, damage: number, knockbackX: number, knockbackY: number) => void
+    gridOrOnDamage:
+      | ServerMiningGrid
+      | ((instanceId: string, damage: number, knockbackX: number, knockbackY: number) => void)
+      | undefined,
+    maybeOnDamage?: (instanceId: string, damage: number, knockbackX: number, knockbackY: number) => void
   ): void {
+    let grid: ServerMiningGrid | undefined;
+    let onDamageMob: (instanceId: string, damage: number, knockbackX: number, knockbackY: number) => void;
+
+    if (typeof gridOrOnDamage === 'function') {
+      onDamageMob = gridOrOnDamage;
+      grid = undefined;
+    } else {
+      grid = gridOrOnDamage;
+      onDamageMob = maybeOnDamage!;
+    }
+
+    if (!onDamageMob) return;
+
     const nowMs = Date.now();
-    const MELEE_SWING_REACH = 2.2;
 
     for (const session of this.players.values()) {
       if (session.inputs.miningKey) {
-        if (!session.lastAttackTimeMs || nowMs - session.lastAttackTimeMs >= 400) {
+        // Dynamic attack rate based on player's equipped weapon speed (baseline 25 = 2.0 swings/sec)
+        const playerSpeed =
+          typeof session.miningSpeed === 'function' ? session.miningSpeed() : (session.miningSpeed ?? 25);
+        const swingsPerSec = 2.0 * ((playerSpeed || 25) / 25);
+        const attackCooldownMs = Math.max(80, (1 / swingsPerSec) * 1000);
+
+        if (!session.lastAttackTimeMs || nowMs - session.lastAttackTimeMs >= attackCooldownMs) {
           session.lastAttackTimeMs = nowMs;
 
           const px = session.playerBody.position.x;
@@ -234,32 +297,31 @@ export class MiningPlayerManager {
             aimY = 0;
           }
 
+          // Weapon position: shoulder pivot pushed out along the aim direction.
+          // The aim direction already tracks the cursor angle, so the weapon (and hit box)
+          // follows where the player is swinging regardless of how far the cursor is.
+          const shoulderY = py - MINING_CONFIG.MELEE_SHOULDER_OFFSET_Y;
+          const weaponX = px + aimX * MINING_CONFIG.MELEE_WEAPON_OFFSET;
+          const weaponY = shoulderY + aimY * MINING_CONFIG.MELEE_WEAPON_OFFSET;
+          const halfSize = MINING_CONFIG.MELEE_HIT_HALF_SIZE + MINING_CONFIG.MELEE_MOB_BODY_MARGIN;
+
+          const damage =
+            typeof session.miningDamage === 'function' ? session.miningDamage() : (session.miningDamage ?? 25);
+
           for (const mob of activeMobs) {
             if (mob.health <= 0) continue;
             const mx = mob.mobBody.position.x;
             const my = mob.mobBody.position.y;
+
+            // Box (AABB) around the weapon, slightly larger than the weapon itself
+            if (Math.abs(mx - weaponX) > halfSize || Math.abs(my - weaponY) > halfSize) continue;
+
+            // Solid tiles between the player and the mob shield it
+            if (grid && isObstructedBySolidTiles(grid, px, py, mx, my)) continue;
+
             const dx = mx - px;
-            const dy = my - py;
-            const dist = Math.hypot(dx, dy);
-
-            if (dist > MELEE_SWING_REACH) continue;
-
-            const toMobX = dist > 0.001 ? dx / dist : aimX;
-            const toMobY = dist > 0.001 ? dy / dist : aimY;
-            const dot = aimX * toMobX + aimY * toMobY;
-
-            const targetTileX = session.miningTarget?.x;
-            const targetTileY = session.miningTarget?.y;
-            const isNearTargetTile =
-              targetTileX !== undefined &&
-              targetTileY !== undefined &&
-              Math.abs(mx - (targetTileX + 0.5)) <= 0.85 &&
-              Math.abs(my - (targetTileY + 0.5)) <= 0.85;
-
-            if (dot >= 0.30 || isNearTargetTile) {
-              const kbDirX = Math.sign(dx) || Math.sign(aimX) || (session.isFacingLeft ? -1 : 1);
-              onDamageMob(mob.id, 15, kbDirX * 4.5, -3.2);
-            }
+            const kbDirX = Math.sign(dx) || Math.sign(aimX) || (session.isFacingLeft ? -1 : 1);
+            onDamageMob(mob.id, damage, kbDirX * 4.5, -3.2);
           }
         }
       }

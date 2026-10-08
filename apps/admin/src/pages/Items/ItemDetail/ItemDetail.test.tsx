@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import '@testing-library/jest-dom/vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ItemDetail from './ItemDetail';
 import { ToastProvider } from '../../../contexts/ToastContext';
@@ -28,7 +29,10 @@ vi.mock('../../../hooks/useApi', () => ({
           ok: true,
           json: () => Promise.resolve({
             types: ['GEAR', 'MATERIAL', 'CONSUMABLE'],
-            subTypes: { CONSUMABLE: ['TORCH', 'LADDER', 'POTION'] },
+            subTypes: {
+              CONSUMABLE: ['TORCH', 'LADDER', 'POTION'],
+              GEAR: ['WEAPON', 'HEAD', 'CHEST', 'LEGGINGS', 'BOOTS', 'GAUNTLETS', 'SHOULDERS'],
+            },
             rarities: ['LOW', 'MEDIUM', 'RARE', 'VERY_RARE']
           })
         });
@@ -75,6 +79,9 @@ vi.mock('../../../hooks/useApi', () => ({
 }));
 
 describe('ItemDetail Page', () => {
+  afterEach(() => {
+    cleanup();
+  });
   const renderDetail = (id = 'item_torch') => {
     render(
       <MemoryRouter initialEntries={[`/items/${id}`]}>
@@ -154,6 +161,11 @@ describe('ItemDetail Page', () => {
     expect(slider).toBeInTheDocument();
     fireEvent.change(slider, { target: { value: '1.75' } });
     expect(slider.value).toBe('1.75');
+  });
+
+  it('renders Character Hold Preview & Offsets section within ItemDetail', async () => {
+    renderDetail('item_pickaxe');
+    expect(await screen.findByText(/Character Hold Preview & Offsets/i)).toBeInTheDocument();
   });
 });
 

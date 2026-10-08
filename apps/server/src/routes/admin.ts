@@ -92,7 +92,7 @@ adminRouter.delete('/effects/:id', EffectController.deleteEffect);
 // MINING BLOCKS
 adminRouter.get('/blocks', BlockController.getBlocks);
 adminRouter.get('/blocks/:id', BlockController.getBlock);
-adminRouter.put('/blocks/:id', BlockController.updateBlock);
+adminRouter.put('/blocks/:id', runValidation(AdminValidation.blockUpdateValidation), BlockController.updateBlock);
 adminRouter.post('/blocks/:id/texture', BlockController.blockTextureUpload, BlockController.uploadBlockTexture);
 adminRouter.post('/blocks/:id/sound-effect', BlockController.blockSoundEffectUpload, BlockController.uploadBlockSoundEffect);
 adminRouter.delete('/blocks/:id/sound-effect', BlockController.removeBlockSoundEffect);

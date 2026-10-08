@@ -3,10 +3,12 @@ import {
   MINING_CONFIG,
   canTileBeDamaged,
   getTileMineTime,
+  getTileMaxHealth,
   isTileSolid,
   DEFAULT_MINING_MAP_CONFIG,
   type MiningMapConfigData,
 } from '@mine-me/shared';
+import { MiningDataManager } from './mining/subsystems/MiningDataManager';
 
 // ============================================================================
 // Mining Map Generator
@@ -24,20 +26,24 @@ export interface ServerTile {
   type: MiningTileType;
   /** Whether this tile has been revealed to the client via fog of war. */
   revealed: boolean;
-  /** Accumulated damage in milliseconds. */
+  /** Accumulated damage dealt to this block (remaining HP = maxHealth - damage). */
+  damage?: number;
+  /** @deprecated Backward compatibility */
   damageMs?: number;
 }
 
 /**
- * Calculate damage stage (0-4) based on accumulated damage vs tile mining time.
+ * Calculate damage stage (0-4) based on accumulated damage vs dynamic tile max health.
  */
 export function getDamageStage(tile: ServerTile): number {
-  if (!tile.damageMs || tile.damageMs <= 0 || !canTileBeDamaged(tile.type)) {
+  const damageTaken = tile.damage ?? tile.damageMs ?? 0;
+  if (damageTaken <= 0 || !canTileBeDamaged(tile.type)) {
     return 0;
   }
-  const totalTimeMs = getTileMineTime(tile.type);
+  const maxHealth = MiningDataManager.getInstance().getBlockMaxHealth(tile.type);
+  if (maxHealth <= 0) return 0;
 
-  const ratio = tile.damageMs / totalTimeMs;
+  const ratio = damageTaken / maxHealth;
   if (ratio >= 0.9) return 4;
   if (ratio >= 0.75) return 3;
   if (ratio >= 0.5) return 2;

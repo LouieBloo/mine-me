@@ -42,6 +42,13 @@ export const TrainingView: React.FC = () => {
       .map(inv => ({
         url: getAssetUrl(inv.item.gearImageUrl),
         subType: inv.item.subType as GearSubType,
+        shootsProjectiles: Boolean(inv.item.shootsProjectiles),
+        throwable: Boolean(inv.item.throwable),
+        holdOffsetX: inv.item.holdOffsetX,
+        holdOffsetY: inv.item.holdOffsetY,
+        holdRotation: inv.item.holdRotation,
+        muzzleOffsetX: inv.item.muzzleOffsetX,
+        muzzleOffsetY: inv.item.muzzleOffsetY,
       }));
   }, [playerState?.inventory?.items]);
 

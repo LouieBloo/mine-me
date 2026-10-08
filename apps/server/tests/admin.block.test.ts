@@ -146,4 +146,18 @@ describe('Mining Block Controller & Routes', () => {
 
     expect(res.status).toBe(200);
   });
+
+  it('PUT /admin/blocks/:id updates block health dynamically', async () => {
+    const res = await request(app)
+      .put('/admin/blocks/block_dirt')
+      .send({
+        name: 'Hardened Dirt',
+        health: 250,
+        staminaCost: 2,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Hardened Dirt');
+    expect(res.body.health).toBe(250);
+  });
 });

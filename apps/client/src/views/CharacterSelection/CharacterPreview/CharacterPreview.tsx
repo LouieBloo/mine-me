@@ -31,6 +31,13 @@ export const CharacterPreview: React.FC<Props> = ({ character, onRetired }) => {
             .map(inv => ({
                 url: `${import.meta.env.VITE_API_URL || ''}${inv.item.gearImageUrl}`,
                 subType: inv.item.subType as GearSubType,
+                shootsProjectiles: Boolean(inv.item.shootsProjectiles),
+                throwable: Boolean(inv.item.throwable),
+                holdOffsetX: inv.item.holdOffsetX,
+                holdOffsetY: inv.item.holdOffsetY,
+                holdRotation: inv.item.holdRotation,
+                muzzleOffsetX: inv.item.muzzleOffsetX,
+                muzzleOffsetY: inv.item.muzzleOffsetY,
             }));
     }, [character?.inventory]);
 

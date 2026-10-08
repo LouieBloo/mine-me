@@ -40,6 +40,10 @@ export interface MiningActiveMobSession {
   miningProgressMs: number;
   mineRange: number;
   hitStunDurationMs?: number;
+  spriteUrl?: string;
+  colliderWidth?: number;
+  colliderHeight?: number;
+  showHealthBar?: boolean;
 }
 
 export class MiningMobSubsystem {
@@ -62,6 +66,10 @@ export class MiningMobSubsystem {
       mineRange?: number;
       animations?: any;
       dropTable?: any;
+      spriteUrl?: string;
+      colliderWidth?: number;
+      colliderHeight?: number;
+      showHealthBar?: boolean;
     },
     position: Vector2D
   ): MiningActiveMobSession {
@@ -70,11 +78,31 @@ export class MiningMobSubsystem {
     const mobId = mobData.id || `mob_custom_${this.mobCounter}`;
     const name = mobData.name || 'Mob';
 
-    const halfHeight = MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE);
+    const colW =
+      mobData.colliderWidth ??
+      mobData.aiConfig?.colliderWidth ??
+      (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE);
+    const colH =
+      mobData.colliderHeight ??
+      mobData.aiConfig?.colliderHeight ??
+      (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE);
+    const halfHeight = colH / 2;
+    // Stationary mobs (e.g. target dummies) keep their configured 0 speed/jump; moving mobs get safe minimums
+    const isStationary = mobData.aiType === 'STATIONARY';
     const mobBody = new MiningMobBody({
       position: { x: position.x, y: position.y - halfHeight },
-      moveSpeed: mobData.moveSpeed && mobData.moveSpeed >= 2.8 ? mobData.moveSpeed : 3.2,
-      jumpForce: mobData.jumpForce && mobData.jumpForce >= 8.0 ? mobData.jumpForce : 8.8,
+      width: colW,
+      height: colH,
+      moveSpeed: isStationary
+        ? (mobData.moveSpeed ?? 0)
+        : mobData.moveSpeed && mobData.moveSpeed >= 2.8
+          ? mobData.moveSpeed
+          : 3.2,
+      jumpForce: isStationary
+        ? (mobData.jumpForce ?? 0)
+        : mobData.jumpForce && mobData.jumpForce >= 8.0
+          ? mobData.jumpForce
+          : 8.8,
     });
 
     const ai = MobAIRegistry.create(mobData.aiType, mobId, instanceId);
@@ -102,6 +130,17 @@ export class MiningMobSubsystem {
       miningTarget: null,
       miningProgressMs: 0,
       mineRange: mobData.aiConfig?.mineRange ?? (mobData as any).mineRange ?? 2.0,
+      spriteUrl:
+        mobData.spriteUrl ??
+        (mobData as any).animations?.url ??
+        mobData.aiConfig?.spriteUrl,
+      colliderWidth: colW,
+      colliderHeight: colH,
+      showHealthBar:
+        mobData.showHealthBar ??
+        (mobData.aiConfig?.showHealthBar !== undefined
+          ? mobData.aiConfig.showHealthBar
+          : true),
     };
 
     this.activeMobs.set(instanceId, session);
@@ -291,9 +330,10 @@ export class MiningMobSubsystem {
     }
 
     const prevStage = getDamageStage(tile);
-    const speedMultiplier = mob.miningSpeed / 100;
-    tile.damageMs = (tile.damageMs || 0) + dt * 1000 * speedMultiplier;
-    mob.miningProgressMs = tile.damageMs;
+    const damageDealt = (mob.miningSpeed || 80) * 2 * dt;
+    tile.damage = (tile.damage || 0) + damageDealt;
+    tile.damageMs = tile.damage;
+    mob.miningProgressMs = tile.damage;
 
     const newStage = getDamageStage(tile);
     if (newStage !== prevStage) {
@@ -305,11 +345,12 @@ export class MiningMobSubsystem {
       });
     }
 
-    const requiredTime = getTileMineTime(tile.type);
-    if (tile.damageMs >= requiredTime) {
+    const maxHealth = dataManager.getBlockMaxHealth(tile.type);
+    if (tile.damage >= maxHealth) {
       const previousType = tile.type;
       tile.type = MiningTileType.EMPTY;
       tile.revealed = true;
+      tile.damage = 0;
       tile.damageMs = 0;
 
       rigidWorld.removeTileCollider(target.x, target.y);
@@ -460,6 +501,16 @@ export class MiningMobSubsystem {
     dropSubsystem.droppedItemsDirty = true;
   }
 
+  public spawnSurfaceTargetDummy(
+    dataManager: MiningDataManager,
+    position?: Vector2D
+  ): MiningActiveMobSession | null {
+    const dummyDef = dataManager.getMobData('mob_target_dummy');
+    if (!dummyDef) return null;
+    const spawnPos = position ?? { x: MINING_CONFIG.ENTRANCE_X + 2.5, y: 0.0 };
+    return this.spawnMob(dummyDef, spawnPos);
+  }
+
   public getActiveMobs(): MiningActiveMob[] {
     const list: MiningActiveMob[] = [];
     for (const mob of this.activeMobs.values()) {
@@ -478,6 +529,10 @@ export class MiningMobSubsystem {
         animationState: mob.animationState,
         miningTarget: mob.miningTarget ?? undefined,
         animations: mob.animations,
+        spriteUrl: mob.spriteUrl,
+        colliderWidth: mob.colliderWidth,
+        colliderHeight: mob.colliderHeight,
+        showHealthBar: mob.showHealthBar,
       });
     }
     return list;

@@ -1,6 +1,6 @@
 import {
   MINING_CONFIG,
-  getTileMineTime,
+  getTileMaxHealth,
   isTileClimbable,
   isTileMineable,
   isTileSolid,
@@ -131,8 +131,8 @@ export class MiningPathfinder {
       const row = grid[y];
       const tile = row ? row[x] : undefined;
       if (!tile) return 1.0;
-      const ms = getTileMineTime(tile.type as any);
-      return 1.0 + ms / 500;
+      const health = getTileMaxHealth(tile.type as any);
+      return 1.0 + health / 100;
     };
 
     const isSupported = (x: number, y: number): boolean => {

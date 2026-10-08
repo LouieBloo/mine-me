@@ -2,8 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Container } from 'pixi.js';
 import { MiningMobRenderer } from './MiningMobRenderer';
 import type { MiningActiveMob } from '@mine-me/shared';
+import { Assets, Texture } from 'pixi.js';
 
-// Mock ModularEntitySprite
+// Mock Assets.load for non-browser environment
+vi.spyOn(Assets, 'load').mockResolvedValue(Texture.EMPTY as any);
+
+// Mock ModularEntitySprite and FloatingTextManager
 vi.mock('../../../../../components/game/sprites', () => {
   class MockModularEntitySprite {
     load = vi.fn().mockResolvedValue(undefined);
@@ -16,8 +20,16 @@ vi.mock('../../../../../components/game/sprites', () => {
     destroy = vi.fn();
     static REFERENCE_HEIGHT = 880;
   }
+  class MockFloatingTextManager {
+    spawnDamage = vi.fn();
+    spawnCritDamage = vi.fn();
+    spawnHeal = vi.fn();
+    spawn = vi.fn();
+    destroy = vi.fn();
+  }
   return {
     ModularEntitySprite: MockModularEntitySprite,
+    FloatingTextManager: MockFloatingTextManager,
   };
 });
 
@@ -423,6 +435,143 @@ describe('MiningMobRenderer', () => {
       // Center point
       expect(mockDebugGraphics.circle).toHaveBeenCalled();
     });
+
+    it('spawns floating damage text when a mob takes damage and floatingTextManager is set', () => {
+      const mockFloatingTextManager = {
+        spawnDamage: vi.fn(),
+        spawnCritDamage: vi.fn(),
+        spawnHeal: vi.fn(),
+        spawn: vi.fn(),
+        destroy: vi.fn(),
+      } as any;
+
+      renderer.setFloatingTextManager(mockFloatingTextManager);
+
+      const mobData: MiningActiveMob = {
+        id: 'mob-floating-dmg',
+        mobId: 'cmn_mole_person_001',
+        name: 'Mole Person',
+        position: { x: 5, y: 10 },
+        velocity: { x: 0, y: 0 },
+        health: 100,
+        maxHealth: 100,
+        attack: 6,
+        defense: 2,
+        isFacingLeft: false,
+        isMining: false,
+        animationState: 'idle',
+      };
+
+      renderer.updateMobs([mobData]);
+
+      // Damaged by 35 points
+      renderer.updateMobs([{ ...mobData, health: 65 }]);
+
+      expect(mockFloatingTextManager.spawnDamage).toHaveBeenCalledWith(
+        5 * 64, // spawnX (position.x * TILE_SIZE)
+        expect.any(Number), // spawnY
+        35 // damageTaken
+      );
+    });
+
+    it('supports single-sprite mobs (like target dummy) without modular puppet', () => {
+      const dummyMob: MiningActiveMob = {
+        id: 'dummy-1',
+        mobId: 'mob_target_dummy',
+        name: 'Target Dummy',
+        position: { x: 25, y: 0 },
+        velocity: { x: 0, y: 0 },
+        health: 1000000,
+        maxHealth: 1000000,
+        attack: 0,
+        defense: 0,
+        isFacingLeft: false,
+        isMining: false,
+        animationState: 'idle',
+        spriteUrl: '/assets/sprites/mobs/target_dummy.png',
+        colliderWidth: 0.8,
+        colliderHeight: 1.25,
+        showHealthBar: false,
+      };
+
+      renderer.updateMobs([dummyMob]);
+      const mob = renderer.getMob('dummy-1');
+
+      expect(mob).toBeDefined();
+      expect(mob?.staticSprite).toBeDefined();
+      expect(mob?.sprite).toBeUndefined();
+      expect(mob?.colliderWidth).toBe(0.8);
+      expect(mob?.colliderHeight).toBe(1.25);
+    });
+
+    it('renders custom rectangular collider dimensions in debug mode', () => {
+      const dummyMob: MiningActiveMob = {
+        id: 'dummy-hitbox',
+        mobId: 'mob_target_dummy',
+        name: 'Target Dummy',
+        position: { x: 25, y: 0 },
+        velocity: { x: 0, y: 0 },
+        health: 1000000,
+        maxHealth: 1000000,
+        attack: 0,
+        defense: 0,
+        isFacingLeft: false,
+        isMining: false,
+        animationState: 'idle',
+        spriteUrl: '/assets/sprites/mobs/target_dummy.png',
+        colliderWidth: 0.8,
+        colliderHeight: 1.25,
+      };
+
+      renderer.updateMobs([dummyMob]);
+
+      const mockDebugGraphics = {
+        rect: vi.fn().mockReturnThis(),
+        stroke: vi.fn().mockReturnThis(),
+        fill: vi.fn().mockReturnThis(),
+        circle: vi.fn().mockReturnThis(),
+        moveTo: vi.fn().mockReturnThis(),
+        lineTo: vi.fn().mockReturnThis(),
+      } as any;
+
+      renderer.renderDebugHitboxes(mockDebugGraphics, 64);
+
+      // Expected width = 0.8 * 64 = 51.2, height = 1.25 * 64 = 80
+      expect(mockDebugGraphics.rect).toHaveBeenCalledWith(
+        25 * 64 - 51.2 / 2,
+        0 * 64 - 80 / 2,
+        51.2,
+        80
+      );
+    });
+
+    it('hides healthbar when showHealthBar is false even after taking damage', () => {
+      const dummyMob: MiningActiveMob = {
+        id: 'dummy-healthbar',
+        mobId: 'mob_target_dummy',
+        name: 'Target Dummy',
+        position: { x: 25, y: 0 },
+        velocity: { x: 0, y: 0 },
+        health: 1000000,
+        maxHealth: 1000000,
+        attack: 0,
+        defense: 0,
+        isFacingLeft: false,
+        isMining: false,
+        animationState: 'idle',
+        spriteUrl: '/assets/sprites/mobs/target_dummy.png',
+        showHealthBar: false,
+      };
+
+      renderer.updateMobs([dummyMob]);
+      const mob = renderer.getMob('dummy-healthbar')!;
+      expect(mob.healthBar.visible).toBe(false);
+
+      // Takes damage: healthbar should still be hidden because showHealthBar is false
+      renderer.updateMobs([{ ...dummyMob, health: 999950 }]);
+      expect(mob.healthBar.visible).toBe(false);
+    });
   });
 });
+
 

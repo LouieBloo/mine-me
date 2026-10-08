@@ -1,10 +1,11 @@
-import { Container, Graphics } from 'pixi.js';
-import { ModularEntitySprite } from '../../../../../components/game/sprites';
+import { Assets, Container, Graphics, Sprite } from 'pixi.js';
+import { FloatingTextManager, ModularEntitySprite } from '../../../../../components/game/sprites';
 import {
   MINING_CONFIG,
   type MiningActiveMob,
   type MiningPosition,
   type Vector2D,
+  getAssetUrl,
   MobSoundProfileRegistry,
   MINING_SPATIAL_AUDIO_PRESETS,
 } from '@mine-me/shared';
@@ -16,7 +17,8 @@ export interface MobInstance {
   mobId: string;
   name: string;
   container: Container;
-  sprite: ModularEntitySprite;
+  sprite?: ModularEntitySprite;
+  staticSprite?: Sprite;
   healthBar: Graphics;
   targetPos: Vector2D;
   currentPos: Vector2D;
@@ -29,24 +31,38 @@ export interface MobInstance {
   isLoaded: boolean;
   lastDigSoundTime: number;
   lastIdleSoundTime: number;
+  colliderWidth?: number;
+  colliderHeight?: number;
+  showHealthBar?: boolean;
+  hitWobbleTimer?: number;
 }
 
 /**
  * Manages Pixi rendering, skeletal sprite instances, position interpolation,
- * health bars, and spatial audio for active NPCs/mobs in the mining grid.
+ * health bars, floating damage numbers, and spatial audio for active NPCs/mobs in the mining grid.
  */
 export class MiningMobRenderer {
   private parentContainer: Container;
   private mobs: Map<string, MobInstance> = new Map();
   private soundManager: SoundManager | null = null;
+  private floatingTextManager: FloatingTextManager | null = null;
 
-  constructor(parentContainer: Container, soundManager?: SoundManager | null) {
+  constructor(
+    parentContainer: Container,
+    soundManager?: SoundManager | null,
+    floatingTextManager?: FloatingTextManager | null
+  ) {
     this.parentContainer = parentContainer;
     this.soundManager = soundManager || null;
+    this.floatingTextManager = floatingTextManager || null;
   }
 
   public setSoundManager(sm: SoundManager | null): void {
     this.soundManager = sm;
+  }
+
+  public setFloatingTextManager(ftm: FloatingTextManager | null): void {
+    this.floatingTextManager = ftm;
   }
 
   public getMobCount(): number {
@@ -89,58 +105,124 @@ export class MiningMobRenderer {
         mobContainer.y = mobData.position.y * TILE_SIZE;
 
         const healthBar = new Graphics();
-        this.drawHealthBar(healthBar, mobData.health, mobData.maxHealth);
+        const showHealthBar = mobData.showHealthBar !== false;
+        this.drawHealthBar(healthBar, mobData.health, mobData.maxHealth, showHealthBar);
         mobContainer.addChild(healthBar);
 
-        const sprite = new ModularEntitySprite(mobContainer, {
-          manifestData: mobData.animations?.parts ? mobData.animations : undefined,
-        });
+        const spriteUrl =
+          mobData.spriteUrl ||
+          (mobData.animations && !mobData.animations.parts ? mobData.animations.url : undefined);
 
-        instance = {
-          id: mobData.id,
-          mobId: mobData.mobId,
-          name: mobData.name,
-          container: mobContainer,
-          sprite,
-          healthBar,
-          targetPos: { ...mobData.position },
-          currentPos: { ...mobData.position },
-          health: mobData.health,
-          maxHealth: mobData.maxHealth,
-          isFacingLeft: mobData.isFacingLeft,
-          animationState: mobData.animationState,
-          isMining: mobData.isMining,
-          miningTarget: mobData.miningTarget,
-          isLoaded: false,
-          lastDigSoundTime: 0,
-          lastIdleSoundTime: now + Math.random() * 3000,
-        };
+        if (spriteUrl) {
+          // Single-sprite entity (e.g. Target Dummy, static objects)
+          const staticSprite = new Sprite();
+          const colPixelH = (mobData.colliderHeight ?? 1.25) * TILE_SIZE;
+          staticSprite.anchor.set(0.5, 1.0);
+          staticSprite.y = colPixelH / 2;
+          staticSprite.visible = false;
+          mobContainer.addChild(staticSprite);
 
-        this.mobs.set(mobData.id, instance);
-        this.parentContainer.addChild(mobContainer);
+          instance = {
+            id: mobData.id,
+            mobId: mobData.mobId,
+            name: mobData.name,
+            container: mobContainer,
+            staticSprite,
+            healthBar,
+            targetPos: { ...mobData.position },
+            currentPos: { ...mobData.position },
+            health: mobData.health,
+            maxHealth: mobData.maxHealth,
+            isFacingLeft: mobData.isFacingLeft,
+            animationState: mobData.animationState,
+            isMining: mobData.isMining,
+            miningTarget: mobData.miningTarget,
+            isLoaded: false,
+            lastDigSoundTime: 0,
+            lastIdleSoundTime: now + Math.random() * 3000,
+            colliderWidth: mobData.colliderWidth,
+            colliderHeight: mobData.colliderHeight,
+            showHealthBar,
+          };
 
-        sprite
-          .load()
-          .then(() => {
-            if (!this.mobs.has(mobData.id)) return;
-            const targetHeight = TILE_SIZE * 1.05;
-            sprite.scaleToHeight(targetHeight);
+          this.mobs.set(mobData.id, instance);
+          this.parentContainer.addChild(mobContainer);
 
-            const unscaledFootDepth = 426;
-            const visualGroundOffset = 15;
-            const footOffset =
-              MINING_CONFIG.PLAYER_RADIUS -
-              unscaledFootDepth * (targetHeight / ModularEntitySprite.REFERENCE_HEIGHT) +
-              visualGroundOffset;
-            sprite.setPosition(0, footOffset);
-
-            sprite.setFlipped(instance!.isFacingLeft);
-            sprite.setVisible(true);
-            instance!.isLoaded = true;
-          })
-          .catch((err) => {
-            console.error('[MiningMobRenderer] Error loading sprite for mob:', mobData.id, err);
+          Assets.load(getAssetUrl(spriteUrl))
+            .then((texture) => {
+              if (!this.mobs.has(mobData.id)) return;
+              staticSprite.texture = texture;
+              const targetHeight = (mobData.colliderHeight ?? 1.25) * TILE_SIZE * 1.05;
+              const texW = texture?.width || 64;
+              const texH = texture?.height || 64;
+              const aspectRatio = texW / texH;
+              try {
+                staticSprite.height = targetHeight;
+                staticSprite.width = targetHeight * aspectRatio;
+              } catch {
+                // Safe fallback for headless unit test environments
+              }
+              staticSprite.visible = true;
+              instance!.isLoaded = true;
+            })
+            .catch((err) => {
+              console.error('[MiningMobRenderer] Error loading static sprite for mob:', mobData.id, err);
+            });
+        } else {
+          // Modular entity skeletal puppet (e.g. Mole Person)
+          const sprite = new ModularEntitySprite(mobContainer, {
+            manifestData: mobData.animations?.parts ? mobData.animations : undefined,
           });
+
+          instance = {
+            id: mobData.id,
+            mobId: mobData.mobId,
+            name: mobData.name,
+            container: mobContainer,
+            sprite,
+            healthBar,
+            targetPos: { ...mobData.position },
+            currentPos: { ...mobData.position },
+            health: mobData.health,
+            maxHealth: mobData.maxHealth,
+            isFacingLeft: mobData.isFacingLeft,
+            animationState: mobData.animationState,
+            isMining: mobData.isMining,
+            miningTarget: mobData.miningTarget,
+            isLoaded: false,
+            lastDigSoundTime: 0,
+            lastIdleSoundTime: now + Math.random() * 3000,
+            colliderWidth: mobData.colliderWidth,
+            colliderHeight: mobData.colliderHeight,
+            showHealthBar,
+          };
+
+          this.mobs.set(mobData.id, instance);
+          this.parentContainer.addChild(mobContainer);
+
+          sprite
+            .load()
+            .then(() => {
+              if (!this.mobs.has(mobData.id)) return;
+              const targetHeight = TILE_SIZE * 1.05;
+              sprite.scaleToHeight(targetHeight);
+
+              const unscaledFootDepth = 426;
+              const visualGroundOffset = 15;
+              const footOffset =
+                MINING_CONFIG.PLAYER_RADIUS -
+                unscaledFootDepth * (targetHeight / ModularEntitySprite.REFERENCE_HEIGHT) +
+                visualGroundOffset;
+              sprite.setPosition(0, footOffset);
+
+              sprite.setFlipped(instance!.isFacingLeft);
+              sprite.setVisible(true);
+              instance!.isLoaded = true;
+            })
+            .catch((err) => {
+              console.error('[MiningMobRenderer] Error loading sprite for mob:', mobData.id, err);
+            });
+        }
       } else {
         instance.targetPos.x = mobData.position.x;
         instance.targetPos.y = mobData.position.y;
@@ -148,9 +230,26 @@ export class MiningMobRenderer {
         instance.animationState = mobData.animationState;
         instance.isMining = mobData.isMining;
         instance.miningTarget = mobData.miningTarget;
+        if (mobData.colliderWidth) instance.colliderWidth = mobData.colliderWidth;
+        if (mobData.colliderHeight) instance.colliderHeight = mobData.colliderHeight;
+        if (mobData.showHealthBar !== undefined) instance.showHealthBar = mobData.showHealthBar;
 
         // Mob took damage
         if (mobData.health < instance.health) {
+          const damageTaken = instance.health - mobData.health;
+
+          // Spawn floating damage text via standardized FloatingTextManager
+          if (this.floatingTextManager) {
+            const spawnX = instance.currentPos.x * TILE_SIZE;
+            const spawnY = (instance.currentPos.y - 0.7) * TILE_SIZE;
+            this.floatingTextManager.spawnDamage(spawnX, spawnY, damageTaken);
+          }
+
+          // Trigger hit wobble animation on static sprite
+          if (instance.staticSprite) {
+            instance.hitWobbleTimer = 220;
+          }
+
           const profile = MobSoundProfileRegistry.getProfile(instance.mobId);
           const damageSound = profile?.getSlot('damage')?.defaultUrl;
           if (damageSound && this.soundManager) {
@@ -171,7 +270,7 @@ export class MiningMobRenderer {
         if (instance.health !== mobData.health || instance.maxHealth !== mobData.maxHealth) {
           instance.health = mobData.health;
           instance.maxHealth = mobData.maxHealth;
-          this.drawHealthBar(instance.healthBar, instance.health, instance.maxHealth);
+          this.drawHealthBar(instance.healthBar, instance.health, instance.maxHealth, instance.showHealthBar);
         }
       }
     }
@@ -179,13 +278,12 @@ export class MiningMobRenderer {
 
   /**
    * Draw miniature health bar above mob's head.
-   * Only rendered if the mob has taken damage and is still alive.
+   * Only rendered if the mob has taken damage and is still alive, and showHealthBar is not false.
    */
-  private drawHealthBar(graphics: Graphics, health: number, maxHealth: number): void {
+  private drawHealthBar(graphics: Graphics, health: number, maxHealth: number, showHealthBar: boolean = true): void {
     graphics.clear();
 
-    // 1. Healthbar only renders if mob has taken damage and is alive
-    if (health >= maxHealth || health <= 0) {
+    if (!showHealthBar || health >= maxHealth || health <= 0) {
       graphics.visible = false;
       return;
     }
@@ -232,9 +330,22 @@ export class MiningMobRenderer {
       instance.container.y = instance.currentPos.y * TILE_SIZE;
 
       if (instance.isLoaded) {
-        instance.sprite.setFlipped(instance.isFacingLeft);
-        instance.sprite.setState(instance.animationState as any);
-        instance.sprite.update(dt);
+        if (instance.sprite) {
+          instance.sprite.setFlipped(instance.isFacingLeft);
+          instance.sprite.setState(instance.animationState as any);
+          instance.sprite.update(dt);
+        } else if (instance.staticSprite) {
+          instance.staticSprite.scale.x = instance.isFacingLeft
+            ? -Math.abs(instance.staticSprite.scale.x)
+            : Math.abs(instance.staticSprite.scale.x);
+
+          if (instance.hitWobbleTimer && instance.hitWobbleTimer > 0) {
+            instance.hitWobbleTimer -= dt * 1000;
+            instance.staticSprite.rotation = Math.sin(instance.hitWobbleTimer * 0.05) * 0.12;
+          } else {
+            instance.staticSprite.rotation = 0;
+          }
+        }
       }
 
       // Audio triggers
@@ -290,7 +401,9 @@ export class MiningMobRenderer {
     this.mobs.delete(id);
     try {
       this.parentContainer.removeChild(instance.container);
-      instance.sprite.destroy();
+      if (instance.sprite) {
+        instance.sprite.destroy();
+      }
       instance.container.destroy({ children: true });
     } catch {
       // Ignore destruction errors
@@ -301,10 +414,13 @@ export class MiningMobRenderer {
    * Render debug hitboxes, collision boxes, and reach indicators for all active mobs.
    */
   public renderDebugHitboxes(debugGraphics: Graphics, tileSize: number = TILE_SIZE): void {
-    const colliderPixelW = (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE) * tileSize;
-    const colliderPixelH = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE) * tileSize;
+    const defaultW = (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE) * tileSize;
+    const defaultH = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE) * tileSize;
 
     for (const instance of this.mobs.values()) {
+      const colliderPixelW = instance.colliderWidth ? instance.colliderWidth * tileSize : defaultW;
+      const colliderPixelH = instance.colliderHeight ? instance.colliderHeight * tileSize : defaultH;
+
       const mobX = instance.currentPos.x * tileSize;
       const mobY = instance.currentPos.y * tileSize;
 
@@ -355,4 +471,3 @@ export class MiningMobRenderer {
     }
   }
 }
-

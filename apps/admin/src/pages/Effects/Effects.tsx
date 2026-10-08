@@ -48,6 +48,11 @@ export default function Effects() {
       cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
     },
     { 
+      field: 'damageModifier', 
+      headerName: 'Damage',
+      cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
+    },
+    { 
       field: 'explodes', 
       headerName: 'Explodes',
       cellRenderer: (params: any) => params.value ? 'Yes' : 'No'

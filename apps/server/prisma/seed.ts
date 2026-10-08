@@ -71,15 +71,21 @@ async function main() {
         update: {
           name: effRoot.name,
           description: effRoot.description,
-          healthGain: effRoot.healthGain,
-          staminaGain: effRoot.staminaGain
+          healthGain: effRoot.healthGain ?? false,
+          staminaGain: effRoot.staminaGain ?? false,
+          miningSpeedModifier: effRoot.miningSpeedModifier ?? false,
+          damageModifier: effRoot.damageModifier ?? false,
+          explodes: effRoot.explodes ?? false,
         },
         create: {
           id: effRoot.id,
           name: effRoot.name,
           description: effRoot.description,
-          healthGain: effRoot.healthGain,
-          staminaGain: effRoot.staminaGain
+          healthGain: effRoot.healthGain ?? false,
+          staminaGain: effRoot.staminaGain ?? false,
+          miningSpeedModifier: effRoot.miningSpeedModifier ?? false,
+          damageModifier: effRoot.damageModifier ?? false,
+          explodes: effRoot.explodes ?? false,
         },
       });
     }
@@ -164,7 +170,17 @@ async function main() {
   // 3. Seed Mobs
   const mobs = JSON.parse(fs.readFileSync(path.join(dataPath, 'mobs.json'), 'utf-8'));
   for (const mobData of mobs) {
-    const { dropTable, dungeonLevelMobs, sounds, ...mobRoot } = mobData;
+    const {
+      dropTable,
+      dungeonLevelMobs,
+      sounds,
+      maxHealth,
+      spriteUrl,
+      colliderWidth,
+      colliderHeight,
+      showHealthBar,
+      ...mobRoot
+    } = mobData;
     await prisma.mob.upsert({
       where: { id: mobRoot.id },
       update: mobRoot,
@@ -222,7 +238,7 @@ async function main() {
           name: blockData.name,
           description: blockData.description,
           textureUrl: blockData.textureUrl,
-          mineTimeMs: blockData.mineTimeMs,
+          health: (blockData.health ?? 100) as any,
           staminaCost: blockData.staminaCost,
           idleParticleEffectId: blockData.idleParticleEffectId || null,
         },
@@ -232,7 +248,7 @@ async function main() {
           name: blockData.name,
           description: blockData.description,
           textureUrl: blockData.textureUrl,
-          mineTimeMs: blockData.mineTimeMs,
+          health: (blockData.health ?? 100) as any,
           staminaCost: blockData.staminaCost,
           idleParticleEffectId: blockData.idleParticleEffectId || null,
         },

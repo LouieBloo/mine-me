@@ -33,6 +33,27 @@ export const MINING_CONFIG = {
   MINERAL_MINE_TIME_MS: 1500,
   CHEST_MINE_TIME_MS: 1000,
 
+  /** Melee hit box: pivot height above player center (shoulder), in tiles */
+  MELEE_SHOULDER_OFFSET_Y: 0.35,
+  /** Melee hit box: distance from shoulder pivot to weapon center along aim, in tiles */
+  MELEE_WEAPON_OFFSET: 0.7,
+  /** Melee hit box: half-width/height of the box around the weapon, in tiles */
+  MELEE_HIT_HALF_SIZE: 0.55,
+  /** Extra tolerance so a mob's body (not just its center) can be struck, in tiles */
+  MELEE_MOB_BODY_MARGIN: 0.3,
+
+  /** Number of damage crack progression stages before a tile is destroyed (1..4) */
+  DAMAGE_STAGES: 4,
+
+  /** Baseline pickaxe mining speed efficiency (25% = 25) */
+  BASE_PICKAXE_MINING_SPEED: 25,
+
+  /** Minimum animation swing speed (swings/second) to prevent sluggish motion */
+  MIN_SWING_SPEED: 1.0,
+
+  /** Maximum animation swing speed (swings/second) to maintain puppet visual clarity */
+  MAX_SWING_SPEED: 5.0,
+
   /** Damage taken when crushed by a falling rock */
   ROCK_CRUSH_DAMAGE: 50,
 
@@ -106,7 +127,8 @@ export interface MiningBlockConfig {
   description?: string | null;
   textureUrl?: string | null;
   soundEffectUrl?: string | null;
-  mineTimeMs: number;
+  health: number;
+  mineTimeMs?: number;
   staminaCost: number;
   idleParticleEffectId?: string | null;
   idleParticleEffect?: ParticleEffect | null;
@@ -128,7 +150,9 @@ export interface MiningTileDefinition {
   isClimbable: boolean;
   /** Whether light (sunlight and ambient) passes through this tile */
   isTransparent: boolean;
-  /** Default duration in ms to mine this block (if mineable) */
+  /** Default block health (HP) if not configured dynamically in database */
+  health?: number;
+  /** Default duration in ms (deprecated in favor of health) */
   defaultMineTimeMs?: number;
   /** Name of the particle effect to emit from this tile */
   particleEffect?: string;
@@ -152,6 +176,7 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     isSolid: true,
     isClimbable: false,
     isTransparent: false,
+    health: 100,
     defaultMineTimeMs: MINING_CONFIG.DIRT_MINE_TIME_MS,
   },
   [MiningTileType.ROCK]: {
@@ -171,6 +196,7 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     isSolid: true,
     isClimbable: false,
     isTransparent: false,
+    health: 300,
     defaultMineTimeMs: MINING_CONFIG.MINERAL_MINE_TIME_MS,
   },
   [MiningTileType.CHEST]: {
@@ -181,6 +207,7 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     isSolid: true,
     isClimbable: false,
     isTransparent: false,
+    health: 200,
     defaultMineTimeMs: MINING_CONFIG.CHEST_MINE_TIME_MS,
   },
   [MiningTileType.ENTRANCE]: {
@@ -218,6 +245,7 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     isSolid: true,
     isClimbable: false,
     isTransparent: false,
+    health: 240,
     defaultMineTimeMs: 1200,
   },
   [MiningTileType.SILVERIUM]: {
@@ -228,6 +256,7 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     isSolid: true,
     isClimbable: false,
     isTransparent: false,
+    health: 400,
     defaultMineTimeMs: 2000,
   },
 };
@@ -256,8 +285,28 @@ export function isTileTransparent(type: MiningTileType): boolean {
   return getTileDefinition(type).isTransparent;
 }
 
-export function getTileMineTime(type: MiningTileType): number {
-  return getTileDefinition(type).defaultMineTimeMs ?? MINING_CONFIG.DIRT_MINE_TIME_MS;
+/**
+ * Dynamically resolves a tile's maximum health from active database block configurations,
+ * falling back to the tile definition default if not yet loaded.
+ */
+export function getTileMaxHealth(
+  type: MiningTileType,
+  blockConfigs?: Map<MiningTileType, MiningBlockConfig> | Record<string, any>
+): number {
+  if (blockConfigs) {
+    const config = blockConfigs instanceof Map ? blockConfigs.get(type) : blockConfigs[type];
+    if (typeof config?.health === 'number' && config.health > 0) {
+      return config.health;
+    }
+  }
+  return getTileDefinition(type).health ?? 100;
+}
+
+export function getTileMineTime(
+  type: MiningTileType,
+  blockConfigs?: Map<MiningTileType, MiningBlockConfig> | Record<string, any>
+): number {
+  return getTileMaxHealth(type, blockConfigs);
 }
 
 export function getTileParticleEffect(
@@ -475,6 +524,14 @@ export interface MiningInputState {
   sequence: number;
 }
 
+/** Authoritative block hit event emitted when a block takes mining damage. */
+export interface MiningBlockHitEvent {
+  x: number;
+  y: number;
+  tileType: MiningTileType;
+  damage?: number;
+}
+
 /** 30 Hz real-time simulation snapshot emitted by server to client. */
 export interface MiningStateTickPayload {
   tick: number;
@@ -493,6 +550,8 @@ export interface MiningStateTickPayload {
   gunshots?: MiningGunshotEvent[];
   /** Explosions that detonated during this simulation tick. */
   explosions?: MiningExplosionEvent[];
+  /** Block damage hit events (e.g. tool swing hits dealing damage) triggered during this tick. */
+  blockHits?: MiningBlockHitEvent[];
   revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
   /** Other players in the shared room during multiplayer sessions. */
   otherPlayers?: MiningRemotePlayer[];
@@ -546,6 +605,10 @@ export interface MiningActiveMob {
   miningTarget?: MiningPosition | null;
   animationState: 'idle' | 'walk' | 'mine' | 'attack' | 'jump' | 'damage' | 'death';
   animations?: any;
+  spriteUrl?: string;
+  colliderWidth?: number;
+  colliderHeight?: number;
+  showHealthBar?: boolean;
 }
 
 /**
@@ -565,6 +628,7 @@ export interface MiningActiveProjectile {
   id: string;
   characterId?: string;
   itemId?: string;
+  weaponItemId?: string;
   position: Vector2D;
   velocity: Vector2D;
   angle: number;

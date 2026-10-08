@@ -451,5 +451,32 @@
     "createdAt": "2026-04-06T21:51:48.684Z",
     "updatedAt": "2026-08-19T02:49:17.707Z",
     "dropTable": null
+  },
+  {
+    "id": "mob_target_dummy",
+    "name": "Target Dummy",
+    "level": 1,
+    "health": 1000000,
+    "attack": 0,
+    "defense": 0,
+    "attackPercentage": 0,
+    "defendPercentage": 0,
+    "aiType": "STATIONARY",
+    "aiConfig": {
+      "colliderWidth": 0.8,
+      "colliderHeight": 1.25,
+      "showHealthBar": false,
+      "spriteUrl": "/assets/sprites/mobs/target_dummy.png"
+    },
+    "abilities": [],
+    "moveSpeed": 0,
+    "jumpForce": 0,
+    "miningSpeed": 0,
+    "animations": {
+      "url": "/assets/sprites/mobs/target_dummy.png"
+    },
+    "createdAt": "2026-10-07T00:00:00.000Z",
+    "updatedAt": "2026-10-07T00:00:00.000Z",
+    "dropTable": null
   }
 ]

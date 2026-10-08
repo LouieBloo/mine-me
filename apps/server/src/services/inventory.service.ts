@@ -102,6 +102,13 @@ export class InventoryService {
       lightConfig: item.lightConfig,
       shootsProjectiles: item.shootsProjectiles,
       projectileConfig: item.projectileConfig,
+      itemKey: item.itemKey,
+      inGameScale: typeof item.inGameScale === 'number' ? item.inGameScale : 1.0,
+      holdOffsetX: typeof item.holdOffsetX === 'number' ? item.holdOffsetX : 0,
+      holdOffsetY: typeof item.holdOffsetY === 'number' ? item.holdOffsetY : 0,
+      holdRotation: typeof item.holdRotation === 'number' ? item.holdRotation : 0,
+      muzzleOffsetX: typeof item.muzzleOffsetX === 'number' ? item.muzzleOffsetX : 0,
+      muzzleOffsetY: typeof item.muzzleOffsetY === 'number' ? item.muzzleOffsetY : 0,
       itemEffects: (item.itemEffects || []).map((ie: any) => ({
         id: ie.id,
         itemId: ie.itemId,
@@ -114,6 +121,7 @@ export class InventoryService {
           healthGain: ie.effect.healthGain,
           staminaGain: ie.effect.staminaGain,
           miningSpeedModifier: ie.effect.miningSpeedModifier,
+          damageModifier: ie.effect.damageModifier,
         } : undefined
       })),
     };
@@ -163,9 +171,9 @@ export class InventoryService {
   }
 
   /**
-   * Calculates the current effective mining speed of a character from database in real-time.
+   * Calculates the current effective mining attributes (speed and damage) of a character in real-time.
    */
-  public static async getCharacterMiningSpeed(characterId: string): Promise<number> {
+  public static async getCharacterMiningStats(characterId: string): Promise<{ miningSpeed: number; miningDamage: number }> {
     const inventory = await prisma.inventoryItem.findMany({
       where: {
         characterId,
@@ -187,6 +195,25 @@ export class InventoryService {
 
     const mappedEntries = inventory.map(inv => InventoryService.mapInventoryEntry(inv)!);
     const mods = CharacterModEngine.getModifications(mappedEntries);
-    return mods.miningSpeed;
+    return {
+      miningSpeed: mods.miningSpeed,
+      miningDamage: mods.miningDamage || 25,
+    };
+  }
+
+  /**
+   * Calculates the current effective mining speed of a character from database in real-time.
+   */
+  public static async getCharacterMiningSpeed(characterId: string): Promise<number> {
+    const stats = await InventoryService.getCharacterMiningStats(characterId);
+    return stats.miningSpeed;
+  }
+
+  /**
+   * Calculates the current effective mining damage per hit of a character from database in real-time.
+   */
+  public static async getCharacterMiningDamage(characterId: string): Promise<number> {
+    const stats = await InventoryService.getCharacterMiningStats(characterId);
+    return stats.miningDamage;
   }
 }

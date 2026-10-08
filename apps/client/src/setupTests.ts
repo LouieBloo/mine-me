@@ -80,7 +80,31 @@ vi.mock('pixi.js', () => ({
     rect = vi.fn().mockReturnThis();
     poly = vi.fn().mockReturnThis();
     fill = vi.fn().mockReturnThis();
+    stroke = vi.fn().mockReturnThis();
+    clear = vi.fn().mockReturnThis();
+    moveTo = vi.fn().mockReturnThis();
+    lineTo = vi.fn().mockReturnThis();
     destroy = vi.fn();
+  },
+  Text: class {
+    anchor = { set: vi.fn() };
+    scale = { set: vi.fn() };
+    x = 0;
+    y = 0;
+    alpha = 1;
+    destroy = vi.fn();
+    constructor(public options?: any) {}
+  },
+  TextStyle: class {
+    constructor(public options?: any) {}
+  },
+  Ticker: {
+    shared: {
+      add: vi.fn(),
+      remove: vi.fn(),
+      deltaMS: 16.6,
+      stop: vi.fn(),
+    },
   },
 }));
 

@@ -2,6 +2,7 @@ import {
   type MiningGunshotEvent,
   type MiningRigidWorld,
   type Vector2D,
+  getItemDamageEffect,
 } from '@mine-me/shared';
 import { isInBounds, type ServerMiningGrid } from '../../miningMap.service';
 import { MiningProjectileEntity } from '../physics/MiningProjectileEntity';
@@ -28,7 +29,8 @@ export class MiningProjectileSubsystem {
     target: Vector2D,
     weaponItemId: string | undefined,
     dataManager: MiningDataManager,
-    rigidWorld: MiningRigidWorld
+    rigidWorld: MiningRigidWorld,
+    muzzlePosition?: Vector2D
   ): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
     if (!session) return { success: false, error: 'Player session not found.' };
 
@@ -51,7 +53,6 @@ export class MiningProjectileSubsystem {
       reloadTime: 1.5,
       projectileSpeed: 28.0,
       projectileGravityScale: 0.05,
-      damage: 35,
     };
 
     const maxAmmo = projConfig.magazineSize ?? 6;
@@ -102,11 +103,31 @@ export class MiningProjectileSubsystem {
     }
 
     // 7. Calculate firing launch vector
-    const startX = session.playerBody.position.x;
-    const startY = session.playerBody.position.y - 0.1;
+    let muzzlePos: Vector2D;
+    if (muzzlePosition && typeof muzzlePosition.x === 'number' && typeof muzzlePosition.y === 'number') {
+      const distFromPlayer = Math.hypot(
+        muzzlePosition.x - session.playerBody.position.x,
+        muzzlePosition.y - session.playerBody.position.y
+      );
+      if (distFromPlayer <= 2.5) {
+        muzzlePos = { x: muzzlePosition.x, y: muzzlePosition.y };
+      } else {
+        muzzlePos = { x: session.playerBody.position.x, y: session.playerBody.position.y - 0.1 };
+      }
+    } else {
+      const startX = session.playerBody.position.x;
+      const startY = session.playerBody.position.y - 0.1;
+      const dxTemp = target.x - startX;
+      const dyTemp = target.y - startY;
+      const distTemp = Math.hypot(dxTemp, dyTemp) || 1.0;
+      muzzlePos = {
+        x: startX + (dxTemp / distTemp) * 0.45,
+        y: startY + (dyTemp / distTemp) * 0.45,
+      };
+    }
 
-    const dx = target.x - startX;
-    const dy = target.y - startY;
+    const dx = target.x - muzzlePos.x;
+    const dy = target.y - muzzlePos.y;
     const dist = Math.hypot(dx, dy) || 1.0;
     const dirX = dx / dist;
     const dirY = dy / dist;
@@ -115,12 +136,6 @@ export class MiningProjectileSubsystem {
     const initialVel: Vector2D = {
       x: dirX * speed,
       y: dirY * speed,
-    };
-
-    const muzzleDist = 0.45;
-    const muzzlePos: Vector2D = {
-      x: startX + dirX * muzzleDist,
-      y: startY + dirY * muzzleDist,
     };
 
     const projectileId = `proj_${characterId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -139,13 +154,17 @@ export class MiningProjectileSubsystem {
       }
     }
 
+    // Projectile damage is resolved from the item that fired it via the effect table
+    const weaponDamage = getItemDamageEffect(weaponItem) || weaponItem?.combatScore || 35;
+
     const projectile = new MiningProjectileEntity(
       projectileId,
       characterId,
       muzzlePos,
       initialVel,
       {
-        damage: projConfig.damage ?? 35,
+        damage: weaponDamage,
+        weaponItemId: weaponItem?.id,
         itemId: projConfig.projectileItemId,
         spriteUrl: bulletSpriteUrl,
         inGameScale: bulletScale,
@@ -238,12 +257,16 @@ export class MiningProjectileSubsystem {
 
     if (this.activeProjectiles.length === 0) return;
 
+    // Materialize once: `mobs` may be a one-shot iterator (e.g. Map.values()), which would be
+    // exhausted by the first projectile and leave every later projectile unable to hit mobs.
+    const mobList = Array.from(mobs);
+
     for (const proj of this.activeProjectiles) {
       proj.update(dt, grid);
 
       // 2. Check collision against active mobs if not already hit a solid tile
       if (!proj.hasHit) {
-        for (const mob of mobs) {
+        for (const mob of mobList) {
           if (mob.health > 0 && mob.animationState !== 'death') {
             const mobX = mob.mobBody.position.x;
             const mobY = mob.mobBody.position.y;

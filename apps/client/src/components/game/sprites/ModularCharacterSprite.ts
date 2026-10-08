@@ -25,6 +25,13 @@ export type {
 export interface GearLayerDescriptor {
   url: string;
   subType: GearSubType;
+  shootsProjectiles?: boolean;
+  throwable?: boolean;
+  holdOffsetX?: number;
+  holdOffsetY?: number;
+  holdRotation?: number; // in degrees
+  muzzleOffsetX?: number;
+  muzzleOffsetY?: number;
 }
 
 /**
@@ -34,6 +41,8 @@ export interface GearLayerDescriptor {
  */
 export class ModularCharacterSprite extends ModularEntitySprite {
   private gearSprites: Map<string, Sprite[]> = new Map();
+  private weaponSprite: Sprite | null = null;
+  private currentMuzzleOffset: { x: number; y: number } = { x: 0, y: 0 };
 
   constructor(
     parentContainer: Container,
@@ -64,11 +73,48 @@ export class ModularCharacterSprite extends ModularEntitySprite {
 
         // Normalize weapons/tools so they scale proportionally to character body parts
         if (layer.subType === 'WEAPON') {
+          this.weaponSprite = sprite;
+          this.currentMuzzleOffset = {
+            x: layer.muzzleOffsetX ?? 0,
+            y: layer.muzzleOffsetY ?? 0,
+          };
+
           const targetToolDimension = 280;
           const maxDim = Math.max(texture.width, texture.height);
           if (maxDim > targetToolDimension) {
             const toolScale = targetToolDimension / maxDim;
             sprite.scale.set(toolScale);
+          }
+
+          if (layer.throwable && sprite.scale) {
+            const currentScaleX = typeof sprite.scale.x === 'number' ? sprite.scale.x : 1;
+            sprite.scale.set(currentScaleX * 0.75);
+          }
+
+          const hasCustomHold =
+            typeof layer.holdOffsetX === 'number' ||
+            typeof layer.holdOffsetY === 'number' ||
+            typeof layer.holdRotation === 'number';
+
+          if (hasCustomHold) {
+            sprite.x = layer.holdOffsetX ?? 0;
+            sprite.y = layer.holdOffsetY ?? 0;
+            sprite.rotation = ((layer.holdRotation ?? 0) * Math.PI) / 180;
+          } else if (layer.shootsProjectiles) {
+            // Weapon shoots projectiles default fallback (0 rad neutral matching Admin preview)
+            sprite.rotation = 0;
+            sprite.x = 0;
+            sprite.y = 0;
+          } else if (layer.throwable) {
+            // Throwable consumable held in hand default fallback (0 rad neutral matching Admin preview)
+            sprite.rotation = 0;
+            sprite.x = 0;
+            sprite.y = 0;
+          } else {
+            // Axes, pickaxes, and melee tools: angled forward ready to strike
+            sprite.rotation = 0.25;
+            sprite.x = 5;
+            sprite.y = -10;
           }
         }
 
@@ -100,6 +146,37 @@ export class ModularCharacterSprite extends ModularEntitySprite {
   }
 
   /**
+   * Returns the currently equipped weapon sprite, if any.
+   */
+  getWeaponSprite(): Sprite | null {
+    return this.weaponSprite;
+  }
+
+  /**
+   * Calculate the world position of the projectile launch point
+   * relative to a given coordinate container (e.g. gridContainer).
+   * Automatically accounts for the character arm aiming angle, recoil, and flip.
+   */
+  getMuzzleWorldPosition(
+    relativeToContainer: Container,
+    customOffset?: { x: number; y: number }
+  ): { x: number; y: number } | null {
+    if (!this.weaponSprite || this.weaponSprite.destroyed || !this.weaponSprite.parent) {
+      return null;
+    }
+    const offset = customOffset ?? this.currentMuzzleOffset;
+    if (typeof this.weaponSprite.toGlobal !== 'function') {
+      return { x: offset.x, y: offset.y };
+    }
+    const globalPos = this.weaponSprite.toGlobal(offset);
+    if (typeof relativeToContainer.toLocal !== 'function') {
+      return globalPos;
+    }
+    const localPos = relativeToContainer.toLocal(globalPos);
+    return localPos;
+  }
+
+  /**
    * Clear all equipped gear layer sprites.
    */
   private clearGearLayers(): void {
@@ -112,6 +189,8 @@ export class ModularCharacterSprite extends ModularEntitySprite {
       }
     });
     this.gearSprites.clear();
+    this.weaponSprite = null;
+    this.currentMuzzleOffset = { x: 0, y: 0 };
   }
 
   /**

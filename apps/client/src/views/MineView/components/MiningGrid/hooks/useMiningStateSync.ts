@@ -82,6 +82,7 @@ export interface UseMiningStateSyncOptions {
     weaponName?: string;
     weaponIconUrl?: string | null;
   } | null) => void;
+  lastWeaponSoundTimeRef?: React.MutableRefObject<number>;
 }
 
 /**
@@ -104,6 +105,7 @@ export function useMiningStateSync({
   droppedItemsRef,
   weaponAmmoStateRef,
   weaponSoundUrlRef,
+  lastWeaponSoundTimeRef: externalLastWeaponSoundTimeRef,
   mouseControllerRef,
   tilesContainerRef,
   droppedItemsContainerRef,
@@ -134,7 +136,8 @@ export function useMiningStateSync({
   onBackpackChangeRef.current = onBackpackChange;
 
   const lastDamageParticleTimeRef = useRef<Map<string, number>>(new Map());
-  const lastWeaponSoundTimeRef = useRef<number>(0);
+  const localLastWeaponSoundTimeRef = useRef<number>(0);
+  const lastWeaponSoundTimeRef = externalLastWeaponSoundTimeRef || localLastWeaponSoundTimeRef;
   const lastBlockSoundTimeRef = useRef<Map<string, number>>(new Map());
   const recentExplosionsRef = useRef<{ x: number; y: number; radius: number; time: number }[]>([]);
 
@@ -225,43 +228,101 @@ export function useMiningStateSync({
         onBackpackChangeRef.current?.(payload.temporaryBackpack);
       }
 
+      // Helper to locate hit position, prioritizing the user's cursor if targeted
+      const getHitPosition = (tileX: number, tileY: number) => {
+        const mouseController = mouseControllerRef.current;
+        if (mouseController) {
+          const worldMouse = mouseController.getWorldMousePosition();
+          const hoveredTile = mouseController.getHoveredTile();
+          const miningTarget = miningTargetRef.current;
+          const isTargetingThis =
+            (hoveredTile && hoveredTile.x === tileX && hoveredTile.y === tileY) ||
+            (miningTarget && miningTarget.x === tileX && miningTarget.y === tileY);
+
+          if (worldMouse && isTargetingThis) {
+            // Clamp tightly inside tile boundaries so particles originate exactly where cursor strikes
+            const minX = tileX * TILE_SIZE + 2;
+            const maxX = (tileX + 1) * TILE_SIZE - 2;
+            const minY = tileY * TILE_SIZE + 2;
+            const maxY = (tileY + 1) * TILE_SIZE - 2;
+            return {
+              x: Math.max(minX, Math.min(maxX, worldMouse.x)),
+              y: Math.max(minY, Math.min(maxY, worldMouse.y)),
+            };
+          }
+        }
+        return { x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
+      };
+
+      // Authoritative Block Damage Hit Events (sound & particles on EVERY hit regardless of stage threshold)
+      if (payload.blockHits && payload.blockHits.length > 0) {
+        const now = performance.now();
+        for (const hit of payload.blockHits) {
+          const tileKey = `${hit.x},${hit.y}`;
+          const isPlayerMiningThisTile =
+            (payload.isMining || isMiningRef?.current) &&
+            miningTargetRef.current &&
+            miningTargetRef.current.x === hit.x &&
+            miningTargetRef.current.y === hit.y;
+
+          if (isPlayerMiningThisTile) {
+            const soundUrl = weaponSoundUrlRef.current;
+            if (soundUrl) {
+              const lastSoundTime = lastWeaponSoundTimeRef.current;
+              if (now - lastSoundTime >= 80) {
+                lastWeaponSoundTimeRef.current = now;
+                soundManager.playSfx(soundUrl);
+              }
+            }
+          }
+
+          const blockSoundUrl = blockSoundsRef.current.get(hit.tileType);
+          if (blockSoundUrl) {
+            const lastBlockSound = lastBlockSoundTimeRef.current.get(tileKey) || 0;
+            if (now - lastBlockSound >= 80) {
+              lastBlockSoundTimeRef.current.set(tileKey, now);
+              const soundPos = { x: hit.x + 0.5, y: hit.y + 0.5 };
+              if (typeof soundManager.playPositionalSfx === 'function') {
+                soundManager.playPositionalSfx(blockSoundUrl, soundPos, {
+                  spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING,
+                });
+              } else {
+                soundManager.playSfx(blockSoundUrl, {
+                  position: soundPos,
+                  spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING,
+                });
+              }
+            }
+          }
+
+          if (particleEngineRef.current) {
+            const hitPos = getHitPosition(hit.x, hit.y);
+            const lastTime = lastDamageParticleTimeRef.current.get(tileKey) || 0;
+            if (now - lastTime >= 100) {
+              lastDamageParticleTimeRef.current.set(tileKey, now);
+              const prevParticleConfig = blockParticleConfigsRef.current.get(hit.tileType);
+              if (prevParticleConfig) {
+                particleEngineRef.current.spawnBurst(prevParticleConfig, hitPos);
+                particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
+              } else if (hit.tileType === MiningTileType.MINERAL) {
+                particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
+              } else {
+                particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_chip, hitPos);
+              }
+            }
+          }
+        }
+      }
+
       // Incremental Tile Updates
       if (payload.revealedTiles && payload.revealedTiles.length > 0) {
         const grid = gridRef.current;
         const now = performance.now();
         recentExplosionsRef.current = recentExplosionsRef.current.filter((e) => now - e.time < 600);
 
-        // Helper to locate hit position, prioritizing the user's cursor if targeted
-        const getHitPosition = (tileX: number, tileY: number) => {
-          const mouseController = mouseControllerRef.current;
-          if (mouseController) {
-            const worldMouse = mouseController.getWorldMousePosition();
-            const hoveredTile = mouseController.getHoveredTile();
-            const miningTarget = miningTargetRef.current;
-            const isTargetingThis =
-              (hoveredTile && hoveredTile.x === tileX && hoveredTile.y === tileY) ||
-              (miningTarget && miningTarget.x === tileX && miningTarget.y === tileY);
-
-            if (worldMouse && isTargetingThis) {
-              // Clamp tightly inside tile boundaries so particles originate exactly where cursor strikes
-              const minX = tileX * TILE_SIZE + 2;
-              const maxX = (tileX + 1) * TILE_SIZE - 2;
-              const minY = tileY * TILE_SIZE + 2;
-              const maxY = (tileY + 1) * TILE_SIZE - 2;
-              return {
-                x: Math.max(minX, Math.min(maxX, worldMouse.x)),
-                y: Math.max(minY, Math.min(maxY, worldMouse.y)),
-              };
-            }
-          }
-          return { x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
-        };
-
         for (const rt of payload.revealedTiles) {
           const prevTile = grid[rt.y]?.[rt.x];
           if (prevTile) {
-            // A tile can only take damage or be destroyed if it was ALREADY revealed
-            const wasDamaged = prevTile.revealed && rt.damageStage !== undefined && rt.damageStage > (prevTile.damageStage || 0);
             const wasDestroyed = prevTile.revealed && prevTile.type !== MiningTileType.EMPTY && rt.type === MiningTileType.EMPTY;
             const tileKey = `${rt.x},${rt.y}`;
 
@@ -270,83 +331,26 @@ export function useMiningStateSync({
               (exp) => Math.hypot(rt.x + 0.5 - exp.x, rt.y + 0.5 - exp.y) <= exp.radius + 1.2
             );
 
-            // Weapon sound ONLY plays when the player is actively mining this specific target tile
-            const isPlayerMiningThisTile =
-              (payload.isMining || isMiningRef?.current) &&
-              miningTargetRef.current &&
-              miningTargetRef.current.x === rt.x &&
-              miningTargetRef.current.y === rt.y;
-
-            if ((wasDamaged || wasDestroyed) && isPlayerMiningThisTile) {
-              const soundUrl = weaponSoundUrlRef.current;
-              if (soundUrl) {
-                const lastSoundTime = lastWeaponSoundTimeRef.current;
-                if (now - lastSoundTime >= 100) {
-                  lastWeaponSoundTimeRef.current = now;
-                  soundManager.playSfx(soundUrl);
-                }
-              }
-            }
-
-            // Block damage/break sound only plays if NOT destroyed by an explosion
-            if ((wasDamaged || wasDestroyed) && !isExplosionDestroyed) {
-              const blockSoundUrl = blockSoundsRef.current.get(prevTile.type);
-              if (blockSoundUrl) {
-                const lastBlockSound = lastBlockSoundTimeRef.current.get(tileKey) || 0;
-                if (now - lastBlockSound >= 100) {
-                  lastBlockSoundTimeRef.current.set(tileKey, now);
-                  const soundPos = { x: rt.x + 0.5, y: rt.y + 0.5 };
-                  if (typeof soundManager.playPositionalSfx === 'function') {
-                    soundManager.playPositionalSfx(blockSoundUrl, soundPos, {
-                      spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING,
-                    });
-                  } else {
-                    soundManager.playSfx(blockSoundUrl, {
-                      position: soundPos,
-                      spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING,
-                    });
-                  }
-                }
-              }
-            }
-
-            if (particleEngineRef.current) {
+            if (particleEngineRef.current && wasDestroyed) {
               const hitPos = getHitPosition(rt.x, rt.y);
-              if (wasDestroyed) {
-                // Block broke completely: trigger full break crumble
-                lastDamageParticleTimeRef.current.delete(tileKey);
-                lastBlockSoundTimeRef.current.delete(tileKey);
-                const blockEmitterId = `block_effect_${rt.x}_${rt.y}`;
-                if (blockEmittersRef.current.has(blockEmitterId)) {
-                  blockEmittersRef.current.get(blockEmitterId)?.destroy();
-                  blockEmittersRef.current.delete(blockEmitterId);
-                }
+              // Block broke completely: trigger full break crumble
+              lastDamageParticleTimeRef.current.delete(tileKey);
+              lastBlockSoundTimeRef.current.delete(tileKey);
+              const blockEmitterId = `block_effect_${rt.x}_${rt.y}`;
+              if (blockEmittersRef.current.has(blockEmitterId)) {
+                blockEmittersRef.current.get(blockEmitterId)?.destroy();
+                blockEmittersRef.current.delete(blockEmitterId);
+              }
 
-                if (!isExplosionDestroyed) {
-                  const prevParticleConfig = blockParticleConfigsRef.current.get(prevTile.type);
-                  if (prevParticleConfig) {
-                    particleEngineRef.current.spawnBurst(prevParticleConfig, hitPos);
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
-                  } else if (prevTile.type === MiningTileType.MINERAL) {
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
-                  } else {
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_hit, hitPos);
-                  }
-                }
-              } else if (wasDamaged) {
-                // Block took damage: throttle intermediate chipping to avoid explosive multi-bursts (~4 Hz)
-                const lastTime = lastDamageParticleTimeRef.current.get(tileKey) || 0;
-                if (now - lastTime >= 240) {
-                  lastDamageParticleTimeRef.current.set(tileKey, now);
-                  const prevParticleConfig = blockParticleConfigsRef.current.get(prevTile.type);
-                  if (prevParticleConfig) {
-                    particleEngineRef.current.spawnBurst(prevParticleConfig, hitPos);
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
-                  } else if (prevTile.type === MiningTileType.MINERAL) {
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
-                  } else {
-                    particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_chip, hitPos);
-                  }
+              if (!isExplosionDestroyed) {
+                const prevParticleConfig = blockParticleConfigsRef.current.get(prevTile.type);
+                if (prevParticleConfig) {
+                  particleEngineRef.current.spawnBurst(prevParticleConfig, hitPos);
+                  particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
+                } else if (prevTile.type === MiningTileType.MINERAL) {
+                  particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
+                } else {
+                  particleEngineRef.current.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_hit, hitPos);
                 }
               }
             }

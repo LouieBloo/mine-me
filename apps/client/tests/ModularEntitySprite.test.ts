@@ -176,4 +176,70 @@ describe('ModularEntitySprite', () => {
     sprite.setFlipped(false);
     expect(container.scale.x).toBe(0.5);
   });
+
+  it('should manage aim angle, recoil kick, and shoulder offset', async () => {
+    const sprite = new ModularEntitySprite(parentContainer);
+    await sprite.load();
+
+    expect(sprite.getAimAngle()).toBeNull();
+
+    // Set immediate aim angle
+    sprite.setAimAngle(0.5, true);
+    expect(sprite.getAimAngle()).toBe(0.5);
+
+    // Frame update with aiming active
+    expect(() => sprite.update(0.016)).not.toThrow();
+
+    // Trigger recoil
+    sprite.triggerRecoil(0.3);
+    expect(() => sprite.update(0.016)).not.toThrow();
+
+    // Aiming during walk and mine states
+    sprite.setState('walk');
+    expect(() => sprite.update(0.016)).not.toThrow();
+
+    sprite.setState('mine');
+    expect(() => sprite.update(0.016)).not.toThrow();
+
+    // Release aiming
+    sprite.setAimAngle(null);
+    expect(sprite.getAimAngle()).toBeNull();
+    expect(() => sprite.update(0.016)).not.toThrow();
+
+    // Shoulder offset
+    const shoulder = sprite.getShoulderOffset();
+    expect(shoulder).toBeDefined();
+    expect(typeof shoulder.x).toBe('number');
+    expect(typeof shoulder.y).toBe('number');
+  });
+
+  it('should support dynamic swingSpeed and compute swingProgress properly', async () => {
+    const sprite = new ModularEntitySprite(parentContainer);
+    await sprite.load();
+
+    expect(sprite.getSwingSpeed()).toBe(1.5);
+    sprite.setSwingSpeed(2.5);
+    expect(sprite.getSwingSpeed()).toBe(2.5);
+
+    // Initial state is idle -> swingProgress is 0
+    expect(sprite.getSwingProgress()).toBe(0);
+
+    // Switch to mine state
+    sprite.setState('mine');
+    expect(sprite.getSwingProgress()).toBe(0);
+
+    // Advance by 0.1s: with swingSpeed 2.5, phi = (0.1 * 2.5) % 1 = 0.25 (wind-up)
+    sprite.update(0.1);
+    expect(sprite.getSwingProgress()).toBeCloseTo(0.25, 3);
+
+    // Advance by another 0.2s: total 0.3s, phi = (0.3 * 2.5) % 1 = 0.75 (impact)
+    sprite.update(0.2);
+    expect(sprite.getSwingProgress()).toBeCloseTo(0.75, 3);
+
+    // Reset back to idle and then to mine -> phase resets to 0
+    sprite.setState('idle');
+    expect(sprite.getSwingProgress()).toBe(0);
+    sprite.setState('mine');
+    expect(sprite.getSwingProgress()).toBe(0);
+  });
 });

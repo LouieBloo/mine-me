@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Application, Container, Graphics, Sprite, TilingSprite, Assets, Texture } from 'pixi.js';
-import { ModularCharacterSprite, type GearLayerDescriptor } from '../../../../../components/game/sprites';
+import { ModularCharacterSprite, FloatingTextManager, type GearLayerDescriptor } from '../../../../../components/game/sprites';
 import { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
 import { MiningMobRenderer } from '../renderers/MiningMobRenderer';
 import { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
@@ -28,6 +28,7 @@ export interface UseMiningSceneOptions {
   isFacingLeftRef: React.MutableRefObject<boolean>;
   zoom: number;
   onAssetsLoaded?: () => void;
+  onDynamicItemsLoaded?: (items: any[]) => void;
 }
 
 export function useMiningScene({
@@ -38,6 +39,7 @@ export function useMiningScene({
   isFacingLeftRef,
   zoom,
   onAssetsLoaded,
+  onDynamicItemsLoaded,
 }: UseMiningSceneOptions) {
   const [containersReady, setContainersReady] = useState<boolean>(false);
   const [tileTextureLoaded, setTileTextureLoaded] = useState<number>(0);
@@ -78,6 +80,7 @@ export function useMiningScene({
   const remotePlayerRendererRef = useRef<MiningRemotePlayerRenderer | null>(null);
   const mobsContainerRef = useRef<Container | null>(null);
   const mobRendererRef = useRef<MiningMobRenderer | null>(null);
+  const floatingTextManagerRef = useRef<FloatingTextManager | null>(null);
   const lightingEngineRef = useRef<LightingEngine | null>(null);
   const flashlightRef = useRef<SpotLight | null>(null);
   const particleEngineRef = useRef<ParticleEngine | null>(null);
@@ -111,6 +114,7 @@ export function useMiningScene({
     const otherPlayersContainer = new Container();
     const playerContainer = new Container();
     const particlesContainer = new Container();
+    const floatingTextContainer = new Container();
     const debugContainer = new Container();
 
     // Render background: Sky above ground (y <= 0), rich underground dirt backdrop (y > 0)
@@ -149,6 +153,7 @@ export function useMiningScene({
     gridContainer.addChild(playerContainer);
     gridContainer.addChild(projectilesContainer);
     gridContainer.addChild(particlesContainer);
+    gridContainer.addChild(floatingTextContainer);
     gridContainer.addChild(reticleContainer);
     gridContainer.addChild(debugContainer);
     app.stage.addChild(gridContainer);
@@ -174,7 +179,10 @@ export function useMiningScene({
       remotePlayerRenderer.updatePlayers(initialSessionState.otherPlayers);
     }
 
-    const mobRenderer = new MiningMobRenderer(mobsContainer);
+    const floatingTextManager = new FloatingTextManager(floatingTextContainer);
+    floatingTextManagerRef.current = floatingTextManager;
+
+    const mobRenderer = new MiningMobRenderer(mobsContainer, null, floatingTextManager);
     mobRendererRef.current = mobRenderer;
     if (initialSessionState.mobs) {
       mobRenderer.updateMobs(initialSessionState.mobs);
@@ -370,16 +378,17 @@ export function useMiningScene({
         console.warn('[MiningGrid] Could not load dynamic particle effects:', err);
       }
 
-      // Fetch dynamic item sound and visual profiles from API
+      // Fetch dynamic item sound and visual profiles from API (with cache-busting to ensure fresh item offsets)
       let dynamicItems: any[] = [];
       try {
-        const itemsRes = await fetch(getAssetUrl('/api/public/items'));
+        const itemsRes = await fetch(getAssetUrl(`/api/public/items?_t=${Date.now()}`));
         if (itemsRes.ok) {
           const items = await itemsRes.json();
           if (Array.isArray(items)) {
             dynamicItems = items;
             dynamicItemsRef.current = items;
             DynamiteVisualManager.setCustomItems(items);
+            onDynamicItemsLoaded?.(items);
           }
         }
       } catch (err) {
@@ -500,6 +509,10 @@ export function useMiningScene({
         mobRendererRef.current.destroy();
         mobRendererRef.current = null;
       }
+      if (floatingTextManagerRef.current) {
+        floatingTextManagerRef.current.destroy();
+        floatingTextManagerRef.current = null;
+      }
       if (playerSpriteRef.current) {
         playerSpriteRef.current.destroy();
         playerSpriteRef.current = null;
@@ -556,6 +569,7 @@ export function useMiningScene({
     remotePlayerRendererRef,
     mobsContainerRef,
     mobRendererRef,
+    floatingTextManagerRef,
     lightingEngineRef,
     flashlightRef,
     particleEngineRef,

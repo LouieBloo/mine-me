@@ -14,6 +14,7 @@ import type { ProjectileVisualManager } from '../renderers/ProjectileVisualManag
 import type { SoundManager } from '../../../../../services/sound';
 import {
   MINING_CONFIG,
+  DEFAULT_MINING_SWING_SPEED,
   type Vector2D,
   type MiningSessionClientState,
   type MiningClientTile,
@@ -78,6 +79,8 @@ export interface UseMiningTickerOptions {
   sessionState?: MiningSessionClientState;
   soundManager?: SoundManager | null;
   weaponSoundUrlRef?: React.MutableRefObject<string | null>;
+  lastWeaponSoundTimeRef?: React.MutableRefObject<number>;
+  miningSwingSpeed?: number;
 }
 
 export function useMiningTicker({
@@ -124,6 +127,8 @@ export function useMiningTicker({
   sessionState,
   soundManager,
   weaponSoundUrlRef,
+  lastWeaponSoundTimeRef,
+  miningSwingSpeed,
 }: UseMiningTickerOptions) {
   const animTimeRef = useRef<number>(0);
   const lastSwingTimeRef = useRef<number>(0);
@@ -215,9 +220,17 @@ export function useMiningTicker({
       }
 
       const mouseWorld = mouseController?.getWorldMousePosition();
+      let localAimAngle: number | null = null;
       if (mouseWorld) {
-        const aimDx = mouseWorld.x - playerContainer.x;
-        const aimDy = mouseWorld.y - playerContainer.y;
+        const sprite = playerSpriteRef.current;
+        const scale = sprite?.getScale() || 0.5;
+        const shoulderOffset = sprite?.getShoulderOffset() || { x: -131, y: -68 };
+        const isFacingLeft = isFacingLeftRef.current;
+        const shoulderWorldX = playerContainer.x + (isFacingLeft ? -shoulderOffset.x : shoulderOffset.x) * scale;
+        const shoulderWorldY = playerContainer.y + shoulderOffset.y * scale;
+
+        const aimDx = mouseWorld.x - shoulderWorldX;
+        const aimDy = mouseWorld.y - shoulderWorldY;
         const aimLen = Math.hypot(aimDx, aimDy);
         if (aimLen > 1) {
           playerFacingDirRef.current = { x: aimDx / aimLen, y: aimDy / aimLen };
@@ -225,6 +238,15 @@ export function useMiningTicker({
           if (isFacingLeftRef.current !== aimFacingLeft) {
             isFacingLeftRef.current = aimFacingLeft;
             playerSpriteRef.current?.setFlipped(aimFacingLeft);
+          }
+          // Compute local angle relative to facing direction (forward = 0 rad)
+          const localDx = aimFacingLeft ? -aimDx : aimDx;
+          localAimAngle = Math.atan2(aimDy, localDx);
+
+          // If charging a throwable item (dynamite/rock), pull the arm back slightly
+          const activeAction = mouseController?.getActiveAction() as any;
+          if (activeAction?.isCharging && typeof activeAction.chargeRatio === 'number') {
+            localAimAngle -= activeAction.chargeRatio * 0.35;
           }
         }
       } else if (playerBody && Math.abs(playerBody.velocity.x) > 0.01) {
@@ -239,19 +261,29 @@ export function useMiningTicker({
       miningProfiler.startSection('Sprites & Anim');
       const isMiningKeyDown = Boolean(keysPressedRef?.current?.miningKey);
       const nowMs = performance.now();
+      const currentSwingSpeed =
+        typeof miningSwingSpeed === 'number' && miningSwingSpeed > 0
+          ? miningSwingSpeed
+          : DEFAULT_MINING_SWING_SPEED;
+      const swingCycleDurationMs = (1 / currentSwingSpeed) * 1000;
+      const swingLingerMs = Math.min(300, swingCycleDurationMs * 0.45);
+
       if (isMiningKeyDown || isMining) {
         lastSwingTimeRef.current = nowMs;
       }
-      const isSwinging = isMining || isMiningKeyDown || (nowMs - lastSwingTimeRef.current < 260);
+      const isSwinging = isMining || isMiningKeyDown || (nowMs - lastSwingTimeRef.current < swingLingerMs);
 
+      const soundTimeRef = lastWeaponSoundTimeRef || lastSwingSoundTimeRef;
       if (isSwinging && soundManager && weaponSoundUrlRef?.current) {
-        if (nowMs - lastSwingSoundTimeRef.current >= 380) {
-          lastSwingSoundTimeRef.current = nowMs;
+        if (nowMs - soundTimeRef.current >= swingCycleDurationMs) {
+          soundTimeRef.current = nowMs;
           soundManager.playSfx(weaponSoundUrlRef.current);
         }
       }
 
       if (playerSpriteRef.current) {
+        playerSpriteRef.current.setAimAngle(localAimAngle);
+        playerSpriteRef.current.setSwingSpeed?.(currentSwingSpeed);
         if (isSwinging) {
           playerSpriteRef.current.setState('mine');
         } else if (playerBody) {

@@ -59,6 +59,7 @@ export interface UseModularCanvasSceneOptions {
   rootOffsetY?: number;
   width?: number;
   height?: number;
+  aimAngle?: number;
 }
 
 export function useModularCanvasScene({
@@ -81,6 +82,7 @@ export function useModularCanvasScene({
   rootOffsetY = 0,
   width = 460,
   height = 520,
+  aimAngle,
 }: UseModularCanvasSceneOptions) {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application | null>(null);
@@ -123,6 +125,7 @@ export function useModularCanvasScene({
     rootOffsetY,
     width,
     height,
+    aimAngle,
   });
 
   useEffect(() => {
@@ -143,6 +146,7 @@ export function useModularCanvasScene({
       rootOffsetY,
       width,
       height,
+      aimAngle,
     };
   }, [
     animationState,
@@ -161,6 +165,7 @@ export function useModularCanvasScene({
     rootOffsetY,
     width,
     height,
+    aimAngle,
   ]);
 
   useEffect(() => {
@@ -441,6 +446,10 @@ export function useModularCanvasScene({
           };
 
           ModularAnimationEngine.updateJoints(nodes, currentAnimState, animTime, baseOffsets, manifest?.miningStyle);
+
+          if (nodes.armFront && typeof statePropsRef.current.aimAngle === 'number') {
+            nodes.armFront.rotation = statePropsRef.current.aimAngle;
+          }
 
           if (nodes.debugLayer) {
             ModularDebugRenderer.renderDebug(nodes.debugLayer, nodes, partSpritesRef.current, {

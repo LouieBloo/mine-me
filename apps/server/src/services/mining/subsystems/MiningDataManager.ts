@@ -15,6 +15,7 @@ export class MiningDataManager {
   private static instance: MiningDataManager | null = null;
 
   private blocksCache: any[] | null = null;
+  private blocksCacheMtime: number = 0;
   private itemsCache: any[] | null = null;
   private itemsCacheMtime: number = 0;
   private mobsCache: any[] | null = null;
@@ -35,6 +36,7 @@ export class MiningDataManager {
 
   public clearCache(): void {
     this.blocksCache = null;
+    this.blocksCacheMtime = 0;
     this.itemsCache = null;
     this.itemsCacheMtime = 0;
     this.mobsCache = null;
@@ -45,10 +47,12 @@ export class MiningDataManager {
    */
   public getBlockConfig(tileType: MiningTileType): any {
     try {
-      if (!this.blocksCache) {
-        const blocksPath = path.join(this.dataDir, 'blocks.json');
-        if (fs.existsSync(blocksPath)) {
+      const blocksPath = path.join(this.dataDir, 'blocks.json');
+      if (fs.existsSync(blocksPath)) {
+        const mtime = fs.statSync(blocksPath).mtimeMs;
+        if (!this.blocksCache || mtime !== this.blocksCacheMtime) {
           this.blocksCache = JSON.parse(fs.readFileSync(blocksPath, 'utf-8'));
+          this.blocksCacheMtime = mtime;
         }
       }
       const typeKeyMap: Record<number, string> = {
@@ -67,6 +71,17 @@ export class MiningDataManager {
       // ignore
     }
     return undefined;
+  }
+
+  /**
+   * Helper to retrieve block max health dynamically from database / blocks.json.
+   */
+  public getBlockMaxHealth(tileType: MiningTileType): number {
+    const config = this.getBlockConfig(tileType);
+    if (config && typeof config.health === 'number' && config.health > 0) {
+      return config.health;
+    }
+    return 100;
   }
 
   /**

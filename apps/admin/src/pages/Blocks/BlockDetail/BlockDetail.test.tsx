@@ -162,4 +162,41 @@ describe('BlockDetail Page', () => {
       );
     });
   });
+
+  it('allows editing block health and saving', async () => {
+    setupMockData({ health: 300 });
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/blocks/block_copperium']}>
+          <Routes>
+            <Route path="/blocks/:id" element={<BlockDetail />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Copperium Ore')).toBeInTheDocument();
+    });
+
+    const healthInput = screen.getByLabelText(/block health \(hp\)/i);
+    expect(healthInput).toHaveValue(300);
+
+    fireEvent.change(healthInput, { target: { value: '450', name: 'health', type: 'number' } });
+    expect(healthInput).toHaveValue(450);
+
+    const saveButton = screen.getByRole('button', { name: /save block properties/i });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mockFetchWithAuth).toHaveBeenCalledWith(
+        '/api/admin/blocks/block_copperium',
+        expect.objectContaining({
+          method: 'PUT',
+          body: expect.stringContaining('"health":450'),
+        })
+      );
+    });
+  });
 });

@@ -1,6 +1,7 @@
 import { BaseMobAI } from './BaseMobAI';
 import { ChaseAndMineAI } from './ChaseAndMineAI';
 import { PatrolAI } from './PatrolAI';
+import { StationaryAI } from './StationaryAI';
 import type { MobAIType } from '../../types/mining';
 
 export type MobAIConstructor = new (mobId: string, instanceId: string) => BaseMobAI;
@@ -18,6 +19,7 @@ export class MobAIRegistry {
     this.register('PATROL', PatrolAI);
     this.register('TUNNELER', ChaseAndMineAI);
     this.register('PASSIVE', PatrolAI);
+    this.register('STATIONARY', StationaryAI);
   }
 
   /**

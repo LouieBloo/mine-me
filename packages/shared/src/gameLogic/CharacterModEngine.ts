@@ -4,6 +4,7 @@ export interface CharacterModifications {
   combatScore: number;
   defenseScore: number;
   miningSpeed: number;
+  miningDamage: number;
 }
 
 export class CharacterModEngine {
@@ -15,6 +16,7 @@ export class CharacterModEngine {
       combatScore: 0,
       defenseScore: 0,
       miningSpeed: 0,
+      miningDamage: 0,
     };
 
     for (const entry of inventoryItems) {
@@ -28,6 +30,9 @@ export class CharacterModEngine {
             if (ie.effect?.miningSpeedModifier) {
               mods.miningSpeed += ie.value || 0;
             }
+            if (ie.effect?.damageModifier) {
+              mods.miningDamage += ie.value || 0;
+            }
           }
         }
       }
@@ -39,15 +44,16 @@ export class CharacterModEngine {
   /**
    * Calculates the total attributes of a character, applying modifications to base stats.
    */
-  static calculateTotalAttributes<T extends { combatScore: number; defenseScore: number; miningSpeed?: number }>(
+  static calculateTotalAttributes<T extends { combatScore: number; defenseScore: number; miningSpeed?: number; miningDamage?: number }>(
     baseAttributes: T,
     mods: CharacterModifications
-  ): T & { miningSpeed: number } {
+  ): T & { miningSpeed: number; miningDamage: number } {
     return {
       ...baseAttributes,
       combatScore: baseAttributes.combatScore + mods.combatScore,
       defenseScore: baseAttributes.defenseScore + mods.defenseScore,
       miningSpeed: (baseAttributes.miningSpeed ?? 0) + mods.miningSpeed,
+      miningDamage: (baseAttributes.miningDamage ?? 0) + mods.miningDamage,
     };
   }
 }

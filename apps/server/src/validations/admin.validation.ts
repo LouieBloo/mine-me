@@ -42,7 +42,12 @@ export const itemValidation = [
   body('itemKey').optional({ nullable: true }).isString().withMessage('itemKey must be a string'),
   body('shootsProjectiles').optional().isBoolean().withMessage('shootsProjectiles must be a boolean'),
   body('projectileConfig').optional({ nullable: true }).isObject().withMessage('projectileConfig must be an object'),
-  body('inGameScale').optional().isFloat({ min: 0.1, max: 5.0 }).withMessage('inGameScale must be between 0.1 and 5.0')
+  body('inGameScale').optional().isFloat({ min: 0.1, max: 5.0 }).withMessage('inGameScale must be between 0.1 and 5.0'),
+  body('holdOffsetX').optional().isFloat().withMessage('holdOffsetX must be a number'),
+  body('holdOffsetY').optional().isFloat().withMessage('holdOffsetY must be a number'),
+  body('holdRotation').optional().isFloat().withMessage('holdRotation must be a number'),
+  body('muzzleOffsetX').optional().isFloat().withMessage('muzzleOffsetX must be a number'),
+  body('muzzleOffsetY').optional().isFloat().withMessage('muzzleOffsetY must be a number')
 ];
 
 export const mobValidation = [
@@ -83,6 +88,7 @@ export const effectValidation = [
   body('healthGain').optional().isBoolean().withMessage('healthGain must be a boolean'),
   body('staminaGain').optional().isBoolean().withMessage('staminaGain must be a boolean'),
   body('miningSpeedModifier').optional().isBoolean().withMessage('miningSpeedModifier must be a boolean'),
+  body('damageModifier').optional().isBoolean().withMessage('damageModifier must be a boolean'),
   body('explodes').optional().isBoolean().withMessage('explodes must be a boolean')
 ];
 
@@ -119,5 +125,12 @@ export const miningConfigValidation = [
   body('mobSpawnCount').optional().isInt({ min: 0, max: 20 }).withMessage('Mob Spawn Count must be between 0 and 20'),
   body('mobSpawnMinDepth').optional().isInt({ min: 1, max: 40 }).withMessage('Mob Spawn Min Depth must be between 1 and 40'),
   body('allowedMobIds').optional().isArray().withMessage('Allowed Mob IDs must be an array of strings'),
+];
+
+export const blockUpdateValidation = [
+  body('name').optional().trim().notEmpty().withMessage('Block Name cannot be empty'),
+  body('health').optional().isInt({ min: 0 }).withMessage('Block Health must be >= 0'),
+  body('staminaCost').optional().isInt({ min: 0 }).withMessage('Stamina Cost must be >= 0'),
+  body('idleParticleEffectId').optional({ nullable: true }).isString().withMessage('idleParticleEffectId must be a string or null'),
 ];
 

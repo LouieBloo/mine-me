@@ -13,6 +13,7 @@ vi.mock('../../../../../components/game/sprites', () => {
     setFlipped = vi.fn();
     setState = vi.fn();
     setVisible = vi.fn();
+    setAimAngle = vi.fn();
     update = vi.fn();
     destroy = vi.fn();
     static REFERENCE_HEIGHT = 500;

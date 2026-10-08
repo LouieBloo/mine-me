@@ -55,7 +55,6 @@ describe('ItemProjectileConfig', () => {
           fireRate: 2.5,
           reloadTime: 1.5,
           projectileSpeed: 28,
-          damage: 35,
           projectileGravityScale: 0.05,
           projectileItemId: 'cmn_bullet_gun_round',
         }}
@@ -66,6 +65,7 @@ describe('ItemProjectileConfig', () => {
     );
 
     expect(screen.getByTestId('projectile-item-select')).toBeDefined();
+    expect(screen.getByText('Weapon Damage')).toBeDefined();
     const magInput = screen.getByTestId('magazine-size-input') as HTMLInputElement;
     expect(magInput.value).toBe('6');
 
@@ -87,7 +87,6 @@ describe('ItemProjectileConfig', () => {
           fireRate: 2.5,
           reloadTime: 1.5,
           projectileSpeed: 28,
-          damage: 35,
           projectileGravityScale: 0.05,
         }}
         availableItems={mockAvailableItems}

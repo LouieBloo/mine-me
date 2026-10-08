@@ -6,6 +6,7 @@
     "healthGain": true,
     "staminaGain": false,
     "miningSpeedModifier": false,
+    "damageModifier": false,
     "explodes": false,
     "createdAt": "2026-06-22T00:13:18.699Z",
     "updatedAt": "2026-09-13T01:41:45.274Z"
@@ -17,6 +18,7 @@
     "healthGain": false,
     "staminaGain": true,
     "miningSpeedModifier": false,
+    "damageModifier": false,
     "explodes": false,
     "createdAt": "2026-06-22T00:13:18.717Z",
     "updatedAt": "2026-09-13T01:41:45.280Z"
@@ -24,10 +26,11 @@
   {
     "id": "cmt27dcbt0000vx8zxmq1sokb",
     "name": "Mining Speed",
-    "description": "Mining Speed yo",
+    "description": "Attack speed with mining tool",
     "healthGain": false,
     "staminaGain": false,
     "miningSpeedModifier": true,
+    "damageModifier": false,
     "explodes": false,
     "createdAt": "2026-08-21T00:20:10.026Z",
     "updatedAt": "2026-09-13T01:41:45.285Z"
@@ -39,8 +42,21 @@
     "healthGain": false,
     "staminaGain": false,
     "miningSpeedModifier": false,
+    "damageModifier": false,
     "explodes": true,
     "createdAt": "2026-09-22T22:01:08.305Z",
     "updatedAt": "2026-09-22T22:01:08.305Z"
+  },
+  {
+    "id": "cmv_damage_effect_001",
+    "name": "Damage",
+    "description": "Increases damage dealt per hit",
+    "healthGain": false,
+    "staminaGain": false,
+    "miningSpeedModifier": false,
+    "damageModifier": true,
+    "explodes": false,
+    "createdAt": "2026-10-07T16:00:00.000Z",
+    "updatedAt": "2026-10-07T16:00:00.000Z"
   }
 ]

@@ -189,7 +189,7 @@ describe('Mining Weapon Sound Effect Playback', () => {
     },
   } as any);
 
-  it('plays weapon sound effect when mining a block and taking damage', () => {
+  it('plays weapon sound effect when mining a block on authoritative hit', () => {
     const playerState = createPlayerState('/assets/sounds/items/item-pickaxe-iron_sfx.wav');
 
     render(
@@ -200,7 +200,7 @@ describe('Mining Weapon Sound Effect Playback', () => {
       />
     );
 
-    // Simulate mining_state_tick where tile (1, 0) takes damage
+    // Simulate mining_state_tick where tile (1, 0) is hit by the player
     act(() => {
       eventListeners['mining_state_tick']?.({
         tick: 1,
@@ -208,6 +208,9 @@ describe('Mining Weapon Sound Effect Playback', () => {
         velocity: { x: 0, y: 0 },
         isMining: true,
         miningTarget: { x: 1, y: 0 },
+        blockHits: [
+          { x: 1, y: 0, tileType: MiningTileType.DIRT, damage: 25 },
+        ],
         revealedTiles: [
           { x: 1, y: 0, type: MiningTileType.DIRT, damageStage: 1 },
         ],
@@ -218,7 +221,8 @@ describe('Mining Weapon Sound Effect Playback', () => {
     expect(mockPlaySfx).toHaveBeenCalledWith('/assets/sounds/items/item-pickaxe-iron_sfx.wav');
   });
 
-  it('plays weapon sound effect when mining a block and destroying it', () => {
+  it('does NOT play sounds on crack stage changes alone without blockHits', () => {
+    mockBlockSounds.set(MiningTileType.DIRT, '/assets/sounds/blocks/dirt_sfx.wav');
     const playerState = createPlayerState('/assets/sounds/items/item-pickaxe-iron_sfx.wav');
 
     render(
@@ -229,7 +233,7 @@ describe('Mining Weapon Sound Effect Playback', () => {
       />
     );
 
-    // Simulate mining_state_tick where tile (1, 0) breaks completely
+    // Crack stage update without a swing hit event should NOT play sounds
     act(() => {
       eventListeners['mining_state_tick']?.({
         tick: 2,
@@ -238,13 +242,13 @@ describe('Mining Weapon Sound Effect Playback', () => {
         isMining: true,
         miningTarget: { x: 1, y: 0 },
         revealedTiles: [
-          { x: 1, y: 0, type: MiningTileType.EMPTY, damageStage: 0 },
+          { x: 1, y: 0, type: MiningTileType.DIRT, damageStage: 2 },
         ],
       });
     });
 
-    expect(mockPlaySfx).toHaveBeenCalledTimes(1);
-    expect(mockPlaySfx).toHaveBeenCalledWith('/assets/sounds/items/item-pickaxe-iron_sfx.wav');
+    expect(mockPlaySfx).not.toHaveBeenCalled();
+    expect(mockPlayPositionalSfx).not.toHaveBeenCalled();
   });
 
   it('does not play sound effect when weapon has no soundEffectUrl', () => {
@@ -265,6 +269,9 @@ describe('Mining Weapon Sound Effect Playback', () => {
         velocity: { x: 0, y: 0 },
         isMining: true,
         miningTarget: { x: 1, y: 0 },
+        blockHits: [
+          { x: 1, y: 0, tileType: MiningTileType.DIRT, damage: 25 },
+        ],
         revealedTiles: [
           { x: 1, y: 0, type: MiningTileType.DIRT, damageStage: 1 },
         ],
@@ -274,7 +281,7 @@ describe('Mining Weapon Sound Effect Playback', () => {
     expect(mockPlaySfx).not.toHaveBeenCalled();
   });
 
-  it('plays block damage sound effect when block is damaged and has soundEffectUrl', () => {
+  it('plays block damage sound effect when block hit occurs and has soundEffectUrl', () => {
     mockBlockSounds.set(MiningTileType.DIRT, '/assets/sounds/blocks/dirt_sfx.wav');
     const playerState = createPlayerState(null); // No weapon sound
 
@@ -293,40 +300,8 @@ describe('Mining Weapon Sound Effect Playback', () => {
         velocity: { x: 0, y: 0 },
         isMining: true,
         miningTarget: { x: 1, y: 0 },
-        revealedTiles: [
-          { x: 1, y: 0, type: MiningTileType.DIRT, damageStage: 1 },
-        ],
-      });
-    });
-
-    expect(mockPlayPositionalSfx).toHaveBeenCalledWith(
-      '/assets/sounds/blocks/dirt_sfx.wav',
-      { x: 1.5, y: 0.5 },
-      expect.objectContaining({ spatial: expect.anything() })
-    );
-  });
-
-  it('plays block damage sound effect when block is destroyed', () => {
-    mockBlockSounds.set(MiningTileType.DIRT, '/assets/sounds/blocks/dirt_sfx.wav');
-    const playerState = createPlayerState(null);
-
-    render(
-      <MiningGrid
-        sessionState={baseSessionState}
-        playerState={playerState}
-        onExit={vi.fn()}
-      />
-    );
-
-    act(() => {
-      eventListeners['mining_state_tick']?.({
-        tick: 5,
-        position: { x: 0, y: 0 },
-        velocity: { x: 0, y: 0 },
-        isMining: true,
-        miningTarget: { x: 1, y: 0 },
-        revealedTiles: [
-          { x: 1, y: 0, type: MiningTileType.EMPTY, damageStage: 0 },
+        blockHits: [
+          { x: 1, y: 0, tileType: MiningTileType.DIRT, damage: 25 },
         ],
       });
     });
@@ -472,6 +447,9 @@ describe('Mining Weapon Sound Effect Playback', () => {
             isMining: true,
             miningTarget: { x: 1, y: 1 },
           },
+        ],
+        blockHits: [
+          { x: 1, y: 1, tileType: MiningTileType.DIRT, damage: 25 },
         ],
         revealedTiles: [
           { x: 1, y: 1, type: MiningTileType.DIRT, damageStage: 1 },

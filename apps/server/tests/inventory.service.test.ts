@@ -152,7 +152,6 @@ describe('InventoryService', () => {
           magazineSize: 6,
           fireRate: 2.5,
           reloadTime: 1.5,
-          damage: 35,
         },
         lightConfig: {
           enabled: true,
@@ -173,7 +172,6 @@ describe('InventoryService', () => {
         magazineSize: 6,
         fireRate: 2.5,
         reloadTime: 1.5,
-        damage: 35,
       });
       expect(mapped?.lightConfig).toEqual({
         enabled: true,

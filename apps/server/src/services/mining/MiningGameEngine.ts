@@ -65,6 +65,7 @@ export interface MiningEngineOptions {
   seed?: number;
   socket?: Socket;
   miningSpeed?: number | (() => number);
+  miningDamage?: number | (() => number);
   gearLayers?: MiningGearLayer[];
   maxDurationSeconds?: number;
   onTimeout?: (roomIdOrCharId: string) => void;
@@ -147,6 +148,7 @@ export class MiningGameEngine {
 
     // Automatically spawn cavern mobs if configured
     this.populateCavernMobs();
+    this.spawnSurfaceTargetDummy();
 
     // If options included an initial character and socket, initialize player session
     if (options.characterId && options.socket) {
@@ -155,6 +157,7 @@ export class MiningGameEngine {
         characterName: options.characterName,
         socket: options.socket,
         miningSpeed: options.miningSpeed,
+        miningDamage: options.miningDamage,
         gearLayers: options.gearLayers,
       });
     }
@@ -334,6 +337,7 @@ export class MiningGameEngine {
     characterName?: string;
     socket: Socket;
     miningSpeed?: number | (() => number);
+    miningDamage?: number | (() => number);
     gearLayers?: MiningGearLayer[];
   }): MiningPlayerSession {
     const session = this.playerManager.addPlayer(options);
@@ -449,10 +453,11 @@ export class MiningGameEngine {
       (x, y, damage, charId) => {
         const tile = this.grid[y][x];
         if (tile && isTileMineable(tile.type)) {
-          tile.damageMs = (tile.damageMs || 0) + damage * 10;
+          tile.damage = (tile.damage || 0) + damage;
+          tile.damageMs = tile.damage;
           const newStage = getDamageStage(tile);
-          const requiredTime = getTileMineTime(tile.type);
-          if (tile.damageMs >= requiredTime) {
+          const maxHealth = this.dataManager.getBlockMaxHealth(tile.type);
+          if (tile.damage >= maxHealth) {
             const miner = this.players.get(charId);
             this.completeMiningBlock({ x, y }, miner ? [miner] : []);
           } else {
@@ -476,16 +481,20 @@ export class MiningGameEngine {
       (target, miners) => this.completeMiningBlock(target, miners)
     );
 
-    // 8. Player Melee Attack against Mobs (Terraria-style directional swing cone)
-    this.playerManager.handleMeleeAttacks(this.activeMobs.values(), (mobId, damage, kbX, kbY) => {
-      this.damageMob(mobId, damage);
-      const mob = this.activeMobs.get(mobId);
-      if (mob) {
-        mob.mobBody.velocity.x = kbX;
-        mob.mobBody.velocity.y = kbY;
-        mob.mobBody.isGrounded = false;
+    // 8. Player Melee Attack against Mobs (Terraria-style localized cursor hit scan with obstacle shielding)
+    this.playerManager.handleMeleeAttacks(
+      this.activeMobs.values(),
+      this.grid,
+      (mobId, damage, kbX, kbY) => {
+        this.damageMob(mobId, damage);
+        const mob = this.activeMobs.get(mobId);
+        if (mob && mob.mobBody.moveSpeed > 0) {
+          mob.mobBody.velocity.x = kbX;
+          mob.mobBody.velocity.y = kbY;
+          mob.mobBody.isGrounded = false;
+        }
       }
-    });
+    );
 
     // 9. Update Active Mobs (AI, Physics, Mining, Combat)
     this.mobSubsystem.updateActiveMobs(
@@ -656,7 +665,8 @@ export class MiningGameEngine {
   public shootProjectile(
     characterId: string,
     target: Vector2D,
-    weaponItemId?: string
+    weaponItemId?: string,
+    muzzlePosition?: Vector2D
   ): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
     const session = this.players.get(characterId);
     return this.projectileSubsystem.shootProjectile(
@@ -664,7 +674,8 @@ export class MiningGameEngine {
       target,
       weaponItemId,
       this.dataManager,
-      this.rigidWorld
+      this.rigidWorld,
+      muzzlePosition
     );
   }
 
@@ -708,6 +719,10 @@ export class MiningGameEngine {
 
   public populateCavernMobs(options?: { count?: number; minDepth?: number; mobIds?: string[] }): void {
     this.mobSubsystem.populateCavernMobs(this.grid, this.dataManager, this.mapConfig, options);
+  }
+
+  public spawnSurfaceTargetDummy(position?: Vector2D): MiningActiveMobSession | null {
+    return this.mobSubsystem.spawnSurfaceTargetDummy(this.dataManager, position);
   }
 
   public updateActiveMobs(dt: number): void {
@@ -811,6 +826,7 @@ export class MiningGameEngine {
       id: p.id,
       characterId: p.characterId,
       itemId: p.itemId,
+      weaponItemId: p.weaponItemId,
       position: { x: p.position.x, y: p.position.y },
       velocity: { x: p.velocity.x, y: p.velocity.y },
       angle: p.angle,
@@ -822,6 +838,7 @@ export class MiningGameEngine {
     const activeMobsPayload = this.getActiveMobs();
     const explosionsToSend = this.explosiveSubsystem.consumePendingExplosions();
     const gunshotsToSend = this.projectileSubsystem.consumePendingGunshots();
+    const blockHitsToSend = this.blockSubsystem.consumePendingBlockHits();
 
     for (const session of this.players.values()) {
       if (!session.socket || !session.socket.connected) continue;
@@ -866,6 +883,7 @@ export class MiningGameEngine {
         mobs: activeMobsPayload.length > 0 ? activeMobsPayload : undefined,
         explosions: explosionsToSend.length > 0 ? explosionsToSend : undefined,
         gunshots: gunshotsToSend.length > 0 ? gunshotsToSend : undefined,
+        blockHits: blockHitsToSend.length > 0 ? blockHitsToSend : undefined,
         otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
         weaponAmmo: weaponAmmoPayload,
         droppedItems: this.dropSubsystem.droppedItemsDirty ? this.droppedItems : undefined,

@@ -103,6 +103,11 @@ model Item {
   shootsProjectiles Boolean       @default(false)
   projectileConfig Json?
   inGameScale     Float           @default(1.0)
+  holdOffsetX     Float           @default(0)
+  holdOffsetY     Float           @default(0)
+  holdRotation    Float           @default(0)
+  muzzleOffsetX   Float           @default(0)
+  muzzleOffsetY   Float           @default(0)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   cityMaterials   CityMaterial[]
@@ -200,6 +205,7 @@ model Effect {
   healthGain          Boolean         @default(false)
   staminaGain         Boolean         @default(false)
   miningSpeedModifier Boolean         @default(false)
+  damageModifier      Boolean         @default(false)
   explodes            Boolean         @default(false)
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
@@ -226,7 +232,7 @@ model MiningBlock {
   description          String?
   textureUrl           String?
   soundEffectUrl       String?
-  mineTimeMs           Int             @default(500)
+  health               Int             @default(100)
   staminaCost          Int             @default(1)
   idleParticleEffectId String?
   idleParticleEffect   ParticleEffect? @relation(fields: [idleParticleEffectId], references: [id], onDelete: SetNull)

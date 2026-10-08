@@ -62,6 +62,13 @@ export const handleMiningStart = async (
       .map((inv) => ({
         url: inv.item.gearImageUrl!,
         subType: inv.item.subType as any,
+        shootsProjectiles: Boolean(inv.item.shootsProjectiles),
+        throwable: Boolean(inv.item.throwable),
+        holdOffsetX: inv.item.holdOffsetX ?? 0,
+        holdOffsetY: inv.item.holdOffsetY ?? 0,
+        holdRotation: inv.item.holdRotation ?? 0,
+        muzzleOffsetX: inv.item.muzzleOffsetX ?? 0,
+        muzzleOffsetY: inv.item.muzzleOffsetY ?? 0,
       }));
 
     // Ensure client has latest authoritative inventory upon entering mine
@@ -83,6 +90,7 @@ export const handleMiningStart = async (
       character.name,
       gearLayers,
       activeConfig,
+      mods.miningDamage,
     );
     const sessionState = miningSessionManager.buildClientState(engine, characterId);
 

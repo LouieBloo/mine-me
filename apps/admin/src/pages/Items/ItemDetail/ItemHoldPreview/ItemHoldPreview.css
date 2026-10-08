@@ -1,0 +1,13 @@
+/* ItemHoldPreview.css */
+
+.item-hold-preview {
+  position: relative;
+}
+
+.item-hold-preview input[type="range"] {
+  accent-color: #3b82f6;
+}
+
+.item-hold-preview .canvas-backdrop {
+  background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+}
