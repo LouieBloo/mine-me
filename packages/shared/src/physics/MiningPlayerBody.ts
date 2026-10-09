@@ -6,6 +6,8 @@ export class MiningPlayerBody extends MiningPhysicsBody {
   public collisionX = false;
   public collisionY = false;
   public isOnLadder = false;
+  /** Seconds left in which movement input is ignored after being knocked back. */
+  public knockbackRemaining = 0;
 
   constructor(position: Vector2D) {
     super({
@@ -48,6 +50,18 @@ export class MiningPlayerBody extends MiningPhysicsBody {
   }
 
   /**
+   * Launches the body (e.g. when hit). Input cannot steer it for `seconds`, and a ladder is let go.
+   */
+  public applyKnockback(vx: number, vy: number, seconds: number): void {
+    this.velocity.x = vx;
+    this.velocity.y = vy;
+    this.isGrounded = false;
+    this.isOnLadder = false;
+    this.hasGravity = true;
+    this.knockbackRemaining = Math.max(0, seconds);
+  }
+
+  /**
    * Process inputs to set velocity, facing direction, climbing, and jumping.
    */
   public processInputs(inputs: MiningInputState, grid?: MiningCollisionGrid): void {
@@ -63,6 +77,12 @@ export class MiningPlayerBody extends MiningPhysicsBody {
     // Update facing direction based on active inputs (supports diagonals: NW, NE, SW, SE)
     if (dx !== 0 || dy !== 0) {
       this.facing = { x: Math.sign(dx), y: Math.sign(dy) };
+    }
+
+    // While knocked back the player is carried by the impulse, not by input or ladders
+    if (this.knockbackRemaining > 0) {
+      this.hasGravity = true;
+      return;
     }
 
     // Set horizontal velocity directly based on move speed
@@ -108,6 +128,9 @@ export class MiningPlayerBody extends MiningPhysicsBody {
   public override update(dt: number, grid: MiningCollisionGrid): void {
     this.collisionX = false;
     this.collisionY = false;
+    if (this.knockbackRemaining > 0) {
+      this.knockbackRemaining = Math.max(0, this.knockbackRemaining - dt);
+    }
     super.update(dt, grid);
   }
 

@@ -91,7 +91,12 @@ export const handleMiningIncreaseVision = async (
   const engine = miningSessionManager.getSession(characterId);
   if (!engine) return { success: false, error: 'No active mining session.' };
 
-  const delta = typeof payload?.amount === 'number' && payload.amount > 0 ? payload.amount : 1;
+  // Debug control: amount is client-supplied, so it must be a positive integer (default 1).
+  const requested = payload?.amount;
+  if (requested !== undefined && (!Number.isInteger(requested) || requested <= 0)) {
+    return { success: false, error: 'Invalid vision amount.' };
+  }
+  const delta = requested ?? 1;
   const newVision = engine.increaseVisionRange(characterId, delta);
 
   return {

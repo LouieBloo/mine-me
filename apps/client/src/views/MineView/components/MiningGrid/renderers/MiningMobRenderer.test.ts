@@ -94,6 +94,64 @@ describe('MiningMobRenderer', () => {
     expect(mario?.animationState).toBe('mine');
   });
 
+  it('shows a killed mob in the death state with no health bar until the server removes it', () => {
+    const alive: MiningActiveMob = {
+      id: 'mob-d',
+      mobId: 'cmn_mole_person_001',
+      name: 'Mole Person',
+      position: { x: 5, y: 10 },
+      velocity: { x: 0, y: 0 },
+      health: 10,
+      maxHealth: 40,
+      attack: 6,
+      defense: 2,
+      isFacingLeft: false,
+      isMining: false,
+      animationState: 'idle',
+    };
+    renderer.updateMobs([alive]);
+    expect(renderer.getMob('mob-d')?.healthBar.visible).toBe(true);
+
+    renderer.updateMobs([{ ...alive, health: 0, animationState: 'death' }]);
+    const dying = renderer.getMob('mob-d');
+    expect(dying).toBeDefined();
+    expect(dying?.animationState).toBe('death');
+    expect(dying?.health).toBe(0);
+    expect(dying?.healthBar.visible).toBe(false);
+
+    renderer.updateMobs([]);
+    expect(renderer.getMob('mob-d')).toBeUndefined();
+  });
+
+  it('removes the last remaining mob when given an empty list, and a fresh list replaces stale mobs', () => {
+    const mk = (id: string): MiningActiveMob => ({
+      id,
+      mobId: 'cmn_mole_person_001',
+      name: 'Mole Person',
+      position: { x: 5, y: 10 },
+      velocity: { x: 0, y: 0 },
+      health: 40,
+      maxHealth: 40,
+      attack: 6,
+      defense: 2,
+      isFacingLeft: false,
+      isMining: false,
+      animationState: 'idle',
+    });
+
+    renderer.updateMobs([mk('a'), mk('b')]);
+    renderer.updateMobs([mk('b')]);
+    expect(renderer.getMobCount()).toBe(1);
+    renderer.updateMobs([]);
+    expect(renderer.getMobCount()).toBe(0);
+
+    // A snapshot (e.g. after reconnect) replaces whatever was there
+    renderer.updateMobs([mk('stale')]);
+    renderer.updateMobs([mk('fresh')]);
+    expect(renderer.getMob('stale')).toBeUndefined();
+    expect(renderer.getMob('fresh')).toBeDefined();
+  });
+
   it('updates existing mob position, health, and removes departed mobs', () => {
     const initialMobs: MiningActiveMob[] = [
       {

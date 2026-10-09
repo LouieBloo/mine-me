@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { describeEffectKinds, getEffectKind } from '../../Effects/effectKinds';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../contexts/ToastContext';
 import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
@@ -341,7 +342,7 @@ export default function ItemDetail() {
                       <option value="">-- Choose an Effect --</option>
                       {effectsList.map(eff => (
                         <option key={eff.id} value={eff.id}>
-                          {eff.name} {eff.miningSpeedModifier ? '(Mining Speed)' : ''}{eff.damageModifier ? '(Damage)' : ''}{eff.healthGain ? '(Health)' : ''}{eff.staminaGain ? '(Stamina)' : ''}
+                          {eff.name} {describeEffectKinds(eff)}
                         </option>
                       ))}
                     </select>
@@ -408,26 +409,10 @@ export default function ItemDetail() {
                               <span className="font-bold text-slate-800">{ie.effect?.name || 'Effect'}</span>
                               <span
                                 className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                  ie.effect?.damageModifier
-                                    ? 'text-rose-800 bg-rose-100 border border-rose-200'
-                                    : ie.effect?.miningSpeedModifier
-                                    ? 'text-amber-800 bg-amber-100 border border-amber-200'
-                                    : ie.effect?.healthGain
-                                    ? 'text-emerald-800 bg-emerald-100 border border-emerald-200'
-                                    : ie.effect?.staminaGain
-                                    ? 'text-blue-800 bg-blue-100 border border-blue-200'
-                                    : 'text-slate-700 bg-slate-100 border border-slate-200'
+                                  getEffectKind(ie.effect)?.badge ?? 'text-slate-700 bg-slate-100 border border-slate-200'
                                 }`}
                               >
-                                {ie.effect?.damageModifier
-                                  ? 'Damage'
-                                  : ie.effect?.miningSpeedModifier
-                                  ? 'Mining Speed'
-                                  : ie.effect?.healthGain
-                                  ? 'Health Gain'
-                                  : ie.effect?.staminaGain
-                                  ? 'Stamina Gain'
-                                  : 'Modifier'}
+                                {getEffectKind(ie.effect)?.short ?? 'Modifier'}
                               </span>
                             </div>
                             {ie.effect?.description && (

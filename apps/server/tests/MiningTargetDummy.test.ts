@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MiningGameEngine } from '../src/services/mining/MiningGameEngine';
 import { MINING_CONFIG } from '@mine-me/shared';
+import { hitMob, hitPlayer } from '../src/services/mining/testHelpers';
 
 describe('MiningGameEngine - Target Dummy', () => {
   let engine: MiningGameEngine;
@@ -11,7 +12,34 @@ describe('MiningGameEngine - Target Dummy', () => {
       characterName: 'Hero',
       cityId: 'city-1',
       socket: { connected: true, emit: () => {} } as any,
+      // The surface dummy comes from the map config (no mob id is built into the game)
+      mapConfig: { surfaceDummyMobId: 'mob_target_dummy' },
     });
+  });
+
+  it('is only spawned when the map config names a dummy', () => {
+    const without = new MiningGameEngine({
+      characterId: 'p', cityId: 'c', socket: { connected: true, emit: () => {} } as any,
+      mapConfig: { surfaceDummyMobId: null },
+    });
+    expect(without.getActiveMobs().find((m) => m.mobId === 'mob_target_dummy')).toBeUndefined();
+
+    const unset = new MiningGameEngine({ characterId: 'p', cityId: 'c', socket: { connected: true, emit: () => {} } as any });
+    expect(unset.getActiveMobs().find((m) => m.mobId === 'mob_target_dummy')).toBeUndefined();
+  });
+
+  it('can be any mob the config names, and an unknown mob id spawns nothing', () => {
+    const named = new MiningGameEngine({
+      characterId: 'p', cityId: 'c', socket: { connected: true, emit: () => {} } as any,
+      mapConfig: { surfaceDummyMobId: 'Mole Person', mobSpawnCount: 0 },
+    });
+    expect(named.getActiveMobs().map((m) => m.name)).toEqual(['Mole Person']);
+
+    const unknown = new MiningGameEngine({
+      characterId: 'p', cityId: 'c', socket: { connected: true, emit: () => {} } as any,
+      mapConfig: { surfaceDummyMobId: 'no-such-mob', mobSpawnCount: 0 },
+    });
+    expect(unknown.getActiveMobs()).toEqual([]);
   });
 
   it('spawns the target dummy at the surface near character entrance spawn', () => {
@@ -32,7 +60,7 @@ describe('MiningGameEngine - Target Dummy', () => {
     expect(dummy).toBeDefined();
 
     const initialHealth = dummy.health;
-    engine.damageMob(dummy.id, 45);
+    hitMob(engine, dummy.id, 45);
 
     const updatedMobs = engine.getActiveMobs();
     const updatedDummy = updatedMobs.find((m) => m.id === dummy.id);

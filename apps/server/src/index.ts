@@ -15,6 +15,7 @@ import { handleSocketConnection } from './sockets/handlers';
 import { socketAuthMiddleware } from './sockets/socket.middleware';
 import { setIO } from './services/characterBroadcast';
 import { initRedis } from './services/redis.service';
+import { installDefinitionsFromDatabase } from './services/mining/definitionLoaders';
 
 dotenv.config();
 
@@ -60,6 +61,15 @@ const PORT = process.env.PORT || 4000;
     await initRedis();
   } catch (err) {
     console.error('Failed to initialize Redis:', err);
+  }
+
+  // Game definitions (items, mobs, blocks) come from Postgres and are held in memory.
+  // Refuse to serve a game without them.
+  try {
+    await installDefinitionsFromDatabase(prisma);
+  } catch (err) {
+    console.error('Failed to load game definitions from the database:', err);
+    process.exit(1);
   }
 
   httpServer.listen(PORT, () => {

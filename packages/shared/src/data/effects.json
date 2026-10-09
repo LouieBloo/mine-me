@@ -9,7 +9,10 @@
     "damageModifier": false,
     "explodes": false,
     "createdAt": "2026-06-22T00:13:18.699Z",
-    "updatedAt": "2026-09-13T01:41:45.274Z"
+    "updatedAt": "2026-09-13T01:41:45.274Z",
+    "toolDamageModifier": false,
+    "pickPowerModifier": false,
+    "knockbackModifier": false
   },
   {
     "id": "cmq1lathh0000w7bkm1lbqp29",
@@ -21,7 +24,10 @@
     "damageModifier": false,
     "explodes": false,
     "createdAt": "2026-06-22T00:13:18.717Z",
-    "updatedAt": "2026-09-13T01:41:45.280Z"
+    "updatedAt": "2026-09-13T01:41:45.280Z",
+    "toolDamageModifier": false,
+    "pickPowerModifier": false,
+    "knockbackModifier": false
   },
   {
     "id": "cmt27dcbt0000vx8zxmq1sokb",
@@ -33,7 +39,10 @@
     "damageModifier": false,
     "explodes": false,
     "createdAt": "2026-08-21T00:20:10.026Z",
-    "updatedAt": "2026-09-13T01:41:45.285Z"
+    "updatedAt": "2026-09-13T01:41:45.285Z",
+    "toolDamageModifier": false,
+    "pickPowerModifier": false,
+    "knockbackModifier": false
   },
   {
     "id": "cmud7xntc00009cfye6butpfo",
@@ -45,18 +54,69 @@
     "damageModifier": false,
     "explodes": true,
     "createdAt": "2026-09-22T22:01:08.305Z",
-    "updatedAt": "2026-09-22T22:01:08.305Z"
+    "updatedAt": "2026-09-22T22:01:08.305Z",
+    "toolDamageModifier": false,
+    "pickPowerModifier": false,
+    "knockbackModifier": false
   },
   {
     "id": "cmv_damage_effect_001",
     "name": "Damage",
-    "description": "Increases damage dealt per hit",
+    "description": "Damage dealt to mobs per hit (melee and projectiles)",
     "healthGain": false,
     "staminaGain": false,
     "miningSpeedModifier": false,
     "damageModifier": true,
     "explodes": false,
     "createdAt": "2026-10-07T16:00:00.000Z",
-    "updatedAt": "2026-10-07T16:00:00.000Z"
+    "updatedAt": "2026-10-07T16:00:00.000Z",
+    "toolDamageModifier": false,
+    "pickPowerModifier": false,
+    "knockbackModifier": false
+  },
+  {
+    "id": "eff_tool_damage",
+    "name": "Tool Damage",
+    "description": "Damage dealt to blocks per swing",
+    "healthGain": false,
+    "staminaGain": false,
+    "miningSpeedModifier": false,
+    "damageModifier": false,
+    "toolDamageModifier": true,
+    "pickPowerModifier": false,
+    "knockbackModifier": false,
+    "explodes": false,
+    "createdAt": "2026-10-08T00:00:00.000Z",
+    "updatedAt": "2026-10-08T00:00:00.000Z"
+  },
+  {
+    "id": "eff_pick_power",
+    "name": "Pick Power",
+    "description": "The hardest block this tool can break",
+    "healthGain": false,
+    "staminaGain": false,
+    "miningSpeedModifier": false,
+    "damageModifier": false,
+    "toolDamageModifier": false,
+    "pickPowerModifier": true,
+    "knockbackModifier": false,
+    "explodes": false,
+    "createdAt": "2026-10-08T00:00:00.000Z",
+    "updatedAt": "2026-10-08T00:00:00.000Z"
+  },
+  {
+    "id": "eff_knockback",
+    "name": "Knockback",
+    "description": "Melee knockback in tenths of tiles/s (45 = 4.5)",
+    "healthGain": false,
+    "staminaGain": false,
+    "miningSpeedModifier": false,
+    "damageModifier": false,
+    "toolDamageModifier": false,
+    "pickPowerModifier": false,
+    "knockbackModifier": true,
+    "explodes": false,
+    "createdAt": "2026-10-08T00:00:00.000Z",
+    "updatedAt": "2026-10-08T00:00:00.000Z"
   }
 ]

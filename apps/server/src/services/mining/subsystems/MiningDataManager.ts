@@ -1,80 +1,113 @@
-import fs from 'fs';
-import path from 'path';
 import {
   DEFAULT_DYNAMITE_PHYSICS_CONFIG,
   MiningTileType,
+  SOL_CURRENCY_SUBTYPE,
+  findCurrencyItem,
+  isThrowableItem,
   type ItemPhysicsConfig,
   type ItemSoundEffectsConfig,
 } from '@mine-me/shared';
 
+/** Static game definitions, in the shape the admin tools / Prisma produce. */
+export interface GameDefinitions {
+  items: any[];
+  mobs: any[];
+  blocks: any[];
+}
+
+const TILE_TYPE_KEYS: Record<number, string> = {
+  [MiningTileType.DIRT]: 'DIRT',
+  [MiningTileType.ROCK]: 'ROCK',
+  [MiningTileType.MINERAL]: 'MINERAL',
+  [MiningTileType.CHEST]: 'CHEST',
+  [MiningTileType.COPPERIUM]: 'COPPERIUM',
+  [MiningTileType.SILVERIUM]: 'SILVERIUM',
+};
+
 /**
- * MiningDataManager manages access and caching for static game definitions (items, blocks, mobs).
- * Decouples disk I/O and JSON parsing from the simulation engine.
+ * MiningDataManager serves static game definitions (items, blocks, mobs) from memory.
+ *
+ * Definitions are loaded once at startup (from Postgres in the running server, see
+ * `definitionLoaders.ts`) and installed with `MiningDataManager.initialize`. Nothing here touches
+ * the database or filesystem at runtime, so it is safe to call from inside the 30 Hz tick.
+ * There is intentionally no refresh: edits made in the admin app apply after a server restart.
  */
 export class MiningDataManager {
   private static instance: MiningDataManager | null = null;
 
-  private blocksCache: any[] | null = null;
-  private blocksCacheMtime: number = 0;
-  private itemsCache: any[] | null = null;
-  private itemsCacheMtime: number = 0;
-  private mobsCache: any[] | null = null;
+  private readonly items: any[];
+  private readonly mobs: any[];
+  private readonly blocksByTypeKey = new Map<string, any>();
 
-  private dataDir: string;
+  private readonly itemsById = new Map<string, any>();
+  private readonly itemsByKey = new Map<string, any>();
+  private readonly itemsByIdLower = new Map<string, any>();
+  private readonly itemsByKeyLower = new Map<string, any>();
+  private readonly itemsByNameLower = new Map<string, any>();
 
-  constructor(dataDir?: string) {
-    this.dataDir =
-      dataDir || path.join(__dirname, '../../../../../../packages/shared/src/data');
+  private readonly mobsById = new Map<string, any>();
+  private readonly mobsByNameLower = new Map<string, any>();
+
+  constructor(definitions: GameDefinitions) {
+    this.items = definitions.items;
+    this.mobs = definitions.mobs;
+
+    for (const block of definitions.blocks) {
+      if (block?.typeKey && !this.blocksByTypeKey.has(block.typeKey)) {
+        this.blocksByTypeKey.set(block.typeKey, block);
+      }
+    }
+    for (const item of this.items) {
+      MiningDataManager.putFirst(this.itemsById, item.id, item);
+      MiningDataManager.putFirst(this.itemsByKey, item.itemKey, item);
+      MiningDataManager.putFirst(this.itemsByIdLower, item.id?.toLowerCase(), item);
+      MiningDataManager.putFirst(this.itemsByKeyLower, item.itemKey?.toLowerCase(), item);
+      MiningDataManager.putFirst(this.itemsByNameLower, item.name?.toLowerCase(), item);
+    }
+    for (const mob of this.mobs) {
+      MiningDataManager.putFirst(this.mobsById, mob.id, mob);
+      MiningDataManager.putFirst(this.mobsByNameLower, mob.name?.toLowerCase(), mob);
+    }
+  }
+
+  private static putFirst(map: Map<string, any>, key: unknown, value: any): void {
+    if (typeof key === 'string' && key.length > 0 && !map.has(key)) map.set(key, value);
+  }
+
+  /** Installs the definitions used by the running process. Call once at startup. */
+  public static initialize(definitions: GameDefinitions): MiningDataManager {
+    MiningDataManager.instance = new MiningDataManager(definitions);
+    return MiningDataManager.instance;
+  }
+
+  public static isInitialized(): boolean {
+    return MiningDataManager.instance !== null;
   }
 
   public static getInstance(): MiningDataManager {
     if (!MiningDataManager.instance) {
-      MiningDataManager.instance = new MiningDataManager();
+      throw new Error(
+        'MiningDataManager has not been initialized: game definitions must be loaded before the mining engine is used.'
+      );
     }
     return MiningDataManager.instance;
   }
 
-  public clearCache(): void {
-    this.blocksCache = null;
-    this.blocksCacheMtime = 0;
-    this.itemsCache = null;
-    this.itemsCacheMtime = 0;
-    this.mobsCache = null;
+  /** Test helper: forget the installed definitions. */
+  public static reset(): void {
+    MiningDataManager.instance = null;
   }
 
   /**
-   * Helper to retrieve block configuration from blocks.json.
+   * Helper to retrieve block configuration by tile type.
    */
   public getBlockConfig(tileType: MiningTileType): any {
-    try {
-      const blocksPath = path.join(this.dataDir, 'blocks.json');
-      if (fs.existsSync(blocksPath)) {
-        const mtime = fs.statSync(blocksPath).mtimeMs;
-        if (!this.blocksCache || mtime !== this.blocksCacheMtime) {
-          this.blocksCache = JSON.parse(fs.readFileSync(blocksPath, 'utf-8'));
-          this.blocksCacheMtime = mtime;
-        }
-      }
-      const typeKeyMap: Record<number, string> = {
-        [MiningTileType.DIRT]: 'DIRT',
-        [MiningTileType.ROCK]: 'ROCK',
-        [MiningTileType.MINERAL]: 'MINERAL',
-        [MiningTileType.CHEST]: 'CHEST',
-        [MiningTileType.COPPERIUM]: 'COPPERIUM',
-        [MiningTileType.SILVERIUM]: 'SILVERIUM',
-      };
-      const key = typeKeyMap[tileType];
-      if (key && this.blocksCache) {
-        return this.blocksCache.find((b: any) => b.typeKey === key);
-      }
-    } catch {
-      // ignore
-    }
-    return undefined;
+    const key = TILE_TYPE_KEYS[tileType];
+    return key ? this.blocksByTypeKey.get(key) : undefined;
   }
 
   /**
-   * Helper to retrieve block max health dynamically from database / blocks.json.
+   * Helper to retrieve block max health.
    */
   public getBlockMaxHealth(tileType: MiningTileType): number {
     const config = this.getBlockConfig(tileType);
@@ -85,61 +118,66 @@ export class MiningDataManager {
   }
 
   /**
-   * Helper to retrieve all items or item definition from items.json.
+   * Pick power a tool needs to damage this block type (0 = anything can mine it).
    */
-  public getItems(): any[] {
-    try {
-      const itemsPath = path.join(this.dataDir, 'items.json');
-      if (fs.existsSync(itemsPath)) {
-        const mtime = fs.statSync(itemsPath).mtimeMs;
-        if (!this.itemsCache || mtime !== this.itemsCacheMtime) {
-          this.itemsCache = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
-          this.itemsCacheMtime = mtime;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return this.itemsCache || [];
+  public getBlockRequiredPickPower(tileType: MiningTileType): number {
+    const required = this.getBlockConfig(tileType)?.requiredPickPower;
+    return typeof required === 'number' && required > 0 ? required : 0;
   }
 
   /**
-   * Helper to retrieve item definition from items.json by ID, itemKey, or name.
+   * All item definitions.
+   */
+  public getItems(): any[] {
+    return this.items;
+  }
+
+  /**
+   * Item definition by ID, itemKey, or name (exact matches first, then case-insensitive).
    */
   public getItemData(itemId: string): any {
-    const items = this.getItems();
+    if (typeof itemId !== 'string') return undefined;
     const query = itemId.toLowerCase();
-    return items.find(
-      (i: any) =>
-        i.id === itemId ||
-        i.itemKey === itemId ||
-        i.id?.toLowerCase() === query ||
-        i.itemKey?.toLowerCase() === query ||
-        i.name?.toLowerCase() === query
+    return (
+      this.itemsById.get(itemId) ??
+      this.itemsByKey.get(itemId) ??
+      this.itemsByIdLower.get(query) ??
+      this.itemsByKeyLower.get(query) ??
+      this.itemsByNameLower.get(query)
     );
   }
 
   /**
-   * Helper to retrieve configured item physics from items.json for any item.
+   * Helper to retrieve configured item physics for any item.
    */
   public getItemPhysicsConfig(itemId: string): ItemPhysicsConfig | undefined {
     return this.getItemData(itemId)?.physicsConfig;
   }
 
   /**
-   * Helper to retrieve configured dynamite item physics from items.json or defaults.
+   * The item used when a throw does not say what is being thrown: the first throwable item in
+   * the item table.
    */
-  public getDynamiteItemPhysicsConfig(): ItemPhysicsConfig {
-    const items = this.getItems();
-    const dynamiteItem = items.find((item: any) => item.subType === 'DYNAMITE');
-    if (dynamiteItem?.physicsConfig) {
-      return dynamiteItem.physicsConfig as ItemPhysicsConfig;
-    }
-    return DEFAULT_DYNAMITE_PHYSICS_CONFIG;
+  public getDefaultThrowable(): any {
+    return this.items.find((item: any) => isThrowableItem(item));
   }
 
   /**
-   * Helper to retrieve configured explosion radius from items.json for any item based on effect.explodes === true.
+   * Physics for throwables that do not define their own: those of the first throwable item that
+   * has any, otherwise the built-in defaults.
+   */
+  public getDynamiteItemPhysicsConfig(): ItemPhysicsConfig {
+    const throwable = this.items.find((item: any) => isThrowableItem(item) && item.physicsConfig);
+    return (throwable?.physicsConfig as ItemPhysicsConfig | undefined) ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG;
+  }
+
+  /** The currency item with this subType (Sol by default), looked up by category, not by id or name. */
+  public getCurrencyItem(subType: string = SOL_CURRENCY_SUBTYPE): any {
+    return findCurrencyItem(this.items, subType);
+  }
+
+  /**
+   * Helper to retrieve configured explosion radius for any item based on effect.explodes === true.
    */
   public getItemExplosionRadius(itemId: string): number | undefined {
     const item = this.getItemData(itemId);
@@ -159,29 +197,17 @@ export class MiningDataManager {
   }
 
   /**
-   * Helper to retrieve configured soundEffects from items.json for any item.
+   * Helper to retrieve configured soundEffects for any item.
    */
   public getItemSoundEffects(itemId: string): ItemSoundEffectsConfig | undefined {
     return this.getItemData(itemId)?.soundEffects;
   }
 
   /**
-   * Helper to retrieve mob definition from mobs.json.
+   * Mob definition by ID or (case-insensitive) name.
    */
   public getMobData(mobId: string): any {
-    try {
-      if (!this.mobsCache) {
-        const mobsPath = path.join(this.dataDir, 'mobs.json');
-        if (fs.existsSync(mobsPath)) {
-          this.mobsCache = JSON.parse(fs.readFileSync(mobsPath, 'utf-8'));
-        }
-      }
-      if (this.mobsCache) {
-        return this.mobsCache.find((m: any) => m.id === mobId || m.name?.toLowerCase() === mobId.toLowerCase());
-      }
-    } catch {
-      // ignore
-    }
-    return undefined;
+    if (typeof mobId !== 'string') return undefined;
+    return this.mobsById.get(mobId) ?? this.mobsByNameLower.get(mobId.toLowerCase());
   }
 }

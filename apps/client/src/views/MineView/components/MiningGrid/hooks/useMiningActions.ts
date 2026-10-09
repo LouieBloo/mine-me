@@ -53,13 +53,6 @@ export interface UseMiningActionsOptions {
   isThrowingItem?: boolean;
   activeThrowableItem?: GameItem | null;
   onDynamiteThrown?: () => void;
-  onWeaponAmmoChange?: (ammo: {
-    current: number;
-    max: number;
-    isReloading: boolean;
-    weaponName?: string;
-    weaponIconUrl?: string | null;
-  } | null) => void;
 }
 
 export function useMiningActions({
@@ -91,7 +84,6 @@ export function useMiningActions({
   isThrowingItem = false,
   activeThrowableItem = null,
   onDynamiteThrown,
-  onWeaponAmmoChange,
 }: UseMiningActionsOptions) {
   const [resolvedSoundUrl, setResolvedSoundUrl] = useState<string | null>(
     equippedWeapon?.soundEffects?.shoot?.url || equippedWeapon?.soundEffectUrl || null
@@ -140,11 +132,6 @@ export function useMiningActions({
       }
 
       weaponAmmoStateRef.current.isReloading = true;
-      onWeaponAmmoChange?.({
-        ...weaponAmmoStateRef.current,
-        weaponName: weapon.name,
-        weaponIconUrl: weapon.iconUrl,
-      });
 
       const res: any = await sendGameEvent({
         type: 'mining_reload',
@@ -158,11 +145,6 @@ export function useMiningActions({
           max: maxAmmo,
           isReloading: ammoData.isReloading ?? false,
         };
-        onWeaponAmmoChange?.({
-          ...weaponAmmoStateRef.current,
-          weaponName: weapon.name,
-          weaponIconUrl: weapon.iconUrl,
-        });
       }
     } catch (err: any) {
       console.error('[MiningGrid] mining_reload error:', err);
@@ -418,11 +400,6 @@ export function useMiningActions({
               ...weaponAmmoStateRef.current,
               current: Math.max(0, weaponAmmoStateRef.current.current - 1),
             };
-            onWeaponAmmoChange?.({
-              ...weaponAmmoStateRef.current,
-              weaponName: weapon.name,
-              weaponIconUrl: weapon.iconUrl,
-            });
 
             try {
               const res: any = await sendGameEvent({
@@ -439,11 +416,6 @@ export function useMiningActions({
                   max: projConfig.magazineSize ?? 6,
                   isReloading: ammoData.isReloading ?? false,
                 };
-                onWeaponAmmoChange?.({
-                  ...weaponAmmoStateRef.current,
-                  weaponName: weapon.name,
-                  weaponIconUrl: weapon.iconUrl,
-                });
               }
 
               if (weaponAmmoStateRef.current.current <= 0 && !weaponAmmoStateRef.current.isReloading) {

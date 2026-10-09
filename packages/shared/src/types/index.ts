@@ -294,6 +294,10 @@ export interface Mob {
   moveSpeed?: number;
   jumpForce?: number;
   miningSpeed?: number;
+  /** How long a hit takes control away from the mob in ms (0 = can't be stunned). */
+  hitStunMs?: number;
+  /** After a stun ends, how long until it can be stunned again, in ms. */
+  stunImmunityMs?: number;
   dropTable?: DropTable;
   animations?: SkeletonManifest | MobAtlas | null;
 }
@@ -314,8 +318,16 @@ export interface Effect {
   description: string;
   healthGain: boolean;
   staminaGain: boolean;
+  /** Swing/attack speed of the equipped tool. */
   miningSpeedModifier?: boolean;
+  /** Weapon damage: dealt to mobs by melee and by projectiles. */
   damageModifier?: boolean;
+  /** Tool damage: dealt to blocks per swing. */
+  toolDamageModifier?: boolean;
+  /** How hard a block this tool can break (compared with the block's required pick power). */
+  pickPowerModifier?: boolean;
+  /** Melee knockback, in tenths of tiles/s (45 = 4.5 tiles/s). */
+  knockbackModifier?: boolean;
   explodes?: boolean;
   createdAt: string;
   updatedAt: string;

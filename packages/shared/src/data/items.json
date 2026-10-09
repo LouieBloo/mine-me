@@ -1034,6 +1034,29 @@
           "createdAt": "2026-10-07T23:25:46.378Z",
           "updatedAt": "2026-10-07T23:25:46.378Z"
         }
+      },
+      {
+        "id": "ie_pickaxe_tool_damage",
+        "itemId": "cmsxycew2000078fxyy1fnqel",
+        "effectId": "eff_tool_damage",
+        "value": 25,
+        "createdAt": "2026-10-08T00:03:52.654Z",
+        "updatedAt": "2026-10-08T00:03:52.654Z",
+        "effect": {
+          "id": "eff_tool_damage",
+          "name": "Tool Damage",
+          "description": "Damage dealt to blocks per swing",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": false,
+          "toolDamageModifier": true,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-10-08T00:00:00.000Z",
+          "updatedAt": "2026-10-08T00:00:00.000Z"
+        }
       }
     ],
     "particleEffect": null

@@ -172,6 +172,8 @@ model Mob {
   moveSpeed        Float      @default(3.0)
   jumpForce        Float      @default(6.5)
   miningSpeed      Float      @default(50.0)
+  hitStunMs        Int        @default(250)
+  stunImmunityMs   Int        @default(500)
   animations       Json?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -206,6 +208,9 @@ model Effect {
   staminaGain         Boolean         @default(false)
   miningSpeedModifier Boolean         @default(false)
   damageModifier      Boolean         @default(false)
+  toolDamageModifier  Boolean         @default(false)
+  pickPowerModifier   Boolean         @default(false)
+  knockbackModifier   Boolean         @default(false)
   explodes            Boolean         @default(false)
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
@@ -233,6 +238,7 @@ model MiningBlock {
   textureUrl           String?
   soundEffectUrl       String?
   health               Int             @default(100)
+  requiredPickPower    Int             @default(0)
   staminaCost          Int             @default(1)
   idleParticleEffectId String?
   idleParticleEffect   ParticleEffect? @relation(fields: [idleParticleEffectId], references: [id], onDelete: SetNull)
@@ -274,6 +280,8 @@ model MiningMapConfig {
   mobSpawnCount       Int      @default(3)
   mobSpawnMinDepth    Int      @default(5)
   allowedMobIds       Json?
+  // Mob that stands on the surface as a target dummy; null means none
+  surfaceDummyMobId   String?  @default("mob_target_dummy")
   isActive            Boolean  @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

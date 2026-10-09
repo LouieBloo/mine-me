@@ -23,7 +23,10 @@ describe('CharacterModEngine', () => {
       expect(mods.combatScore).toBe(0);
       expect(mods.defenseScore).toBe(0);
       expect(mods.miningSpeed).toBe(0);
-      expect(mods.miningDamage).toBe(0);
+      expect(mods.toolDamage).toBe(0);
+      expect(mods.weaponDamage).toBe(0);
+      expect(mods.pickPower).toBe(0);
+      expect(mods.knockback).toBe(0);
     });
 
     it('returns accumulated scores and mining speed from equipped gear with object effects', () => {
@@ -142,14 +145,17 @@ describe('CharacterModEngine', () => {
         combatScore: 10,
         defenseScore: 5,
         miningSpeed: 100,
-        miningDamage: 50,
+        toolDamage: 50,
+        weaponDamage: 30,
+        pickPower: 2,
+        knockback: 0,
       };
 
       const total = CharacterModEngine.calculateTotalAttributes(base, mods);
       expect(total.combatScore).toBe(25);
       expect(total.defenseScore).toBe(17);
       expect(total.miningSpeed).toBe(100);
-      expect(total.miningDamage).toBe(50);
+      expect(total.toolDamage).toBe(50);
       expect(total.health).toBe(100);
       expect(total.stamina).toBe(80);
     });
@@ -225,7 +231,8 @@ describe('CharacterModEngine', () => {
 
       const mods = CharacterModEngine.getModifications(items);
       expect(mods.miningSpeed).toBe(25);
-      expect(mods.miningDamage).toBe(40); // 25 + 15 stacked damage!
+      expect(mods.weaponDamage).toBe(40); // 25 + 15 stacked damage!
+      expect(mods.toolDamage).toBe(0); // plain Damage effects are weapon damage, not tool damage
     });
   });
 });

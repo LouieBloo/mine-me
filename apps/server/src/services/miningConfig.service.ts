@@ -47,6 +47,7 @@ export async function getActiveMiningConfig(): Promise<MiningMapConfigData> {
         mobSpawnCount: (config as any).mobSpawnCount ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnCount,
         mobSpawnMinDepth: (config as any).mobSpawnMinDepth ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnMinDepth,
         allowedMobIds: ((config as any).allowedMobIds as string[]) ?? DEFAULT_MINING_MAP_CONFIG.allowedMobIds,
+        surfaceDummyMobId: (config as any).surfaceDummyMobId ?? null,
       };
       return cachedConfig;
     }
@@ -92,7 +93,12 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     rockRestitution: data.rockRestitution ?? existing?.rockRestitution ?? DEFAULT_MINING_MAP_CONFIG.rockRestitution ?? 0.1,
     mobSpawnCount: data.mobSpawnCount ?? (existing as any)?.mobSpawnCount ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnCount ?? 3,
     mobSpawnMinDepth: data.mobSpawnMinDepth ?? (existing as any)?.mobSpawnMinDepth ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnMinDepth ?? 5,
-    allowedMobIds: data.allowedMobIds ?? ((existing as any)?.allowedMobIds as string[]) ?? DEFAULT_MINING_MAP_CONFIG.allowedMobIds ?? ['cmn_mole_person_001'],
+    allowedMobIds: data.allowedMobIds ?? ((existing as any)?.allowedMobIds as string[]) ?? DEFAULT_MINING_MAP_CONFIG.allowedMobIds ?? [],
+    // null is meaningful here ("no dummy"), so only fall back when the field was not supplied at all
+    surfaceDummyMobId:
+      data.surfaceDummyMobId !== undefined
+        ? data.surfaceDummyMobId || null
+        : ((existing as any)?.surfaceDummyMobId ?? DEFAULT_MINING_MAP_CONFIG.surfaceDummyMobId ?? null),
     isActive: true,
   };
 
@@ -139,6 +145,7 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     mobSpawnCount: (saved as any).mobSpawnCount,
     mobSpawnMinDepth: (saved as any).mobSpawnMinDepth,
     allowedMobIds: ((saved as any).allowedMobIds as string[]) ?? undefined,
+    surfaceDummyMobId: (saved as any).surfaceDummyMobId ?? null,
   };
 
   syncJson('mining_map_config.json', payload);

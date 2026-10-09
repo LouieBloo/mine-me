@@ -3,6 +3,7 @@ import { gameEventHandlers } from './gameEvents';
 import { prisma } from '../index';
 import * as characterBroadcast from '../services/characterBroadcast';
 import { Server } from 'socket.io';
+import { miningSessionManager } from '../services/mining/MiningSessionManager';
 
 vi.mock('../index', () => {
   const mockPrisma: any = {
@@ -495,6 +496,61 @@ describe('gameEvents — handleEquipItem & handleUnequipItem', () => {
       data: { equipped: false },
     });
     expect(characterBroadcast.broadcastStatUpdate).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Equip/unequip keeps a live mining session's loadout in sync
+// ---------------------------------------------------------------------------
+describe('gameEvents — equip/unequip updates live mining session', () => {
+  const handleEquipItem = gameEventHandlers.equip_item;
+  const handleUnequipItem = gameEventHandlers.unequip_item;
+  const io = {} as Server;
+
+  const weaponItem = {
+    id: 'gun-1',
+    type: 'GEAR',
+    subType: 'WEAPON',
+    gearImageUrl: '/g.png',
+    shootsProjectiles: true,
+    combatScore: 0,
+    defenseScore: 0,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    miningSessionManager.cancelSession('char1');
+  });
+
+  it('sets the equipped weapon and gear layers on the session, and clears them on unequip', async () => {
+    const socket = makeSocket();
+    const engine = miningSessionManager.createSession('char1', 'city-a', { connected: true, emit: vi.fn() } as any, true);
+    const session = engine.getPlayer('char1')!;
+    expect(session.equippedWeaponId).toBeNull();
+
+    (prisma.inventoryItem.findUnique as any).mockResolvedValue({
+      id: 'inv-w', characterId: 'char1', itemId: 'gun-1', equipped: false, item: weaponItem,
+    });
+    (prisma.inventoryItem.findFirst as any).mockResolvedValue(null);
+    (prisma.character.findUnique as any).mockResolvedValue({
+      id: 'char1', maxInventorySlots: 25,
+      inventory: [{ id: 'inv-w', quantity: 1, equipped: true, item: weaponItem }],
+    });
+
+    await handleEquipItem(io, socket, { type: 'equip_item', inventoryItemId: 'inv-w' });
+    expect(session.equippedWeaponId).toBe('gun-1');
+    expect(session.gearLayers).toHaveLength(1);
+    expect(session.gearLayers[0]).toMatchObject({ url: '/g.png', subType: 'WEAPON', shootsProjectiles: true });
+
+    (prisma.character.findUnique as any).mockResolvedValue({
+      id: 'char1', maxInventorySlots: 25,
+      inventory: [{ id: 'inv-w', quantity: 1, equipped: false, item: weaponItem }],
+    });
+    await handleUnequipItem(io, socket, { type: 'unequip_item', inventoryItemId: 'inv-w' });
+    expect(session.equippedWeaponId).toBeNull();
+    expect(session.gearLayers).toHaveLength(0);
+
+    miningSessionManager.cancelSession('char1');
   });
 });
 

@@ -3,6 +3,9 @@ import { CharacterService } from './character.service';
 import { LootResult } from './loot.service';
 import { CharacterModEngine } from '@mine-me/shared';
 
+/** Prisma client or interactive-transaction client; both expose the models we write to. */
+type DbClient = Pick<typeof prisma, 'character' | 'inventoryItem'>;
+
 export class InventoryService {
   /**
    * Awards an item to a character, persists it to the database,
@@ -25,34 +28,7 @@ export class InventoryService {
     const experienceGranted = (item.experience || 0) * quantity;
 
     // 1. Award to Character (Wallet balance for CURRENCY, inventory slot for others)
-    if ((item.type as string) === 'CURRENCY') {
-      const isLear = item.subType?.toUpperCase() === 'LEAR' || item.name?.toUpperCase() === 'LEAR';
-      await prisma.character.update({
-        where: { id: characterId },
-        data: isLear
-          ? { lear: { increment: quantity } }
-          : { sol: { increment: quantity } },
-      });
-    } else {
-      const existing = await prisma.inventoryItem.findFirst({
-        where: { characterId, itemId }
-      });
-
-      if (existing) {
-        await prisma.inventoryItem.update({
-          where: { id: existing.id },
-          data: { quantity: { increment: quantity } }
-        });
-      } else {
-        await prisma.inventoryItem.create({
-          data: {
-            characterId,
-            itemId,
-            quantity
-          }
-        });
-      }
-    }
+    await InventoryService.applyItemGrant(prisma, characterId, item, quantity);
 
     let levelUpLoot: LootResult | undefined = undefined;
 
@@ -68,6 +44,93 @@ export class InventoryService {
       itemDetails: item,
       levelUpLoot
     };
+  }
+
+  /**
+   * Writes a single item grant (wallet increment for CURRENCY, inventory row otherwise)
+   * using the supplied client, so callers can run it inside a transaction.
+   */
+  private static async applyItemGrant(
+    client: DbClient,
+    characterId: string,
+    item: { id: string; type: unknown; subType?: string | null; name?: string | null },
+    quantity: number
+  ): Promise<void> {
+    if ((item.type as string) === 'CURRENCY') {
+      const isLear = item.subType?.toUpperCase() === 'LEAR' || item.name?.toUpperCase() === 'LEAR';
+      await client.character.update({
+        where: { id: characterId },
+        data: isLear
+          ? { lear: { increment: quantity } }
+          : { sol: { increment: quantity } },
+      });
+      return;
+    }
+
+    const existing = await client.inventoryItem.findFirst({
+      where: { characterId, itemId: item.id },
+    });
+
+    if (existing) {
+      await client.inventoryItem.update({
+        where: { id: existing.id },
+        data: { quantity: { increment: quantity } },
+      });
+    } else {
+      await client.inventoryItem.create({
+        data: { characterId, itemId: item.id, quantity },
+      });
+    }
+  }
+
+  /**
+   * Awards several items atomically: every inventory/wallet write happens in one
+   * transaction (all or nothing). Items are matched by database ID only; unknown IDs and
+   * non-positive / non-integer quantities are skipped and reported. Experience is granted
+   * after the transaction commits.
+   */
+  public static async giveItemsToCharacter(
+    characterId: string,
+    grants: { itemId: string; quantity: number }[]
+  ): Promise<{
+    granted: { itemId: string; quantity: number }[];
+    skipped: { itemId: string; quantity: number; reason: string }[];
+    experienceGranted: number;
+    levelUpLoot?: LootResult;
+  }> {
+    const skipped: { itemId: string; quantity: number; reason: string }[] = [];
+    const merged = new Map<string, number>();
+    for (const g of grants) {
+      if (!Number.isInteger(g.quantity) || g.quantity <= 0) {
+        skipped.push({ itemId: g.itemId, quantity: g.quantity, reason: 'invalid quantity' });
+        continue;
+      }
+      merged.set(g.itemId, (merged.get(g.itemId) ?? 0) + g.quantity);
+    }
+
+    const { granted, experienceGranted } = await prisma.$transaction(async (tx) => {
+      const granted: { itemId: string; quantity: number }[] = [];
+      let xp = 0;
+      for (const [itemId, quantity] of merged) {
+        const item = await tx.item.findUnique({ where: { id: itemId } });
+        if (!item) {
+          skipped.push({ itemId, quantity, reason: 'item not found' });
+          continue;
+        }
+        await InventoryService.applyItemGrant(tx, characterId, item, quantity);
+        xp += (item.experience || 0) * quantity;
+        granted.push({ itemId, quantity });
+      }
+      return { granted, experienceGranted: xp };
+    });
+
+    let levelUpLoot: LootResult | undefined;
+    if (experienceGranted > 0) {
+      const result = await CharacterService.addExperience(characterId, experienceGranted);
+      levelUpLoot = result.levelUpLoot;
+    }
+
+    return { granted, skipped, experienceGranted, levelUpLoot };
   }
 
   /**
@@ -122,6 +185,10 @@ export class InventoryService {
           staminaGain: ie.effect.staminaGain,
           miningSpeedModifier: ie.effect.miningSpeedModifier,
           damageModifier: ie.effect.damageModifier,
+          toolDamageModifier: ie.effect.toolDamageModifier,
+          pickPowerModifier: ie.effect.pickPowerModifier,
+          knockbackModifier: ie.effect.knockbackModifier,
+          explodes: ie.effect.explodes,
         } : undefined
       })),
     };
@@ -173,7 +240,7 @@ export class InventoryService {
   /**
    * Calculates the current effective mining attributes (speed and damage) of a character in real-time.
    */
-  public static async getCharacterMiningStats(characterId: string): Promise<{ miningSpeed: number; miningDamage: number }> {
+  public static async getCharacterMiningStats(characterId: string): Promise<{ miningSpeed: number; toolDamage: number; weaponDamage: number; pickPower: number; knockback: number }> {
     const inventory = await prisma.inventoryItem.findMany({
       where: {
         characterId,
@@ -197,7 +264,10 @@ export class InventoryService {
     const mods = CharacterModEngine.getModifications(mappedEntries);
     return {
       miningSpeed: mods.miningSpeed,
-      miningDamage: mods.miningDamage || 25,
+      toolDamage: mods.toolDamage || 25,
+      weaponDamage: mods.weaponDamage,
+      pickPower: mods.pickPower,
+      knockback: mods.knockback,
     };
   }
 
@@ -210,10 +280,10 @@ export class InventoryService {
   }
 
   /**
-   * Calculates the current effective mining damage per hit of a character from database in real-time.
+   * Calculates the current effective damage per swing to blocks (tool damage) of a character in real-time.
    */
-  public static async getCharacterMiningDamage(characterId: string): Promise<number> {
+  public static async getCharacterToolDamage(characterId: string): Promise<number> {
     const stats = await InventoryService.getCharacterMiningStats(characterId);
-    return stats.miningDamage;
+    return stats.toolDamage;
   }
 }

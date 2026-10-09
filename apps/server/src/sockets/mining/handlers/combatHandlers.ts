@@ -1,15 +1,14 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../../../index';
-import { broadcastStatUpdate } from '../../../services/characterBroadcast';
-import { InventoryService } from '../../../services/inventory.service';
-import { type GameEventResult, type Vector2D } from '@mine-me/shared';
+import { ITEM_ROLE_WHERE, type GameEventResult, type Vector2D, sanitizeWorldPoint } from '@mine-me/shared';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
+import { broadcastInventory, consumeInventoryItem, refundInventoryItem } from './inventoryActions';
 
 /**
  * Handler: mining_throw_dynamite & mining_throw_item
- * Throws a throwable item (dynamite, bomb, etc.) towards target position if player has it in inventory.
- * Authoritative: Deducts 1 item, creates physics entity with fuse,
- * and starts countdown on server with scaled throw force.
+ * Throws a throwable item (dynamite, bomb, etc.) towards target position.
+ * The client must say which item (itemId); the server verifies the character owns it and that
+ * it is throwable, atomically consumes one, then launches it (refunding if the launch fails).
  */
 export const handleMiningThrowDynamite = async (
   io: Server,
@@ -22,50 +21,47 @@ export const handleMiningThrowDynamite = async (
   const engine = miningSessionManager.getSession(characterId);
   if (!engine) return { success: false, error: 'No active mining session.' };
 
-  if (!payload?.target) {
+  const throwTarget = sanitizeWorldPoint(payload?.target);
+  if (!throwTarget) {
     return { success: false, error: 'Target position is required.' };
   }
+  if (typeof payload.itemId !== 'string' || payload.itemId.length === 0) {
+    return { success: false, error: 'No throwable item specified.' };
+  }
+  const forceRatio =
+    typeof payload.forceRatio === 'number' && Number.isFinite(payload.forceRatio)
+      ? Math.min(1, Math.max(0, payload.forceRatio))
+      : undefined;
 
-  // 1. Check if user has the specific item (or any throwable / dynamite) in character inventory
-  let inventoryItemToThrow: any = null;
-  const itemInclude = {
+  // 1. Check the character owns the specified item and that it is throwable
+  const inventoryItemToThrow: any = await prisma.inventoryItem.findFirst({
+    where: {
+      characterId,
+      itemId: payload.itemId,
+      quantity: { gt: 0 },
+      item: ITEM_ROLE_WHERE.throwable,
+    } as any,
     include: {
-      itemEffects: {
-        include: { effect: true },
+      item: {
+        include: {
+          itemEffects: {
+            include: { effect: true },
+          },
+        },
       },
     },
-  };
-
-  if (payload.itemId) {
-    inventoryItemToThrow = await prisma.inventoryItem.findFirst({
-      where: {
-        characterId,
-        itemId: payload.itemId,
-        quantity: { gt: 0 },
-      },
-      include: { item: itemInclude },
-    });
-  }
+  });
 
   if (!inventoryItemToThrow) {
-    inventoryItemToThrow = await prisma.inventoryItem.findFirst({
-      where: {
-        characterId,
-        quantity: { gt: 0 },
-        OR: [
-          { item: { throwable: true } },
-          { item: { subType: { equals: 'DYNAMITE', mode: 'insensitive' } } },
-        ],
-      } as any,
-      include: { item: itemInclude },
-    });
+    return { success: false, error: 'You do not have that throwable item.' };
   }
 
-  if (!inventoryItemToThrow) {
-    return { success: false, error: 'You do not have any dynamite or throwable items to throw.' };
+  // 2. Atomically consume one; fails if a concurrent request already used the last one
+  if (!(await consumeInventoryItem(characterId, inventoryItemToThrow.id))) {
+    return { success: false, error: 'You do not have that throwable item.' };
   }
 
-  // 2. Launch throwable item in server engine (calculates throw trajectory & starts fuse)
+  // 3. Launch throwable item in server engine (calculates throw trajectory & starts fuse)
   const itemPhysicsConfig = ((inventoryItemToThrow.item as any).physicsConfig as any) || undefined;
   const explodeEffect = (inventoryItemToThrow.item as any)?.itemEffects?.find(
     (ie: any) => ie.effect?.explodes === true && ie.value > 0
@@ -73,55 +69,21 @@ export const handleMiningThrowDynamite = async (
   const explosionRadius = explodeEffect ? Number(explodeEffect.value) : undefined;
   const soundEffects = (inventoryItemToThrow.item as any)?.soundEffects || undefined;
 
-  const thrown = engine.throwDynamite(
-    characterId,
-    payload.target,
-    itemPhysicsConfig,
-    payload.forceRatio,
+  const thrown = engine.throwDynamite(characterId, {
+    target: throwTarget,
+    forceRatio,
+    itemId: inventoryItemToThrow.item?.id,
+    physicsConfig: itemPhysicsConfig,
+    soundEffects,
     explosionRadius,
-    inventoryItemToThrow.item?.id,
-    soundEffects
-  );
+  });
   if (!thrown) {
+    await refundInventoryItem(characterId, inventoryItemToThrow.itemId);
+    await broadcastInventory(characterId);
     return { success: false, error: 'Failed to throw item.' };
   }
 
-  // 3. Deduct 1 item from character inventory
-  if (inventoryItemToThrow.quantity <= 1) {
-    await prisma.inventoryItem.delete({
-      where: { id: inventoryItemToThrow.id },
-    });
-  } else {
-    await prisma.inventoryItem.update({
-      where: { id: inventoryItemToThrow.id },
-      data: { quantity: { decrement: 1 } },
-    });
-  }
-
-  const updatedChar = await prisma.character.findUnique({
-    where: { id: characterId },
-    include: {
-      inventory: {
-        include: {
-          item: {
-            include: {
-              itemEffects: {
-                include: {
-                  effect: true,
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (updatedChar) {
-    const mappedInventory = InventoryService.mapCharacterInventory(updatedChar);
-    broadcastStatUpdate(characterId, { inventory: mappedInventory });
-  }
-
+  await broadcastInventory(characterId);
   return { success: true };
 };
 
@@ -135,7 +97,7 @@ export const handleMiningThrowItem = handleMiningThrowDynamite;
 export const handleMiningShoot = async (
   io: Server,
   socket: Socket,
-  payload: { target: Vector2D; itemId?: string; weaponItemId?: string; muzzlePosition?: Vector2D }
+  payload: { target: Vector2D; muzzlePosition?: Vector2D; itemId?: string; weaponItemId?: string }
 ): Promise<GameEventResult> => {
   const characterId = socket.data.characterId;
   if (!characterId) return { success: false, error: 'No character selected.' };
@@ -143,12 +105,16 @@ export const handleMiningShoot = async (
   const engine = miningSessionManager.getSession(characterId);
   if (!engine) return { success: false, error: 'No active mining session.' };
 
-  if (!payload?.target) {
+  const shootTarget = sanitizeWorldPoint(payload?.target);
+  if (!shootTarget) {
     return { success: false, error: 'Target position is required.' };
   }
+  // Muzzle is optional; a malformed one is ignored and the server computes it.
+  const muzzle = payload.muzzlePosition ? sanitizeWorldPoint(payload.muzzlePosition) ?? undefined : undefined;
 
-  const weaponId = payload.weaponItemId || payload.itemId;
-  const result = engine.shootProjectile(characterId, payload.target, weaponId, payload.muzzlePosition);
+  // The weapon is resolved server-side from the character's equipped gear; any client-sent
+  // weaponItemId / itemId is ignored.
+  const result = engine.shootProjectile(characterId, shootTarget, muzzle);
   if (!result.success) {
     return {
       success: false,

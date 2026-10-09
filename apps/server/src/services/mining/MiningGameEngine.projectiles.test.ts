@@ -17,12 +17,16 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
       cityId: 'city-1',
       gameMode: 'singleplayer',
       socket: mockSocket,
+      equippedWeaponId: 'cmn_revolver_6shooter',
     });
   });
 
   afterEach(() => {
     engine.stop();
   });
+
+  const REVOLVER = 'cmn_revolver_6shooter';
+  const mag = (weaponId = REVOLVER) => engine.projectileSubsystem.magazines.peek('char-shooter-1', weaponId);
 
   it('shoots a projectile towards the target and tracks magazine rounds (6 shots)', () => {
     const res1 = engine.shootProjectile('char-shooter-1', { x: 35, y: 0 });
@@ -39,8 +43,8 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
   it('enforces 6 shots per cylinder before initiating automatic reload', () => {
     // Fire remaining shots by clearing fire rate restriction between shots
     for (let i = 0; i < 6; i++) {
-      const ammo = engine.playerWeaponAmmo.get('char-shooter-1');
-      if (ammo) ammo.lastShotTime = 0; // bypass cooldown for rapid testing
+      const ammo = mag();
+      if (ammo) ammo.lastShotAt = -Infinity; // bypass cooldown for rapid testing
       const res = engine.shootProjectile('char-shooter-1', { x: 20, y: 10 });
       expect(res.success).toBe(true);
       if (i < 5) {
@@ -63,12 +67,12 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
   it('completes reload after reload duration expires in simulation update', () => {
     // Empty cylinder
     for (let i = 0; i < 6; i++) {
-      const ammo = engine.playerWeaponAmmo.get('char-shooter-1');
-      if (ammo) ammo.lastShotTime = 0;
+      const ammo = mag();
+      if (ammo) ammo.lastShotAt = -Infinity;
       engine.shootProjectile('char-shooter-1', { x: 20, y: 10 });
     }
 
-    const ammo = engine.playerWeaponAmmo.get('char-shooter-1')!;
+    const ammo = mag()!;
     expect(ammo.isReloading).toBe(true);
 
     // Advance 0.5s (reload duration is 1.5s)
@@ -133,7 +137,14 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
     expect(emittedPayload).toBeDefined();
     expect(emittedPayload.activeProjectiles).toBeDefined();
     expect(emittedPayload.activeProjectiles.length).toBeGreaterThan(0);
-    expect(emittedPayload.activeProjectiles[0].inGameScale).toBe(0.4);
+    // Dynamic fields travel every tick; the sprite/scale description is sent once in `spawned`
+    expect(emittedPayload.activeProjectiles[0]).toEqual({
+      id: expect.any(String),
+      position: expect.any(Object),
+      velocity: expect.any(Object),
+      angle: expect.any(Number),
+    });
+    expect(emittedPayload.spawned.projectiles[0].inGameScale).toBe(0.4);
     expect(emittedPayload.gunshots).toBeDefined();
     expect(emittedPayload.gunshots.length).toBe(1);
     expect(emittedPayload.gunshots[0].characterId).toBe('char-shooter-1');
@@ -154,7 +165,7 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
   it('spawns projectile at specified muzzlePosition and aims directly towards target', () => {
     const muzzlePos = { x: 22.4, y: -0.3 };
     const target = { x: 30.0, y: 10.0 };
-    const res = engine.shootProjectile('char-shooter-1', target, undefined, muzzlePos);
+    const res = engine.shootProjectile('char-shooter-1', target, muzzlePos);
     expect(res.success).toBe(true);
     expect(engine.activeProjectiles.length).toBe(1);
     const projectile = engine.activeProjectiles[0];
@@ -169,7 +180,7 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
   });
 
   it('derives projectile damage from weapon item effects and tracks weaponItemId', () => {
-    engine.shootProjectile('char-shooter-1', { x: 25, y: 0 }, 'cmn_revolver_6shooter');
+    engine.shootProjectile('char-shooter-1', { x: 25, y: 0 });
     expect(engine.activeProjectiles.length).toBe(1);
     const projectile = engine.activeProjectiles[0];
     expect(projectile.weaponItemId).toBe('cmn_revolver_6shooter');

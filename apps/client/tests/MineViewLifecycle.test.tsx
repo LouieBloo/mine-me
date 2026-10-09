@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React, { useState } from 'react';
 import { render, screen, act } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { notificationService } from '../src/services/notificationService';
 import { MineView } from '../src/views/MineView/MineView';
 import { GameProvider, useGame } from '../src/contexts/GameContext';
 
@@ -182,6 +183,88 @@ describe('MineView Navigation & Session Lifecycle', () => {
     // Expedition modal must show up cleanly again with no errors
     expect(screen.getByText(/Select Mining Expedition/i)).toBeDefined();
     expect(screen.getByText(/Single Player/i)).toBeDefined();
+  });
+
+  describe('server-ended runs', () => {
+    const startSession = async (handlers: Record<string, (p: any) => void>) => {
+      mockOnEvent.mockImplementation((name: string, handler: (p: any) => void) => {
+        handlers[name] = handler;
+        return () => {};
+      });
+      let session: any = 'uninitialized';
+      let path = '';
+      const Probe = () => {
+        session = useGame().miningSession;
+        path = useLocation().pathname;
+        return null;
+      };
+      render(
+        <MemoryRouter initialEntries={['/mine']}>
+          <GameProvider>
+            <Probe />
+            <MineView />
+          </GameProvider>
+        </MemoryRouter>
+      );
+      mockSendGameEvent.mockResolvedValueOnce({
+        success: true,
+        data: {
+          sessionState: {
+            grid: [], position: { x: 15, y: 0 }, droppedItems: [], temporaryBackpack: [],
+            visionRange: 3, canExtract: true, isMining: false,
+          },
+        },
+      });
+      await act(async () => {
+        screen.getByText(/Single Player/i).click();
+      });
+      expect(session).not.toBeNull();
+      return { getSession: () => session, getPath: () => path };
+    };
+
+    it('shows an error and returns home when the player dies (mining_session_ended)', async () => {
+      const errorSpy = vi.spyOn(notificationService, 'error').mockImplementation(() => undefined as any);
+      const handlers: Record<string, (p: any) => void> = {};
+      const { getSession, getPath } = await startSession(handlers);
+
+      await act(async () => {
+        handlers['mining_session_ended']({ reason: 'death', title: 'You Were Knocked Out', message: 'Backpack lost.' });
+      });
+
+      expect(errorSpy).toHaveBeenCalledWith('You Were Knocked Out', 'Backpack lost.');
+      expect(getSession()).toBeNull();
+      expect(getPath()).toBe('/home');
+      // The server already ended the run, so unmounting must not send a second cancel
+      mockSendGameEvent.mockClear();
+    });
+
+    it('shows a toast when the server says the tool is too weak, without ending the run', async () => {
+      const infoSpy = vi.spyOn(notificationService, 'info').mockImplementation(() => undefined as any);
+      const handlers: Record<string, (p: any) => void> = {};
+      const { getSession, getPath } = await startSession(handlers);
+
+      await act(async () => {
+        handlers['mining_notice']({ kind: 'tool_too_weak', message: "Your tool isn't strong enough to break Silverium." });
+      });
+
+      expect(infoSpy).toHaveBeenCalledWith('Tool Too Weak', "Your tool isn't strong enough to break Silverium.");
+      expect(getSession()).not.toBeNull();
+      expect(getPath()).toBe('/mine');
+    });
+
+    it('still handles the 15 minute timeout the same way', async () => {
+      const infoSpy = vi.spyOn(notificationService, 'info').mockImplementation(() => undefined as any);
+      const handlers: Record<string, (p: any) => void> = {};
+      const { getSession, getPath } = await startSession(handlers);
+
+      await act(async () => {
+        handlers['mining_session_timeout']({ message: 'Out of time.' });
+      });
+
+      expect(infoSpy).toHaveBeenCalledWith('Time Limit Reached', 'Out of time.');
+      expect(getSession()).toBeNull();
+      expect(getPath()).toBe('/home');
+    });
   });
 
   it('safely catches and absorbs mining_input rejections when session is inactive on server', async () => {

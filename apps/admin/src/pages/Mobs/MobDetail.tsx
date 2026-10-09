@@ -24,6 +24,8 @@ export default function MobDetail() {
           moveSpeed: 2.5,
           jumpForce: 6.0,
           miningSpeed: 1.0,
+          hitStunMs: 250,
+          stunImmunityMs: 500,
           dropTable: null,
           animations: null,
         }
@@ -319,6 +321,36 @@ export default function MobDetail() {
                 onChange={(e) => setData({ ...data, miningSpeed: Number(e.target.value) })}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
               />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="hitStunMs" className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                Hit Stun (ms)
+              </label>
+              <input
+                id="hitStunMs"
+                type="number"
+                min={0}
+                step="10"
+                value={data.hitStunMs ?? 250}
+                onChange={(e) => setData({ ...data, hitStunMs: Number(e.target.value) })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+              />
+              <p className="text-[11px] text-slate-400 font-medium">Time a hit takes control away from the mob. 0 = can't be stunned.</p>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="stunImmunityMs" className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                Stun Immunity (ms)
+              </label>
+              <input
+                id="stunImmunityMs"
+                type="number"
+                min={0}
+                step="10"
+                value={data.stunImmunityMs ?? 500}
+                onChange={(e) => setData({ ...data, stunImmunityMs: Number(e.target.value) })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+              />
+              <p className="text-[11px] text-slate-400 font-medium">After a stun ends, how long until it can be stunned again.</p>
             </div>
           </div>
 

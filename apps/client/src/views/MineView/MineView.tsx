@@ -64,15 +64,6 @@ export const MineView: React.FC = () => {
     setShowDebug((prev) => !prev);
   }, []);
 
-  // Equipped Weapon Ammo State
-  const [weaponAmmo, setWeaponAmmo] = useState<{
-    current: number;
-    max: number;
-    isReloading: boolean;
-    weaponName?: string;
-    weaponIconUrl?: string | null;
-  } | null>(null);
-
   // Torch, Ladder and Dynamite/Throwable Placement Mode State from QuickAccessContext
   const { isPlacingTorch, isPlacingLadder, isThrowingDynamite, isThrowingItem, activeThrowableItem, selectSlot } = useQuickAccess();
 
@@ -122,22 +113,38 @@ export const MineView: React.FC = () => {
   // Track whether session has already been extracted/cleaned up so unmount doesn't double-cancel
   const isCleanedUpRef = useRef<boolean>(false);
 
-  // Listen for Server-Side Session Timeout (15 minute max limit)
+  // The server can end a run on its own: the 15 minute limit, or the player dying
   useEffect(() => {
-    const cleanup = onEvent('mining_session_timeout', (payload: { message?: string }) => {
+    const endRun = (title: string, message: string, severity: 'info' | 'error') => {
       isCleanedUpRef.current = true;
       setMiningSession(null);
-      notificationService.info(
-        'Time Limit Reached',
-        payload?.message || 'Your mining expedition has reached its 15-minute time limit and ended.'
-      );
+      notificationService[severity](title, message);
       navigate('/home');
+    };
+
+    const cleanupTimeout = onEvent('mining_session_timeout', (payload: { message?: string }) => {
+      endRun(
+        'Time Limit Reached',
+        payload?.message || 'Your mining expedition has reached its 15-minute time limit and ended.',
+        'info'
+      );
+    });
+    const cleanupEnded = onEvent('mining_session_ended', (payload) => {
+      endRun(payload?.title || 'Expedition Over', payload?.message || 'Your expedition has ended.', 'error');
     });
 
     return () => {
-      cleanup();
+      cleanupTimeout();
+      cleanupEnded();
     };
   }, [onEvent, setMiningSession, navigate]);
+
+  // Tool feedback from the server, e.g. "Your tool isn't strong enough to break Silverium."
+  useEffect(() => {
+    return onEvent('mining_notice', (payload) => {
+      if (payload?.message) notificationService.info('Tool Too Weak', payload.message);
+    });
+  }, [onEvent]);
 
   // Clean up server session and local context if player navigates away without extraction
   useEffect(() => {
@@ -243,14 +250,6 @@ export const MineView: React.FC = () => {
     setShowModeModal(true);
   }, []);
 
-  // Weapon Reload Handler
-  const handleReload = useCallback(async () => {
-    try {
-      await sendGameEvent({ type: 'mining_reload' } as any);
-    } catch (err: any) {
-      console.error('[MineView] Failed to reload weapon:', err);
-    }
-  }, [sendGameEvent]);
   const xpGained = summaryLoot.reduce((sum, item) => sum + item.quantity * 5, 0);
   const mappedLootItems = (() => {
     const groupedMap: Record<string, typeof summaryLoot[number]> = {};
@@ -322,7 +321,6 @@ export const MineView: React.FC = () => {
             onToggleDebug={handleToggleDebug}
             onVisionChange={handleVisionChange}
             onBackpackChange={handleBackpackChange}
-            onWeaponAmmoChange={setWeaponAmmo}
           />
         </PixiStageProvider>
       )}
@@ -340,8 +338,6 @@ export const MineView: React.FC = () => {
           onZoomChange={handleZoomChange}
           showDebug={showDebug}
           onToggleDebug={handleToggleDebug}
-          weaponAmmo={weaponAmmo}
-          onReload={handleReload}
         />
       )}
 

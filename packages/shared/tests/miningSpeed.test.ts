@@ -116,7 +116,15 @@ describe('calculateEffectiveMiningDamage', () => {
       ],
     };
 
+    // A plain Damage effect is weapon damage (mobs, bullets); it does not count as tool damage
     expect(getItemDamageEffect(weapon)).toBe(45);
-    expect(calculateEffectiveMiningDamage(weapon)).toBe(45);
+    expect(calculateEffectiveMiningDamage(weapon)).toBe(DEFAULT_MINING_DAMAGE);
+  });
+
+  it('extracts tool damage from the Tool Damage effect', () => {
+    const tool: any = {
+      itemEffects: [{ value: 60, effect: { toolDamageModifier: true } }],
+    };
+    expect(calculateEffectiveMiningDamage(tool)).toBe(60);
   });
 });

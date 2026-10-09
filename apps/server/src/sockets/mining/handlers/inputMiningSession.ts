@@ -3,6 +3,7 @@ import {
   type GameEventResult,
   type MiningInputPayload,
   type MiningInteractPayload,
+  sanitizeTilePosition,
 } from '@mine-me/shared';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
 
@@ -21,7 +22,7 @@ export const handleMiningInput = async (
   const engine = miningSessionManager.getSession(characterId);
   if (!engine) return { success: false, error: 'No active mining session.' };
 
-  if (payload.input) {
+  if (payload?.input) {
     engine.handleInput(characterId, payload.input);
   }
 
@@ -43,9 +44,10 @@ export const handleMiningInteract = async (
   const engine = miningSessionManager.getSession(characterId);
   if (!engine) return { success: false, error: 'No active mining session.' };
 
-  if (!payload.target) return { success: false, error: 'Invalid target.' };
+  const target = sanitizeTilePosition(payload?.target);
+  if (!target) return { success: false, error: 'Invalid target.' };
 
-  const started = engine.startMining(payload.target, characterId);
+  const started = engine.startMining(characterId, target);
   if (!started) return { success: false, error: 'Cannot mine target block.' };
 
   const session = engine.getPlayer(characterId);
@@ -53,9 +55,9 @@ export const handleMiningInteract = async (
   return {
     success: true,
     data: {
-      isMining: session?.isMining ?? engine.isMining,
-      miningTarget: session?.miningTarget ?? engine.miningTarget,
-      miningTimeMs: session?.miningTimeMs ?? engine.miningTimeMs,
+      isMining: session?.isMining ?? false,
+      miningTarget: session?.miningTarget ?? null,
+      miningTimeMs: session?.miningTimeMs ?? 0,
     },
   };
 };

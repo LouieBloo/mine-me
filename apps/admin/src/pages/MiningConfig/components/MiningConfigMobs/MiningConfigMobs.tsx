@@ -1,10 +1,53 @@
+import { useEffect, useState } from 'react';
 import type { MiningConfigFieldProps } from '../MiningConfigTypes';
+import LoadingSpinner from '../../../../components/LoadingSpinner/LoadingSpinner';
+import { useApi } from '../../../../hooks/useApi';
+import { useToast } from '../../../../contexts/ToastContext';
 import './MiningConfigMobs.css';
 
+interface MobOption {
+  id: string;
+  name: string;
+  aiType?: string;
+}
+
 /**
- * Hostile NPCs & Mob Spawning card.
+ * Hostile NPCs & Mob Spawning card. Which mobs live in the mine, and which one (if any) stands on
+ * the surface as a target dummy, come from the mobs in the database.
  */
 export default function MiningConfigMobs({ config, onFieldChange }: MiningConfigFieldProps) {
+  const { fetchWithAuth } = useApi();
+  const toast = useToast();
+  const [mobs, setMobs] = useState<MobOption[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchWithAuth('/api/admin/mobs?limit=200')
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to load mobs');
+        return res.json();
+      })
+      .then((list: MobOption[]) => {
+        if (!cancelled) setMobs(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => toast.error(err.message || 'Failed to load mobs'))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const allowedMobIds = config.allowedMobIds ?? [];
+  const toggleMob = (id: string) =>
+    onFieldChange(
+      'allowedMobIds',
+      allowedMobIds.includes(id) ? allowedMobIds.filter((m) => m !== id) : [...allowedMobIds, id]
+    );
+
   return (
     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
       <div className="border-b border-slate-100 pb-3">
@@ -62,21 +105,57 @@ export default function MiningConfigMobs({ config, onFieldChange }: MiningConfig
         </div>
       </div>
 
-      {/* Configured Mob Species */}
-      <div className="border-t border-slate-100 pt-3">
-        <span className="text-xs font-semibold text-slate-500 block mb-2">Available Underground Species:</span>
-        <div className="flex flex-wrap gap-2">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-medium text-amber-900">
-            <span className="text-base">🦹</span>
-            <div>
-              <span className="font-bold">Mole Person</span>
-              <span className="text-amber-600 ml-1.5 font-mono text-[10px]">(cmn_mole_person_001)</span>
-            </div>
-            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-200 text-amber-800">
-              Active
-            </span>
+      {/* Which mobs spawn underground */}
+      <div className="border-t border-slate-100 pt-3 space-y-2">
+        <span className="text-xs font-semibold text-slate-500 block">Underground Species:</span>
+        {loading ? (
+          <LoadingSpinner size={24} />
+        ) : mobs.length === 0 ? (
+          <p className="text-xs text-slate-400">No mobs exist yet. Create some in the Mobs section.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {mobs.map((mob) => {
+              const active = allowedMobIds.includes(mob.id);
+              return (
+                <label
+                  key={mob.id}
+                  className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                    active
+                      ? 'bg-amber-50 border-amber-300 text-amber-900'
+                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  <input type="checkbox" checked={active} onChange={() => toggleMob(mob.id)} className="cursor-pointer" />
+                  <span className="font-bold">{mob.name}</span>
+                  <span className="font-mono text-[10px] opacity-70">({mob.id})</span>
+                </label>
+              );
+            })}
           </div>
-        </div>
+        )}
+        <p className="text-xs text-slate-400">With none selected, no hostiles spawn underground.</p>
+      </div>
+
+      {/* Surface target dummy */}
+      <div className="border-t border-slate-100 pt-3 space-y-1">
+        <label htmlFor="surfaceDummyMobId" className="text-sm font-semibold text-slate-700">
+          Surface Target Dummy
+        </label>
+        <select
+          id="surfaceDummyMobId"
+          value={config.surfaceDummyMobId ?? ''}
+          onChange={(e) => onFieldChange('surfaceDummyMobId', e.target.value || null)}
+          disabled={loading}
+          className="w-full p-2.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-800 cursor-pointer hover:border-slate-400"
+        >
+          <option value="">None</option>
+          {mobs.map((mob) => (
+            <option key={mob.id} value={mob.id}>
+              {mob.name} ({mob.aiType ?? 'mob'})
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-slate-400">A mob placed near the entrance for practising combat.</p>
       </div>
     </div>
   );

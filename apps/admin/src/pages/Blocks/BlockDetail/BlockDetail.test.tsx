@@ -199,4 +199,52 @@ describe('BlockDetail Page', () => {
       );
     });
   });
+
+  it('shows the required pick power (0 by default) and saves changes to it', async () => {
+    setupMockData();
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/blocks/block_copperium']}>
+          <Routes>
+            <Route path="/blocks/:id" element={<BlockDetail />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Copperium Ore')).toBeInTheDocument();
+    });
+
+    const input = screen.getByLabelText(/required pick power/i) as HTMLInputElement;
+    expect(input.value).toBe('0');
+
+    fireEvent.change(input, { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: /save block properties/i }));
+
+    await waitFor(() => {
+      const putCall = mockFetchWithAuth.mock.calls.find((c) => c[1]?.method === 'PUT');
+      expect(putCall).toBeDefined();
+      expect(JSON.parse(putCall![1].body).requiredPickPower).toBe(3);
+    });
+  });
+
+  it('loads an existing required pick power from the block', async () => {
+    setupMockData({ requiredPickPower: 2 });
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/blocks/block_copperium']}>
+          <Routes>
+            <Route path="/blocks/:id" element={<BlockDetail />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect((screen.getByLabelText(/required pick power/i) as HTMLInputElement).value).toBe('2');
+    });
+  });
 });

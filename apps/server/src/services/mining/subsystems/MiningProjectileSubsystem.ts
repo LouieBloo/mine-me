@@ -1,130 +1,99 @@
 import {
+  type DamageEvent,
   type MiningGunshotEvent,
-  type MiningRigidWorld,
   type Vector2D,
   getItemDamageEffect,
 } from '@mine-me/shared';
-import { isInBounds, type ServerMiningGrid } from '../../miningMap.service';
+import { isInBounds } from '../../miningMap.service';
 import { MiningProjectileEntity } from '../physics/MiningProjectileEntity';
-import type { MiningDataManager } from './MiningDataManager';
+import { resolveMuzzlePosition } from './miningMuzzle';
 import type { MiningPlayerSession } from './MiningPlayerManager';
+import { WeaponMagazines, resolveWeaponLimits } from './WeaponMagazines';
+import type { MiningWorld } from '../MiningWorld';
 
-export interface PlayerAmmoState {
-  currentAmmo: number;
-  maxAmmo: number;
-  isReloading: boolean;
-  reloadTimer: number;
-  reloadDuration: number;
-  lastShotTime: number;
-  fireRate: number;
-}
+export type ShootResult = {
+  success: boolean;
+  error?: string;
+  remainingAmmo?: number;
+  isReloading?: boolean;
+};
 
 export class MiningProjectileSubsystem {
   public activeProjectiles: MiningProjectileEntity[] = [];
-  public playerWeaponAmmo: Map<string, PlayerAmmoState> = new Map();
+  public readonly magazines = new WeaponMagazines();
   public pendingGunshots: MiningGunshotEvent[] = [];
+
+  constructor(private readonly world: MiningWorld) {}
+
+  /** The ranged weapon definition a player currently has equipped, if any. */
+  private resolveEquippedWeapon(session: MiningPlayerSession): any | undefined {
+    const weapon = session.equippedWeaponId ? this.world.data.getItemData(session.equippedWeaponId) : undefined;
+    return weapon && weapon.shootsProjectiles === true ? weapon : undefined;
+  }
+
+  /** Ammo shown to the client for the currently equipped weapon, or null if none. */
+  public getAmmoStatus(session: MiningPlayerSession): { current: number; max: number; isReloading: boolean } | null {
+    const weapon = this.resolveEquippedWeapon(session);
+    if (!weapon) return null;
+    const mag = this.magazines.get(session.characterId, weapon.id, resolveWeaponLimits(weapon));
+    return { current: mag.currentAmmo, max: mag.maxAmmo, isReloading: mag.isReloading };
+  }
 
   public shootProjectile(
     session: MiningPlayerSession | undefined,
     target: Vector2D,
-    weaponItemId: string | undefined,
-    dataManager: MiningDataManager,
-    rigidWorld: MiningRigidWorld,
     muzzlePosition?: Vector2D
-  ): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
+  ): ShootResult {
     if (!session) return { success: false, error: 'Player session not found.' };
 
     const characterId = session.characterId;
-    const now = Date.now();
-
-    // 1. Get weapon definition from items.json or item cache using item framework
-    let weaponItem = weaponItemId ? dataManager.getItemData(weaponItemId) : undefined;
+    // 1. The weapon is whatever the server knows the character has equipped (never client-supplied)
+    const { data, grid, rigidWorld, simTime } = this.world;
+    const weaponItem = this.resolveEquippedWeapon(session);
     if (!weaponItem) {
-      const items = dataManager.getItems();
-      weaponItem = items.find((it: any) => it.shootsProjectiles === true);
-      if (!weaponItem) {
-        weaponItem = dataManager.getItemData('revolver_6shooter');
-      }
+      return { success: false, error: 'No ranged weapon equipped.' };
     }
 
-    const projConfig = weaponItem?.projectileConfig || {
-      magazineSize: 6,
-      fireRate: 2.5,
-      reloadTime: 1.5,
-      projectileSpeed: 28.0,
-      projectileGravityScale: 0.05,
-    };
+    // Limits come from the weapon's database-backed definition; each weapon has its own magazine
+    const limits = resolveWeaponLimits(weaponItem);
+    const projConfig = weaponItem.projectileConfig ?? {};
+    const mag = this.magazines.get(characterId, weaponItem.id, limits);
 
-    const maxAmmo = projConfig.magazineSize ?? 6;
-    const fireRate = projConfig.fireRate ?? 2.5;
-    const minCooldownMs = 1000 / fireRate;
-    const reloadDuration = projConfig.reloadTime ?? 1.5;
-
-    // 2. Retrieve or initialize character weapon ammo state
-    let ammoState = this.playerWeaponAmmo.get(characterId);
-    if (!ammoState) {
-      ammoState = {
-        currentAmmo: maxAmmo,
-        maxAmmo,
-        isReloading: false,
-        reloadTimer: 0,
-        reloadDuration,
-        lastShotTime: 0,
-        fireRate,
-      };
-      this.playerWeaponAmmo.set(characterId, ammoState);
+    // 2. Check if reloading
+    if (mag.isReloading) {
+      return { success: false, error: 'Reloading weapon...', isReloading: true, remainingAmmo: mag.currentAmmo };
     }
 
-    // 3. Check if reloading
-    if (ammoState.isReloading) {
-      return { success: false, error: 'Reloading weapon...', isReloading: true, remainingAmmo: 0 };
-    }
-
-    // 4. Check if empty
-    if (ammoState.currentAmmo <= 0) {
-      ammoState.isReloading = true;
-      ammoState.reloadTimer = reloadDuration;
+    // 3. Check if empty
+    if (mag.currentAmmo <= 0) {
+      this.magazines.startReload(mag);
       return { success: false, error: 'Weapon is empty. Reloading...', isReloading: true, remainingAmmo: 0 };
     }
 
-    // 5. Fire rate rate-limiting
-    if (now - ammoState.lastShotTime < minCooldownMs) {
-      return { success: false, error: 'Firing too fast.', remainingAmmo: ammoState.currentAmmo };
+    // 4. Fire rate rate-limiting
+    const minCooldownSeconds = 1 / mag.fireRate;
+    if (simTime - mag.lastShotAt < minCooldownSeconds) {
+      return { success: false, error: 'Firing too fast.', remainingAmmo: mag.currentAmmo };
     }
 
-    // 6. Deduct 1 shot
-    ammoState.currentAmmo--;
-    ammoState.lastShotTime = now;
+    // 5. Deduct 1 shot
+    mag.currentAmmo--;
+    mag.lastShotAt = simTime;
 
-    // If cylinder is now empty, immediately begin reload countdown
-    if (ammoState.currentAmmo === 0) {
-      ammoState.isReloading = true;
-      ammoState.reloadTimer = reloadDuration;
+    // If the magazine is now empty, immediately begin reload countdown
+    if (mag.currentAmmo === 0) {
+      this.magazines.startReload(mag);
     }
 
-    // 7. Calculate firing launch vector
-    let muzzlePos: Vector2D;
-    if (muzzlePosition && typeof muzzlePosition.x === 'number' && typeof muzzlePosition.y === 'number') {
-      const distFromPlayer = Math.hypot(
-        muzzlePosition.x - session.playerBody.position.x,
-        muzzlePosition.y - session.playerBody.position.y
-      );
-      if (distFromPlayer <= 2.5) {
-        muzzlePos = { x: muzzlePosition.x, y: muzzlePosition.y };
-      } else {
-        muzzlePos = { x: session.playerBody.position.x, y: session.playerBody.position.y - 0.1 };
-      }
-    } else {
-      const startX = session.playerBody.position.x;
-      const startY = session.playerBody.position.y - 0.1;
-      const dxTemp = target.x - startX;
-      const dyTemp = target.y - startY;
-      const distTemp = Math.hypot(dxTemp, dyTemp) || 1.0;
-      muzzlePos = {
-        x: startX + (dxTemp / distTemp) * 0.45,
-        y: startY + (dyTemp / distTemp) * 0.45,
-      };
-    }
+    // 7. Calculate firing launch vector (client muzzle is only trusted when plausible)
+    const muzzlePos = resolveMuzzlePosition(
+      session.playerBody.position,
+      target,
+      grid,
+      muzzlePosition && Number.isFinite(muzzlePosition.x) && Number.isFinite(muzzlePosition.y)
+        ? muzzlePosition
+        : undefined
+    );
 
     const dx = target.x - muzzlePos.x;
     const dy = target.y - muzzlePos.y;
@@ -143,7 +112,7 @@ export class MiningProjectileSubsystem {
     let bulletSpriteUrl: string | null = '/assets/sprites/items/gun_bullet_ingame.png';
     let bulletScale = 1.0;
     if (projConfig.projectileItemId) {
-      const bulletItem = dataManager.getItemData(projConfig.projectileItemId);
+      const bulletItem = data.getItemData(projConfig.projectileItemId);
       if (bulletItem) {
         if (bulletItem.inGameSpriteUrl) {
           bulletSpriteUrl = bulletItem.inGameSpriteUrl;
@@ -164,7 +133,7 @@ export class MiningProjectileSubsystem {
       initialVel,
       {
         damage: weaponDamage,
-        weaponItemId: weaponItem?.id,
+        weaponItemId: weaponItem.id,
         itemId: projConfig.projectileItemId,
         spriteUrl: bulletSpriteUrl,
         inGameScale: bulletScale,
@@ -192,74 +161,59 @@ export class MiningProjectileSubsystem {
 
     return {
       success: true,
-      remainingAmmo: ammoState.currentAmmo,
-      isReloading: ammoState.isReloading,
+      remainingAmmo: mag.currentAmmo,
+      isReloading: mag.isReloading,
     };
   }
 
-  public reloadWeapon(
-    characterId: string,
-    session: MiningPlayerSession | undefined,
-    dataManager: MiningDataManager
-  ): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
+  public reloadWeapon(session: MiningPlayerSession | undefined): ShootResult {
     if (!session) return { success: false, error: 'Player session not found.' };
 
-    let ammoState = this.playerWeaponAmmo.get(characterId);
-    if (!ammoState) {
-      ammoState = {
-        currentAmmo: 6,
-        maxAmmo: 6,
-        isReloading: false,
-        reloadTimer: 0,
-        reloadDuration: 1.5,
-        lastShotTime: 0,
-        fireRate: 2.5,
-      };
-      this.playerWeaponAmmo.set(characterId, ammoState);
+    const characterId = session.characterId;
+    const weapon = this.resolveEquippedWeapon(session);
+    if (!weapon) return { success: false, error: 'No ranged weapon equipped.' };
+
+    const mag = this.magazines.get(characterId, weapon.id, resolveWeaponLimits(weapon));
+
+    if (mag.isReloading) {
+      return { success: true, remainingAmmo: mag.currentAmmo, isReloading: true };
     }
 
-    if (ammoState.isReloading) {
-      return { success: true, remainingAmmo: 0, isReloading: true };
-    }
-
-    if (ammoState.currentAmmo >= ammoState.maxAmmo) {
+    if (mag.currentAmmo >= mag.maxAmmo) {
       return {
         success: false,
         error: 'Magazine is already full.',
-        remainingAmmo: ammoState.currentAmmo,
+        remainingAmmo: mag.currentAmmo,
         isReloading: false,
       };
     }
 
-    ammoState.isReloading = true;
-    ammoState.reloadTimer = ammoState.reloadDuration;
-    return { success: true, remainingAmmo: 0, isReloading: true };
+    this.magazines.startReload(mag);
+    return { success: true, remainingAmmo: mag.currentAmmo, isReloading: true };
   }
 
-  public updateActiveProjectiles(
-    dt: number,
-    grid: ServerMiningGrid,
-    mobs: Iterable<{ id: string; health: number; animationState: string; mobBody: any }>,
-    onDamageMob: (mobId: string, damage: number) => void,
-    onMineTileDamage: (x: number, y: number, damage: number, characterId: string) => void
-  ): void {
-    // 1. Advance reload timers for all characters
-    for (const [, ammo] of this.playerWeaponAmmo.entries()) {
-      if (ammo.isReloading) {
-        ammo.reloadTimer -= dt;
-        if (ammo.reloadTimer <= 0) {
-          ammo.isReloading = false;
-          ammo.reloadTimer = 0;
-          ammo.currentAmmo = ammo.maxAmmo;
-        }
-      }
-    }
+  public updateActiveProjectiles(dt: number): void {
+    const { grid } = this.world;
+    // 1. Advance reload timers for every weapon of every character
+    this.magazines.tick(dt);
 
     if (this.activeProjectiles.length === 0) return;
 
-    // Materialize once: `mobs` may be a one-shot iterator (e.g. Map.values()), which would be
-    // exhausted by the first projectile and leave every later projectile unable to hit mobs.
-    const mobList = Array.from(mobs);
+    // Snapshot the mobs: hits can change the mob map while we iterate
+    const mobList = Array.from(this.world.mobs.activeMobs.values());
+
+    // A projectile's hit: attributed to the player who fired it, via their weapon
+    const hitEvent = (proj: MiningProjectileEntity): DamageEvent => ({
+      amount: proj.damage,
+      type: 'ranged',
+      source: {
+        kind: 'projectile',
+        id: proj.id,
+        ownerId: proj.characterId,
+        itemId: proj.weaponItemId,
+        position: { x: proj.position.x, y: proj.position.y },
+      },
+    });
 
     for (const proj of this.activeProjectiles) {
       proj.update(dt, grid);
@@ -274,7 +228,7 @@ export class MiningProjectileSubsystem {
             if (dist < 0.7) {
               proj.hasHit = true;
               proj.hitMobId = mob.id;
-              onDamageMob(mob.id, proj.damage);
+              this.world.damage.applyDamage({ kind: 'mob', id: mob.id }, hitEvent(proj));
               proj.cleanup();
               break;
             }
@@ -286,7 +240,7 @@ export class MiningProjectileSubsystem {
       if (proj.hitTile) {
         const { x, y } = proj.hitTile;
         if (isInBounds(x, y)) {
-          onMineTileDamage(x, y, proj.damage, proj.characterId);
+          this.world.damage.damageTile(x, y, hitEvent(proj));
         }
       }
     }

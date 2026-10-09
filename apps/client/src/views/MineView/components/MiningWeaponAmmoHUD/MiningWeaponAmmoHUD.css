@@ -1,9 +1,0 @@
-.mining-weapon-ammo-hud {
-  position: relative;
-  transition: all 0.2s ease-in-out;
-}
-
-.mining-weapon-ammo-hud .pixelated {
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-}

@@ -4,20 +4,20 @@ import {
   MiningMobBody,
   MiningTileType,
   MobAIRegistry,
-  getTileMineTime,
   isTileMineable,
   isTileSolid,
   type MiningActiveMob,
   type MiningPosition,
-  type MiningRigidWorld,
   type MobAIContext,
   type Vector2D,
+  knockbackAway,
+  rollDropTable,
 } from '@mine-me/shared';
-import { getDamageStage, isInBounds, type ServerMiningGrid } from '../../miningMap.service';
-import type { MiningDataManager } from './MiningDataManager';
-import type { MiningDropSubsystem } from './MiningDropSubsystem';
+import { isInBounds, type ServerMiningGrid } from '../../miningMap.service';
 import type { MiningPlayerSession } from './MiningPlayerManager';
-import type { PendingTileUpdate } from './MiningBlockSubsystem';
+import type { MiningWorld } from '../MiningWorld';
+import { isSegmentBlocked } from './miningGeometry';
+import { toActiveMob } from '../MiningEntitySync';
 
 export interface MiningActiveMobSession {
   id: string;
@@ -39,16 +39,39 @@ export interface MiningActiveMobSession {
   miningTarget: MiningPosition | null;
   miningProgressMs: number;
   mineRange: number;
+  /** AI settings (from the mob's aiConfig, defaulting to MINING_CONFIG.MOB_DEFAULT_*). */
+  canMine: boolean;
+  aggroRange: number;
+  attackRange: number;
+  /** How long a hit takes control away from this mob (0 = can't be stunned). */
+  hitStunMs: number;
+  /** After a stun ends, how long until it can be stunned again. */
+  stunImmunityMs: number;
+  /** Time left in the current stun. */
   hitStunDurationMs?: number;
+  /** Time left in the post-stun immunity window. */
+  stunImmuneRemainingMs?: number;
   spriteUrl?: string;
   colliderWidth?: number;
   colliderHeight?: number;
   showHealthBar?: boolean;
+  /** Dig feedback batching state (see MINING_CONFIG.MOB_DIG_HIT_INTERVAL). */
+  digTargetKey?: string | null;
+  digHitTimer?: number;
+  digHitDamage?: number;
+  /** Seconds left before a killed mob is removed (set when it dies). */
+  deathTimer?: number;
 }
 
 export class MiningMobSubsystem {
   public activeMobs: Map<string, MiningActiveMobSession> = new Map();
   public mobCounter = 0;
+
+  constructor(private readonly world: MiningWorld) {}
+
+  private static nonNegative(value: unknown, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
+  }
 
   public spawnMob(
     mobData: {
@@ -64,6 +87,8 @@ export class MiningMobSubsystem {
       miningSpeed?: number;
       aiConfig?: any;
       mineRange?: number;
+      hitStunMs?: number;
+      stunImmunityMs?: number;
       animations?: any;
       dropTable?: any;
       spriteUrl?: string;
@@ -87,23 +112,24 @@ export class MiningMobSubsystem {
       mobData.aiConfig?.colliderHeight ??
       (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE);
     const halfHeight = colH / 2;
-    // Stationary mobs (e.g. target dummies) keep their configured 0 speed/jump; moving mobs get safe minimums
+    // A mob's own numbers always win; the defaults only fill in what its data leaves out.
+    // (Stationary mobs such as target dummies default to not moving at all.)
     const isStationary = mobData.aiType === 'STATIONARY';
     const mobBody = new MiningMobBody({
       position: { x: position.x, y: position.y - halfHeight },
       width: colW,
       height: colH,
-      moveSpeed: isStationary
-        ? (mobData.moveSpeed ?? 0)
-        : mobData.moveSpeed && mobData.moveSpeed >= 2.8
-          ? mobData.moveSpeed
-          : 3.2,
-      jumpForce: isStationary
-        ? (mobData.jumpForce ?? 0)
-        : mobData.jumpForce && mobData.jumpForce >= 8.0
-          ? mobData.jumpForce
-          : 8.8,
+      moveSpeed: MiningMobSubsystem.nonNegative(
+        mobData.moveSpeed,
+        isStationary ? 0 : MINING_CONFIG.MOB_DEFAULT_MOVE_SPEED
+      ),
+      jumpForce: MiningMobSubsystem.nonNegative(
+        mobData.jumpForce,
+        isStationary ? 0 : MINING_CONFIG.MOB_DEFAULT_JUMP_FORCE
+      ),
     });
+
+    const aiConfig = mobData.aiConfig ?? {};
 
     const ai = MobAIRegistry.create(mobData.aiType, mobId, instanceId);
 
@@ -117,11 +143,16 @@ export class MiningMobSubsystem {
       maxHealth: mobData.health ?? 50,
       attack: mobData.attack ?? 10,
       defense: mobData.defense ?? 2,
-      miningSpeed:
-        mobData.miningSpeed !== undefined && mobData.miningSpeed <= 10
-          ? mobData.miningSpeed * 100
-          : (mobData.miningSpeed ?? 80.0),
-      attackCooldownMs: 1200,
+      miningSpeed: MiningMobSubsystem.nonNegative(mobData.miningSpeed, MINING_CONFIG.MOB_DEFAULT_MINING_SPEED),
+      attackCooldownMs: MiningMobSubsystem.nonNegative(
+        aiConfig.attackCooldownMs,
+        MINING_CONFIG.MOB_DEFAULT_ATTACK_COOLDOWN_MS
+      ),
+      canMine: aiConfig.canMine !== false,
+      aggroRange: MiningMobSubsystem.nonNegative(aiConfig.aggroRange, MINING_CONFIG.MOB_DEFAULT_AGGRO_RANGE),
+      attackRange: MiningMobSubsystem.nonNegative(aiConfig.attackRange, MINING_CONFIG.MOB_DEFAULT_ATTACK_RANGE),
+      hitStunMs: MiningMobSubsystem.nonNegative(mobData.hitStunMs, MINING_CONFIG.MOB_HIT_STUN_MS),
+      stunImmunityMs: MiningMobSubsystem.nonNegative(mobData.stunImmunityMs, MINING_CONFIG.MOB_STUN_IMMUNITY_MS),
       dropTable: mobData.dropTable,
       animations: mobData.animations,
       animationState: 'idle',
@@ -129,7 +160,10 @@ export class MiningMobSubsystem {
       isMining: false,
       miningTarget: null,
       miningProgressMs: 0,
-      mineRange: mobData.aiConfig?.mineRange ?? (mobData as any).mineRange ?? 2.0,
+      mineRange: MiningMobSubsystem.nonNegative(
+        aiConfig.mineRange ?? (mobData as any).mineRange,
+        MINING_CONFIG.MOB_DEFAULT_MINE_RANGE
+      ),
       spriteUrl:
         mobData.spriteUrl ??
         (mobData as any).animations?.url ??
@@ -147,7 +181,8 @@ export class MiningMobSubsystem {
     return session;
   }
 
-  public findValidCavernSpawnPosition(grid: ServerMiningGrid, minDepth = 5): Vector2D {
+  public findValidCavernSpawnPosition(minDepth = 5): Vector2D {
+    const grid = this.world.grid;
     const candidates: Vector2D[] = [];
     const startY = Math.max(2, minDepth);
     for (let y = startY; y < MINING_CONFIG.GRID_HEIGHT - 3; y++) {
@@ -169,48 +204,49 @@ export class MiningMobSubsystem {
     return { x: 22.5, y: Math.max(15, minDepth + 5) };
   }
 
-  public populateCavernMobs(
-    grid: ServerMiningGrid,
-    dataManager: MiningDataManager,
-    mapConfig?: { mobSpawnCount?: number; mobSpawnMinDepth?: number; allowedMobIds?: string[] },
-    options?: { count?: number; minDepth?: number; mobIds?: string[] }
-  ): void {
+  public populateCavernMobs(options?: { count?: number; minDepth?: number; mobIds?: string[] }): void {
+    const mapConfig = this.world.mapConfig;
     const mobCount = options?.count ?? mapConfig?.mobSpawnCount ?? 3;
     if (mobCount <= 0) return;
 
     const minDepth = options?.minDepth ?? mapConfig?.mobSpawnMinDepth ?? 5;
-    const allowedMobIds = options?.mobIds ?? mapConfig?.allowedMobIds ?? ['cmn_mole_person_001'];
+    const allowedMobIds = options?.mobIds ?? mapConfig?.allowedMobIds ?? [];
     if (!allowedMobIds || allowedMobIds.length === 0) return;
 
     for (let i = 0; i < mobCount; i++) {
       const mobId = allowedMobIds[i % allowedMobIds.length];
-      const mobDef = dataManager.getMobData(mobId);
+      const mobDef = this.world.data.getMobData(mobId);
       if (!mobDef) continue;
 
-      const spawnPos = this.findValidCavernSpawnPosition(grid, minDepth);
+      const spawnPos = this.findValidCavernSpawnPosition(minDepth);
       this.spawnMob(mobDef, spawnPos);
     }
   }
 
-  public updateActiveMobs(
-    dt: number,
-    grid: ServerMiningGrid,
-    players: Map<string, MiningPlayerSession>,
-    rigidWorld: MiningRigidWorld,
-    dropSubsystem: MiningDropSubsystem,
-    dataManager: MiningDataManager,
-    onPendingTile: (update: PendingTileUpdate) => void
-  ): void {
+  public updateActiveMobs(dt: number): void {
     if (this.activeMobs.size === 0) return;
+    const { grid, players } = this.world;
 
     for (const mob of this.activeMobs.values()) {
-      if (mob.health <= 0) continue;
+      if (mob.health <= 0) {
+        this.updateDyingMob(mob, dt, grid);
+        continue;
+      }
+
+      if (mob.stunImmuneRemainingMs && mob.stunImmuneRemainingMs > 0) {
+        mob.stunImmuneRemainingMs = Math.max(0, mob.stunImmuneRemainingMs - dt * 1000);
+      }
 
       if (mob.hitStunDurationMs && mob.hitStunDurationMs > 0) {
         mob.hitStunDurationMs -= dt * 1000;
         mob.animationState = 'damage';
         mob.mobBody.velocity.x *= 0.92;
         mob.mobBody.update(dt, grid);
+        if (mob.hitStunDurationMs <= 0) {
+          // Control returns, but the mob can't be stunned again for a moment (no stun-lock)
+          mob.hitStunDurationMs = 0;
+          mob.stunImmuneRemainingMs = mob.stunImmunityMs;
+        }
         continue;
       }
 
@@ -230,13 +266,13 @@ export class MiningMobSubsystem {
           characterId: p.characterId,
           characterName: p.characterName,
           position: { x: p.playerBody.position.x, y: p.playerBody.position.y },
-          health: 100,
+          health: p.health,
         })),
         config: {
-          canMine: true,
+          canMine: mob.canMine,
           mineRange: mob.mineRange,
-          aggroRange: 20,
-          attackRange: 1.25,
+          aggroRange: mob.aggroRange,
+          attackRange: mob.attackRange,
           attackCooldownMs: mob.attackCooldownMs,
         },
       };
@@ -256,8 +292,13 @@ export class MiningMobSubsystem {
       if (intent.isAttacking && intent.attackTargetId) {
         mob.animationState = 'attack';
         const targetPlayer = players.get(intent.attackTargetId);
-        if (targetPlayer) {
-          this.handleMobAttackPlayer(mob, targetPlayer);
+        // Solid tiles between the mob and the player block the attack (no hitting through walls)
+        if (
+          targetPlayer &&
+          !targetPlayer.isDead &&
+          !isSegmentBlocked(grid, mob.mobBody.position, targetPlayer.playerBody.position)
+        ) {
+          this.attackPlayer(mob, targetPlayer);
         }
       } else if (intent.isMining && intent.miningTarget) {
         const inReach = BaseMobAI.isWithinReach(
@@ -276,265 +317,178 @@ export class MiningMobSubsystem {
             mob.isFacingLeft = false;
             mob.mobBody.isFacingLeft = false;
           }
-          this.handleMobMining(
-            mob,
-            intent.miningTarget,
-            dt,
-            grid,
-            rigidWorld,
-            dropSubsystem,
-            dataManager,
-            onPendingTile
-          );
+          this.handleMobMining(mob, intent.miningTarget, dt);
         } else {
-          mob.isMining = false;
-          mob.miningTarget = null;
+          this.stopMobMining(mob);
           mob.animationState = 'walk';
         }
       } else {
-        mob.isMining = false;
-        mob.miningTarget = null;
+        this.stopMobMining(mob);
         mob.animationState = intent.animationState;
       }
     }
   }
 
-  public handleMobMining(
-    mob: MiningActiveMobSession,
-    target: MiningPosition,
-    dt: number,
-    grid: ServerMiningGrid,
-    rigidWorld: MiningRigidWorld,
-    dropSubsystem: MiningDropSubsystem,
-    dataManager: MiningDataManager,
-    onPendingTile: (update: PendingTileUpdate) => void
-  ): void {
+  /**
+   * A killed mob lingers briefly so clients can play its death animation. It is inert: no AI, no
+   * attacks, and it cannot be damaged (every damage path ignores mobs at 0 health). It still obeys
+   * gravity so it doesn't hang in mid-air, then it is removed.
+   */
+  private updateDyingMob(mob: MiningActiveMobSession, dt: number, grid: ServerMiningGrid): void {
+    mob.deathTimer = (mob.deathTimer ?? 0) - dt;
+    mob.mobBody.velocity.x *= 0.9;
+    mob.mobBody.update(dt, grid);
+    if (mob.deathTimer <= 0) {
+      this.activeMobs.delete(mob.id);
+    }
+  }
+
+  private canBeStunned(mob: MiningActiveMobSession): boolean {
+    if (mob.hitStunMs <= 0) return false;
+    if ((mob.hitStunDurationMs ?? 0) > 0) return false;
+    if ((mob.stunImmuneRemainingMs ?? 0) > 0) return false;
+    return true;
+  }
+
+  private stopMobMining(mob: MiningActiveMobSession): void {
+    mob.isMining = false;
+    mob.miningTarget = null;
+    mob.digTargetKey = null;
+    mob.digHitTimer = 0;
+    mob.digHitDamage = 0;
+  }
+
+  public handleMobMining(mob: MiningActiveMobSession, target: MiningPosition, dt: number): void {
+    const grid = this.world.grid;
     if (!isInBounds(target.x, target.y)) {
-      mob.isMining = false;
-      mob.miningTarget = null;
+      this.stopMobMining(mob);
       return;
     }
 
     if (!BaseMobAI.isWithinReach(mob.mobBody.position, target, mob.mineRange)) {
-      mob.isMining = false;
-      mob.miningTarget = null;
+      this.stopMobMining(mob);
       mob.miningProgressMs = 0;
       return;
     }
 
     const tile = grid[target.y][target.x];
     if (!tile || !isTileMineable(tile.type)) {
-      mob.isMining = false;
-      mob.miningTarget = null;
+      this.stopMobMining(mob);
       return;
     }
 
-    const prevStage = getDamageStage(tile);
+    const tileType = tile.type;
     const damageDealt = (mob.miningSpeed || 80) * 2 * dt;
-    tile.damage = (tile.damage || 0) + damageDealt;
-    tile.damageMs = tile.damage;
-    mob.miningProgressMs = tile.damage;
+    const result = this.world.damage.damageTile(target.x, target.y, {
+      amount: damageDealt,
+      type: 'mining',
+      source: { kind: 'mob', id: mob.id, name: mob.name, position: { x: mob.mobBody.position.x, y: mob.mobBody.position.y } },
+    });
+    if (!result.applied) {
+      this.stopMobMining(mob);
+      return;
+    }
+    mob.miningProgressMs = result.tileDamage;
 
-    const newStage = getDamageStage(tile);
-    if (newStage !== prevStage) {
-      onPendingTile({
+    // Batch digging feedback so nearby players hear/see it without a 30 Hz event stream
+    const key = `${target.x},${target.y}`;
+    if (mob.digTargetKey !== key) {
+      mob.digTargetKey = key;
+      mob.digHitTimer = 0;
+      mob.digHitDamage = 0;
+    }
+    mob.digHitTimer = (mob.digHitTimer ?? 0) + dt;
+    mob.digHitDamage = (mob.digHitDamage ?? 0) + damageDealt;
+
+    if (mob.digHitTimer >= MINING_CONFIG.MOB_DIG_HIT_INTERVAL || result.destroyed) {
+      this.world.blocks.queueBlockHit({
         x: target.x,
         y: target.y,
-        type: tile.type,
-        damageStage: newStage,
+        tileType,
+        damage: mob.digHitDamage,
+        source: 'mob',
       });
+      mob.digHitTimer = 0;
+      mob.digHitDamage = 0;
     }
 
-    const maxHealth = dataManager.getBlockMaxHealth(tile.type);
-    if (tile.damage >= maxHealth) {
-      const previousType = tile.type;
-      tile.type = MiningTileType.EMPTY;
-      tile.revealed = true;
-      tile.damage = 0;
-      tile.damageMs = 0;
-
-      rigidWorld.removeTileCollider(target.x, target.y);
-      onPendingTile({
-        x: target.x,
-        y: target.y,
-        type: MiningTileType.EMPTY,
-        damageStage: 0,
-      });
-
-      dropSubsystem.spawnBlockDrops(
-        target.x,
-        target.y,
-        previousType,
-        (t) => dataManager.getBlockConfig(t),
-        (id) => dataManager.getItemData(id),
-        rigidWorld
-      );
-
-      mob.isMining = false;
-      mob.miningTarget = null;
+    if (result.destroyed) {
+      this.stopMobMining(mob);
       mob.miningProgressMs = 0;
     }
   }
 
-  public handleMobAttackPlayer(mob: MiningActiveMobSession, player: MiningPlayerSession): void {
-    const damage = Math.max(1, mob.attack);
-    if (player.socket && player.socket.connected) {
-      player.socket.emit('player_damaged', {
-        damage,
-        mobId: mob.id,
-        mobName: mob.name,
-      });
-    }
+  /** A mob's melee attack connects: damage plus a push away from the mob. */
+  private attackPlayer(mob: MiningActiveMobSession, player: MiningPlayerSession): void {
+    const from = mob.mobBody.position;
+    this.world.damage.applyDamage(
+      { kind: 'player', id: player.characterId },
+      {
+        amount: Math.max(1, mob.attack),
+        type: 'melee',
+        source: { kind: 'mob', id: mob.id, name: mob.name, position: { x: from.x, y: from.y } },
+        knockback: knockbackAway(
+          from.x,
+          player.playerBody.position.x,
+          { x: MINING_CONFIG.PLAYER_HIT_KNOCKBACK_X, y: MINING_CONFIG.PLAYER_HIT_KNOCKBACK_Y },
+          player.isFacingLeft ? 1 : -1
+        ),
+      }
+    );
   }
 
-  public damageMob(
-    instanceId: string,
-    damage: number,
-    rigidWorld: MiningRigidWorld,
-    dropSubsystem: MiningDropSubsystem,
-    dataManager: MiningDataManager
-  ): void {
+  /**
+   * Removes health from a mob. Not for gameplay code: hits go through `world.damage.applyDamage`,
+   * which calls this after its own checks.
+   */
+  public damageMob(instanceId: string, damage: number): void {
     const mob = this.activeMobs.get(instanceId);
     if (!mob || mob.health <= 0) return;
 
     mob.health -= damage;
-    mob.animationState = 'damage';
-    mob.hitStunDurationMs = 250;
+
+    // A hit only costs the mob control if it isn't already stunned or still immune from a recent
+    // stun, so sustained fire can't stun-lock it. Damage and knockback apply regardless.
+    if (mob.health > 0 && this.canBeStunned(mob)) {
+      mob.hitStunDurationMs = mob.hitStunMs;
+      mob.animationState = 'damage';
+      // Being hit interrupts whatever the mob was doing
+      this.stopMobMining(mob);
+    }
 
     if (mob.health <= 0) {
-      this.killMob(mob, rigidWorld, dropSubsystem, dataManager);
+      this.killMob(mob);
     }
   }
 
-  public killMob(
-    mob: MiningActiveMobSession,
-    rigidWorld: MiningRigidWorld,
-    dropSubsystem: MiningDropSubsystem,
-    dataManager: MiningDataManager
-  ): void {
+  public killMob(mob: MiningActiveMobSession): void {
+    if (mob.deathTimer !== undefined) return; // already dying: never drop loot twice
+
     mob.health = 0;
     mob.animationState = 'death';
-    this.spawnMobDrops(mob, rigidWorld, dropSubsystem, dataManager);
-    this.activeMobs.delete(mob.id);
+    mob.deathTimer = MINING_CONFIG.MOB_DEATH_LINGER_SECONDS;
+    mob.hitStunDurationMs = 0;
+    this.stopMobMining(mob);
+    // Loot drops immediately; the lingering body is purely visual
+    this.spawnMobDrops(mob);
   }
 
-  public spawnMobDrops(
-    mob: MiningActiveMobSession,
-    rigidWorld: MiningRigidWorld,
-    dropSubsystem: MiningDropSubsystem,
-    dataManager: MiningDataManager
-  ): void {
-    const dropTable = mob.dropTable;
-    const dropsToSpawn: { itemId: string; quantity: number }[] = [];
-
-    if (dropTable && Array.isArray(dropTable.items) && dropTable.items.length > 0) {
-      for (const entry of dropTable.items) {
-        const roll = Math.random() * 100;
-        if (roll <= entry.chance) {
-          const qty =
-            Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1)) +
-            entry.minQuantity;
-          if (qty > 0) {
-            dropsToSpawn.push({ itemId: entry.itemId, quantity: qty });
-          }
-        }
-      }
-    }
-
-    if (dropTable && (dropTable.solMin > 0 || dropTable.solMax > 0)) {
-      const minSol = dropTable.solMin || 0;
-      const maxSol = dropTable.solMax || minSol;
-      const solQty = Math.floor(Math.random() * (maxSol - minSol + 1)) + minSol;
-      if (solQty > 0) {
-        dropsToSpawn.push({ itemId: 'sol', quantity: solQty });
-      }
-    }
-
-    if (dropsToSpawn.length === 0) return;
-
-    const N = dropsToSpawn.length;
-    const tx = mob.mobBody.position.x;
-    const ty = mob.mobBody.position.y;
-
-    dropsToSpawn.forEach((drop, idx) => {
-      dropSubsystem.droppedItemCounter++;
-      const id = `mob_drop_${Date.now()}_${dropSubsystem.droppedItemCounter}_${idx}`;
-      const itemData = dataManager.getItemData(drop.itemId);
-
-      const offsetX = N > 1 ? (idx - (N - 1) / 2) * 0.25 : 0;
-      const posX = tx + offsetX;
-      const posY = ty;
-
-      const vx =
-        N > 1
-          ? (idx - (N - 1) / 2) * 1.5 + (Math.random() - 0.5) * 0.4
-          : (Math.random() - 0.5) * 0.5;
-      const vy =
-        N > 1 ? -2.2 - Math.random() * 1.0 : -1.8 - Math.random() * 0.6;
-
-      const rigidBody = rigidWorld.createItemBody(
-        id,
-        { x: posX, y: posY },
-        { x: vx, y: vy }
-      );
-      dropSubsystem.activeItemBodies.set(id, rigidBody);
-
-      dropSubsystem.droppedItems.push({
-        id,
-        position: { x: posX, y: posY },
-        velocity: { x: vx, y: vy },
-        itemId: drop.itemId,
-        itemName: itemData?.name || drop.itemId,
-        iconUrl: itemData?.iconUrl || null,
-        inGameSpriteUrl: itemData?.inGameSpriteUrl || null,
-        quantity: drop.quantity,
-        physicsConfig: itemData?.physicsConfig,
-        particleEffectId: itemData?.particleEffectId || null,
-        lightConfig: itemData?.lightConfig || null,
-        inGameScale:
-          typeof (itemData as any)?.inGameScale === 'number'
-            ? (itemData as any).inGameScale
-            : 1.0,
-      });
-    });
-
-    dropSubsystem.droppedItemsDirty = true;
+  public spawnMobDrops(mob: MiningActiveMobSession): void {
+    const drops = rollDropTable(mob.dropTable, { currencyItemId: this.world.data.getCurrencyItem()?.id });
+    this.world.drops.spawnDrops(drops, { x: mob.mobBody.position.x, y: mob.mobBody.position.y });
   }
 
-  public spawnSurfaceTargetDummy(
-    dataManager: MiningDataManager,
-    position?: Vector2D
-  ): MiningActiveMobSession | null {
-    const dummyDef = dataManager.getMobData('mob_target_dummy');
+  /** Spawns the map config's surface dummy mob, if the config names one. */
+  public spawnSurfaceTargetDummy(position?: Vector2D): MiningActiveMobSession | null {
+    const dummyMobId = this.world.mapConfig?.surfaceDummyMobId;
+    if (!dummyMobId) return null;
+    const dummyDef = this.world.data.getMobData(dummyMobId);
     if (!dummyDef) return null;
     const spawnPos = position ?? { x: MINING_CONFIG.ENTRANCE_X + 2.5, y: 0.0 };
     return this.spawnMob(dummyDef, spawnPos);
   }
 
   public getActiveMobs(): MiningActiveMob[] {
-    const list: MiningActiveMob[] = [];
-    for (const mob of this.activeMobs.values()) {
-      list.push({
-        id: mob.id,
-        mobId: mob.mobId,
-        name: mob.name,
-        position: { x: mob.mobBody.position.x, y: mob.mobBody.position.y },
-        velocity: { x: mob.mobBody.velocity.x, y: mob.mobBody.velocity.y },
-        health: mob.health,
-        maxHealth: mob.maxHealth,
-        attack: mob.attack,
-        defense: mob.defense,
-        isFacingLeft: mob.isFacingLeft,
-        isMining: mob.isMining,
-        animationState: mob.animationState,
-        miningTarget: mob.miningTarget ?? undefined,
-        animations: mob.animations,
-        spriteUrl: mob.spriteUrl,
-        colliderWidth: mob.colliderWidth,
-        colliderHeight: mob.colliderHeight,
-        showHealthBar: mob.showHealthBar,
-      });
-    }
-    return list;
+    return Array.from(this.activeMobs.values(), toActiveMob);
   }
 }

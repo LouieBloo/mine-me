@@ -12,7 +12,8 @@
     "createdAt": "2026-08-17T03:27:35.321Z",
     "updatedAt": "2026-09-29T03:06:06.491Z",
     "idleParticleEffect": null,
-    "dropTable": null
+    "dropTable": null,
+    "requiredPickPower": 0
   },
   {
     "id": "block_copperium",
@@ -93,7 +94,8 @@
           "updatedAt": "2026-09-25T03:38:21.568Z"
         }
       ]
-    }
+    },
+    "requiredPickPower": 0
   },
   {
     "id": "block_dirt",
@@ -130,7 +132,8 @@
           "updatedAt": "2026-09-30T01:12:33.169Z"
         }
       ]
-    }
+    },
+    "requiredPickPower": 0
   },
   {
     "id": "block_entrance",
@@ -145,7 +148,8 @@
     "createdAt": "2026-08-17T03:27:35.325Z",
     "updatedAt": "2026-09-29T03:06:06.504Z",
     "idleParticleEffect": null,
-    "dropTable": null
+    "dropTable": null,
+    "requiredPickPower": 0
   },
   {
     "id": "block_mineral",
@@ -160,7 +164,8 @@
     "createdAt": "2026-08-17T03:27:35.316Z",
     "updatedAt": "2026-09-29T03:06:06.507Z",
     "idleParticleEffect": null,
-    "dropTable": null
+    "dropTable": null,
+    "requiredPickPower": 0
   },
   {
     "id": "block_rock",
@@ -175,7 +180,8 @@
     "createdAt": "2026-08-17T03:27:35.310Z",
     "updatedAt": "2026-09-29T03:06:06.511Z",
     "idleParticleEffect": null,
-    "dropTable": null
+    "dropTable": null,
+    "requiredPickPower": 0
   },
   {
     "id": "block_silverium",
@@ -256,6 +262,7 @@
           "updatedAt": "2026-09-25T03:41:51.932Z"
         }
       ]
-    }
+    },
+    "requiredPickPower": 0
   }
 ]

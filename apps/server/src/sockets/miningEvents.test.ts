@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../index', () => ({
   prisma: {
@@ -9,6 +9,9 @@ vi.mock('../index', () => ({
       findFirst: vi.fn(),
       delete: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
+      deleteMany: vi.fn(),
+      create: vi.fn(),
     },
     character: {
       findUnique: vi.fn(),
@@ -100,6 +103,12 @@ describe('MiningSessionManager', () => {
   });
 });
 
+beforeEach(() => {
+  (prisma.inventoryItem.updateMany as any).mockReset().mockResolvedValue({ count: 1 });
+  (prisma.inventoryItem.deleteMany as any).mockReset().mockResolvedValue({ count: 0 });
+  (prisma.inventoryItem.create as any).mockReset();
+});
+
 describe('handleMiningPlaceTorch', () => {
   const mockIo = {} as any;
   const mockSocket = {
@@ -125,7 +134,7 @@ describe('handleMiningPlaceTorch', () => {
 
   it('places torch and deducts from inventory when character has torch', async () => {
     const session = miningSessionManager.createSession('char-torch-1', 'city-1', mockSocket);
-    session.playerBody.position = { x: 10.5, y: 5.5 };
+    session.getPlayer('char-torch-1')!.playerBody.position = { x: 10.5, y: 5.5 };
     session.grid[5][11] = { type: 0 as any, revealed: true };
 
     (prisma.inventoryItem.findFirst as any).mockResolvedValue({
@@ -142,8 +151,8 @@ describe('handleMiningPlaceTorch', () => {
 
     const res = await handleMiningPlaceTorch(mockIo, mockSocket, { target: { x: 11, y: 5 } });
     expect(res.success).toBe(true);
-    expect(prisma.inventoryItem.update).toHaveBeenCalledWith({
-      where: { id: 'inv-torch-1' },
+    expect(prisma.inventoryItem.updateMany).toHaveBeenCalledWith({
+      where: { id: 'inv-torch-1', characterId: 'char-torch-1', quantity: { gte: 1 } },
       data: { quantity: { decrement: 1 } },
     });
     expect(session.grid[5][11].type).toBe(MiningTileType.TORCH);
@@ -175,7 +184,7 @@ describe('handleMiningPlaceLadder', () => {
 
   it('places ladder and deducts from inventory when character has ladder', async () => {
     const session = miningSessionManager.createSession('char-ladder-1', 'city-1', mockSocket);
-    session.playerBody.position = { x: 10.5, y: 5.5 };
+    session.getPlayer('char-ladder-1')!.playerBody.position = { x: 10.5, y: 5.5 };
     session.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
 
     (prisma.inventoryItem.findFirst as any).mockResolvedValue({
@@ -192,8 +201,8 @@ describe('handleMiningPlaceLadder', () => {
 
     const res = await handleMiningPlaceLadder(mockIo, mockSocket, { target: { x: 11, y: 5 } });
     expect(res.success).toBe(true);
-    expect(prisma.inventoryItem.update).toHaveBeenCalledWith({
-      where: { id: 'inv-ladder-1' },
+    expect(prisma.inventoryItem.updateMany).toHaveBeenCalledWith({
+      where: { id: 'inv-ladder-1', characterId: 'char-ladder-1', quantity: { gte: 1 } },
       data: { quantity: { decrement: 1 } },
     });
     expect(session.grid[5][11].type).toBe(MiningTileType.LADDER);
@@ -201,7 +210,7 @@ describe('handleMiningPlaceLadder', () => {
 
   it('deletes inventory item if remaining quantity was 1', async () => {
     const session = miningSessionManager.createSession('char-ladder-1', 'city-1', mockSocket);
-    session.playerBody.position = { x: 10.5, y: 5.5 };
+    session.getPlayer('char-ladder-1')!.playerBody.position = { x: 10.5, y: 5.5 };
     session.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
 
     (prisma.inventoryItem.findFirst as any).mockResolvedValue({
@@ -218,8 +227,8 @@ describe('handleMiningPlaceLadder', () => {
 
     const res = await handleMiningPlaceLadder(mockIo, mockSocket, { target: { x: 11, y: 5 } });
     expect(res.success).toBe(true);
-    expect(prisma.inventoryItem.delete).toHaveBeenCalledWith({
-      where: { id: 'inv-ladder-last' },
+    expect(prisma.inventoryItem.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'inv-ladder-last', characterId: 'char-ladder-1', quantity: { lte: 0 } },
     });
     expect(session.grid[5][11].type).toBe(MiningTileType.LADDER);
   });
@@ -237,9 +246,9 @@ describe('handleMiningThrowDynamite', () => {
     miningSessionManager.createSession('char-dyn-1', 'city-1', mockSocket);
     (prisma.inventoryItem.findFirst as any).mockResolvedValue(null);
 
-    const res = await handleMiningThrowDynamite(mockIo, mockSocket, { target: { x: 15, y: 10 } });
+    const res = await handleMiningThrowDynamite(mockIo, mockSocket, { target: { x: 15, y: 10 }, itemId: 'dyn-item-id' });
     expect(res.success).toBe(false);
-    expect(res.error).toMatch(/do not have any dynamite/i);
+    expect(res.error).toMatch(/do not have that throwable/i);
   });
 
   it('throws dynamite and decrements inventory when quantity > 1', async () => {
@@ -256,10 +265,10 @@ describe('handleMiningThrowDynamite', () => {
       inventory: [],
     });
 
-    const res = await handleMiningThrowDynamite(mockIo, mockSocket, { target: { x: 12, y: 8 } });
+    const res = await handleMiningThrowDynamite(mockIo, mockSocket, { target: { x: 12, y: 8 }, itemId: 'dyn-item-id' });
     expect(res.success).toBe(true);
-    expect(prisma.inventoryItem.update).toHaveBeenCalledWith({
-      where: { id: 'inv-dyn-1' },
+    expect(prisma.inventoryItem.updateMany).toHaveBeenCalledWith({
+      where: { id: 'inv-dyn-1', characterId: 'char-dyn-1', quantity: { gte: 1 } },
       data: { quantity: { decrement: 1 } },
     });
     expect(session.activeDynamites).toHaveLength(1);
@@ -280,10 +289,10 @@ describe('handleMiningThrowDynamite', () => {
       inventory: [],
     });
 
-    const res = await handleMiningThrowDynamite(mockIo, mockSocket, { target: { x: 14, y: 6 } });
+    const res = await handleMiningThrowDynamite(mockIo, mockSocket, { target: { x: 14, y: 6 }, itemId: 'dyn-item-id' });
     expect(res.success).toBe(true);
-    expect(prisma.inventoryItem.delete).toHaveBeenCalledWith({
-      where: { id: 'inv-dyn-last' },
+    expect(prisma.inventoryItem.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'inv-dyn-last', characterId: 'char-dyn-1', quantity: { lte: 0 } },
     });
     expect(session.activeDynamites.length).toBeGreaterThanOrEqual(1);
   });
@@ -305,9 +314,9 @@ describe('handleMiningShoot', () => {
 
   it('shoots projectile, decrements ammo, and returns remainingAmmo in data', async () => {
     const session = miningSessionManager.createSession('char-shoot-1', 'city-1', mockSocket);
+    session.getPlayer('char-shoot-1')!.equippedWeaponId = 'cmn_revolver_6shooter';
     const res = await handleMiningShoot(mockIo, mockSocket, {
       target: { x: 25, y: 10 },
-      weaponItemId: 'cmn_revolver_6shooter',
     });
 
     expect(res.success).toBe(true);
@@ -315,6 +324,52 @@ describe('handleMiningShoot', () => {
     expect(res.data?.remainingAmmo).toBe(5);
     expect(res.data?.isReloading).toBe(false);
     expect(session.activeProjectiles).toHaveLength(1);
+  });
+});
+
+describe('handleMiningShoot — server-resolved weapon', () => {
+  const mockIo = {} as any;
+  const mockSocket = {
+    connected: true,
+    data: { characterId: 'char-shoot-2' },
+    emit: vi.fn(),
+  } as any;
+
+  it('rejects the shot when no weapon is equipped, ignoring a client-supplied weapon id', async () => {
+    const session = miningSessionManager.createSession('char-shoot-2', 'city-1', mockSocket, true);
+    const res = await handleMiningShoot(mockIo, mockSocket, {
+      target: { x: 25, y: 10 },
+      weaponItemId: 'cmn_revolver_6shooter',
+      itemId: 'cmn_revolver_6shooter',
+    });
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/no ranged weapon/i);
+    expect(session.activeProjectiles).toHaveLength(0);
+  });
+
+  it('rejects the shot when the equipped weapon does not shoot projectiles', async () => {
+    const session = miningSessionManager.createSession('char-shoot-2', 'city-1', mockSocket, true);
+    session.getPlayer('char-shoot-2')!.equippedWeaponId = 'definitely-not-an-item';
+    const res = await handleMiningShoot(mockIo, mockSocket, { target: { x: 25, y: 10 } });
+    expect(res.success).toBe(false);
+    expect(session.activeProjectiles).toHaveLength(0);
+  });
+
+  it('uses the equipped weapon even if the client names a different one', async () => {
+    const session = miningSessionManager.createSession('char-shoot-2', 'city-1', mockSocket, true);
+    session.getPlayer('char-shoot-2')!.equippedWeaponId = 'cmn_revolver_6shooter';
+    const res = await handleMiningShoot(mockIo, mockSocket, {
+      target: { x: 25, y: 10 },
+      weaponItemId: 'some-overpowered-gun',
+    });
+    expect(res.success).toBe(true);
+    expect(session.activeProjectiles[0].weaponItemId).toBe('cmn_revolver_6shooter');
+  });
+
+  it('rejects malformed targets', async () => {
+    miningSessionManager.createSession('char-shoot-2', 'city-1', mockSocket, true);
+    const res = await handleMiningShoot(mockIo, mockSocket, { target: { x: NaN, y: 1 } as any });
+    expect(res.success).toBe(false);
   });
 });
 
@@ -327,11 +382,11 @@ describe('handleMiningReload', () => {
   } as any;
 
   it('initiates weapon reload and returns status', async () => {
-    miningSessionManager.createSession('char-reload-1', 'city-1', mockSocket);
+    const reloadEngine = miningSessionManager.createSession('char-reload-1', 'city-1', mockSocket);
+    reloadEngine.getPlayer('char-reload-1')!.equippedWeaponId = 'cmn_revolver_6shooter';
     // Shoot once so ammo is 5/6
     await handleMiningShoot(mockIo, mockSocket, {
       target: { x: 25, y: 10 },
-      weaponItemId: 'cmn_revolver_6shooter',
     });
 
     const res = await handleMiningReload(mockIo, mockSocket);

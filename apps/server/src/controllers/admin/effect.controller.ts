@@ -15,19 +15,26 @@ export const getEffect = async (req: Request, res: Response) => {
   res.json(effect);
 };
 
+/** Every boolean flag that says what an effect does. Add new kinds of effect here. */
+const EFFECT_FLAGS = [
+  'healthGain',
+  'staminaGain',
+  'miningSpeedModifier',
+  'damageModifier',
+  'toolDamageModifier',
+  'pickPowerModifier',
+  'knockbackModifier',
+  'explodes',
+] as const;
+
+const parseEffectFlags = (body: Record<string, unknown>) =>
+  Object.fromEntries(EFFECT_FLAGS.map((flag) => [flag, body[flag] === true || body[flag] === 'true']));
+
 export const createEffect = async (req: Request, res: Response) => {
   try {
-    const { name, description, healthGain, staminaGain, miningSpeedModifier, damageModifier, explodes } = req.body;
+    const { name, description } = req.body;
     const effect = await prisma.effect.create({
-      data: {
-        name,
-        description,
-        healthGain: healthGain === true || healthGain === 'true',
-        staminaGain: staminaGain === true || staminaGain === 'true',
-        miningSpeedModifier: miningSpeedModifier === true || miningSpeedModifier === 'true',
-        damageModifier: damageModifier === true || damageModifier === 'true',
-        explodes: explodes === true || explodes === 'true',
-      }
+      data: { name, description, ...parseEffectFlags(req.body) }
     });
 
     const allEffects = await prisma.effect.findMany();
@@ -41,18 +48,10 @@ export const createEffect = async (req: Request, res: Response) => {
 
 export const updateEffect = async (req: Request, res: Response) => {
   try {
-    const { name, description, healthGain, staminaGain, miningSpeedModifier, damageModifier, explodes } = req.body;
+    const { name, description } = req.body;
     const effect = await prisma.effect.update({
       where: { id: req.params.id },
-      data: {
-        name,
-        description,
-        healthGain: healthGain === true || healthGain === 'true',
-        staminaGain: staminaGain === true || staminaGain === 'true',
-        miningSpeedModifier: miningSpeedModifier === true || miningSpeedModifier === 'true',
-        damageModifier: damageModifier === true || damageModifier === 'true',
-        explodes: explodes === true || explodes === 'true',
-      }
+      data: { name, description, ...parseEffectFlags(req.body) }
     });
 
     const allEffects = await prisma.effect.findMany();

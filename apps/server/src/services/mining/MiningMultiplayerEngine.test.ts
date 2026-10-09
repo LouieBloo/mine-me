@@ -51,12 +51,12 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
     expect(mockSocket1.emit).toHaveBeenCalledWith(
       'mining_state_tick',
       expect.objectContaining({
-        otherPlayers: expect.arrayContaining([
-          expect.objectContaining({
-            characterId: 'char-2',
-            characterName: 'Miner Bob',
-          }),
-        ]),
+        otherPlayers: expect.arrayContaining([expect.objectContaining({ characterId: 'char-2' })]),
+        spawned: expect.objectContaining({
+          players: expect.arrayContaining([
+            expect.objectContaining({ characterId: 'char-2', characterName: 'Miner Bob' }),
+          ]),
+        }),
       }),
     );
 
@@ -64,15 +64,18 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
     expect(mockSocket2.emit).toHaveBeenCalledWith(
       'mining_state_tick',
       expect.objectContaining({
-        otherPlayers: expect.arrayContaining([
-          expect.objectContaining({
-            characterId: 'char-1',
-            characterName: 'Miner Alice',
-            gearLayers: expect.arrayContaining([
-              expect.objectContaining({ url: '/gear/hat.png', subType: 'HEAD' }),
-            ]),
-          }),
-        ]),
+        otherPlayers: expect.arrayContaining([expect.objectContaining({ characterId: 'char-1' })]),
+        spawned: expect.objectContaining({
+          players: expect.arrayContaining([
+            expect.objectContaining({
+              characterId: 'char-1',
+              characterName: 'Miner Alice',
+              gearLayers: expect.arrayContaining([
+                expect.objectContaining({ url: '/gear/hat.png', subType: 'HEAD' }),
+              ]),
+            }),
+          ]),
+        }),
       }),
     );
   });
@@ -162,8 +165,8 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
     });
 
     // Both players start mining target
-    const started1 = engine.startMining(target, 'char-1');
-    const started2 = engine.startMining(target, 'char-2');
+    const started1 = engine.startMining('char-1', target);
+    const started2 = engine.startMining('char-2', target);
     expect(started1).toBe(true);
     expect(started2).toBe(true);
 
@@ -255,7 +258,7 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
     expect(mockSocket2.emit).toHaveBeenLastCalledWith(
       'mining_state_tick',
       expect.objectContaining({
-        otherPlayers: undefined,
+        otherPlayers: [],
       }),
     );
 
@@ -320,7 +323,8 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
           expect.objectContaining({
             characterId: 'char-1',
             isFacingLeft: true,
-            aimDirection: { x: -0.707, y: -0.707 },
+            // Aim is normalised server-side, so compare approximately
+            aimDirection: { x: expect.closeTo(-0.707, 2), y: expect.closeTo(-0.707, 2) },
             flashlightOn: true,
           }),
         ]),

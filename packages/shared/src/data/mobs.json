@@ -14,13 +14,13 @@
       "attackRange": 1.1,
       "jumpCooldownMs": 600,
       "mineCooldownMs": 400,
-      "detectionRadius": 12,
-      "attackCooldownMs": 1000
+      "attackCooldownMs": 1000,
+      "aggroRange": 12
     },
     "abilities": [],
     "moveSpeed": 1,
     "jumpForce": 6.5,
-    "miningSpeed": 0.25,
+    "miningSpeed": 25.0,
     "sounds": {
       "dig": {
         "url": "/assets/sounds/cmn_mole_person_dig.mp3",
@@ -213,7 +213,9 @@
           "updatedAt": "2026-10-02T00:01:15.809Z"
         }
       ]
-    }
+    },
+    "hitStunMs": 250,
+    "stunImmunityMs": 500
   },
   {
     "id": "cmn1zb9op0000ihw4mgknuvlr",
@@ -278,7 +280,9 @@
           "updatedAt": "2026-09-30T01:45:50.251Z"
         }
       ]
-    }
+    },
+    "hitStunMs": 250,
+    "stunImmunityMs": 500
   },
   {
     "id": "cmn1zl1bk0001ihw48b0c492z",
@@ -450,7 +454,9 @@
     },
     "createdAt": "2026-04-06T21:51:48.684Z",
     "updatedAt": "2026-08-19T02:49:17.707Z",
-    "dropTable": null
+    "dropTable": null,
+    "hitStunMs": 250,
+    "stunImmunityMs": 500
   },
   {
     "id": "mob_target_dummy",
@@ -477,6 +483,8 @@
     },
     "createdAt": "2026-10-07T00:00:00.000Z",
     "updatedAt": "2026-10-07T00:00:00.000Z",
-    "dropTable": null
+    "dropTable": null,
+    "hitStunMs": 250,
+    "stunImmunityMs": 500
   }
 ]

@@ -1,11 +1,8 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../../../index';
 import { broadcastStatUpdate } from '../../../services/characterBroadcast';
-import { InventoryService } from '../../../services/inventory.service';
-import {
-  type GameEventResult,
-  CharacterModEngine,
-} from '@mine-me/shared';
+import { buildMiningLoadout } from '../../../services/mining/miningLoadout';
+import { type GameEventResult } from '@mine-me/shared';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
 import { getActiveMiningConfig } from '../../../services/miningConfig.service';
 
@@ -53,23 +50,8 @@ export const handleMiningStart = async (
   }
 
   try {
-    const clientInventory = InventoryService.mapCharacterInventory(character);
-    const mods = CharacterModEngine.getModifications(clientInventory.items);
-
-    // Extract equipped gear layers for remote rendering
-    const gearLayers = character.inventory
-      .filter((inv) => inv.item.type === 'GEAR' && inv.item.gearImageUrl && inv.equipped)
-      .map((inv) => ({
-        url: inv.item.gearImageUrl!,
-        subType: inv.item.subType as any,
-        shootsProjectiles: Boolean(inv.item.shootsProjectiles),
-        throwable: Boolean(inv.item.throwable),
-        holdOffsetX: inv.item.holdOffsetX ?? 0,
-        holdOffsetY: inv.item.holdOffsetY ?? 0,
-        holdRotation: inv.item.holdRotation ?? 0,
-        muzzleOffsetX: inv.item.muzzleOffsetX ?? 0,
-        muzzleOffsetY: inv.item.muzzleOffsetY ?? 0,
-      }));
+    const loadout = buildMiningLoadout(character);
+    const clientInventory = loadout.clientInventory;
 
     // Ensure client has latest authoritative inventory upon entering mine
     broadcastStatUpdate(characterId, { inventory: clientInventory });
@@ -85,17 +67,33 @@ export const handleMiningStart = async (
       character.cityId,
       socket,
       payload?.forceNew,
-      mods.miningSpeed,
+      loadout.miningSpeed,
       mode,
       character.name,
-      gearLayers,
+      loadout.gearLayers,
       activeConfig,
-      mods.miningDamage,
+      {
+        toolDamage: loadout.toolDamage,
+        weaponDamage: loadout.weaponDamage,
+        pickPower: loadout.pickPower,
+        knockback: loadout.knockback,
+      },
+      loadout.equippedWeaponId,
+      character.maxHealth,
     );
+
+    // A run starts at full health; show that in the app's health bar (and the current value on re-entry)
+    const runSession = engine.getPlayer(characterId);
+    if (runSession) {
+      broadcastStatUpdate(characterId, {
+        health: Math.max(0, Math.round(runSession.health)),
+        maxHealth: runSession.maxHealth,
+      });
+    }
     const sessionState = miningSessionManager.buildClientState(engine, characterId);
 
     console.log(
-      `[Mining] ${character.name} entered real-time mine (${mode}) in city ${character.cityId} with speed ${mods.miningSpeed}${
+      `[Mining] ${character.name} entered real-time mine (${mode}) in city ${character.cityId} with speed ${loadout.miningSpeed}${
         payload?.forceNew ? ' (fresh session)' : ''
       }`,
     );

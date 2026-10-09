@@ -18,6 +18,7 @@ import {
 } from './miningEvents';
 import { miningSessionManager } from '../services/mining/MiningSessionManager';
 import { InventoryService } from '../services/inventory.service';
+import { buildMiningLoadout } from '../services/mining/miningLoadout';
 import {
   type GameEventPayload,
   type GameEventResult,
@@ -25,7 +26,6 @@ import {
   type RestPayload,
   calculateTravelDays,
   getStaminaRecoveryPerDay,
-  CharacterModEngine,
 } from '@mine-me/shared';
 
 // ============================================================================
@@ -311,11 +311,12 @@ const handleEquipItem: GameEventHandler<any> = async (io, socket, payload) => {
 
   const clientInventory = InventoryService.mapCharacterInventory(character);
   const clientGear = InventoryService.mapCharacterGear(character.inventory);
-  const mods = CharacterModEngine.getModifications(clientInventory.items);
 
+  // Keep a live mining session in sync with the new equipment (speed, damage, gear visuals, weapon)
   const activeEngine = miningSessionManager.getSession(characterId);
   if (activeEngine) {
-    activeEngine.setMiningSpeed(mods.miningSpeed);
+    const { clientInventory: _inv, ...loadout } = buildMiningLoadout(character);
+    activeEngine.setLoadout(characterId, loadout);
   }
 
   broadcastStatUpdate(characterId, {
@@ -382,11 +383,12 @@ const handleUnequipItem: GameEventHandler<any> = async (io, socket, payload) => 
 
   const clientInventory = InventoryService.mapCharacterInventory(character);
   const clientGear = InventoryService.mapCharacterGear(character.inventory);
-  const mods = CharacterModEngine.getModifications(clientInventory.items);
 
+  // Keep a live mining session in sync with the new equipment (speed, damage, gear visuals, weapon)
   const activeEngine = miningSessionManager.getSession(characterId);
   if (activeEngine) {
-    activeEngine.setMiningSpeed(mods.miningSpeed);
+    const { clientInventory: _inv, ...loadout } = buildMiningLoadout(character);
+    activeEngine.setLoadout(characterId, loadout);
   }
 
   broadcastStatUpdate(characterId, {

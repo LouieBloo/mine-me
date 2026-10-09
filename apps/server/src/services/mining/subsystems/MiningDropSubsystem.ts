@@ -1,85 +1,85 @@
 import * as planck from 'planck';
 import {
+  MINING_CONFIG,
   MiningTileType,
+  rollDropTable,
   type MiningDroppedItem,
-  type MiningRigidWorld,
+  type RolledDrop,
+  type Vector2D,
 } from '@mine-me/shared';
-import type { MiningDataManager } from './MiningDataManager';
 import type { MiningPlayerSession } from './MiningPlayerManager';
+import type { MiningWorld } from '../MiningWorld';
 
 export class MiningDropSubsystem {
   public droppedItems: MiningDroppedItem[] = [];
   public activeItemBodies: Map<string, planck.Body> = new Map();
   public droppedItemCounter = 0;
   public droppedItemsDirty: boolean = true;
+  private lastLimitWarningAt = -Infinity;
 
-  public spawnBlockDrops(
-    tx: number,
-    ty: number,
-    tileType: MiningTileType,
-    getBlockConfig: (tileType: MiningTileType) => any,
-    getItemData: (itemId: string) => any,
-    rigidWorld: MiningRigidWorld
-  ): void {
+  constructor(private readonly world: MiningWorld) {}
+
+  /**
+   * How many of `requested` new drops may be created. Items never despawn, so the room is capped
+   * at MAX_DROPPED_ITEMS as a safety net; drops beyond it are skipped (and logged, at most every
+   * few seconds) rather than evicting items that are already on the floor.
+   */
+  public reserveDropSlots(requested: number): number {
+    const free = Math.max(0, MINING_CONFIG.MAX_DROPPED_ITEMS - this.droppedItems.length);
+    if (requested <= free) return requested;
+
+    const now = Date.now(); // log throttling only; never used for game logic
+    if (now - this.lastLimitWarningAt > 5000) {
+      this.lastLimitWarningAt = now;
+      console.warn(
+        `[Mining] Dropped item limit (${MINING_CONFIG.MAX_DROPPED_ITEMS}) reached; skipping ${requested - free} drop(s)`
+      );
+    }
+    return free;
+  }
+
+  /** Rolls a mined block's drop table and drops the result at the tile. */
+  public spawnBlockDrops(tx: number, ty: number, tileType: MiningTileType): void {
     if (tileType === MiningTileType.EMPTY || tileType === MiningTileType.ENTRANCE) return;
 
-    const blockConfig = getBlockConfig(tileType);
-    const dropTable = blockConfig?.dropTable;
-    const dropsToSpawn: { itemId: string; quantity: number }[] = [];
+    // The block's drop table (from the database) is the only source of loot: no table, no drops.
+    const dropTable = this.world.data.getBlockConfig(tileType)?.dropTable;
+    this.spawnDrops(rollDropTable(dropTable), { x: tx + 0.5, y: ty + 0.5 });
+  }
 
-    if (dropTable && Array.isArray(dropTable.items) && dropTable.items.length > 0) {
-      for (const entry of dropTable.items) {
-        const roll = Math.random() * 100;
-        if (roll <= entry.chance) {
-          const qty =
-            Math.floor(Math.random() * (entry.maxQuantity - entry.minQuantity + 1)) +
-            entry.minQuantity;
-          if (qty > 0) {
-            dropsToSpawn.push({ itemId: entry.itemId, quantity: qty });
-          }
-        }
-      }
-    } else {
-      // Fallback for legacy blocks without drop tables configured
-      if (tileType === MiningTileType.MINERAL) {
-        dropsToSpawn.push({ itemId: 'copper_ore', quantity: 1 });
-      } else if (tileType === MiningTileType.CHEST) {
-        dropsToSpawn.push({ itemId: 'sol', quantity: 50 });
-      }
-    }
+  /**
+   * Drops a batch of items around `origin`: spread out so they don't overlap, popped upward with a
+   * little randomness, each backed by a physics body. The one place dropped items are created
+   * (blocks and mobs both use it). Respects the room's item limit.
+   */
+  public spawnDrops(drops: RolledDrop[], origin: Vector2D): void {
+    const batch = drops.slice(0, this.reserveDropSlots(drops.length));
+    if (batch.length === 0) return;
 
-    if (dropsToSpawn.length === 0) return;
-
-    const N = dropsToSpawn.length;
-    dropsToSpawn.forEach((drop, idx) => {
+    const N = batch.length;
+    batch.forEach((drop, idx) => {
       this.droppedItemCounter++;
       const id = `drop_${Date.now()}_${this.droppedItemCounter}_${idx}`;
-      const itemData = getItemData(drop.itemId);
+      const itemData = this.world.data.getItemData(drop.itemId);
 
-      // Spread out multiple items so they don't overlap
-      const offsetX = N > 1 ? (idx - (N - 1) / 2) * 0.25 : 0;
-      const posX = tx + 0.5 + offsetX;
-      const posY = ty + 0.5;
+      const posX = origin.x + (N > 1 ? (idx - (N - 1) / 2) * 0.25 : 0);
+      const posY = origin.y;
 
       const vx =
         N > 1
           ? (idx - (N - 1) / 2) * 1.5 + (Math.random() - 0.5) * 0.4
           : (Math.random() - 0.5) * 0.5;
-      const vy =
-        N > 1 ? -2.2 - Math.random() * 1.0 : -1.8 - Math.random() * 0.6;
+      const vy = N > 1 ? -2.2 - Math.random() * 1.0 : -1.8 - Math.random() * 0.6;
 
-      const rigidBody = rigidWorld.createItemBody(
-        id,
-        { x: posX, y: posY },
-        { x: vx, y: vy }
-      );
+      const rigidBody = this.world.rigidWorld.createItemBody(id, { x: posX, y: posY }, { x: vx, y: vy });
       this.activeItemBodies.set(id, rigidBody);
 
       this.droppedItems.push({
         id,
         position: { x: posX, y: posY },
         velocity: { x: vx, y: vy },
-        itemId: drop.itemId,
+        // Store the canonical DB id (drop tables may reference an itemKey)
+        itemId: itemData?.id ?? drop.itemId,
         itemName: itemData?.name || drop.itemId,
         iconUrl: itemData?.iconUrl || null,
         inGameSpriteUrl: itemData?.inGameSpriteUrl || null,
@@ -87,10 +87,7 @@ export class MiningDropSubsystem {
         physicsConfig: itemData?.physicsConfig,
         particleEffectId: itemData?.particleEffectId || null,
         lightConfig: itemData?.lightConfig || null,
-        inGameScale:
-          typeof (itemData as any)?.inGameScale === 'number'
-            ? (itemData as any).inGameScale
-            : 1.0,
+        inGameScale: typeof itemData?.inGameScale === 'number' ? itemData.inGameScale : 1.0,
       });
     });
 
@@ -126,10 +123,7 @@ export class MiningDropSubsystem {
     }
   }
 
-  public checkItemPickupsForPlayer(
-    session: MiningPlayerSession,
-    rigidWorld: MiningRigidWorld
-  ): void {
+  public checkItemPickupsForPlayer(session: MiningPlayerSession): void {
     if (this.droppedItems.length === 0) return;
 
     const remainingItems: MiningDroppedItem[] = [];
@@ -160,7 +154,7 @@ export class MiningDropSubsystem {
         if (item.id) {
           const body = this.activeItemBodies.get(item.id);
           if (body) {
-            rigidWorld.destroyBody(body);
+            this.world.rigidWorld.destroyBody(body);
             this.activeItemBodies.delete(item.id);
           }
         }

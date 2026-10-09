@@ -1,26 +1,40 @@
 import {
   MINING_CONFIG,
   MiningTileType,
+  canBreakBlock,
   canPlaceBuildable,
-  getTileMineTime,
-  getTileMaxHealth,
   isTileMineable,
   type MiningPosition,
   type MiningBlockHitEvent,
+  type DamageEvent,
 } from '@mine-me/shared';
-import { getDamageStage, isInBounds, type ServerMiningGrid } from '../../miningMap.service';
-import { MiningDataManager } from './MiningDataManager';
+import { isInBounds } from '../../miningMap.service';
 import type { MiningPlayerSession } from './MiningPlayerManager';
+import type { MiningWorld, PendingTileUpdate } from '../MiningWorld';
 
-export interface PendingTileUpdate {
-  x: number;
-  y: number;
-  type: MiningTileType;
-  damageStage?: number;
-}
+export type { PendingTileUpdate };
 
 export class MiningBlockSubsystem {
   private pendingBlockHits: MiningBlockHitEvent[] = [];
+
+  constructor(private readonly world: MiningWorld) {}
+
+  /** Called when a player tries to break a block their tool is too weak for. */
+  public onToolTooWeak?: (session: MiningPlayerSession, blockName: string) => void;
+
+  /** True if the player's tool can damage this tile; otherwise tells them why (throttled by the callback). */
+  private checkPickPower(session: MiningPlayerSession, tile: { type: MiningTileType }): boolean {
+    const data = this.world.data;
+    const required = data.getBlockRequiredPickPower(tile.type);
+    if (canBreakBlock(session.pickPower, required)) return true;
+    this.onToolTooWeak?.(session, data.getBlockConfig(tile.type)?.name ?? 'this block');
+    return false;
+  }
+
+  /** Queues a block hit event produced outside this subsystem (e.g. a mob digging). */
+  public queueBlockHit(hit: MiningBlockHitEvent): void {
+    this.pendingBlockHits.push(hit);
+  }
 
   public consumePendingBlockHits(): MiningBlockHitEvent[] {
     const hits = this.pendingBlockHits;
@@ -28,12 +42,9 @@ export class MiningBlockSubsystem {
     return hits;
   }
 
-  public startMining(
-    target: MiningPosition,
-    session: MiningPlayerSession | undefined,
-    grid: ServerMiningGrid
-  ): boolean {
+  public startMining(session: MiningPlayerSession | undefined, target: MiningPosition): boolean {
     if (!session) return false;
+    const grid = this.world.grid;
     if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return false;
     if (!isInBounds(target.x, target.y)) return false;
 
@@ -46,6 +57,7 @@ export class MiningBlockSubsystem {
 
     const tile = grid[target.y][target.x];
     if (!isTileMineable(tile.type)) return false;
+    if (!this.checkPickPower(session, tile)) return false;
 
     // Check reach distance
     const tileCenterX = target.x + 0.5;
@@ -58,18 +70,12 @@ export class MiningBlockSubsystem {
 
     session.isMining = true;
     session.miningTarget = { x: target.x, y: target.y };
-    const maxHealth = MiningDataManager.getInstance().getBlockMaxHealth(tile.type);
+    const maxHealth = this.world.data.getBlockMaxHealth(tile.type);
     session.targetMaxHealth = maxHealth;
     session.miningTimeMs = maxHealth;
     session.miningProgressMs = tile.damage ?? tile.damageMs ?? 0;
-    const swingsPerSec = 2.0 * ((playerSpeed || 25) / 25);
-    const swingInterval = 1 / swingsPerSec;
-    // Honor the swing cooldown across click/release so tap-spamming can't swing faster than holding.
-    // If the cooldown already elapsed (or no prior swing), prime so the first hit lands immediately.
-    const elapsedSec =
-      session.lastSwingAtMs === undefined ? Infinity : (Date.now() - session.lastSwingAtMs) / 1000;
-    session.swingTimer = Math.min(swingInterval, Math.max(0, elapsedSec));
-
+    // Swing timing lives in MiningPlayerManager.advanceSwings (shared with melee), and persists
+    // across clicks, so tapping can't swing faster than holding.
     return true;
   }
 
@@ -78,21 +84,20 @@ export class MiningBlockSubsystem {
     session.isMining = false;
     session.miningTarget = null;
     session.miningProgressMs = 0;
-    // swingTimer is intentionally recomputed from lastSwingAtMs on the next startMining.
   }
 
-  public placeLadder(
-    target: MiningPosition | undefined,
+  /** Returns the tile a ladder would be placed on, or null if placement is not allowed. */
+  public validateLadderPlacement(
     session: MiningPlayerSession | undefined,
-    grid: ServerMiningGrid,
-    onPendingTile: (update: PendingTileUpdate) => void
-  ): boolean {
-    if (!session) return false;
+    target: MiningPosition | undefined
+  ): MiningPosition | null {
+    if (!session) return null;
+    const grid = this.world.grid;
 
     const x = target ? target.x : Math.floor(session.playerBody.position.x);
     const y = target ? target.y : Math.floor(session.playerBody.position.y);
 
-    if (!isInBounds(x, y)) return false;
+    if (!isInBounds(x, y)) return null;
 
     if (target && typeof target.x === 'number' && typeof target.y === 'number') {
       const tileCenterX = target.x + 0.5;
@@ -100,20 +105,28 @@ export class MiningBlockSubsystem {
       const dx = Math.abs(tileCenterX - session.playerBody.position.x);
       const dy = Math.abs(tileCenterY - session.playerBody.position.y);
       if (dx > MINING_CONFIG.TORCH_PLACEMENT_REACH || dy > MINING_CONFIG.TORCH_PLACEMENT_REACH)
-        return false;
+        return null;
     }
 
     const tile = grid[y][x];
-    if (tile.type === MiningTileType.ENTRANCE) return false;
-    if (!canPlaceBuildable(MiningTileType.LADDER, tile.type)) return false;
+    if (tile.type === MiningTileType.ENTRANCE) return null;
+    if (!canPlaceBuildable(MiningTileType.LADDER, tile.type)) return null;
 
+    return { x, y };
+  }
+
+  public placeLadder(session: MiningPlayerSession | undefined, target: MiningPosition | undefined): boolean {
+    const pos = this.validateLadderPlacement(session, target);
+    if (!pos) return false;
+
+    const tile = this.world.grid[pos.y][pos.x];
     tile.type = MiningTileType.LADDER;
     tile.revealed = true;
     tile.damageMs = 0;
 
-    onPendingTile({
-      x,
-      y,
+    this.world.pushTileUpdate({
+      x: pos.x,
+      y: pos.y,
       type: MiningTileType.LADDER,
       damageStage: 0,
     });
@@ -121,13 +134,10 @@ export class MiningBlockSubsystem {
     return true;
   }
 
-  public placeTorch(
-    target: MiningPosition,
-    session: MiningPlayerSession | undefined,
-    grid: ServerMiningGrid,
-    onPendingTile: (update: PendingTileUpdate) => void
-  ): boolean {
+  /** Returns true if a torch can currently be placed at target. */
+  public validateTorchPlacement(session: MiningPlayerSession | undefined, target: MiningPosition): boolean {
     if (!session) return false;
+    const grid = this.world.grid;
     if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return false;
     if (!isInBounds(target.x, target.y)) return false;
 
@@ -140,13 +150,18 @@ export class MiningBlockSubsystem {
 
     const tile = grid[target.y][target.x];
     if (!tile.revealed) return false;
-    if (!canPlaceBuildable(MiningTileType.TORCH, tile.type)) return false;
+    return canPlaceBuildable(MiningTileType.TORCH, tile.type);
+  }
 
+  public placeTorch(session: MiningPlayerSession | undefined, target: MiningPosition): boolean {
+    if (!this.validateTorchPlacement(session, target)) return false;
+
+    const tile = this.world.grid[target.y][target.x];
     tile.type = MiningTileType.TORCH;
     tile.revealed = true;
     tile.damageMs = 0;
 
-    onPendingTile({
+    this.world.pushTileUpdate({
       x: target.x,
       y: target.y,
       type: MiningTileType.TORCH,
@@ -156,14 +171,9 @@ export class MiningBlockSubsystem {
     return true;
   }
 
-  public updateMiningProgress(
-    dt: number,
-    players: Iterable<MiningPlayerSession>,
-    grid: ServerMiningGrid,
-    onStageChanged: (update: PendingTileUpdate) => void,
-    onBlockCompleted: (target: MiningPosition, miners: MiningPlayerSession[]) => void
-  ): void {
-    const playerList = Array.from(players);
+  public updateMiningProgress(_dt: number): void {
+    const grid = this.world.grid;
+    const playerList = Array.from(this.world.players.values());
 
     // 1. Validate & trigger mining actions for each player
     for (const session of playerList) {
@@ -193,7 +203,7 @@ export class MiningBlockSubsystem {
         if (isInBounds(target.x, target.y)) {
           const tile = grid[target.y][target.x];
           if (isTileMineable(tile.type)) {
-            this.startMining({ x: target.x, y: target.y }, session, grid);
+            this.startMining(session, { x: target.x, y: target.y });
           }
         }
       }
@@ -222,87 +232,89 @@ export class MiningBlockSubsystem {
         continue;
       }
 
-      const prevStage = getDamageStage(tile);
-
-      // Discrete per-swing damage:
-      // miningSpeed represents weapon attack speed (baseline 25 = 2.0 swings/sec).
-      // miningDamage represents damage dealt per swing (baseline 25).
-      // Damage is applied only when a swing completes, so tapping and holding deal
-      // identical damage per swing. Dirt (100 HP) takes 4 swings at baseline.
+      // Discrete per-swing damage: a miner deals their tool damage on the tick their swing fires
+      // (see MiningPlayerManager.advanceSwings), so tapping and holding deal identical damage per
+      // swing. Dirt (100 HP) takes 4 swings at baseline (25 damage). Miners hitting the same block
+      // on the same tick combine into one hit.
       let damageDealt = 0;
       for (const miner of miners) {
-        const speed = typeof miner.miningSpeed === 'function' ? miner.miningSpeed() : (miner.miningSpeed ?? 25);
-        const damage = typeof miner.miningDamage === 'function' ? miner.miningDamage() : (miner.miningDamage ?? 25);
-        if (speed <= 0 || damage <= 0) continue;
-
-        const swingsPerSec = 2.0 * (speed / 25);
-        const swingInterval = 1 / swingsPerSec;
-
-        miner.swingTimer = (miner.swingTimer ?? swingInterval) + dt;
-        if (miner.swingTimer >= swingInterval) {
-          miner.swingTimer = miner.swingTimer % swingInterval;
-          miner.lastSwingAtMs = Date.now();
-          damageDealt += damage;
+        if (!miner.swungThisTick || miner.toolDamage <= 0) continue;
+        // Tool swapped mid-mine for one that is too weak for this block
+        if (!this.checkPickPower(miner, tile)) {
+          this.stopMining(miner);
+          continue;
         }
+        damageDealt += miner.toolDamage;
       }
 
       if (damageDealt > 0) {
-        tile.damage = (tile.damage || 0) + damageDealt;
-        tile.damageMs = tile.damage;
+        const tileType = tile.type;
+        // Cooperating miners hit together; the first miner is credited as the source
+        const event: DamageEvent = {
+          amount: damageDealt,
+          type: 'mining',
+          source: {
+            kind: 'player',
+            id: miners[0].characterId,
+            name: miners[0].characterName,
+            position: { x: miners[0].playerBody.position.x, y: miners[0].playerBody.position.y },
+          },
+        };
+        const result = this.world.damage.damageTile(target.x, target.y, event, miners);
 
-        for (const miner of miners) {
-          miner.miningProgressMs = tile.damage;
+        if (result.applied) {
+          if (!result.destroyed) {
+            for (const miner of miners) {
+              miner.miningProgressMs = result.tileDamage;
+            }
+          }
+          this.pendingBlockHits.push({
+            x: target.x,
+            y: target.y,
+            tileType,
+            damage: damageDealt,
+          });
         }
-
-        this.pendingBlockHits.push({
-          x: target.x,
-          y: target.y,
-          tileType: tile.type,
-          damage: damageDealt,
-        });
-      }
-
-      const newStage = getDamageStage(tile);
-      if (newStage !== prevStage) {
-        onStageChanged({
-          x: target.x,
-          y: target.y,
-          type: tile.type,
-          damageStage: newStage,
-        });
-      }
-
-      const maxHealth = MiningDataManager.getInstance().getBlockMaxHealth(tile.type);
-      if ((tile.damage ?? 0) >= maxHealth) {
-        onBlockCompleted(target, miners);
       }
     }
   }
 
+  /**
+   * The single path for a block being mined through (players, projectiles, mobs, explosions' leftovers).
+   * Removes the collider, tells clients, optionally drops loot, may start rocks falling, and stops
+   * everyone who was mining it (`miners` when known, otherwise whoever targets that tile).
+   */
   public completeMiningBlock(
     target: MiningPosition,
-    miners: MiningPlayerSession[] | undefined,
-    grid: ServerMiningGrid,
-    onExcavate: (target: MiningPosition, previousType: MiningTileType) => void,
-    allPlayers: Iterable<MiningPlayerSession>
+    miners?: MiningPlayerSession[],
+    options: { dropItems?: boolean } = {}
   ): void {
+    const { grid, rigidWorld } = this.world;
     const tile = grid[target.y][target.x];
     if (tile.type === MiningTileType.EMPTY) return;
     const previousType = tile.type;
+    const dropItems = options.dropItems ?? true;
+
+    const players = Array.from(this.world.players.values());
 
     grid[target.y][target.x] = { type: MiningTileType.EMPTY, revealed: true };
 
-    onExcavate(target, previousType);
+    rigidWorld.removeTileCollider(target.x, target.y);
+    this.world.pushTileUpdate({ x: target.x, y: target.y, type: MiningTileType.EMPTY, damageStage: 0 });
+    if (dropItems) {
+      this.world.drops.spawnBlockDrops(target.x, target.y, previousType);
+    }
+    this.world.rocks.checkAndTriggerFallingRocks(target.x, target.y);
 
     // Invalidate reveal positions
-    for (const p of allPlayers) {
+    for (const p of players) {
       p.lastRevealGridPos = null;
     }
 
     // Reset mining state
     const list =
       miners ||
-      Array.from(allPlayers).filter(
+      players.filter(
         (p) => p.isMining && p.miningTarget?.x === target.x && p.miningTarget?.y === target.y
       );
     for (const miner of list) {

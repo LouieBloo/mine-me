@@ -26,6 +26,7 @@ export default function BlockDetail() {
     description: '',
     health: 100,
     staminaCost: 1,
+    requiredPickPower: 0,
     idleParticleEffectId: '',
   });
 
@@ -50,6 +51,7 @@ export default function BlockDetail() {
           description: data.description || '',
           health: data.health ?? (data.mineTimeMs ? Math.round(data.mineTimeMs / 5) : 100),
           staminaCost: data.staminaCost ?? 1,
+          requiredPickPower: data.requiredPickPower ?? 0,
           idleParticleEffectId: data.idleParticleEffectId || '',
         });
         setLoading(false);
@@ -212,6 +214,22 @@ export default function BlockDetail() {
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-800"
                   />
                   <span className="text-[11px] text-slate-400 font-medium">Stamina spent per block mined</span>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="requiredPickPower" className="block text-xs font-black uppercase text-slate-600 tracking-wider">
+                    Required Pick Power
+                  </label>
+                  <input
+                    id="requiredPickPower"
+                    type="number"
+                    name="requiredPickPower"
+                    value={formData.requiredPickPower}
+                    onChange={handleChange}
+                    min={0}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-800"
+                  />
+                  <span className="text-[11px] text-slate-400 font-medium">Tools with less Pick Power can't damage this block (0 = any tool)</span>
                 </div>
               </div>
 

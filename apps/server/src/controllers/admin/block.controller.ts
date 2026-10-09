@@ -98,18 +98,18 @@ export const getBlock = async (req: Request, res: Response) => {
   }
 };
 
-import { MiningDataManager } from '../../services/mining/subsystems/MiningDataManager';
 
 export const updateBlock = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, health, mineTimeMs, staminaCost, idleParticleEffectId, dropTable } = req.body;
+    const { name, description, health, mineTimeMs, staminaCost, requiredPickPower, idleParticleEffectId, dropTable } = req.body;
 
     const dataToUpdate: any = {
       ...(name !== undefined && { name }),
       ...(description !== undefined && { description }),
       ...(health !== undefined ? { health: Number(health) } : (mineTimeMs !== undefined ? { health: Math.round(Number(mineTimeMs) / 5) } : {})),
       ...(staminaCost !== undefined && { staminaCost: Number(staminaCost) }),
+      ...(requiredPickPower !== undefined && { requiredPickPower: Math.max(0, Math.floor(Number(requiredPickPower)) || 0) }),
       ...(idleParticleEffectId !== undefined && { idleParticleEffectId: idleParticleEffectId || null }),
       ...(req.body.soundEffectUrl !== undefined && { soundEffectUrl: req.body.soundEffectUrl || null })
     };
@@ -135,7 +135,6 @@ export const updateBlock = async (req: Request, res: Response) => {
       }
     });
     syncJson('blocks.json', allBlocks);
-    MiningDataManager.getInstance().clearCache();
 
     res.json(block);
   } catch (err: any) {

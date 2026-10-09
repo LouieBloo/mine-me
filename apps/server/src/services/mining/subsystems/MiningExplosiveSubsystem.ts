@@ -6,32 +6,37 @@ import {
   type ItemPhysicsConfig,
   type ItemSoundEffectsConfig,
   type MiningExplosionEvent,
-  type MiningPosition,
-  type MiningRigidWorld,
+  type Vector2D,
 } from '@mine-me/shared';
-import { isInBounds, type ServerMiningGrid } from '../../miningMap.service';
+import { isInBounds } from '../../miningMap.service';
 import { MiningDynamiteEntity } from '../physics/MiningDynamiteEntity';
-import type { MiningDataManager } from './MiningDataManager';
 import type { MiningPlayerSession } from './MiningPlayerManager';
-import type { PendingTileUpdate } from './MiningBlockSubsystem';
+import type { MiningWorld } from '../MiningWorld';
+
+/** What a player throws, and how. Anything not given is taken from the item's definition. */
+export interface ThrowRequest {
+  /** World point the throw is aimed at. */
+  target: Vector2D;
+  /** How hard to throw, 0..1 (defaults to full strength). */
+  forceRatio?: number;
+  /** The thrown item; its physics, sounds and blast radius are looked up from this. */
+  itemId?: string;
+  physicsConfig?: ItemPhysicsConfig;
+  soundEffects?: ItemSoundEffectsConfig | null;
+  explosionRadius?: number;
+}
 
 export class MiningExplosiveSubsystem {
   public activeDynamites: MiningDynamiteEntity[] = [];
   public dynamiteCounter = 0;
   public pendingExplosions: MiningExplosionEvent[] = [];
 
-  public throwDynamite(
-    session: MiningPlayerSession | undefined,
-    target: MiningPosition,
-    physicsConfig: ItemPhysicsConfig | undefined,
-    forceRatio: number = 1.0,
-    explosionRadius: number | undefined,
-    itemId: string | undefined,
-    soundEffects: ItemSoundEffectsConfig | null | undefined,
-    dataManager: MiningDataManager,
-    rigidWorld: MiningRigidWorld
-  ): boolean {
+  constructor(private readonly world: MiningWorld) {}
+
+  public throwDynamite(session: MiningPlayerSession | undefined, request: ThrowRequest): boolean {
     if (!session) return false;
+    const { data, rigidWorld } = this.world;
+    const { target, forceRatio = 1.0, itemId, physicsConfig, soundEffects, explosionRadius } = request;
 
     this.dynamiteCounter++;
     const dynamiteId = `dynamite_${session.characterId}_${this.dynamiteCounter}_${Date.now()}`;
@@ -39,7 +44,7 @@ export class MiningExplosiveSubsystem {
     const startX = session.playerBody.position.x;
     const startY = session.playerBody.position.y;
 
-    const config = physicsConfig ?? dataManager.getDynamiteItemPhysicsConfig();
+    const config = physicsConfig ?? data.getDynamiteItemPhysicsConfig();
     const throwPower = config.throwPower ?? rigidWorld.config.dynamiteThrowPower ?? 20.5;
     const gravityScale = config.gravityScale ?? 1.0;
 
@@ -54,31 +59,30 @@ export class MiningExplosiveSubsystem {
       gravityScale,
       session.isFacingLeft
     );
-    const vx = initialVel.x;
-    const vy = initialVel.y;
+
+    // What is being thrown: the named item, or the default throwable when the throw doesn't say
+    const thrown = itemId ? data.getItemData(itemId) : data.getDefaultThrowable();
+    const fallbackThrowable = data.getDefaultThrowable();
 
     const resolvedExplosionRadius =
       explosionRadius !== undefined
         ? explosionRadius
-        : dataManager.getItemExplosionRadius(itemId ?? 'dynamite');
+        : thrown
+          ? data.getItemExplosionRadius(thrown.id)
+          : undefined;
 
     const resolvedSoundEffects =
       soundEffects !== undefined
         ? soundEffects
-        : (itemId ? dataManager.getItemSoundEffects(itemId) : undefined) ??
-          dataManager.getItemSoundEffects('dynamite') ??
-          DEFAULT_DYNAMITE_SOUNDS;
+        : thrown?.soundEffects ?? fallbackThrowable?.soundEffects ?? DEFAULT_DYNAMITE_SOUNDS;
 
-    const dynamiteItem = itemId ? dataManager.getItemData(itemId) : dataManager.getItemData('dynamite');
     const dynamiteScale =
-      typeof (dynamiteItem as any)?.inGameScale === 'number' && (dynamiteItem as any).inGameScale > 0
-        ? (dynamiteItem as any).inGameScale
-        : 1.0;
+      typeof thrown?.inGameScale === 'number' && thrown.inGameScale > 0 ? thrown.inGameScale : 1.0;
 
     const dynamite = new MiningDynamiteEntity(
       dynamiteId,
       { x: startX, y: startY },
-      { x: vx, y: vy },
+      { x: initialVel.x, y: initialVel.y },
       config.fuseSeconds ?? 4.0,
       rigidWorld,
       {
@@ -89,45 +93,34 @@ export class MiningExplosiveSubsystem {
         itemId,
         soundEffects: resolvedSoundEffects,
         inGameScale: dynamiteScale,
+        ownerId: session.characterId,
       }
     );
     this.activeDynamites.push(dynamite);
     return true;
   }
 
-  public updateActiveDynamites(
-    dt: number,
-    onExplode: (dynamite: MiningDynamiteEntity) => void
-  ): void {
+  /** Counts down fuses and detonates dynamite whose fuse ran out. */
+  public updateActiveDynamites(dt: number): void {
     if (this.activeDynamites.length === 0) return;
 
     for (const dynamite of this.activeDynamites) {
       dynamite.update(dt);
       if (dynamite.hasExploded) {
-        onExplode(dynamite);
+        this.explodeDynamite(dynamite);
       }
     }
 
     this.activeDynamites = this.activeDynamites.filter((d) => !d.hasExploded);
   }
 
-  public explodeDynamite(
-    dynamite: MiningDynamiteEntity,
-    grid: ServerMiningGrid,
-    rigidWorld: MiningRigidWorld,
-    players: Iterable<MiningPlayerSession>,
-    mobs: Iterable<{ id: string; mobBody: any }>,
-    onSpawnBlockDrops: (tx: number, ty: number, previousType: MiningTileType) => void,
-    onStopMining: (characterId: string) => void,
-    onDamageMob: (mobId: string, damage: number) => void,
-    onTriggerFallingRocks: (col: number, highestClearedY: number) => void,
-    onPendingTile: (update: PendingTileUpdate) => void
-  ): void {
+  public explodeDynamite(dynamite: MiningDynamiteEntity): void {
     const radius = dynamite.explosionRadius;
     if (!radius || radius <= 0) {
       return;
     }
 
+    const { grid, rigidWorld } = this.world;
     const cx = Math.round(dynamite.position.x);
     const cy = Math.round(dynamite.position.y);
     const radiusSq = radius * radius;
@@ -155,14 +148,9 @@ export class MiningExplosiveSubsystem {
               tile.revealed = true;
               tile.damageMs = 0;
               rigidWorld.removeTileCollider(tx, ty);
-              onPendingTile({
-                x: tx,
-                y: ty,
-                type: MiningTileType.EMPTY,
-                damageStage: 0,
-              });
+              this.world.pushTileUpdate({ x: tx, y: ty, type: MiningTileType.EMPTY, damageStage: 0 });
               affectedCols.add(tx);
-              onSpawnBlockDrops(tx, ty, previousType);
+              this.world.drops.spawnBlockDrops(tx, ty, previousType);
             }
           }
         }
@@ -170,22 +158,35 @@ export class MiningExplosiveSubsystem {
     }
 
     // 2. Interrupt any player currently mining a block inside the blast zone
-    for (const session of players) {
+    for (const session of this.world.players.values()) {
       if (session.isMining && session.miningTarget) {
         const dtx = session.miningTarget.x - cx;
         const dty = session.miningTarget.y - cy;
         if (dtx * dtx + dty * dty <= radiusSq) {
-          onStopMining(session.characterId);
+          this.world.blocks.stopMining(session);
         }
       }
     }
 
     // 2.5. Damage active mobs caught within blast radius
-    for (const mob of mobs) {
+    for (const mob of this.world.mobs.activeMobs.values()) {
       const mdx = mob.mobBody.position.x - cx;
       const mdy = mob.mobBody.position.y - cy;
       if (mdx * mdx + mdy * mdy <= radiusSq) {
-        onDamageMob(mob.id, 50);
+        this.world.damage.applyDamage(
+          { kind: 'mob', id: mob.id },
+          {
+            amount: MINING_CONFIG.EXPLOSION_MOB_DAMAGE,
+            type: 'explosive',
+            source: {
+              kind: 'explosion',
+              id: dynamite.id,
+              ownerId: dynamite.ownerId,
+              itemId: dynamite.itemId,
+              position: { x: dynamite.position.x, y: dynamite.position.y },
+            },
+          }
+        );
       }
     }
 
@@ -197,11 +198,11 @@ export class MiningExplosiveSubsystem {
           highestClearedY = Math.min(highestClearedY, y);
         }
       }
-      onTriggerFallingRocks(col, highestClearedY);
+      this.world.rocks.checkAndTriggerFallingRocks(col, highestClearedY);
     }
 
     // 4. Invalidate line of sight caches
-    for (const session of players) {
+    for (const session of this.world.players.values()) {
       session.lastRevealGridPos = null;
     }
   }

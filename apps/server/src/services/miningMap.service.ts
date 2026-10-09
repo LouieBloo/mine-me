@@ -497,7 +497,7 @@ interface MiningPosition {
  * Check if a position is within grid bounds.
  */
 export function isInBounds(x: number, y: number): boolean {
-  return x >= 0 && x < MINING_CONFIG.GRID_WIDTH && y >= 0 && y < MINING_CONFIG.GRID_HEIGHT;
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && x < MINING_CONFIG.GRID_WIDTH && y >= 0 && y < MINING_CONFIG.GRID_HEIGHT;
 }
 
 /**

@@ -11,6 +11,9 @@ import { ParticleEngine } from '../../../../../components/game/particles/Particl
 import {
   MiningTileType,
   MINING_CONFIG,
+  isTorchItem,
+  isLadderItem,
+  isThrowableItem,
   DEFAULT_PARTICLE_EFFECTS,
   type ParticleEffectConfig,
   getAssetUrl,
@@ -397,7 +400,7 @@ export function useMiningScene({
 
       // Always load Torch and Ladder tile textures dynamically from item definitions
       const torchItem = dynamicItems.find(
-        (i) => i.itemKey === 'torch' || i.subType?.toUpperCase() === 'TORCH' || i.name?.toLowerCase().includes('torch')
+        (i) => isTorchItem(i)
       );
       const torchTileUrl = getAssetUrl(torchItem?.iconUrl || torchItem?.inGameSpriteUrl || '/assets/icons/items/cmt4m445e0000xx0vdu7ve6q0_icon.png');
       const torchPromise = Assets.load(torchTileUrl)
@@ -411,7 +414,7 @@ export function useMiningScene({
       blockPromises.push(torchPromise);
 
       const ladderItem = dynamicItems.find(
-        (i) => i.itemKey === 'ladder' || i.subType?.toUpperCase() === 'LADDER' || i.name?.toLowerCase().includes('ladder')
+        (i) => isLadderItem(i)
       );
       const ladderAlwaysTileUrl = getAssetUrl(ladderItem?.iconUrl || ladderItem?.inGameSpriteUrl || '/assets/mining/block_entrance-block.png');
       const ladderAlwaysPromise = Assets.load(ladderAlwaysTileUrl)
@@ -430,7 +433,7 @@ export function useMiningScene({
 
       // Load dynamite icon texture dynamically for thrown dynamite rendering
       const dynamiteItem = dynamicItems.find(
-        (i) => i.itemKey === 'dynamite' || i.subType?.toUpperCase() === 'DYNAMITE' || i.name?.toLowerCase().includes('dynamite')
+        (i) => isThrowableItem(i)
       );
       const dynamiteIconUrl = getAssetUrl(dynamiteItem?.iconUrl || dynamiteItem?.inGameSpriteUrl || '/assets/icons/items/cmtz702uk0001nu7bn2tidnx0_icon.png');
       Assets.load(dynamiteIconUrl)

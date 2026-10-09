@@ -1,5 +1,6 @@
 import type { GameItem } from '../types';
 import { MINING_CONFIG } from '../types/mining';
+import { getItemToolDamageEffect } from './combatStats';
 
 /**
  * Baseline mining swing speed (swings per second)
@@ -29,7 +30,9 @@ export function getItemMiningSpeedEffect(item?: GameItem | null): number {
 }
 
 /**
- * Extracts the total damage modifier value from an item's attached effects.
+ * Extracts the total weapon damage (Damage effect) from an item's attached effects.
+ * This is what a weapon deals to mobs, by melee or by projectile. Damage to blocks is the
+ * separate Tool Damage effect (see `getItemToolDamageEffect`).
  */
 export function getItemDamageEffect(item?: GameItem | null): number {
   if (!item || !item.itemEffects || !Array.isArray(item.itemEffects)) return 0;
@@ -43,7 +46,7 @@ export function getItemDamageEffect(item?: GameItem | null): number {
 }
 
 /**
- * Calculates effective mining damage dealt per hit, checking weapon and character mods.
+ * Calculates effective damage to blocks per swing (tool damage), checking the tool and character mods.
  */
 export function calculateEffectiveMiningDamage(
   weapon?: GameItem | null,
@@ -52,9 +55,9 @@ export function calculateEffectiveMiningDamage(
   if (typeof characterMiningDamage === 'number' && characterMiningDamage > 0) {
     return characterMiningDamage;
   }
-  const weaponDamage = getItemDamageEffect(weapon);
-  if (weaponDamage > 0) {
-    return weaponDamage;
+  const toolDamage = getItemToolDamageEffect(weapon);
+  if (toolDamage > 0) {
+    return toolDamage;
   }
   return DEFAULT_MINING_DAMAGE;
 }

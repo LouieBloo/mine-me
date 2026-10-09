@@ -2,16 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { type MiningSessionClientState, type PlayerState, MINING_CONFIG } from '@mine-me/shared';
 import { ZoomControl } from '../ZoomControl/ZoomControl';
 import { TemporaryBackpack } from '../TemporaryBackpack/TemporaryBackpack';
-import { MiningWeaponAmmoHUD } from '../MiningWeaponAmmoHUD/MiningWeaponAmmoHUD';
 import './MiningHUD.css';
-
-export interface WeaponAmmoHUDState {
-  current: number;
-  max: number;
-  isReloading: boolean;
-  weaponName?: string;
-  weaponIconUrl?: string | null;
-}
 
 interface MiningHUDProps {
   sessionState: MiningSessionClientState;
@@ -24,8 +15,6 @@ interface MiningHUDProps {
   onZoomChange?: (zoom: number) => void;
   showDebug?: boolean;
   onToggleDebug?: () => void;
-  weaponAmmo?: WeaponAmmoHUDState | null;
-  onReload?: () => void;
 }
 
 export const MiningHUD: React.FC<MiningHUDProps> = ({
@@ -39,8 +28,6 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
   onZoomChange,
   showDebug = false,
   onToggleDebug,
-  weaponAmmo,
-  onReload,
 }) => {
   const [miningProgress, setMiningProgress] = useState(0);
 
@@ -201,18 +188,6 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
 
       {/* Bottom HUD Row */}
       <div className="flex flex-col items-center gap-4 w-full">
-        {/* Weapon Ammo Cylinder HUD */}
-        {weaponAmmo && (
-          <MiningWeaponAmmoHUD
-            weaponName={weaponAmmo.weaponName}
-            weaponIconUrl={weaponAmmo.weaponIconUrl}
-            currentAmmo={weaponAmmo.current}
-            maxAmmo={weaponAmmo.max}
-            isReloading={weaponAmmo.isReloading}
-            onReload={onReload}
-          />
-        )}
-
         {/* Mining Progress Bar */}
         {sessionState.isMining && (
           <div className="w-96 bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 shadow-2xl backdrop-blur-md flex flex-col gap-1.5 items-center">
@@ -245,17 +220,8 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
             <span className="text-slate-700">|</span>
             <span className="flex items-center gap-1.5">
               <span className="text-amber-400">Left Click</span>
-              <span>{weaponAmmo ? 'Shoot' : 'Mine'}</span>
+              <span>Mine</span>
             </span>
-            {weaponAmmo && (
-              <>
-                <span className="text-slate-700">|</span>
-                <span className="flex items-center gap-1.5">
-                  <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">R</kbd>
-                  <span className="text-amber-400">Reload</span>
-                </span>
-              </>
-            )}
             <span className="text-slate-700">|</span>
             <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">Space</kbd>

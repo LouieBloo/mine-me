@@ -55,7 +55,9 @@ export const mobValidation = [
   body('level').isInt({ min: 1 }).withMessage('Level must be >= 1'),
   body('health').isInt({ min: 1 }).withMessage('Health must be >= 1'),
   body('attack').isInt({ min: 0 }).withMessage('Attack must be >= 0'),
-  body('defense').isInt({ min: 0 }).withMessage('Defense must be >= 0')
+  body('defense').isInt({ min: 0 }).withMessage('Defense must be >= 0'),
+  body('hitStunMs').optional().isInt({ min: 0, max: 5000 }).withMessage('Hit Stun must be between 0 and 5000 ms'),
+  body('stunImmunityMs').optional().isInt({ min: 0, max: 10000 }).withMessage('Stun Immunity must be between 0 and 10000 ms')
 ];
 
 export const mobUpdateValidation = [
@@ -63,7 +65,9 @@ export const mobUpdateValidation = [
   body('level').optional().isInt({ min: 1 }).withMessage('Level must be >= 1'),
   body('health').optional().isInt({ min: 1 }).withMessage('Health must be >= 1'),
   body('attack').optional().isInt({ min: 0 }).withMessage('Attack must be >= 0'),
-  body('defense').optional().isInt({ min: 0 }).withMessage('Defense must be >= 0')
+  body('defense').optional().isInt({ min: 0 }).withMessage('Defense must be >= 0'),
+  body('hitStunMs').optional().isInt({ min: 0, max: 5000 }).withMessage('Hit Stun must be between 0 and 5000 ms'),
+  body('stunImmunityMs').optional().isInt({ min: 0, max: 10000 }).withMessage('Stun Immunity must be between 0 and 10000 ms')
 ];
 
 export const userValidation = [
@@ -89,6 +93,9 @@ export const effectValidation = [
   body('staminaGain').optional().isBoolean().withMessage('staminaGain must be a boolean'),
   body('miningSpeedModifier').optional().isBoolean().withMessage('miningSpeedModifier must be a boolean'),
   body('damageModifier').optional().isBoolean().withMessage('damageModifier must be a boolean'),
+  body('toolDamageModifier').optional().isBoolean().withMessage('toolDamageModifier must be a boolean'),
+  body('pickPowerModifier').optional().isBoolean().withMessage('pickPowerModifier must be a boolean'),
+  body('knockbackModifier').optional().isBoolean().withMessage('knockbackModifier must be a boolean'),
   body('explodes').optional().isBoolean().withMessage('explodes must be a boolean')
 ];
 
@@ -125,12 +132,14 @@ export const miningConfigValidation = [
   body('mobSpawnCount').optional().isInt({ min: 0, max: 20 }).withMessage('Mob Spawn Count must be between 0 and 20'),
   body('mobSpawnMinDepth').optional().isInt({ min: 1, max: 40 }).withMessage('Mob Spawn Min Depth must be between 1 and 40'),
   body('allowedMobIds').optional().isArray().withMessage('Allowed Mob IDs must be an array of strings'),
+  body('surfaceDummyMobId').optional({ nullable: true }).isString().withMessage('Surface Dummy Mob ID must be a string or null'),
 ];
 
 export const blockUpdateValidation = [
   body('name').optional().trim().notEmpty().withMessage('Block Name cannot be empty'),
   body('health').optional().isInt({ min: 0 }).withMessage('Block Health must be >= 0'),
   body('staminaCost').optional().isInt({ min: 0 }).withMessage('Stamina Cost must be >= 0'),
+  body('requiredPickPower').optional().isInt({ min: 0 }).withMessage('Required Pick Power must be >= 0'),
   body('idleParticleEffectId').optional({ nullable: true }).isString().withMessage('idleParticleEffectId must be a string or null'),
 ];
 

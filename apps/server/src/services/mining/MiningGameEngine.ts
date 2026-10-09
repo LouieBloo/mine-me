@@ -2,38 +2,43 @@ import { Socket } from 'socket.io';
 import {
   MINING_CONFIG,
   MiningTileType,
-  isTileMineable,
-  getTileMineTime,
   type MiningBackpackItem,
   type MiningDroppedItem,
   type MiningFallingRock,
-  type MiningActiveDynamite,
   type MiningGearLayer,
   type MiningInputState,
   type MiningPosition,
-  type MiningRemotePlayer,
   type MiningStateTickPayload,
-  type MiningExplosionEvent,
-  type MiningActiveProjectile,
-  type MiningGunshotEvent,
   type Vector2D,
   MiningRigidWorld,
-  type ItemPhysicsConfig,
-  type ItemSoundEffectsConfig,
   type MiningActiveMob,
+  type MiningBlockHitEvent,
+  type MiningCombatStats,
+  type MiningSessionEndedEvent,
+  type DamageEvent,
+  type DamageResult,
+  type DamageTarget,
+  type TileDamageResult,
 } from '@mine-me/shared';
 import * as planck from 'planck';
 import {
   generateMiningMap,
   getDamageStage,
   isInBounds,
-  revealTiles,
   type ServerMiningGrid,
 } from '../miningMap.service';
-import { MiningPlayerBody } from './physics/MiningPlayerBody';
 import { MiningRockEntity } from './physics/MiningRockEntity';
 import { MiningDynamiteEntity } from './physics/MiningDynamiteEntity';
 import { MiningProjectileEntity } from './physics/MiningProjectileEntity';
+import { MiningDamageSystem } from './MiningDamageSystem';
+import type { MiningWorld } from './MiningWorld';
+import {
+  collectSpawned,
+  dynamiteDynamic,
+  mobDynamic,
+  playerDynamic,
+  projectileDynamic,
+} from './MiningEntitySync';
 
 // Subsystems
 import { MiningDataManager } from './subsystems/MiningDataManager';
@@ -44,19 +49,13 @@ import {
 import { MiningBlockSubsystem } from './subsystems/MiningBlockSubsystem';
 import { MiningDropSubsystem } from './subsystems/MiningDropSubsystem';
 import { MiningRockSubsystem } from './subsystems/MiningRockSubsystem';
-import { MiningExplosiveSubsystem } from './subsystems/MiningExplosiveSubsystem';
-import {
-  MiningProjectileSubsystem,
-  type PlayerAmmoState,
-} from './subsystems/MiningProjectileSubsystem';
-import {
-  MiningMobSubsystem,
-  type MiningActiveMobSession,
-} from './subsystems/MiningMobSubsystem';
+import { MiningExplosiveSubsystem, type ThrowRequest } from './subsystems/MiningExplosiveSubsystem';
+import { MiningProjectileSubsystem, type ShootResult } from './subsystems/MiningProjectileSubsystem';
+import { MiningMobSubsystem, type MiningActiveMobSession } from './subsystems/MiningMobSubsystem';
 
-export type { MiningPlayerSession, MiningActiveMobSession, PlayerAmmoState };
+export type { MiningPlayerSession, MiningActiveMobSession };
 
-export interface MiningEngineOptions {
+export interface MiningEngineOptions extends Partial<MiningCombatStats> {
   roomId?: string;
   gameMode?: 'singleplayer' | 'multiplayer';
   characterId?: string;
@@ -65,11 +64,19 @@ export interface MiningEngineOptions {
   seed?: number;
   socket?: Socket;
   miningSpeed?: number | (() => number);
-  miningDamage?: number | (() => number);
   gearLayers?: MiningGearLayer[];
+  equippedWeaponId?: string | null;
+  /** Maximum health of the initial player (a run starts at full health). */
+  maxHealth?: number;
   maxDurationSeconds?: number;
-  onTimeout?: (roomIdOrCharId: string) => void;
+  onTimeout?: (roomId: string) => void;
   onRoomEmpty?: (roomId: string) => void;
+  /** A player's health changed (damage taken). Used to keep the app's health bar in sync. */
+  onPlayerHealthChanged?: (characterId: string, health: number, maxHealth: number) => void;
+  /** A player died. Called after the tick finishes, so it is safe to remove them from the room. */
+  onPlayerDeath?: (characterId: string) => void;
+  /** Called when the room is shut down after too many consecutive failing ticks. */
+  onFatalError?: (roomId: string) => void;
   mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>;
 }
 
@@ -89,10 +96,23 @@ export class MiningGameEngine {
 
   public maxDurationSeconds = MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
   public elapsedTimeSeconds = 0;
-  private onTimeout?: (roomIdOrCharId: string) => void;
+  private onTimeout?: (roomId: string) => void;
   private onRoomEmpty?: (roomId: string) => void;
+  private onFatalError?: (roomId: string) => void;
+  private onPlayerHealthChanged?: MiningEngineOptions['onPlayerHealthChanged'];
+  private onPlayerDeath?: MiningEngineOptions['onPlayerDeath'];
+  private pendingDeaths: string[] = [];
+
+  /** Consecutive ticks in which at least one step threw; the room is ended at this limit. */
+  public static readonly MAX_CONSECUTIVE_FAILED_TICKS = 10;
+  private consecutiveFailedTicks = 0;
+  private tickHadError = false;
 
   private tickCount = 0;
+  private accumulatorSeconds = 0;
+  private lastLoopAtMs = 0;
+  /** Total ticks skipped because the loop fell too far behind (for diagnostics). */
+  public droppedTicks = 0;
   private intervalId: NodeJS.Timeout | null = null;
   private isStopped = false;
   private pendingRevealedTiles: { x: number; y: number; type: MiningTileType; damageStage?: number }[] = [];
@@ -106,6 +126,8 @@ export class MiningGameEngine {
   public readonly explosiveSubsystem: MiningExplosiveSubsystem;
   public readonly projectileSubsystem: MiningProjectileSubsystem;
   public readonly mobSubsystem: MiningMobSubsystem;
+  /** The single place hits are applied (see MiningDamageSystem). */
+  public readonly damageSystem: MiningDamageSystem;
 
   constructor(options: MiningEngineOptions) {
     this.roomId =
@@ -117,6 +139,9 @@ export class MiningGameEngine {
     this.maxDurationSeconds = options.maxDurationSeconds ?? MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
     this.onTimeout = options.onTimeout;
     this.onRoomEmpty = options.onRoomEmpty;
+    this.onFatalError = options.onFatalError;
+    this.onPlayerHealthChanged = options.onPlayerHealthChanged;
+    this.onPlayerDeath = options.onPlayerDeath;
     this.mapConfig = options.mapConfig;
 
     // Generate authoritative grid
@@ -136,15 +161,20 @@ export class MiningGameEngine {
     });
     this.rigidWorld.setGrid(this.grid);
 
-    // Initialize subsystems
+    // Initialize subsystems. Each one is given the same world (its view of this room) and reaches
+    // its collaborators through it, so none of them needs the engine or each other's constructors.
     this.dataManager = MiningDataManager.getInstance();
-    this.playerManager = new MiningPlayerManager(options.characterId || '');
-    this.blockSubsystem = new MiningBlockSubsystem();
-    this.dropSubsystem = new MiningDropSubsystem();
-    this.rockSubsystem = new MiningRockSubsystem();
-    this.explosiveSubsystem = new MiningExplosiveSubsystem();
-    this.projectileSubsystem = new MiningProjectileSubsystem();
-    this.mobSubsystem = new MiningMobSubsystem();
+    const world = this.buildWorld();
+    this.playerManager = new MiningPlayerManager(world);
+    this.blockSubsystem = new MiningBlockSubsystem(world);
+    this.dropSubsystem = new MiningDropSubsystem(world);
+    this.rockSubsystem = new MiningRockSubsystem(world);
+    this.explosiveSubsystem = new MiningExplosiveSubsystem(world);
+    this.projectileSubsystem = new MiningProjectileSubsystem(world);
+    this.mobSubsystem = new MiningMobSubsystem(world);
+    this.damageSystem = new MiningDamageSystem(world);
+    this.blockSubsystem.onToolTooWeak = (session, blockName) =>
+      this.playerManager.sendNotice(session, 'tool_too_weak', `Your tool isn't strong enough to break ${blockName}.`);
 
     // Automatically spawn cavern mobs if configured
     this.populateCavernMobs();
@@ -157,8 +187,13 @@ export class MiningGameEngine {
         characterName: options.characterName,
         socket: options.socket,
         miningSpeed: options.miningSpeed,
-        miningDamage: options.miningDamage,
+        toolDamage: options.toolDamage,
+        weaponDamage: options.weaponDamage,
+        pickPower: options.pickPower,
+        knockback: options.knockback,
         gearLayers: options.gearLayers,
+        equippedWeaponId: options.equippedWeaponId,
+        maxHealth: options.maxHealth,
       });
     }
   }
@@ -188,19 +223,8 @@ export class MiningGameEngine {
     this.projectileSubsystem.activeProjectiles = val;
   }
 
-  public get playerWeaponAmmo(): Map<string, PlayerAmmoState> {
-    return this.projectileSubsystem.playerWeaponAmmo;
-  }
-
   public get players(): Map<string, MiningPlayerSession> {
     return this.playerManager.players;
-  }
-
-  public get primaryCharacterId(): string {
-    return this.playerManager.primaryCharacterId;
-  }
-  public set primaryCharacterId(val: string) {
-    this.playerManager.primaryCharacterId = val;
   }
 
   public get activeMobs(): Map<string, MiningActiveMobSession> {
@@ -218,114 +242,8 @@ export class MiningGameEngine {
     return this.dropSubsystem.activeItemBodies;
   }
 
-  public get primarySession(): MiningPlayerSession | undefined {
-    return this.playerManager.primarySession;
-  }
-
-  public get characterId(): string {
-    return this.playerManager.primaryCharacterId;
-  }
-
   public get playerCount(): number {
     return this.playerManager.playerCount;
-  }
-
-  public get playerBody(): MiningPlayerBody {
-    const s = this.primarySession;
-    if (!s) throw new Error('No active primary player session');
-    return s.playerBody;
-  }
-
-  public get position(): Vector2D {
-    return this.primarySession?.playerBody.position ?? { x: MINING_CONFIG.ENTRANCE_X, y: MINING_CONFIG.ENTRANCE_Y };
-  }
-  public set position(pos: Vector2D) {
-    if (this.primarySession) this.primarySession.playerBody.position = { ...pos };
-  }
-
-  public get velocity(): Vector2D {
-    return this.primarySession?.playerBody.velocity ?? { x: 0, y: 0 };
-  }
-  public set velocity(vel: Vector2D) {
-    if (this.primarySession) this.primarySession.playerBody.velocity = { ...vel };
-  }
-
-  public get facing(): Vector2D {
-    return this.primarySession?.aimDirection ?? { x: 1, y: 0 };
-  }
-  public set facing(f: Vector2D) {
-    if (this.primarySession) this.primarySession.aimDirection = { ...f };
-  }
-
-  public get inputs(): MiningInputState {
-    return (
-      this.primarySession?.inputs ?? {
-        up: false,
-        down: false,
-        left: false,
-        right: false,
-        jump: false,
-        miningKey: false,
-        sequence: 0,
-      }
-    );
-  }
-  public set inputs(inp: MiningInputState) {
-    if (this.primarySession) this.primarySession.inputs = { ...inp };
-  }
-
-  public get temporaryBackpack(): MiningBackpackItem[] {
-    return this.primarySession?.temporaryBackpack ?? [];
-  }
-
-  public get visionRange(): number {
-    return this.primarySession?.visionRange ?? MINING_CONFIG.DEFAULT_VISION_RANGE;
-  }
-  public set visionRange(val: number) {
-    if (this.primarySession) this.primarySession.visionRange = val;
-  }
-
-  public get isMining(): boolean {
-    return this.primarySession?.isMining ?? false;
-  }
-  public set isMining(val: boolean) {
-    if (this.primarySession) this.primarySession.isMining = val;
-  }
-
-  public get miningTarget(): MiningPosition | null {
-    return this.primarySession?.miningTarget ?? null;
-  }
-  public set miningTarget(t: MiningPosition | null) {
-    if (this.primarySession) this.primarySession.miningTarget = t;
-  }
-
-  public get miningProgressMs(): number {
-    return this.primarySession?.miningProgressMs ?? 0;
-  }
-  public set miningProgressMs(val: number) {
-    if (this.primarySession) this.primarySession.miningProgressMs = val;
-  }
-
-  public get miningTimeMs(): number {
-    return this.primarySession?.miningTimeMs ?? 0;
-  }
-  public set miningTimeMs(val: number) {
-    if (this.primarySession) this.primarySession.miningTimeMs = val;
-  }
-
-  public get miningSpeed(): number {
-    if (!this.primarySession) return 1.0;
-    return typeof this.primarySession.miningSpeed === 'function'
-      ? this.primarySession.miningSpeed()
-      : this.primarySession.miningSpeed;
-  }
-
-  public get isFacingLeft(): boolean {
-    return this.primarySession?.isFacingLeft ?? false;
-  }
-
-  public get animationState(): 'idle' | 'walk' | 'mine' | 'jump' | 'climb' {
-    return this.primarySession?.animationState ?? 'idle';
   }
 
   // ============================================================================
@@ -337,9 +255,10 @@ export class MiningGameEngine {
     characterName?: string;
     socket: Socket;
     miningSpeed?: number | (() => number);
-    miningDamage?: number | (() => number);
     gearLayers?: MiningGearLayer[];
-  }): MiningPlayerSession {
+    equippedWeaponId?: string | null;
+    maxHealth?: number;
+  } & Partial<MiningCombatStats>): MiningPlayerSession {
     const session = this.playerManager.addPlayer(options);
     this.revealAndTrackTiles(session.playerBody.position, session.visionRange);
     return session;
@@ -347,6 +266,7 @@ export class MiningGameEngine {
 
   public removePlayer(characterId: string): { extractedItems: MiningBackpackItem[] } | null {
     const res = this.playerManager.removePlayer(characterId);
+    this.projectileSubsystem.magazines.removeCharacter(characterId);
     if (this.playerManager.playerCount === 0 && this.onRoomEmpty) {
       this.onRoomEmpty(this.roomId);
     }
@@ -357,35 +277,90 @@ export class MiningGameEngine {
     return this.playerManager.getPlayer(characterId);
   }
 
-  public increaseVisionRange(characterId?: string, amount: number = 1): number {
+  public increaseVisionRange(characterId: string, amount: number = 1): number {
     return this.playerManager.increaseVisionRange(characterId, amount);
   }
 
-  public setMiningSpeed(speed: number | (() => number), characterId?: string): void {
-    this.playerManager.setMiningSpeed(speed, characterId);
+  public setMiningSpeed(characterId: string, speed: number | (() => number)): void {
+    this.playerManager.setMiningSpeed(characterId, speed);
   }
 
-  public setSocket(socket: Socket, characterId?: string): void {
-    this.playerManager.setSocket(socket, characterId);
-  }
-
-  public handleInput(
-    characterIdOrInput: string | MiningInputState,
-    maybeInput?: MiningInputState
+  public setLoadout(
+    characterId: string,
+    loadout: {
+      miningSpeed: number;
+      gearLayers: MiningGearLayer[];
+      equippedWeaponId: string | null;
+    } & MiningCombatStats
   ): void {
-    this.playerManager.handleInput(characterIdOrInput, maybeInput);
+    const previousWeaponId = this.players.get(characterId)?.equippedWeaponId ?? null;
+    this.playerManager.setLoadout(characterId, loadout);
+    // Swapping away from a gun cancels its reload (rounds in the gun are kept)
+    if (previousWeaponId && previousWeaponId !== loadout.equippedWeaponId) {
+      this.projectileSubsystem.magazines.cancelReload(characterId, previousWeaponId);
+    }
+  }
+
+  public setSocket(characterId: string, socket: Socket): void {
+    this.playerManager.setSocket(characterId, socket);
+  }
+
+  public handleInput(characterId: string, input: MiningInputState): void {
+    this.playerManager.handleInput(characterId, input);
   }
 
   // ============================================================================
   // Simulation Loop Lifecycle
   // ============================================================================
 
+  /** Length of one simulation step in seconds. */
+  public static readonly TICK_SECONDS = 1 / MINING_CONFIG.SERVER_TICK_RATE;
+
+  /** How often the loop checks the clock; finer than a tick so steps start close to on time. */
+  private static readonly LOOP_POLL_MS = 1000 / 60;
+
   public start(): void {
     if (this.intervalId) return;
     this.isStopped = false;
+    this.accumulatorSeconds = 0;
+    this.lastLoopAtMs = performance.now();
     this.intervalId = setInterval(() => {
-      this.tick(1 / 30);
-    }, 1000 / 30);
+      const nowMs = performance.now();
+      const elapsedSeconds = (nowMs - this.lastLoopAtMs) / 1000;
+      this.lastLoopAtMs = nowMs;
+      this.advance(elapsedSeconds);
+    }, MiningGameEngine.LOOP_POLL_MS);
+  }
+
+  /**
+   * Advances the simulation by `elapsedSeconds` of real time using fixed steps, so game speed
+   * doesn't depend on timer jitter or event-loop lag: a late wake-up runs the missed steps.
+   * At most MAX_CATCHUP_TICKS run per call; anything beyond that is dropped (the game hitches
+   * instead of freezing the server in a catch-up spiral). Returns how many steps ran.
+   */
+  public advance(elapsedSeconds: number): number {
+    if (this.isStopped || !Number.isFinite(elapsedSeconds) || elapsedSeconds <= 0) return 0;
+
+    const step = MiningGameEngine.TICK_SECONDS;
+    this.accumulatorSeconds += elapsedSeconds;
+
+    let ticks = 0;
+    while (this.accumulatorSeconds >= step - 1e-9 && ticks < MINING_CONFIG.MAX_CATCHUP_TICKS) {
+      this.tick(step);
+      this.accumulatorSeconds -= step;
+      ticks++;
+      if (this.isStopped) return ticks;
+    }
+
+    if (this.accumulatorSeconds >= step - 1e-9) {
+      // Fell too far behind: drop the backlog (keep the partial step) rather than spiral
+      const droppedSteps = Math.floor((this.accumulatorSeconds + 1e-9) / step);
+      this.accumulatorSeconds -= droppedSteps * step;
+      this.droppedTicks += droppedSteps;
+      console.warn(`[Mining] Room ${this.roomId} fell behind; dropped ${droppedSteps} ticks (${this.droppedTicks} total)`);
+    }
+    this.accumulatorSeconds = Math.max(0, this.accumulatorSeconds);
+    return ticks;
   }
 
   public stop(): void {
@@ -416,274 +391,159 @@ export class MiningGameEngine {
       return;
     }
 
+    this.tickHadError = false;
+    this.runTickSteps(dt);
+    this.processDeaths();
+
+    if (this.tickHadError) {
+      this.consecutiveFailedTicks++;
+      if (this.consecutiveFailedTicks >= MiningGameEngine.MAX_CONSECUTIVE_FAILED_TICKS) {
+        this.handleFatalError();
+      }
+    } else {
+      this.consecutiveFailedTicks = 0;
+    }
+  }
+
+  /**
+   * Runs one simulation step in isolation so a failure in one subsystem is logged
+   * but cannot take down the process or the other subsystems.
+   */
+  private runStep(name: string, step: () => void): void {
+    try {
+      step();
+    } catch (err) {
+      this.tickHadError = true;
+      console.error(`[Mining] Room ${this.roomId} tick ${this.tickCount} step "${name}" failed:`, err);
+    }
+  }
+
+  private runTickSteps(dt: number): void {
     // 1. Process physics, animations, FoW, and item pickups for all players
-    this.playerManager.updatePlayerPhysicsAndFoW(
-      dt,
-      this.grid,
-      (pos, vision) => this.revealAndTrackTiles(pos, vision),
-      (session) => this.dropSubsystem.checkItemPickupsForPlayer(session, this.rigidWorld)
-    );
+    this.runStep('players', () => this.playerManager.updatePlayerPhysicsAndFoW(dt));
 
     // 2. Step Planck rigid world
-    this.rigidWorld.step(dt);
+    this.runStep('rigidWorld', () => this.rigidWorld.step(dt));
 
     // 3. Update dropped items physics
-    this.dropSubsystem.updateDroppedItemsPhysics();
+    this.runStep('drops', () => this.dropSubsystem.updateDroppedItemsPhysics());
 
     // 4. Falling rocks simulation
-    this.rockSubsystem.updateFallingRocks(
-      dt,
-      this.grid,
-      this.rigidWorld,
-      this.playerManager.players.values(),
-      (update) => this.pendingRevealedTiles.push(update)
-    );
+    this.runStep('rocks', () => this.rockSubsystem.updateFallingRocks(dt));
 
     // 5. Dynamite continuous physics & fuse countdown simulation
-    this.explosiveSubsystem.updateActiveDynamites(dt, (dynamite) => {
-      this.explodeDynamite(dynamite);
-    });
+    this.runStep('explosives', () => this.explosiveSubsystem.updateActiveDynamites(dt));
 
     // 6. Projectiles continuous physics, collision detection & ammo reloading
-    this.projectileSubsystem.updateActiveProjectiles(
-      dt,
-      this.grid,
-      this.activeMobs.values(),
-      (mobId, damage) => this.damageMob(mobId, damage),
-      (x, y, damage, charId) => {
-        const tile = this.grid[y][x];
-        if (tile && isTileMineable(tile.type)) {
-          tile.damage = (tile.damage || 0) + damage;
-          tile.damageMs = tile.damage;
-          const newStage = getDamageStage(tile);
-          const maxHealth = this.dataManager.getBlockMaxHealth(tile.type);
-          if (tile.damage >= maxHealth) {
-            const miner = this.players.get(charId);
-            this.completeMiningBlock({ x, y }, miner ? [miner] : []);
-          } else {
-            this.pendingRevealedTiles.push({
-              x,
-              y,
-              type: tile.type,
-              damageStage: newStage,
-            });
-          }
-        }
-      }
-    );
+    this.runStep('projectiles', () => this.projectileSubsystem.updateActiveProjectiles(dt));
+
+    // 6.5 Advance each player's swing timer (one swing drives both block damage and melee)
+    this.runStep('swings', () => this.playerManager.advanceSwings(dt));
 
     // 7. Validate & trigger mining actions for each player & cooperative progress
-    this.blockSubsystem.updateMiningProgress(
-      dt,
-      this.playerManager.players.values(),
-      this.grid,
-      (stageUpdate) => this.pendingRevealedTiles.push(stageUpdate),
-      (target, miners) => this.completeMiningBlock(target, miners)
-    );
+    this.runStep('mining', () => this.blockSubsystem.updateMiningProgress(dt));
 
     // 8. Player Melee Attack against Mobs (Terraria-style localized cursor hit scan with obstacle shielding)
-    this.playerManager.handleMeleeAttacks(
-      this.activeMobs.values(),
-      this.grid,
-      (mobId, damage, kbX, kbY) => {
-        this.damageMob(mobId, damage);
-        const mob = this.activeMobs.get(mobId);
-        if (mob && mob.mobBody.moveSpeed > 0) {
-          mob.mobBody.velocity.x = kbX;
-          mob.mobBody.velocity.y = kbY;
-          mob.mobBody.isGrounded = false;
-        }
-      }
-    );
+    this.runStep('melee', () => this.playerManager.handleMeleeAttacks());
 
     // 9. Update Active Mobs (AI, Physics, Mining, Combat)
-    this.mobSubsystem.updateActiveMobs(
-      dt,
-      this.grid,
-      this.playerManager.players,
-      this.rigidWorld,
-      this.dropSubsystem,
-      this.dataManager,
-      (update) => this.pendingRevealedTiles.push(update)
-    );
+    this.runStep('mobs', () => this.mobSubsystem.updateActiveMobs(dt));
 
     // 10. Broadcast 30 Hz State Tick
-    this.broadcastStateTick();
+    this.runStep('broadcast', () => this.broadcastStateTick());
+  }
+
+  /** Ends the run of every player who died this tick (after the simulation steps, so it is safe). */
+  private processDeaths(): void {
+    if (this.pendingDeaths.length === 0) return;
+    const dead = this.pendingDeaths;
+    this.pendingDeaths = [];
+    for (const characterId of dead) {
+      const session = this.players.get(characterId);
+      if (!session) continue;
+      if (session.socket && session.socket.connected) {
+        const ended: MiningSessionEndedEvent = {
+          reason: 'death',
+          title: 'You Were Knocked Out',
+          message: 'You were knocked out in the mine. You have been returned to the surface and the contents of your backpack were lost.',
+        };
+        session.socket.emit('mining_session_ended', ended);
+      }
+      this.onPlayerDeath?.(characterId);
+    }
+  }
+
+  private handleFatalError(): void {
+    console.error(
+      `[Mining] Room ${this.roomId} ended after ${this.consecutiveFailedTicks} consecutive failing ticks`
+    );
+    this.stop();
+
+    for (const session of this.players.values()) {
+      if (session.socket && session.socket.connected) {
+        // Reuses the timeout event so existing clients return to the surface.
+        session.socket.emit('mining_session_timeout', {
+          message: 'The mine became unstable and collapsed. You have been returned to the surface and the contents of your backpack were lost.',
+        });
+      }
+    }
+
+    const notify = this.onFatalError ?? this.onTimeout;
+    notify?.(this.roomId);
   }
 
   // ============================================================================
   // Mining Block Excavation & Placement
   // ============================================================================
 
-  public startMining(target: MiningPosition, characterId?: string): boolean {
-    const session = characterId ? this.players.get(characterId) : this.primarySession;
-    return this.blockSubsystem.startMining(target, session, this.grid);
+  public startMining(characterId: string, target: MiningPosition): boolean {
+    return this.blockSubsystem.startMining(this.players.get(characterId), target);
   }
 
-  public stopMining(characterId?: string): void {
-    const session = characterId ? this.players.get(characterId) : this.primarySession;
-    this.blockSubsystem.stopMining(session);
+  public stopMining(characterId: string): void {
+    this.blockSubsystem.stopMining(this.players.get(characterId));
   }
 
-  public placeLadder(target?: MiningPosition, characterId?: string): boolean {
-    const session = characterId ? this.players.get(characterId) : this.primarySession;
-    return this.blockSubsystem.placeLadder(target, session, this.grid, (update) => {
-      this.pendingRevealedTiles.push(update);
-    });
+  /** Validation-only check; lets callers consume an item before committing the placement. */
+  public canPlaceLadder(characterId: string, target?: MiningPosition): boolean {
+    return this.blockSubsystem.validateLadderPlacement(this.players.get(characterId), target) !== null;
   }
 
-  public placeTorch(target: MiningPosition, characterId?: string): boolean {
-    const session = characterId ? this.players.get(characterId) : this.primarySession;
-    return this.blockSubsystem.placeTorch(target, session, this.grid, (update) => {
-      this.pendingRevealedTiles.push(update);
-    });
+  public canPlaceTorch(characterId: string, target: MiningPosition): boolean {
+    return this.blockSubsystem.validateTorchPlacement(this.players.get(characterId), target);
   }
 
-  private completeMiningBlock(target: MiningPosition, miners?: MiningPlayerSession[]): void {
-    this.blockSubsystem.completeMiningBlock(
-      target,
-      miners,
-      this.grid,
-      (pos, prevType) => {
-        this.rigidWorld.removeTileCollider(pos.x, pos.y);
-        this.pendingRevealedTiles.push({
-          x: pos.x,
-          y: pos.y,
-          type: MiningTileType.EMPTY,
-          damageStage: 0,
-        });
-        this.spawnBlockDrops(pos.x, pos.y, prevType);
-        this.rockSubsystem.checkAndTriggerFallingRocks(
-          pos.x,
-          pos.y,
-          this.grid,
-          this.rigidWorld,
-          (u) => this.pendingRevealedTiles.push(u)
-        );
-      },
-      this.playerManager.players.values()
-    );
+  /** Without a target, the ladder goes on the tile the player is standing in. */
+  public placeLadder(characterId: string, target?: MiningPosition): boolean {
+    return this.blockSubsystem.placeLadder(this.players.get(characterId), target);
+  }
+
+  public placeTorch(characterId: string, target: MiningPosition): boolean {
+    return this.blockSubsystem.placeTorch(this.players.get(characterId), target);
   }
 
   public spawnBlockDrops(tx: number, ty: number, tileType: MiningTileType): void {
-    this.dropSubsystem.spawnBlockDrops(
-      tx,
-      ty,
-      tileType,
-      (t) => this.getBlockConfig(t),
-      (id) => this.getItemData(id),
-      this.rigidWorld
-    );
-  }
-
-  public updateDroppedItemsPhysics(): void {
-    this.dropSubsystem.updateDroppedItemsPhysics();
-  }
-
-  // ============================================================================
-  // Data Manager Delegations
-  // ============================================================================
-
-  public getBlockConfig(tileType: MiningTileType): any {
-    return this.dataManager.getBlockConfig(tileType);
-  }
-
-  public getItemData(itemId: string): any {
-    return this.dataManager.getItemData(itemId);
-  }
-
-  public getItemPhysicsConfig(itemId: string): ItemPhysicsConfig | undefined {
-    return this.dataManager.getItemPhysicsConfig(itemId);
-  }
-
-  public getDynamiteItemPhysicsConfig(): ItemPhysicsConfig {
-    return this.dataManager.getDynamiteItemPhysicsConfig();
-  }
-
-  public getItemExplosionRadius(itemId: string): number | undefined {
-    return this.dataManager.getItemExplosionRadius(itemId);
-  }
-
-  public getItemSoundEffects(itemId: string): ItemSoundEffectsConfig | undefined {
-    return this.dataManager.getItemSoundEffects(itemId);
-  }
-
-  public getMobData(mobId: string): any {
-    return this.dataManager.getMobData(mobId);
+    this.dropSubsystem.spawnBlockDrops(tx, ty, tileType);
   }
 
   // ============================================================================
   // Explosives & Combat
   // ============================================================================
 
-  public throwDynamite(
-    characterId: string,
-    target: MiningPosition,
-    physicsConfig?: ItemPhysicsConfig,
-    forceRatio: number = 1.0,
-    explosionRadius?: number,
-    itemId?: string,
-    soundEffects?: ItemSoundEffectsConfig | null
-  ): boolean {
-    const session = this.players.get(characterId);
-    return this.explosiveSubsystem.throwDynamite(
-      session,
-      target,
-      physicsConfig,
-      forceRatio,
-      explosionRadius,
-      itemId,
-      soundEffects,
-      this.dataManager,
-      this.rigidWorld
-    );
+  public throwDynamite(characterId: string, request: ThrowRequest): boolean {
+    return this.explosiveSubsystem.throwDynamite(this.players.get(characterId), request);
   }
 
   public explodeDynamite(dynamite: MiningDynamiteEntity): void {
-    this.explosiveSubsystem.explodeDynamite(
-      dynamite,
-      this.grid,
-      this.rigidWorld,
-      this.playerManager.players.values(),
-      this.activeMobs.values(),
-      (tx, ty, prevType) => this.spawnBlockDrops(tx, ty, prevType),
-      (charId) => this.stopMining(charId),
-      (mobId, damage) => this.damageMob(mobId, damage),
-      (col, highestY) => {
-        this.rockSubsystem.checkAndTriggerFallingRocks(
-          col,
-          highestY,
-          this.grid,
-          this.rigidWorld,
-          (u) => this.pendingRevealedTiles.push(u)
-        );
-      },
-      (u) => this.pendingRevealedTiles.push(u)
-    );
+    this.explosiveSubsystem.explodeDynamite(dynamite);
   }
 
-  public shootProjectile(
-    characterId: string,
-    target: Vector2D,
-    weaponItemId?: string,
-    muzzlePosition?: Vector2D
-  ): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
-    const session = this.players.get(characterId);
-    return this.projectileSubsystem.shootProjectile(
-      session,
-      target,
-      weaponItemId,
-      this.dataManager,
-      this.rigidWorld,
-      muzzlePosition
-    );
+  public shootProjectile(characterId: string, target: Vector2D, muzzlePosition?: Vector2D): ShootResult {
+    return this.projectileSubsystem.shootProjectile(this.players.get(characterId), target, muzzlePosition);
   }
 
-  public reloadWeapon(
-    characterId: string
-  ): { success: boolean; error?: string; remainingAmmo?: number; isReloading?: boolean } {
-    const session = this.players.get(characterId);
-    return this.projectileSubsystem.reloadWeapon(characterId, session, this.dataManager);
+  public reloadWeapon(characterId: string): ShootResult {
+    return this.projectileSubsystem.reloadWeapon(this.players.get(characterId));
   }
 
   // ============================================================================
@@ -691,22 +551,7 @@ export class MiningGameEngine {
   // ============================================================================
 
   public spawnMob(
-    mobData: {
-      id?: string;
-      name?: string;
-      level?: number;
-      health?: number;
-      attack?: number;
-      defense?: number;
-      aiType?: string;
-      moveSpeed?: number;
-      jumpForce?: number;
-      miningSpeed?: number;
-      aiConfig?: any;
-      mineRange?: number;
-      animations?: any;
-      dropTable?: any;
-    },
+    mobData: Parameters<MiningMobSubsystem['spawnMob']>[0],
     position?: Vector2D
   ): MiningActiveMobSession {
     const spawnPos = position || this.findValidCavernSpawnPosition();
@@ -714,62 +559,102 @@ export class MiningGameEngine {
   }
 
   public findValidCavernSpawnPosition(minDepth = 5): Vector2D {
-    return this.mobSubsystem.findValidCavernSpawnPosition(this.grid, minDepth);
+    return this.mobSubsystem.findValidCavernSpawnPosition(minDepth);
   }
 
   public populateCavernMobs(options?: { count?: number; minDepth?: number; mobIds?: string[] }): void {
-    this.mobSubsystem.populateCavernMobs(this.grid, this.dataManager, this.mapConfig, options);
+    this.mobSubsystem.populateCavernMobs(options);
   }
 
   public spawnSurfaceTargetDummy(position?: Vector2D): MiningActiveMobSession | null {
-    return this.mobSubsystem.spawnSurfaceTargetDummy(this.dataManager, position);
+    return this.mobSubsystem.spawnSurfaceTargetDummy(position);
+  }
+
+  /**
+   * Applies a hit to a mob or player. Every source of damage goes through here (melee, bullets,
+   * explosions, mob attacks) so immunity, knockback and future modifiers live in one place.
+   */
+  public applyDamage(target: DamageTarget, event: DamageEvent): DamageResult {
+    return this.damageSystem.applyDamage(target, event);
+  }
+
+  /** Applies a hit to a block, mining it through when its health is used up. */
+  public damageTile(x: number, y: number, event: DamageEvent, miners?: MiningPlayerSession[]): TileDamageResult {
+    return this.damageSystem.damageTile(x, y, event, miners);
+  }
+
+  /**
+   * The view of this room that every subsystem is given. Properties are read lazily (getters), so
+   * a subsystem always sees the room's current state, including systems created after it.
+   */
+  private buildWorld(): MiningWorld {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const engine = this;
+    return {
+      get grid() {
+        return engine.grid;
+      },
+      get rigidWorld() {
+        return engine.rigidWorld;
+      },
+      get data() {
+        return engine.dataManager;
+      },
+      get mapConfig() {
+        return engine.mapConfig;
+      },
+      get players() {
+        return engine.playerManager.players;
+      },
+      get simTime() {
+        return engine.elapsedTimeSeconds;
+      },
+      get playerManager() {
+        return engine.playerManager;
+      },
+      get blocks() {
+        return engine.blockSubsystem;
+      },
+      get drops() {
+        return engine.dropSubsystem;
+      },
+      get rocks() {
+        return engine.rockSubsystem;
+      },
+      get explosives() {
+        return engine.explosiveSubsystem;
+      },
+      get projectiles() {
+        return engine.projectileSubsystem;
+      },
+      get mobs() {
+        return engine.mobSubsystem;
+      },
+      get damage() {
+        return engine.damageSystem;
+      },
+      pushTileUpdate: (update) => {
+        engine.pendingRevealedTiles.push(update);
+      },
+      revealAround: (position, visionRange) => engine.revealAndTrackTiles(position, visionRange),
+      notifyPlayerHealth: (characterId, health, maxHealth) =>
+        engine.onPlayerHealthChanged?.(characterId, health, maxHealth),
+      queuePlayerDeath: (characterId) => {
+        engine.pendingDeaths.push(characterId);
+      },
+    };
   }
 
   public updateActiveMobs(dt: number): void {
-    this.mobSubsystem.updateActiveMobs(
-      dt,
-      this.grid,
-      this.playerManager.players,
-      this.rigidWorld,
-      this.dropSubsystem,
-      this.dataManager,
-      (u) => this.pendingRevealedTiles.push(u)
-    );
+    this.mobSubsystem.updateActiveMobs(dt);
   }
 
   public handleMobMining(mob: MiningActiveMobSession, target: MiningPosition, dt: number): void {
-    this.mobSubsystem.handleMobMining(
-      mob,
-      target,
-      dt,
-      this.grid,
-      this.rigidWorld,
-      this.dropSubsystem,
-      this.dataManager,
-      (u) => this.pendingRevealedTiles.push(u)
-    );
-  }
-
-  public handleMobAttackPlayer(mob: MiningActiveMobSession, player: MiningPlayerSession): void {
-    this.mobSubsystem.handleMobAttackPlayer(mob, player);
-  }
-
-  public damageMob(instanceId: string, damage: number): void {
-    this.mobSubsystem.damageMob(
-      instanceId,
-      damage,
-      this.rigidWorld,
-      this.dropSubsystem,
-      this.dataManager
-    );
+    this.mobSubsystem.handleMobMining(mob, target, dt);
   }
 
   public killMob(mob: MiningActiveMobSession): void {
-    this.mobSubsystem.killMob(mob, this.rigidWorld, this.dropSubsystem, this.dataManager);
-  }
-
-  public spawnMobDrops(mob: MiningActiveMobSession): void {
-    this.mobSubsystem.spawnMobDrops(mob, this.rigidWorld, this.dropSubsystem, this.dataManager);
+    this.mobSubsystem.killMob(mob);
   }
 
   public getActiveMobs(): MiningActiveMob[] {
@@ -809,66 +694,30 @@ export class MiningGameEngine {
       angle: r.angle,
     }));
 
-    const dynamitePayloads: MiningActiveDynamite[] = this.activeDynamites.map((d) => ({
-      id: d.id,
-      position: { x: d.position.x, y: d.position.y },
-      velocity: { x: d.velocity.x, y: d.velocity.y },
-      angle: d.angle,
-      angularVelocity: d.angularVelocity,
-      fuseRemainingSeconds: d.fuseRemainingSeconds,
-      physicsConfig: d.physicsConfig,
-      itemId: d.itemId,
-      soundEffects: d.soundEffects,
-      inGameScale: d.inGameScale,
-    }));
-
-    const projectilePayloads: MiningActiveProjectile[] = this.activeProjectiles.map((p) => ({
-      id: p.id,
-      characterId: p.characterId,
-      itemId: p.itemId,
-      weaponItemId: p.weaponItemId,
-      position: { x: p.position.x, y: p.position.y },
-      velocity: { x: p.velocity.x, y: p.velocity.y },
-      angle: p.angle,
-      damage: p.damage,
-      spriteUrl: p.spriteUrl,
-      inGameScale: p.inGameScale,
-    }));
-
-    const activeMobsPayload = this.getActiveMobs();
+    // Dynamic fields only: static descriptions are sent once per client in `spawned` (MiningEntitySync)
+    const dynamitePayloads = this.activeDynamites.map(dynamiteDynamic);
+    const projectilePayloads = this.activeProjectiles.map(projectileDynamic);
+    const mobSessions = Array.from(this.activeMobs.values());
+    const activeMobsPayload = mobSessions.map(mobDynamic);
     const explosionsToSend = this.explosiveSubsystem.consumePendingExplosions();
     const gunshotsToSend = this.projectileSubsystem.consumePendingGunshots();
-    const blockHitsToSend = this.blockSubsystem.consumePendingBlockHits();
+    const allBlockHits = this.blockSubsystem.consumePendingBlockHits();
 
     for (const session of this.players.values()) {
       if (!session.socket || !session.socket.connected) continue;
 
-      const otherPlayers: MiningRemotePlayer[] = [];
-      for (const other of this.players.values()) {
-        if (other.characterId === session.characterId) continue;
-        otherPlayers.push({
-          characterId: other.characterId,
-          characterName: other.characterName,
-          position: { x: other.playerBody.position.x, y: other.playerBody.position.y },
-          velocity: { x: other.playerBody.velocity.x, y: other.playerBody.velocity.y },
-          isMining: other.isMining,
-          miningTarget: other.miningTarget ?? undefined,
-          isFacingLeft: other.isFacingLeft,
-          aimDirection: other.aimDirection,
-          flashlightOn: other.flashlightOn,
-          animationState: other.animationState,
-          gearLayers: other.gearLayers,
-        });
-      }
+      const others = Array.from(this.players.values()).filter((p) => p.characterId !== session.characterId);
+      const otherPlayers = others.map(playerDynamic);
+      const spawned = collectSpawned(session.known, {
+        mobs: mobSessions,
+        projectiles: this.activeProjectiles,
+        dynamites: this.activeDynamites,
+        others,
+      });
 
-      const ammoState = this.playerWeaponAmmo.get(session.characterId);
-      const weaponAmmoPayload = ammoState
-        ? {
-            current: ammoState.currentAmmo,
-            max: ammoState.maxAmmo,
-            isReloading: ammoState.isReloading,
-          }
-        : undefined;
+      const blockHitsToSend = this.blockHitsFor(session, allBlockHits);
+
+      const weaponAmmoPayload = this.projectileSubsystem.getAmmoStatus(session);
 
       const payload: MiningStateTickPayload = {
         tick: this.tickCount,
@@ -880,12 +729,14 @@ export class MiningGameEngine {
         fallingRocks: fallingRockPayloads.length > 0 ? fallingRockPayloads : undefined,
         activeDynamites: dynamitePayloads.length > 0 ? dynamitePayloads : undefined,
         activeProjectiles: projectilePayloads.length > 0 ? projectilePayloads : undefined,
-        mobs: activeMobsPayload.length > 0 ? activeMobsPayload : undefined,
+        // Always sent (even when empty) so clients can tell "none" from "unchanged"
+        mobs: activeMobsPayload,
         explosions: explosionsToSend.length > 0 ? explosionsToSend : undefined,
         gunshots: gunshotsToSend.length > 0 ? gunshotsToSend : undefined,
         blockHits: blockHitsToSend.length > 0 ? blockHitsToSend : undefined,
-        otherPlayers: otherPlayers.length > 0 ? otherPlayers : undefined,
-        weaponAmmo: weaponAmmoPayload,
+        otherPlayers,
+        spawned,
+        weaponAmmo: weaponAmmoPayload ?? undefined,
         droppedItems: this.dropSubsystem.droppedItemsDirty ? this.droppedItems : undefined,
         temporaryBackpack: session.backpackDirty ? session.temporaryBackpack : undefined,
       };
@@ -898,6 +749,19 @@ export class MiningGameEngine {
     this.pendingRevealedTiles = [];
   }
 
+  /**
+   * Player-caused hits go to everyone in the room. Mob-caused hits (digging) are only sent to
+   * players close enough to see/hear them.
+   */
+  private blockHitsFor(session: MiningPlayerSession, hits: MiningBlockHitEvent[]): MiningBlockHitEvent[] {
+    if (hits.length === 0) return hits;
+    const { x: px, y: py } = session.playerBody.position;
+    const range = MINING_CONFIG.BLOCK_HIT_HEARING_RANGE;
+    return hits.filter(
+      (h) => h.source !== 'mob' || Math.hypot(h.x + 0.5 - px, h.y + 0.5 - py) <= range
+    );
+  }
+
   private handleSessionTimeout(): void {
     console.log(`[Mining] Room ${this.roomId} timed out (${this.elapsedTimeSeconds.toFixed(1)}s elapsed)`);
     this.stop();
@@ -905,14 +769,12 @@ export class MiningGameEngine {
     for (const session of this.players.values()) {
       if (session.socket && session.socket.connected) {
         session.socket.emit('mining_session_timeout', {
-          extractedItems: session.temporaryBackpack,
-          message: 'Your mining session has reached the 15-minute time limit. You have been returned to the surface with your extracted items.',
+          message: 'Your mining session has reached the 15-minute time limit. You have been returned to the surface and the contents of your backpack were lost.',
         });
       }
     }
 
-    if (this.onTimeout) {
-      this.onTimeout(this.primaryCharacterId || this.roomId);
-    }
+    // Rooms are keyed by roomId (solo rooms are `solo_<characterId>`), so always pass it.
+    this.onTimeout?.(this.roomId);
   }
 }

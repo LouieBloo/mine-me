@@ -3,6 +3,7 @@ import { useGame } from './GameContext';
 import { useSocket } from './SocketContext';
 import { notificationService } from '../services/notificationService';
 import type { InventoryEntry, GameItem } from '@mine-me/shared';
+import { isTorchItem, isLadderItem, isThrowableItem } from '@mine-me/shared';
 
 interface QuickAccessContextType {
   /** 4 quick slots storing item definition IDs (or null if empty) */
@@ -129,11 +130,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (isPlacingTorch) {
       const torchCount = playerState?.inventory?.items
         ? playerState.inventory.items
-            .filter(
-              (inv) =>
-                inv.item?.subType?.toUpperCase() === 'TORCH' ||
-                inv.item?.name?.toLowerCase().includes('torch')
-            )
+            .filter((inv) => isTorchItem(inv.item))
             .reduce((sum, inv) => sum + inv.quantity, 0)
         : 0;
       if (torchCount === 0) {
@@ -143,11 +140,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (isPlacingLadder) {
       const ladderCount = playerState?.inventory?.items
         ? playerState.inventory.items
-            .filter(
-              (inv) =>
-                inv.item?.subType?.toUpperCase() === 'LADDER' ||
-                inv.item?.name?.toLowerCase().includes('ladder')
-            )
+            .filter((inv) => isLadderItem(inv.item))
             .reduce((sum, inv) => sum + inv.quantity, 0)
         : 0;
       if (ladderCount === 0) {
@@ -162,7 +155,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
               if (activeThrowableItem?.id) {
                 return it?.id === activeThrowableItem.id;
               }
-              return it?.throwable || it?.subType?.toUpperCase() === 'DYNAMITE' || it?.name?.toLowerCase().includes('dynamite');
+              return isThrowableItem(it);
             })
             .reduce((sum, inv) => sum + inv.quantity, 0)
         : 0;
@@ -207,9 +200,9 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
 
     const item = entry.item;
-    const isTorch = item.subType?.toUpperCase() === 'TORCH' || item.name.toLowerCase().includes('torch');
-    const isLadder = item.subType?.toUpperCase() === 'LADDER' || item.name.toLowerCase().includes('ladder');
-    const isThrowable = item.throwable || item.subType?.toUpperCase() === 'DYNAMITE' || item.name.toLowerCase().includes('dynamite');
+    const isTorch = isTorchItem(item);
+    const isLadder = isLadderItem(item);
+    const isThrowable = isThrowableItem(item);
 
     if (isThrowable) {
       if (totalQuantity <= 0) {

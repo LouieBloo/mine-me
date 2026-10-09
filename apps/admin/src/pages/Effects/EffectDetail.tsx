@@ -3,12 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
+import { DEFAULT_EFFECT_FLAGS, EFFECT_KINDS } from './effectKinds';
 
 export default function EffectDetail() {
   const { id } = useParams<{ id: string }>();
   const isNew = id === 'new';
   const navigate = useNavigate();
-  const [data, setData] = useState<any>(isNew ? { name: '', description: '', healthGain: false, staminaGain: false, miningSpeedModifier: false, damageModifier: false, explodes: false } : null);
+  const [data, setData] = useState<any>(isNew ? { name: '', description: '', ...DEFAULT_EFFECT_FLAGS } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -130,57 +131,19 @@ export default function EffectDetail() {
               {errors.description && <p className="text-red-500 text-xs font-bold mt-1 tracking-wide">{errors.description}</p>}
             </div>
 
-            {/* Gains toggles */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 pt-2">
-              <label className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">
-                <input
-                  type="checkbox"
-                  checked={data.healthGain || false}
-                  onChange={(e) => setData({ ...data, healthGain: e.target.checked })}
-                  className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Grants Health Gain
-              </label>
-
-              <label className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">
-                <input
-                  type="checkbox"
-                  checked={data.staminaGain || false}
-                  onChange={(e) => setData({ ...data, staminaGain: e.target.checked })}
-                  className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Grants Stamina Gain
-              </label>
-
-              <label className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">
-                <input
-                  type="checkbox"
-                  checked={data.miningSpeedModifier || false}
-                  onChange={(e) => setData({ ...data, miningSpeedModifier: e.target.checked })}
-                  className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Mining Speed Modifier (Attack Speed)
-              </label>
-
-              <label className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">
-                <input
-                  type="checkbox"
-                  checked={data.damageModifier || false}
-                  onChange={(e) => setData({ ...data, damageModifier: e.target.checked })}
-                  className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Damage Modifier (Weapon / Mining Damage)
-              </label>
-
-              <label className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">
-                <input
-                  type="checkbox"
-                  checked={data.explodes || false}
-                  onChange={(e) => setData({ ...data, explodes: e.target.checked })}
-                  className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Explodes
-              </label>
+            {/* Effect kind toggles */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+              {EFFECT_KINDS.map((kind) => (
+                <label key={kind.flag} className="text-sm font-black text-slate-700 uppercase tracking-widest cursor-pointer flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={data[kind.flag] || false}
+                    onChange={(e) => setData({ ...data, [kind.flag]: e.target.checked })}
+                    className="w-5 h-5 mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  {kind.label}
+                </label>
+              ))}
             </div>
           </div>
 

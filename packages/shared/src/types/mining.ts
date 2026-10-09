@@ -24,6 +24,7 @@ export const MINING_CONFIG = {
 
   /** Default vision range in tiles (cardinally adjacent) */
   DEFAULT_VISION_RANGE: 6,
+  MAX_VISION_RANGE: 20, // Hard cap on tiles of vision (Manhattan radius); bounds the reveal loop cost
 
   /** Stamina cost per block mined */
   MINING_STAMINA_COST: 1,
@@ -38,6 +39,28 @@ export const MINING_CONFIG = {
   /** Melee hit box: distance from shoulder pivot to weapon center along aim, in tiles */
   MELEE_WEAPON_OFFSET: 0.7,
   /** Melee hit box: half-width/height of the box around the weapon, in tiles */
+  // Ranged weapons: server-side estimate of the barrel position (tiles from the shoulder along the aim)
+  // Mob digging feedback: hit events are batched at this cadence (seconds) and only sent to players
+  // within BLOCK_HIT_HEARING_RANGE tiles of the block (rough on-screen/earshot distance; tune as needed)
+  EXPLOSION_MOB_DAMAGE: 50, // flat damage dynamite deals to mobs in its radius (data-driven in ticket 025)
+  TOOL_NOTICE_COOLDOWN_SECONDS: 3.0, // minimum gap between "your pickaxe is too weak"-style messages
+  // Defaults for a mob whose data leaves a stat out (a mob's own value always wins)
+  MOB_DEFAULT_MOVE_SPEED: 3.2, // tiles/s
+  MOB_DEFAULT_JUMP_FORCE: 8.8,
+  MOB_DEFAULT_MINING_SPEED: 80, // percent of base mining rate
+  MOB_DEFAULT_AGGRO_RANGE: 20, // tiles at which it notices a player
+  MOB_DEFAULT_ATTACK_RANGE: 1.25, // tiles
+  MOB_DEFAULT_ATTACK_COOLDOWN_MS: 1200,
+  MOB_DEFAULT_MINE_RANGE: 2.0, // tiles
+  MOB_HIT_STUN_MS: 250, // default time a mob loses control when hit (a mob's own hitStunMs overrides)
+  MOB_STUN_IMMUNITY_MS: 500, // default time after a stun ends during which it can't be stunned again
+  MAX_DROPPED_ITEMS: 1000, // hard safety limit per room (items never despawn); drops beyond it are skipped
+  MOB_DEATH_LINGER_SECONDS: 1.0, // how long a killed mob stays (inert) so clients can play its death animation
+  MOB_DIG_HIT_INTERVAL: 0.4,
+  BLOCK_HIT_HEARING_RANGE: 14,
+  GUN_MUZZLE_REACH: 0.9,
+  // A client-reported muzzle is trusted only within this distance of the server estimate
+  GUN_MUZZLE_MAX_DEVIATION: 1.0,
   MELEE_HIT_HALF_SIZE: 0.55,
   /** Extra tolerance so a mob's body (not just its center) can be struck, in tiles */
   MELEE_MOB_BODY_MARGIN: 0.3,
@@ -56,6 +79,14 @@ export const MINING_CONFIG = {
 
   /** Damage taken when crushed by a falling rock */
   ROCK_CRUSH_DAMAGE: 50,
+  // Player hit reaction: grace period after taking damage, and the knockback impulse (tiles/s, away from the source)
+  SERVER_TICK_RATE: 30, // simulation steps per second (fixed timestep)
+  MAX_CATCHUP_TICKS: 5, // most steps run in one loop wake-up; any more lag is dropped instead of spiralling
+  DEFAULT_PLAYER_MAX_HEALTH: 100,
+  PLAYER_HIT_INVULNERABILITY: 0.5,
+  PLAYER_HIT_KNOCKBACK_X: 5.0,
+  PLAYER_HIT_KNOCKBACK_Y: -4.0,
+  PLAYER_HIT_KNOCKBACK_SECONDS: 0.2, // movement input is ignored this long after being hit
 
   /** Number of treasure chests per map */
   TREASURE_CHEST_COUNT: 4,
@@ -130,6 +161,8 @@ export interface MiningBlockConfig {
   health: number;
   mineTimeMs?: number;
   staminaCost: number;
+  /** Pick power a tool needs to damage this block (0 = any tool). */
+  requiredPickPower?: number;
   idleParticleEffectId?: string | null;
   idleParticleEffect?: ParticleEffect | null;
   dropTable?: DropTable | null;
@@ -479,11 +512,11 @@ export interface MiningSessionClientState {
   miningStartedAt?: number;
   /** Current game mode ('singleplayer' or 'multiplayer'). */
   gameMode?: 'singleplayer' | 'multiplayer';
-  /** Other players in the shared mining room (if multiplayer). */
+  /** Other players in the shared mining room (if multiplayer). An empty array means "none". */
   otherPlayers?: MiningRemotePlayer[];
   /** Active thrown dynamites in the cavern world. */
   activeDynamites?: MiningActiveDynamite[];
-  /** Active mobs/NPCs in the mining cavern. */
+  /** Active mobs/NPCs in the mining cavern. An empty array means "none". */
   mobs?: MiningActiveMob[];
 }
 
@@ -524,12 +557,79 @@ export interface MiningInputState {
   sequence: number;
 }
 
+/** Emitted to a player when they take damage in the mine. */
+export interface MiningPlayerDamagedEvent {
+  damage: number;
+  /** Health after the hit. */
+  health: number;
+  maxHealth: number;
+  sourceId?: string;
+  sourceName?: string;
+  /** Impulse (tiles/s) the client should apply to its predicted body. */
+  knockback: { x: number; y: number };
+  knockbackSeconds: number;
+  invulnerableSeconds: number;
+}
+
+/** A short message to the player about their tool or action (shown as a toast). */
+export interface MiningNoticeEvent {
+  kind: 'tool_too_weak';
+  message: string;
+}
+
+/** Emitted when the server ends a player's run for a reason other than the time limit. */
+export interface MiningSessionEndedEvent {
+  reason: 'death';
+  title: string;
+  message: string;
+}
+
 /** Authoritative block hit event emitted when a block takes mining damage. */
 export interface MiningBlockHitEvent {
   x: number;
   y: number;
   tileType: MiningTileType;
   damage?: number;
+  /** Who dealt the hit. Absent means a player. Mob hits are only sent to nearby players. */
+  source?: 'player' | 'mob';
+}
+
+/**
+ * What changes every tick for an entity. The rest of its description (sprites, animations,
+ * physics config, gear...) is static and arrives once, in `MiningStateTickPayload.spawned` or in the
+ * session snapshot; clients merge the two (see the client's EntityDefinitionCache).
+ */
+export type MiningMobDynamic = Pick<
+  MiningActiveMob,
+  'id' | 'position' | 'velocity' | 'health' | 'isFacingLeft' | 'isMining' | 'miningTarget' | 'animationState'
+>;
+
+export type MiningRemotePlayerDynamic = Pick<
+  MiningRemotePlayer,
+  | 'characterId'
+  | 'position'
+  | 'velocity'
+  | 'isMining'
+  | 'miningTarget'
+  | 'isFacingLeft'
+  | 'aimDirection'
+  | 'flashlightOn'
+  | 'animationState'
+>;
+
+export type MiningProjectileDynamic = Pick<MiningActiveProjectile, 'id' | 'position' | 'velocity' | 'angle'>;
+
+export type MiningDynamiteDynamic = Pick<
+  MiningActiveDynamite,
+  'id' | 'position' | 'velocity' | 'angle' | 'angularVelocity' | 'fuseRemainingSeconds'
+>;
+
+/** Full entity descriptions for entities a client has not seen yet (or whose static data changed). */
+export interface MiningSpawnedEntities {
+  mobs?: MiningActiveMob[];
+  players?: MiningRemotePlayer[];
+  projectiles?: MiningActiveProjectile[];
+  dynamites?: MiningActiveDynamite[];
 }
 
 /** 30 Hz real-time simulation snapshot emitted by server to client. */
@@ -543,9 +643,15 @@ export interface MiningStateTickPayload {
   temporaryBackpack?: MiningBackpackItem[];
   droppedItems?: MiningDroppedItem[];
   fallingRocks?: MiningFallingRock[];
-  activeDynamites?: MiningActiveDynamite[];
-  /** Projectiles actively simulated in flight (e.g. revolver bullets). */
-  activeProjectiles?: MiningActiveProjectile[];
+  /** Thrown dynamites in flight (dynamic fields only; definitions arrive once in `spawned`). */
+  activeDynamites?: MiningDynamiteDynamic[];
+  /** Projectiles actively simulated in flight (dynamic fields only; definitions arrive once in `spawned`). */
+  activeProjectiles?: MiningProjectileDynamic[];
+  /**
+   * Full definitions (sprites, animations, physics config, gear...) of entities this client has not
+   * been told about yet. Sent once per entity; later ticks only carry the dynamic fields.
+   */
+  spawned?: MiningSpawnedEntities;
   /** Gunshot muzzle flash and audio events triggered during this tick. */
   gunshots?: MiningGunshotEvent[];
   /** Explosions that detonated during this simulation tick. */
@@ -553,10 +659,10 @@ export interface MiningStateTickPayload {
   /** Block damage hit events (e.g. tool swing hits dealing damage) triggered during this tick. */
   blockHits?: MiningBlockHitEvent[];
   revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
-  /** Other players in the shared room during multiplayer sessions. */
-  otherPlayers?: MiningRemotePlayer[];
-  /** Active mobs and NPCs navigating and interacting with the mine. */
-  mobs?: MiningActiveMob[];
+  /** Other players in the shared room (dynamic fields only). An empty array means "none". */
+  otherPlayers?: MiningRemotePlayerDynamic[];
+  /** Active mobs and NPCs (dynamic fields only). An empty array means "none". */
+  mobs?: MiningMobDynamic[];
   /** Current vision discovery range in tiles. */
   visionRange?: number;
   /** Authoritative weapon ammo and reload status for the character. */
@@ -695,6 +801,8 @@ export interface MiningMapConfigData {
   mobSpawnCount?: number;
   mobSpawnMinDepth?: number;
   allowedMobIds?: string[];
+  /** Mob that stands on the surface as a target dummy; empty/absent means none. */
+  surfaceDummyMobId?: string | null;
 }
 
 export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
@@ -725,5 +833,7 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   rockRestitution: 0.1,
   mobSpawnCount: 3,
   mobSpawnMinDepth: 5,
-  allowedMobIds: ['cmn_mole_person_001'],
+  // No built-in mobs: the active map config (database) says which mobs live in the mine
+  allowedMobIds: [],
+  surfaceDummyMobId: null,
 };

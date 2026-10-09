@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Container, Texture, Graphics, Sprite } from 'pixi.js';
 import {
+  type MiningSessionClientState,
   type MiningStateTickPayload,
   type Vector2D,
   type MiningClientTile,
@@ -30,9 +31,13 @@ import type { ProjectileVisualManager } from '../renderers/ProjectileVisualManag
 import type { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
 import type { MiningMobRenderer } from '../renderers/MiningMobRenderer';
 import { miningProfiler } from '../utils/MiningProfiler';
+import { applyTickEntityLists } from '../systems/applyTickEntityLists';
+import { EntityDefinitionCache } from '../systems/EntityDefinitionCache';
 
 export interface UseMiningStateSyncOptions {
   onEvent: (event: any, handler: (payload: any) => void) => () => void;
+  /** The join snapshot; its entities are already fully described, so the cache starts from it. */
+  initialSessionState?: Pick<MiningSessionClientState, 'mobs' | 'otherPlayers' | 'activeDynamites'>;
   playerState: PlayerState;
   equippedWeapon: any;
   soundManager: SoundManager;
@@ -75,13 +80,6 @@ export interface UseMiningStateSyncOptions {
 
   onVisionChange?: (newVision: number) => void;
   onBackpackChange?: (newBackpack: MiningBackpackItem[]) => void;
-  onWeaponAmmoChange?: (ammo: {
-    current: number;
-    max: number;
-    isReloading: boolean;
-    weaponName?: string;
-    weaponIconUrl?: string | null;
-  } | null) => void;
   lastWeaponSoundTimeRef?: React.MutableRefObject<number>;
 }
 
@@ -91,6 +89,7 @@ export interface UseMiningStateSyncOptions {
  */
 export function useMiningStateSync({
   onEvent,
+  initialSessionState,
   playerState,
   equippedWeapon,
   soundManager,
@@ -127,13 +126,19 @@ export function useMiningStateSync({
   droppedItemVisualManagerRef,
   onVisionChange,
   onBackpackChange,
-  onWeaponAmmoChange,
 }: UseMiningStateSyncOptions) {
   const onVisionChangeRef = useRef(onVisionChange);
   onVisionChangeRef.current = onVisionChange;
 
   const onBackpackChangeRef = useRef(onBackpackChange);
   onBackpackChangeRef.current = onBackpackChange;
+
+  // Static entity descriptions arrive once; each tick only carries what changes (see EntityDefinitionCache)
+  const entityDefsRef = useRef<EntityDefinitionCache | null>(null);
+  if (!entityDefsRef.current) {
+    entityDefsRef.current = new EntityDefinitionCache();
+    entityDefsRef.current.seedFromSnapshot(initialSessionState);
+  }
 
   const lastDamageParticleTimeRef = useRef<Map<string, number>>(new Map());
   const localLastWeaponSoundTimeRef = useRef<number>(0);
@@ -151,8 +156,10 @@ export function useMiningStateSync({
       activeFallingRocksRef.current = payload.fallingRocks
         ? payload.fallingRocks.map((r) => ({ id: r.id, x: r.position.x, y: r.position.y }))
         : [];
-      activeDynamitesRef.current = payload.activeDynamites || [];
-      const serverProjectiles = (payload.activeProjectiles || []).filter(
+      const defs = entityDefsRef.current!;
+      defs.applySpawned(payload.spawned);
+      activeDynamitesRef.current = defs.hydrateDynamites(payload.activeDynamites ?? []) ?? [];
+      const serverProjectiles = (defs.hydrateProjectiles(payload.activeProjectiles ?? []) ?? []).filter(
         (p) => p.characterId !== playerState?.id
       );
       const clientProjectiles = activeProjectilesRef.current.filter((p) =>
@@ -167,13 +174,6 @@ export function useMiningStateSync({
           max: payload.weaponAmmo.max,
           isReloading: payload.weaponAmmo.isReloading,
         };
-        onWeaponAmmoChange?.({
-          current: payload.weaponAmmo.current,
-          max: payload.weaponAmmo.max,
-          isReloading: payload.weaponAmmo.isReloading,
-          weaponName: equippedWeapon.name,
-          weaponIconUrl: equippedWeapon.iconUrl,
-        });
       }
 
       // Process gunshots if received in server tick
@@ -208,15 +208,14 @@ export function useMiningStateSync({
         }
       }
 
-      // Update remote players
-      if (remotePlayerRendererRef.current && payload.otherPlayers) {
-        remotePlayerRendererRef.current.updatePlayers(payload.otherPlayers);
-      }
-
-      // Update active mobs
-      if (mobRendererRef?.current && payload.mobs) {
-        mobRendererRef.current.updateMobs(payload.mobs);
-      }
+      // Update remote players & active mobs (empty arrays clear them; missing fields leave them alone)
+      applyTickEntityLists(
+        { mobs: defs.hydrateMobs(payload.mobs), otherPlayers: defs.hydratePlayers(payload.otherPlayers) },
+        {
+          remotePlayerRenderer: remotePlayerRendererRef.current,
+          mobRenderer: mobRendererRef?.current,
+        }
+      );
 
       // Update vision range if provided
       if (payload.visionRange !== undefined) {

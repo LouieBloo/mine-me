@@ -7,6 +7,8 @@ export class MiningDynamiteEntity extends MiningPhysicsBody {
   public readonly physicsConfig?: ItemPhysicsConfig;
   public readonly explosionRadius?: number;
   public readonly itemId?: string;
+  /** Character who threw it (credited for its damage). */
+  public readonly ownerId?: string;
   public readonly soundEffects?: ItemSoundEffectsConfig | null;
   public readonly inGameScale: number;
   public fuseRemainingSeconds: number;
@@ -52,7 +54,7 @@ export class MiningDynamiteEntity extends MiningPhysicsBody {
     initialVelocity: Vector2D,
     fuseSeconds: number = 4.0,
     rigidWorld?: MiningRigidWorld,
-    options?: DynamiteBodyOptions
+    options?: DynamiteBodyOptions & { ownerId?: string }
   ) {
     super({
       position: { ...initialPosition },
@@ -66,6 +68,7 @@ export class MiningDynamiteEntity extends MiningPhysicsBody {
     this.physicsConfig = options?.physicsConfig;
     this.explosionRadius = options?.explosionRadius;
     this.itemId = options?.itemId;
+    this.ownerId = options?.ownerId;
     this.soundEffects = options?.soundEffects;
     this.inGameScale = typeof options?.inGameScale === 'number' && options.inGameScale > 0 ? options.inGameScale : 1.0;
     this._position = { ...initialPosition };

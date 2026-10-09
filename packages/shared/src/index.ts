@@ -1,6 +1,10 @@
 export * from './types';
 export * from './gameLogic/CharacterModEngine';
 export * from './gameLogic/miningSpeed';
+export * from './gameLogic/damage';
+export * from './gameLogic/dropTable';
+export * from './gameLogic/itemRoles';
+export * from './gameLogic/combatStats';
 export * from './constants';
 export * from './utils/jwt';
 export * from './utils/city';
@@ -21,3 +25,4 @@ export * from './gameLogic/abilities/BaseMobAbility';
 export * from './utils/pixiParticlesConverter';
 export * from './sound';
 
+export * from './utils/miningInputValidation';

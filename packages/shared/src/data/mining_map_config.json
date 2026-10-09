@@ -30,5 +30,6 @@
   "allowedMobIds": [
     "cmn_mole_person_001"
   ],
-  "isActive": true
+  "isActive": true,
+  "surfaceDummyMobId": "mob_target_dummy"
 }

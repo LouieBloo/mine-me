@@ -1,10 +1,19 @@
 import type { GameItem } from '../types';
+import { sumItemEffect } from './combatStats';
 
 export interface CharacterModifications {
   combatScore: number;
   defenseScore: number;
+  /** Swing/attack speed. */
   miningSpeed: number;
-  miningDamage: number;
+  /** Damage per swing to blocks (Tool Damage effect). */
+  toolDamage: number;
+  /** Damage per hit to mobs (Damage effect). */
+  weaponDamage: number;
+  /** Hardest block this gear can break (Pick Power effect). */
+  pickPower: number;
+  /** Melee knockback in tenths of tiles/s (Knockback effect); 0 means the default push. */
+  knockback: number;
 }
 
 export class CharacterModEngine {
@@ -16,7 +25,10 @@ export class CharacterModEngine {
       combatScore: 0,
       defenseScore: 0,
       miningSpeed: 0,
-      miningDamage: 0,
+      toolDamage: 0,
+      weaponDamage: 0,
+      pickPower: 0,
+      knockback: 0,
     };
 
     for (const entry of inventoryItems) {
@@ -25,16 +37,11 @@ export class CharacterModEngine {
         if (item.combatScore) mods.combatScore += item.combatScore;
         if (item.defenseScore) mods.defenseScore += item.defenseScore;
 
-        if (item.itemEffects && Array.isArray(item.itemEffects)) {
-          for (const ie of item.itemEffects) {
-            if (ie.effect?.miningSpeedModifier) {
-              mods.miningSpeed += ie.value || 0;
-            }
-            if (ie.effect?.damageModifier) {
-              mods.miningDamage += ie.value || 0;
-            }
-          }
-        }
+        mods.miningSpeed += sumItemEffect(item, 'miningSpeedModifier');
+        mods.toolDamage += sumItemEffect(item, 'toolDamageModifier');
+        mods.weaponDamage += sumItemEffect(item, 'damageModifier');
+        mods.pickPower += sumItemEffect(item, 'pickPowerModifier');
+        mods.knockback += sumItemEffect(item, 'knockbackModifier');
       }
     }
 
@@ -44,16 +51,16 @@ export class CharacterModEngine {
   /**
    * Calculates the total attributes of a character, applying modifications to base stats.
    */
-  static calculateTotalAttributes<T extends { combatScore: number; defenseScore: number; miningSpeed?: number; miningDamage?: number }>(
+  static calculateTotalAttributes<T extends { combatScore: number; defenseScore: number; miningSpeed?: number; toolDamage?: number }>(
     baseAttributes: T,
     mods: CharacterModifications
-  ): T & { miningSpeed: number; miningDamage: number } {
+  ): T & { miningSpeed: number; toolDamage: number } {
     return {
       ...baseAttributes,
       combatScore: baseAttributes.combatScore + mods.combatScore,
       defenseScore: baseAttributes.defenseScore + mods.defenseScore,
       miningSpeed: (baseAttributes.miningSpeed ?? 0) + mods.miningSpeed,
-      miningDamage: (baseAttributes.miningDamage ?? 0) + mods.miningDamage,
+      toolDamage: (baseAttributes.toolDamage ?? 0) + mods.toolDamage,
     };
   }
 }

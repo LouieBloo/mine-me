@@ -4,6 +4,7 @@ import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
 import { useNavigate } from 'react-router-dom';
+import { EFFECT_KINDS } from './effectKinds';
 
 export default function Effects() {
   const [effects, setEffects] = useState([]);
@@ -32,31 +33,11 @@ export default function Effects() {
     { field: 'id', headerName: 'ID', minWidth: 200 },
     { field: 'name', headerName: 'Name' },
     { field: 'description', headerName: 'Description', flex: 2 },
-    { 
-      field: 'healthGain', 
-      headerName: 'Health Gain',
-      cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
-    },
-    { 
-      field: 'staminaGain', 
-      headerName: 'Stamina Gain',
-      cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
-    },
-    { 
-      field: 'miningSpeedModifier', 
-      headerName: 'Mining Speed',
-      cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
-    },
-    { 
-      field: 'damageModifier', 
-      headerName: 'Damage',
-      cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
-    },
-    { 
-      field: 'explodes', 
-      headerName: 'Explodes',
-      cellRenderer: (params: any) => params.value ? 'Yes' : 'No'
-    }
+    ...EFFECT_KINDS.map((kind) => ({
+      field: kind.flag,
+      headerName: kind.short,
+      cellRenderer: (params: any) => (params.value ? 'Yes' : 'No'),
+    })),
   ];
 
   return (

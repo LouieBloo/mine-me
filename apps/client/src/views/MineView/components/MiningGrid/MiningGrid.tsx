@@ -26,6 +26,7 @@ import { useMiningScene } from './hooks/useMiningScene';
 import { useMiningActions } from './hooks/useMiningActions';
 import { useMiningAmbientEffects } from './hooks/useMiningAmbientEffects';
 import { useMiningStateSync } from './hooks/useMiningStateSync';
+import { usePlayerDamageEvents } from './hooks/usePlayerDamageEvents';
 import { useMiningTicker } from './hooks/useMiningTicker';
 import { TILE_SIZE } from './renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from './renderers/DynamiteVisualManager';
@@ -52,7 +53,6 @@ interface MiningGridProps {
   onToggleDebug?: () => void;
   onVisionChange?: (newVision: number) => void;
   onBackpackChange?: (newBackpack: MiningBackpackItem[]) => void;
-  onWeaponAmmoChange?: (ammo: { current: number; max: number; isReloading: boolean; weaponName?: string; weaponIconUrl?: string | null } | null) => void;
 }
 
 export const MiningGrid: React.FC<MiningGridProps> = ({
@@ -73,7 +73,6 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onToggleDebug,
   onVisionChange,
   onBackpackChange,
-  onWeaponAmmoChange,
 }) => {
   const { app } = usePixiStage();
   const { onEvent, sendGameEvent } = useSocket();
@@ -211,18 +210,6 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
         (inv) => inv.equipped && inv.item?.type === 'GEAR' && inv.item?.subType?.toUpperCase() === 'WEAPON'
       );
       if (equipped?.item) weapon = equipped.item;
-      else {
-        const anyWeapon = items.find(
-          (inv) => inv.item?.type === 'GEAR' && inv.item?.subType?.toUpperCase() === 'WEAPON'
-        );
-        if (anyWeapon?.item) weapon = anyWeapon.item;
-        else {
-          const pickaxeItem = items.find(
-            (inv) => inv.item?.name?.toLowerCase().includes('pickaxe')
-          );
-          if (pickaxeItem?.item) weapon = pickaxeItem.item;
-        }
-      }
     }
     if (!weapon) return null;
     const dbItem = dynamicItems.find(
@@ -334,8 +321,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     isThrowingItem,
     activeThrowableItem,
     onDynamiteThrown,
-    onWeaponAmmoChange,
-  });
+    });
 
   const lastWeaponSoundTimeRef = useRef<number>(0);
 
@@ -371,9 +357,13 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     blockEmittersRef,
   });
 
+  // Hit knockback from the server is applied to the predicted player body
+  usePlayerDamageEvents({ onEvent, playerBodyRef });
+
   // Real-time 30 Hz server ticks subscription (updates refs & graphics incrementally with ZERO React re-renders)
   useMiningStateSync({
     onEvent,
+    initialSessionState,
     playerState,
     equippedWeapon,
     soundManager,
@@ -410,8 +400,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     droppedItemVisualManagerRef,
     onVisionChange,
     onBackpackChange,
-    onWeaponAmmoChange,
-  });
+    });
 
   // 60+ FPS Frame Ticker Loop Hook
   useMiningTicker({
