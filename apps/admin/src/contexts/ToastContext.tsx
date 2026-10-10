@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Snackbar, Alert } from '@mui/material';
 import type { AlertColor } from '@mui/material';
+import { DEFINITIONS_RELOAD_FAILED_EVENT } from '../hooks/definitionsReloadEvent';
 
 interface ToastContextType {
   showToast: (message: string, severity?: AlertColor) => void;
@@ -23,6 +24,14 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setSeverity(sev);
     setOpen(true);
   }, []);
+
+  // Saves still work when the live reload fails, but the game server won't see the change until restarted
+  useEffect(() => {
+    const onReloadFailed = () =>
+      showToast('Saved, but the game server could not reload its definitions. Restart the server to apply the change.', 'warning');
+    window.addEventListener(DEFINITIONS_RELOAD_FAILED_EVENT, onReloadFailed);
+    return () => window.removeEventListener(DEFINITIONS_RELOAD_FAILED_EVENT, onReloadFailed);
+  }, [showToast]);
 
   const handleClose = (_event?: React.SyntheticEvent | Event, reason?: string) => {
     if (reason === 'clickaway') {

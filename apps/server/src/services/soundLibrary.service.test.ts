@@ -6,8 +6,8 @@ import {
   categoryForUrl,
   registerSoundFile,
   syncSoundLibrary,
-  tryRegisterSoundFile,
-  unregisterSoundFile,
+  soundNameFromFile,
+  uniqueSoundFileName,
 } from './soundLibrary.service';
 
 const fakeDb = (rows: any[] = []) => {
@@ -40,11 +40,11 @@ describe('categoryForUrl', () => {
   ])('%s -> %s', (url, expected) => expect(categoryForUrl(url)).toBe(expected));
 });
 
-describe('registerSoundFile / unregisterSoundFile', () => {
-  it('creates a sound-effect row with a readable name', async () => {
+describe('registerSoundFile', () => {
+  it('creates a sound-effect row named after the file itself', async () => {
     const { db, rows } = fakeDb();
     await registerSoundFile(db, { url: '/assets/sounds/items/revolver_shot.wav', fileName: 'revolver_shot.wav', fileSize: 10, category: 'ITEM' });
-    expect(rows[0]).toMatchObject({ name: 'revolver shot', type: 'SFX', category: 'ITEM', mimeType: 'audio/wav', loop: false });
+    expect(rows[0]).toMatchObject({ name: 'revolver_shot', type: 'SFX', category: 'ITEM', mimeType: 'audio/wav', loop: false });
   });
 
   it('updates the existing row for the same url instead of duplicating', async () => {
@@ -55,18 +55,37 @@ describe('registerSoundFile / unregisterSoundFile', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].fileSize).toBe(99);
   });
+});
 
-  it('removes the row by url', async () => {
-    const { db, rows } = fakeDb([{ id: '1', url: '/assets/sounds/a.mp3' }]);
-    await unregisterSoundFile(db, '/assets/sounds/a.mp3');
-    expect(rows).toHaveLength(0);
+describe('soundNameFromFile', () => {
+  it('is the file name without its extension, exactly as given', () => {
+    expect(soundNameFromFile('Big Boom (final).WAV')).toBe('Big Boom (final)');
+    expect(soundNameFromFile('mole_growl-2.mp3')).toBe('mole_growl-2');
+  });
+});
+
+describe('uniqueSoundFileName', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sound-names-'));
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it('keeps the uploaded name, made url-safe, with its case', () => {
+    expect(uniqueSoundFileName(dir, 'Big Boom (final).WAV')).toBe('Big_Boom_final.wav');
+    expect(uniqueSoundFileName(dir, 'Mole-Growl.mp3')).toBe('Mole-Growl.mp3');
   });
 
-  it('tryRegister swallows database errors', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { db } = fakeDb();
-    db.sound.findFirst.mockRejectedValue(new Error('down'));
-    await expect(tryRegisterSoundFile(db, { url: '/x.mp3', fileName: 'x.mp3', fileSize: 1, category: 'GENERAL' })).resolves.toBeUndefined();
+  it('never overwrites: a clash gets -2, -3...', () => {
+    fs.writeFileSync(path.join(dir, 'boom.mp3'), 'a');
+    expect(uniqueSoundFileName(dir, 'boom.mp3')).toBe('boom-2.mp3');
+    fs.writeFileSync(path.join(dir, 'boom-2.mp3'), 'b');
+    expect(uniqueSoundFileName(dir, 'boom.mp3')).toBe('boom-3.mp3');
+  });
+
+  it('falls back to a name for an empty or odd file name', () => {
+    expect(uniqueSoundFileName(dir, '###.mp3')).toBe('sound.mp3');
+    expect(uniqueSoundFileName(dir, 'noext')).toBe('noext.mp3');
   });
 });
 

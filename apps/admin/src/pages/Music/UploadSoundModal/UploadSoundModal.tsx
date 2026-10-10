@@ -58,8 +58,8 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({ isOpen, onCl
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
-      // Auto-fill track name with new filename without extension
-      const autoName = selectedFile.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+      // The sound keeps the file's own name (minus the extension); it can still be edited here
+      const autoName = selectedFile.name.replace(/\.[^/.]+$/, '');
       setName(autoName);
       setError(null);
     }

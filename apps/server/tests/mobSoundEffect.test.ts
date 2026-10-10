@@ -82,35 +82,12 @@ describe('Mob sound slots', () => {
     expect(mobs[0].soundEffects).toBeNull();
   });
 
-  it('uploads a file into the library as a MOB sound and points the slot at it', async () => {
+  it('has no upload endpoint of its own any more (sounds are uploaded to the library)', async () => {
     const res = await request(app)
       .post('/api/admin/mobs/mob1/sound-effects/death')
-      .attach('soundEffect', Buffer.from('ID3fake'), 'roar.mp3');
-    expect(res.status).toBe(200);
-    const created = sounds.find((s) => s.url === '/assets/sounds/mobs/mob1/mob1_death.mp3');
-    expect(created).toMatchObject({ category: 'MOB', type: 'SFX', name: 'Mole - death' });
-    expect(mobs[0].soundEffects).toEqual({ death: { soundId: created.id } });
-    expect(fs.existsSync(getSoundsDir('mobs', 'mob1', 'mob1_death.mp3'))).toBe(true);
-  });
-
-  it('rejects uploads with no file, a bad slot or a non-audio file', async () => {
-    expect((await request(app).post('/api/admin/mobs/mob1/sound-effects/death')).status).toBe(400);
-    expect(
-      (await request(app).post('/api/admin/mobs/mob1/sound-effects/fly').attach('soundEffect', Buffer.from('x'), 'a.mp3')).status
-    ).toBe(400);
-    const bad = await request(app)
-      .post('/api/admin/mobs/mob1/sound-effects/death')
-      .attach('soundEffect', Buffer.from('x'), { filename: 'a.txt', contentType: 'text/plain' });
-    expect(bad.status).toBeGreaterThanOrEqual(400);
-    expect(mobs[0].soundEffects).toBeNull();
-  });
-
-  it('does not write a file for an unknown mob', async () => {
-    const res = await request(app)
-      .post('/api/admin/mobs/ghost/sound-effects/death')
       .attach('soundEffect', Buffer.from('ID3fake'), 'roar.mp3');
     expect(res.status).toBe(404);
-    expect(fs.existsSync(getSoundsDir('mobs', 'ghost', 'ghost_death.mp3'))).toBe(false);
+    expect(mobs[0].soundEffects).toBeNull();
   });
 
   it('mob save normalizes soundEffects and never stores the resolved `sounds`', async () => {

@@ -1,5 +1,6 @@
 import React from 'react';
-import { type MiningBackpackItem, getAssetUrl } from '@mine-me/shared';
+import { type MiningBackpackItem } from '@mine-me/shared';
+import { GameImage } from '../../../../components/GameImage/GameImage';
 import './TemporaryBackpack.css';
 
 interface TemporaryBackpackProps {
@@ -30,23 +31,19 @@ export const TemporaryBackpack: React.FC<TemporaryBackpackProps> = ({ items }) =
       ) : (
         <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
           {items.map((item, idx) => {
-            const iconSrc = item.iconUrl ? getAssetUrl(item.iconUrl) : null;
             return (
               <div
                 key={`${item.itemId}_${idx}`}
                 className="relative bg-slate-950/80 border border-slate-800 rounded-lg p-1.5 flex flex-col items-center justify-center w-full aspect-square group hover:border-amber-500/50 transition-colors"
                 title={`${item.itemName} (x${item.quantity})`}
               >
-                {iconSrc ? (
-                  <img
-                    src={iconSrc}
-                    alt={item.itemName}
-                    className="w-8 h-8 object-contain pixelated"
-                    style={{ imageRendering: 'pixelated' }}
-                  />
-                ) : (
-                  <span className="text-lg">📦</span>
-                )}
+                <GameImage
+                  src={item.iconUrl}
+                  alt={item.itemName}
+                  className="w-8 h-8 object-contain pixelated"
+                  style={{ imageRendering: 'pixelated' }}
+                  fallback={<span className="text-lg">📦</span>}
+                />
                 <span className="absolute bottom-0.5 right-1 text-[10px] font-black text-amber-400 font-mono drop-shadow">
                   {item.quantity}
                 </span>

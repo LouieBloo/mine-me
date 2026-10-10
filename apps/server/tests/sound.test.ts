@@ -174,6 +174,40 @@ describe('Sound Admin & Public API', () => {
     expect(mockSyncJson).toHaveBeenCalledWith('sounds.json', expect.any(Array));
   });
 
+  describe('uploaded sounds keep their own name', () => {
+    it('names the sound and its file after the uploaded file, whatever it is for', async () => {
+      const res = await request(app)
+        .post('/admin/sounds')
+        .field('category', 'ITEM')
+        .field('type', 'SFX')
+        .attach('file', Buffer.from('ID3a'), 'Big Boom (final).mp3');
+
+      expect(res.status).toBe(201);
+      expect(res.body.name).toBe('Big Boom (final)');
+      expect(res.body.fileName).toBe('Big_Boom_final.mp3');
+      expect(res.body.url).toBe('/assets/sounds/Big_Boom_final.mp3');
+      expect(res.body.category).toBe('ITEM');
+      expect(fs.existsSync(getSoundsDir('Big_Boom_final.mp3'))).toBe(true);
+    });
+
+    it('never overwrites an existing file: a second upload with the same name gets -2', async () => {
+      const first = await request(app).post('/admin/sounds').attach('file', Buffer.from('FIRST'), 'click.mp3');
+      const second = await request(app).post('/admin/sounds').attach('file', Buffer.from('SECOND'), 'click.mp3');
+
+      expect(first.body.fileName).toBe('click.mp3');
+      expect(second.body.fileName).toBe('click-2.mp3');
+      expect(second.body.name).toBe('click');
+      expect(fs.readFileSync(getSoundsDir('click.mp3'), 'utf-8')).toBe('FIRST');
+      expect(fs.readFileSync(getSoundsDir('click-2.mp3'), 'utf-8')).toBe('SECOND');
+    });
+
+    it('lets an explicit name override the file name', async () => {
+      const res = await request(app).post('/admin/sounds').field('name', 'Pistol Shot').attach('file', Buffer.from('x'), 'a1.wav');
+      expect(res.body.name).toBe('Pistol Shot');
+      expect(res.body.fileName).toBe('a1.wav');
+    });
+  });
+
   it('PUT /admin/sounds/:id - updates sound properties', async () => {
     mockSyncJson.mockClear();
     const res = await request(app)

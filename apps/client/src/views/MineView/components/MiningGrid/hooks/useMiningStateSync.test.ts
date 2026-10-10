@@ -1,10 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useMiningStateSync } from './useMiningStateSync';
+import { ReloadSoundTrigger } from '../systems/ReloadSoundTrigger';
 
 const ref = <T>(current: T) => ({ current });
 
-function setup() {
+const revolver: any = {
+  id: 'gun',
+  projectileConfig: { reloadTime: 1.5 },
+  soundEffects: { reload: { url: '/assets/sounds/items/reload.mp3' } },
+};
+
+function setup(options: { equippedWeapon?: any; reloadSound?: ReloadSoundTrigger } = {}) {
   const emitter = { destroy: vi.fn() };
   const world: any = {
     gridRef: ref([]),
@@ -39,18 +46,19 @@ function setup() {
   const off = vi.fn();
   let handler: ((p: unknown) => void) | undefined;
   const onEvent = vi.fn((_name: string, h: (p: unknown) => void) => { handler = h; return off; });
-  const soundManager: any = { setListenerPosition: vi.fn() };
+  const soundManager: any = { setListenerPosition: vi.fn(), playSfx: vi.fn() };
   const hook = renderHook(() =>
     useMiningStateSync({
       onEvent: onEvent as any,
       playerState: { id: 'me' } as any,
-      equippedWeapon: null,
+      equippedWeapon: options.equippedWeapon ?? null,
       soundManager,
       world,
       containersReady: true,
+      reloadSound: options.reloadSound,
     })
   );
-  return { world, emitter, off, onEvent, getHandler: () => handler!, hook };
+  return { world, emitter, off, onEvent, soundManager, getHandler: () => handler!, hook };
 }
 
 describe('useMiningStateSync', () => {
@@ -77,5 +85,29 @@ describe('useMiningStateSync', () => {
     expect(world.blockEmittersRef.current.size).toBe(0);
     expect(world.dynamiteVisualManagerRef.current.destroy).toHaveBeenCalled();
     expect(world.droppedItemVisualManagerRef.current.destroy).toHaveBeenCalled();
+  });
+
+  const tick = (weaponAmmo: unknown) => ({
+    tick: 1, position: { x: 1, y: 1 }, velocity: { x: 0, y: 0 }, ackSequence: 0, ackAge: 1, isMining: false, weaponAmmo,
+  });
+
+  it('plays the reload sound when the server starts a reload on its own (last round fired)', () => {
+    const { soundManager, getHandler } = setup({ equippedWeapon: revolver, reloadSound: new ReloadSoundTrigger() });
+    getHandler()(tick({ current: 1, max: 6, isReloading: false }));
+    expect(soundManager.playSfx).not.toHaveBeenCalled();
+    getHandler()(tick({ current: 0, max: 6, isReloading: true }));
+    expect(soundManager.playSfx).toHaveBeenCalledTimes(1);
+    expect(soundManager.playSfx).toHaveBeenCalledWith('/assets/sounds/items/reload.mp3');
+    getHandler()(tick({ current: 0, max: 6, isReloading: true }));
+    expect(soundManager.playSfx).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not double the sound when the reload key already played it', () => {
+    const reloadSound = new ReloadSoundTrigger();
+    const { soundManager, getHandler } = setup({ equippedWeapon: revolver, reloadSound });
+    getHandler()(tick({ current: 3, max: 6, isReloading: false }));
+    reloadSound.trigger(revolver, (url) => soundManager.playSfx(url)); // R pressed
+    getHandler()(tick({ current: 3, max: 6, isReloading: true }));
+    expect(soundManager.playSfx).toHaveBeenCalledTimes(1);
   });
 });

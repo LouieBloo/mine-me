@@ -150,7 +150,8 @@ describe('ItemDetail Page', () => {
   it('renders Weapon Sound Effect section when item subtype is WEAPON', async () => {
     renderDetail('item_pickaxe');
     expect(await screen.findByText(/Weapon Sound Effect/i)).toBeInTheDocument();
-    expect(screen.getByText(/item_pickaxe_sfx\.wav/i)).toBeInTheDocument();
+    // the slot's file is shown in its sound picker
+    expect(await screen.findByText(/item_pickaxe_sfx\.wav/i)).toBeInTheDocument();
   });
 
   it('renders In-Game World Scale section and allows scale adjustments', async () => {

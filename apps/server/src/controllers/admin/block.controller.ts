@@ -5,7 +5,6 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import { getSoundsDir, resolveAssetUrl } from '../../config/assetPaths';
-import { tryRegisterSoundFile, tryUnregisterSoundFile } from '../../services/soundLibrary.service';
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -32,31 +31,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
 const upload = multer({ storage, fileFilter });
 export const blockTextureUpload = upload.single('texture');
 
-const soundEffectStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const dir = getSoundsDir('blocks');
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase() || '.mp3';
-    const cleanKey = (req.params.typeKey || req.params.id || 'block').toLowerCase();
-    cb(null, `${cleanKey}_sfx${ext}`);
-  }
-});
 
-const audioFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedExtensions = ['.mp3', '.wav', '.ogg', '.webm', '.m4a', '.aac', '.flac'];
-  const ext = path.extname(file.originalname).toLowerCase();
-  if (file.mimetype.startsWith('audio/') || allowedExtensions.includes(ext)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only audio files (.mp3, .wav, .ogg, .webm, .m4a, .aac, .flac) are allowed'));
-  }
-};
-
-const uploadSoundEffect = multer({ storage: soundEffectStorage, fileFilter: audioFileFilter });
-export const blockSoundEffectUpload = uploadSoundEffect.single('soundEffect');
 
 export const getBlocks = async (req: Request, res: Response) => {
   try {
@@ -191,116 +166,55 @@ export const uploadBlockTexture = async (req: Request, res: Response) => {
   }
 };
 
-export const uploadBlockSoundEffect = async (req: Request, res: Response) => {
+/** Points the block's mining sound at a library sound (`soundId`), or clears it (`soundId: null`). */
+export const setBlockSoundEffect = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const file = req.file;
+    const { soundId } = req.body ?? {};
 
     const block = await prisma.miningBlock.findFirst({
-      where: {
-        OR: [
-          { id },
-          { typeKey: id.toUpperCase() }
-        ]
-      }
+      where: { OR: [{ id }, { typeKey: id.toUpperCase() }] },
     });
-
     if (!block) {
       res.status(404).json({ error: 'Block not found' });
       return;
     }
 
-    if (!file) {
-      res.status(400).json({ error: 'No sound effect file provided' });
-      return;
+    let soundEffectUrl: string | null = null;
+    if (soundId !== null && soundId !== undefined) {
+      if (typeof soundId !== 'string' || soundId.length === 0) {
+        res.status(400).json({ error: 'soundId must be a sound id or null' });
+        return;
+      }
+      const sound = await prisma.sound.findUnique({ where: { id: soundId } });
+      if (!sound) {
+        res.status(404).json({ error: 'Sound not found in the library' });
+        return;
+      }
+      soundEffectUrl = sound.url;
     }
-
-    const soundEffectUrl = `/assets/sounds/blocks/${file.filename}`;
-    await tryRegisterSoundFile(prisma, {
-      url: soundEffectUrl,
-      fileName: file.filename,
-      fileSize: file.size,
-      mimeType: file.mimetype,
-      category: 'BLOCK',
-      name: `${(block as any).name} - mining`,
-    });
 
     const updatedBlock = await prisma.miningBlock.update({
       where: { id: block.id },
       data: { soundEffectUrl } as any,
       include: {
         idleParticleEffect: true,
-        dropTable: { include: { items: { include: { item: true } } } }
-      }
+        dropTable: { include: { items: { include: { item: true } } } },
+      },
     });
 
     const allBlocks = await prisma.miningBlock.findMany({
       orderBy: { typeKey: 'asc' },
       include: {
         idleParticleEffect: true,
-        dropTable: { include: { items: true } }
-      }
+        dropTable: { include: { items: true } },
+      },
     });
     syncJson('blocks.json', allBlocks);
 
     res.json(updatedBlock);
   } catch (error: any) {
     console.error(error);
-    res.status(500).json({ error: error.message || 'Failed to upload block sound effect' });
-  }
-};
-
-export const removeBlockSoundEffect = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const block = await prisma.miningBlock.findFirst({
-      where: {
-        OR: [
-          { id },
-          { typeKey: id.toUpperCase() }
-        ]
-      }
-    });
-
-    if (!block) {
-      res.status(404).json({ error: 'Block not found' });
-      return;
-    }
-
-    if ((block as any).soundEffectUrl) {
-      const filePath = resolveAssetUrl((block as any).soundEffectUrl);
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (e) {
-          console.warn('Could not remove sound effect file:', e);
-        }
-      }
-      await tryUnregisterSoundFile(prisma, (block as any).soundEffectUrl);
-    }
-
-    const updatedBlock = await prisma.miningBlock.update({
-      where: { id: block.id },
-      data: { soundEffectUrl: null } as any,
-      include: {
-        idleParticleEffect: true,
-        dropTable: { include: { items: { include: { item: true } } } }
-      }
-    });
-
-    const allBlocks = await prisma.miningBlock.findMany({
-      orderBy: { typeKey: 'asc' },
-      include: {
-        idleParticleEffect: true,
-        dropTable: { include: { items: true } }
-      }
-    });
-    syncJson('blocks.json', allBlocks);
-
-    res.json(updatedBlock);
-  } catch (error: any) {
-    console.error(error);
-    res.status(500).json({ error: error.message || 'Failed to remove block sound effect' });
+    res.status(500).json({ error: error.message || 'Failed to update block sound effect' });
   }
 };

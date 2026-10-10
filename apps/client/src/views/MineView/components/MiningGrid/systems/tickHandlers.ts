@@ -42,6 +42,8 @@ export interface TickHandlerContext {
   containersReady: boolean;
   entityDefs: EntityDefinitionCache;
   effects: TickEffectState;
+  /** Called with the server's ammo state every tick it is sent (the reload sound watches this). */
+  onWeaponAmmo?: (ammo: { current: number; max: number; isReloading: boolean }) => void;
   onVisionChange?: (vision: number) => void;
   onBackpackChange?: (backpack: NonNullable<MiningStateTickPayload['temporaryBackpack']>) => void;
 }
@@ -120,6 +122,7 @@ export function applySessionData(payload: MiningStateTickPayload, ctx: TickHandl
       max: payload.weaponAmmo.max,
       isReloading: payload.weaponAmmo.isReloading,
     };
+    ctx.onWeaponAmmo?.(world.weaponAmmoStateRef.current);
   }
   if (payload.visionRange !== undefined) ctx.onVisionChange?.(payload.visionRange);
   if (payload.temporaryBackpack) ctx.onBackpackChange?.(payload.temporaryBackpack);

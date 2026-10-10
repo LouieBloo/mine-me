@@ -73,6 +73,7 @@ const mockActiveCharacter = {
 };
 
 const mockPlayerState = {
+  id: mockActiveCharacter.id,
   character: mockActiveCharacter,
   inventory: { items: [], capacity: 20 },
   attributes: {

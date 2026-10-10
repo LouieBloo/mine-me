@@ -32,9 +32,9 @@ Monorepo with three apps and one shared package:
 
 ### Use the existing tables and frameworks
 Check what already exists before writing anything new. Don't hard-code item names, stats or URLs in logic, and don't add one-off uploads, folders or entity-specific columns.
-- **Game data** (items, mobs, blocks) lives in Postgres and loads at server start (`definitionLoaders`), so admin edits need a server restart. `packages/shared/src/data/*.json` is only a dev seed/mirror that server tests read.
+- **Game data** (items, mobs, blocks) lives in Postgres and loads at server start (`definitionLoaders`) and reloads after every admin save (ticket 036), so admin edits apply to the next run without a restart; edits made outside the admin (scripts, Prisma Studio) still need one. `packages/shared/src/data/*.json` is only a dev seed/mirror that server tests read.
 - **Stats come from the Effects table** for players, mobs and anything later, via the shared `deriveCombatStats` / `advanceSwing`. Mining Speed is the swing rate, not damage.
-- **Sounds go through the sound library** (`Sound` rows with a category). Mobs reference sounds by id (`Mob.soundEffects`) and the server resolves them to URLs at load. Slots are defined once in `MOB_SOUND_SLOTS` (shared); add a slot there, then its trigger in the renderer. Item and block uploads must register a library row. Follow `MobSoundEffects` for any new sound picker.
+- **Sounds go through the sound library** (`Sound` rows with a category). There is ONE upload path: `POST /api/admin/sounds` (the file keeps its own name; a clash gets `-2`, never an overwrite; never name a sound or file after what it is attached to). Entities reference sounds by library sound: mobs by id (`Mob.soundEffects`, resolved to URLs at load; slots defined once in `MOB_SOUND_SLOTS`, add a slot there, then its trigger in the renderer), items and blocks by `PATCH ... { soundId }` (which stores the sound's url). Every admin screen assigns sounds with the shared `SoundSlotPicker`; don't build another uploader.
 - **New content or field checklist:** schema, shared type, loader, wire format, admin UI, client use, tests. Send static data once with an entity's description, not every tick. Anything to preload must be a `/assets/...` URL (the preloader finds them generically).
 
 ### Shared code

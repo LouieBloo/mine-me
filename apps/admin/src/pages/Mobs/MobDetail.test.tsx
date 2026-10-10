@@ -56,7 +56,7 @@ describe('MobDetail stun settings', () => {
     expect((screen.getByLabelText(/stun immunity/i) as HTMLInputElement).value).toBe('1500');
 
     fireEvent.change(screen.getByLabelText(/hit stun/i), { target: { value: '120' } });
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save base information/i }));
 
     await waitFor(() => {
       const put = mockFetchWithAuth.mock.calls.find((c) => c[1]?.method === 'PUT');
@@ -103,7 +103,7 @@ describe('MobDetail combat effects', () => {
     fireEvent.change(screen.getByLabelText('Select Effect'), { target: { value: 'e_dmg' } });
     fireEvent.change(screen.getByLabelText('Value', { selector: '#effects-editor-value' }), { target: { value: '6' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add Effect' }));
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save base information/i }));
 
     await waitFor(() => {
       const put = mockFetchWithAuth.mock.calls.find((c) => c[1]?.method === 'PUT');

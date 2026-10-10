@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { InventoryEntry } from '@mine-me/shared';
+import { GameImage } from '../GameImage/GameImage';
 import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 import { ItemTooltip } from '../ItemTooltip/ItemTooltip';
 import { useSocket } from '../../contexts/SocketContext';
@@ -125,23 +126,18 @@ export const ItemListIcon = ({ entry }: ItemListIconProps) => {
           </div>
         )}
 
-        {item.iconUrl ? (
-          <img
-            src={
-              item.iconUrl.startsWith('http')
-                ? item.iconUrl
-                : `${import.meta.env.VITE_API_URL || ''}${item.iconUrl}`
-            }
-            alt={item.name}
-            className="w-full h-full object-cover scale-90 group-hover:scale-100 transition-transform"
-          />
-        ) : (
-          <div className="item-name-placeholder">
-            <span className="item-name-text">
-              {item.name}
-            </span>
-          </div>
-        )}
+        <GameImage
+          src={item.iconUrl}
+          alt={item.name}
+          className="w-full h-full object-cover scale-90 group-hover:scale-100 transition-transform"
+          fallback={
+            <div className="item-name-placeholder">
+              <span className="item-name-text">
+                {item.name}
+              </span>
+            </div>
+          }
+        />
 
         {/* Quantity badge - absolute positioned in bottom right */}
         {quantity > 1 && (

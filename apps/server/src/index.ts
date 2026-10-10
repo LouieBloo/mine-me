@@ -16,6 +16,7 @@ import { socketAuthMiddleware } from './sockets/socket.middleware';
 import { setIO } from './services/characterBroadcast';
 import { initRedis } from './services/redis.service';
 import { installDefinitionsFromDatabase } from './services/mining/definitionLoaders';
+import { configureDefinitionReloader } from './services/mining/definitionReloader';
 
 dotenv.config();
 
@@ -67,6 +68,7 @@ const PORT = process.env.PORT || 4000;
   // Refuse to serve a game without them.
   try {
     await installDefinitionsFromDatabase(prisma);
+    configureDefinitionReloader(prisma);
   } catch (err) {
     console.error('Failed to load game definitions from the database:', err);
     process.exit(1);

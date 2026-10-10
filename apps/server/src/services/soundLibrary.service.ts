@@ -26,8 +26,29 @@ export function categoryForUrl(url: string): SoundCategory {
   return rest !== undefined && FOLDER_CATEGORY[folder] ? FOLDER_CATEGORY[folder] : 'GENERAL';
 }
 
-const readableName = (fileName: string): string =>
-  path.basename(fileName, path.extname(fileName)).replace(/[_-]+/g, ' ').trim() || fileName;
+/** The sound's display name: the uploaded file's own name without its extension, exactly as given. */
+export const soundNameFromFile = (originalName: string): string =>
+  path.basename(originalName, path.extname(originalName)).trim() || originalName;
+
+/**
+ * A safe, unique file name for an uploaded sound that keeps the file's own name: spaces and odd
+ * characters become `_` (so urls never need escaping), case is kept, and a clash with an existing
+ * file gets `-2`, `-3`... rather than overwriting it. Nothing about what the sound is attached to
+ * ever goes in the name.
+ */
+export function uniqueSoundFileName(dir: string, originalName: string): string {
+  const ext = path.extname(originalName).toLowerCase() || '.mp3';
+  const base =
+    path
+      .basename(originalName, path.extname(originalName))
+      .trim()
+      .replace(/[^A-Za-z0-9._-]+/g, '_')
+      .replace(/^[._]+|[._]+$/g, '')
+      .slice(0, 80) || 'sound';
+  let candidate = `${base}${ext}`;
+  for (let n = 2; fs.existsSync(path.join(dir, candidate)); n++) candidate = `${base}-${n}${ext}`;
+  return candidate;
+}
 
 export interface RegisterSoundFile {
   url: string;
@@ -35,13 +56,13 @@ export interface RegisterSoundFile {
   fileSize: number;
   mimeType?: string;
   category: SoundCategory;
-  /** Defaults to a readable form of the file name. */
+  /** Defaults to the file's own name without its extension. */
   name?: string;
 }
 
 /**
- * Makes sure a sound file has a library row, keyed by its url (uploads overwrite the same file
- * name, so the row is updated rather than duplicated). Sound effects only; music has its own upload.
+ * Makes sure a sound file found on disk has a library row, keyed by its url. Used by Sync and the
+ * backfill script; uploads create their row directly in the library upload.
  */
 export async function registerSoundFile(db: SoundDb, file: RegisterSoundFile) {
   const existing = await db.sound.findFirst({ where: { url: file.url } });
@@ -53,7 +74,7 @@ export async function registerSoundFile(db: SoundDb, file: RegisterSoundFile) {
   }
   return db.sound.create({
     data: {
-      name: file.name ?? readableName(file.fileName),
+      name: file.name ?? soundNameFromFile(file.fileName),
       type: 'SFX',
       category: file.category,
       url: file.url,
@@ -65,29 +86,6 @@ export async function registerSoundFile(db: SoundDb, file: RegisterSoundFile) {
       isActive: true,
     },
   });
-}
-
-/** Removes the library row for a url (the file itself is the caller's to delete). */
-export async function unregisterSoundFile(db: SoundDb, url: string) {
-  return db.sound.deleteMany({ where: { url } });
-}
-
-/** Library bookkeeping must never fail an upload; Sync repairs anything this misses. */
-export async function tryRegisterSoundFile(db: SoundDb, file: RegisterSoundFile): Promise<void> {
-  try {
-    await registerSoundFile(db, file);
-  } catch (err) {
-    console.warn('[SoundLibrary] Could not register sound file:', file.url, err);
-  }
-}
-
-export async function tryUnregisterSoundFile(db: SoundDb, url: string | null | undefined): Promise<void> {
-  if (!url) return;
-  try {
-    await unregisterSoundFile(db, url);
-  } catch (err) {
-    console.warn('[SoundLibrary] Could not remove sound row:', url, err);
-  }
 }
 
 function listAudioFiles(dir: string, urlPrefix: string): { url: string; fileName: string; fileSize: number }[] {

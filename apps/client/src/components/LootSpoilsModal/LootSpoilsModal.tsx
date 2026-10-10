@@ -1,5 +1,5 @@
 import React from 'react';
-import { getAssetUrl } from '@mine-me/shared';
+import { GameImage } from '../GameImage/GameImage';
 import { Modal } from '../Modal/Modal';
 import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 import { ItemTooltip } from '../ItemTooltip/ItemTooltip';
@@ -124,19 +124,18 @@ export const LootSpoilsModal: React.FC<LootSpoilsModalProps> = ({
                     <div
                       className={`relative aspect-square ${rarityColors.bg} border-2 ${rarityColors.border} rounded-lg flex items-center justify-center overflow-hidden transition-all duration-300 ${rarityColors.shadow} hover:scale-105 cursor-pointer`}
                     >
-                      {item.itemDetails?.iconUrl ? (
-                        <img
-                          src={getAssetUrl(item.itemDetails.iconUrl)}
-                          alt={item.itemDetails.name}
-                          className="w-full h-full object-cover scale-90"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center p-2 text-center">
-                          <span className="text-[10px] font-black text-slate-500 uppercase leading-tight truncate">
-                            {item.itemDetails?.name || 'Item'}
-                          </span>
-                        </div>
-                      )}
+                      <GameImage
+                        src={item.itemDetails?.iconUrl}
+                        alt={item.itemDetails?.name ?? 'Item'}
+                        className="w-full h-full object-cover scale-90"
+                        fallback={
+                          <div className="flex items-center justify-center p-2 text-center">
+                            <span className="text-[10px] font-black text-slate-500 uppercase leading-tight truncate">
+                              {item.itemDetails?.name || 'Item'}
+                            </span>
+                          </div>
+                        }
+                      />
                       {item.quantity > 1 && (
                         <span className="absolute bottom-1 right-1 text-[9px] font-black text-white bg-slate-900/90 border border-slate-700/50 rounded px-1.5 py-0.5 leading-none shadow-sm">
                           {item.quantity}

@@ -29,6 +29,11 @@ export abstract class LightSource {
     this.enabled = true;
   }
 
+  /** Whether update() changes the light's look over time (flicker/pulse). Static lights don't need re-renders. */
+  public get isAnimated(): boolean {
+    return false;
+  }
+
   /**
    * Update internal animation, flicker, or pulse states.
    */

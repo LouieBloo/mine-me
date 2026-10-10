@@ -5,7 +5,7 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import { SOUND_CATEGORIES } from '@mine-me/shared';
-import { syncSoundLibrary } from '../../services/soundLibrary.service';
+import { soundNameFromFile, syncSoundLibrary, uniqueSoundFileName } from '../../services/soundLibrary.service';
 import { buildSoundUsageIndex, usageForSound } from '../../services/soundUsage.service';
 import { getSoundsDir } from '../../config/assetPaths';
 
@@ -15,14 +15,9 @@ const storage = multer.diskStorage({
     fs.mkdirSync(soundsDir, { recursive: true });
     cb(null, soundsDir);
   },
+  // The file keeps its own name (made url-safe); a clash gets -2, -3... and never overwrites
   filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase() || '.mp3';
-    const baseName = path.basename(file.originalname, ext)
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, '_')
-      .slice(0, 50);
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e4)}`;
-    cb(null, `${baseName}-${uniqueSuffix}${ext}`);
+    cb(null, uniqueSoundFileName(getSoundsDir(), file.originalname));
   }
 });
 
@@ -116,7 +111,7 @@ export const uploadSound = async (req: Request, res: Response) => {
 
     const soundName = name && name.trim().length > 0
       ? name.trim()
-      : path.basename(file.originalname, path.extname(file.originalname));
+      : soundNameFromFile(file.originalname);
 
     const soundUrl = `/assets/sounds/${file.filename}`;
 

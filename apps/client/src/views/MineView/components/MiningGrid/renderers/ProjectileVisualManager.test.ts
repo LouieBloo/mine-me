@@ -76,6 +76,26 @@ describe('ProjectileVisualManager', () => {
     expect(mockLightingEngine.addLight).toHaveBeenCalledTimes(1);
   });
 
+  it("never replays the local player's own shot when the server echoes it, however late", () => {
+    const now = vi.spyOn(performance, 'now');
+    now.mockReturnValue(1000);
+    manager.triggerLocalShot({ x: 5, y: 5 }, 0, '/shot.wav', mockParticleEngine, mockLightingEngine, mockSoundManager);
+    mockSoundManager.playPositionalSfx.mockClear();
+    mockParticleEngine.spawnBurst.mockClear();
+
+    now.mockReturnValue(1900); // a slow connection: the echo lands far later than the shot
+    manager.handleGunshotEvents(
+      [{ id: 'echo_1', characterId: 'local-char-1', weaponItemId: 'gun', position: { x: 5, y: 5 }, angle: 0, soundUrl: '/shot.wav' } as any],
+      'local-char-1',
+      mockParticleEngine,
+      mockLightingEngine,
+      mockSoundManager
+    );
+    expect(mockSoundManager.playPositionalSfx).not.toHaveBeenCalled();
+    expect(mockParticleEngine.spawnBurst).not.toHaveBeenCalled();
+    now.mockRestore();
+  });
+
   it('decays and cleans up muzzle flash light over time', () => {
     manager.triggerLocalShot(
       { x: 10, y: 10 },

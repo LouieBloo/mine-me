@@ -9,6 +9,7 @@ import './CharacterSelection.css';
 import { type GameItem, type GameCity } from '@mine-me/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import { useGame } from '../../contexts/GameContext';
+import { notificationService } from '../../services/notificationService';
 import { useNavigate } from 'react-router-dom';
 
 export interface Character {
@@ -51,13 +52,17 @@ export const CharacterSelection: React.FC = () => {
     const fetchCharacters = async () => {
         try {
             const response = await fetchWithAuth('/api/characters');
-            const data = await response.json();
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !Array.isArray(data)) {
+                throw new Error(data?.error || `Server returned ${response.status}`);
+            }
             setCharacters(data);
             if (data.length > 0 && !selectedCharacter) {
                 setSelectedCharacter(data[0]);
             }
         } catch (err) {
             console.error('Failed to fetch characters', err);
+            notificationService.error('Could not load characters', err instanceof Error ? err.message : 'Please try again.');
         } finally {
             setLoading(false);
         }
@@ -92,6 +97,7 @@ export const CharacterSelection: React.FC = () => {
             navigate('/home');
         } catch (err: any) {
             console.error('[CharacterSelection] Failed to enter game:', err.message);
+            notificationService.error('Could not enter the game', err.message);
         } finally {
             setEntering(false);
         }

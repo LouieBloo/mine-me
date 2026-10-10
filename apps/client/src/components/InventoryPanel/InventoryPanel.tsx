@@ -26,14 +26,10 @@ export const InventoryPanel = ({ inventory }: Props) => {
   const [sortBy, setSortBy] = useState<SortOption>('default');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
-  if (!inventory) return null;
-
-  const totalItems = inventory.items.reduce((sum, e) => sum + e.quantity, 0);
-
   // Group items by category: Consumables first, Materials second, Gear last
   const sortedAndGroupedItems = useMemo(() => {
     // 1. First sort the items according to user preference
-    const itemsCopy = [...inventory.items];
+    const itemsCopy = [...(inventory?.items ?? [])];
 
     if (sortBy === 'name') {
       itemsCopy.sort((a, b) => {
@@ -67,7 +63,7 @@ export const InventoryPanel = ({ inventory }: Props) => {
     });
 
     return { consumables, materials, gear };
-  }, [inventory.items, sortBy, sortOrder]);
+  }, [inventory?.items, sortBy, sortOrder]);
 
   const handleSortToggle = (option: SortOption) => {
     if (sortBy === option) {
@@ -78,6 +74,10 @@ export const InventoryPanel = ({ inventory }: Props) => {
     }
   };
 
+  // Hooks above must run on every render, so the empty case returns only after them
+  if (!inventory) return null;
+
+  const totalItems = inventory.items.reduce((sum, e) => sum + e.quantity, 0);
   const emptySlotsCount = Math.max(0, inventory.slots - inventory.items.length);
 
   return (

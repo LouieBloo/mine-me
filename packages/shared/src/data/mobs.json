@@ -1,282 +1,5 @@
 [
   {
-    "id": "cmn_mole_person_001",
-    "name": "Mole Person",
-    "level": 1,
-    "health": 40,
-    "defense": 2,
-    "attackPercentage": 80,
-    "defendPercentage": 20,
-    "aiType": "CHASE_AND_MINE",
-    "aiConfig": {
-      "mineRange": 1.1,
-      "attackRange": 1.1,
-      "jumpCooldownMs": 600,
-      "mineCooldownMs": 400,
-      "aggroRange": 12
-    },
-    "abilities": [],
-    "moveSpeed": 1,
-    "jumpForce": 6.5,
-    "sounds": {
-      "dig": {
-        "url": "/assets/sounds/cmn_mole_person_dig.mp3",
-        "loop": false
-      },
-      "idle": {
-        "url": "/assets/sounds/cmn_mole_person_idle.mp3",
-        "loop": false
-      },
-      "damage": {
-        "url": "/assets/sounds/cmn_mole_person_damage.mp3",
-        "loop": false
-      }
-    },
-    "animations": {
-      "version": "2.0",
-      "miningStyle": "hands",
-      "canvas_size": [
-        1024,
-        1024
-      ],
-      "pelvis_origin": [
-        512,
-        590
-      ],
-      "hand_joint": {
-        "offset": [
-          50,
-          80
-        ]
-      },
-      "tool_socket": {
-        "scale": 0,
-        "offset": [
-          0,
-          0
-        ],
-        "rotation": 0
-      },
-      "parts": {
-        "arm_back": {
-          "file": "/assets/sprites/mobs/cmn_mole_person_001/arm_back.png",
-          "width": 140,
-          "height": 270,
-          "bbox": [
-            0,
-            0,
-            140,
-            270
-          ],
-          "pivot_anchor": [
-            0.2,
-            0.2
-          ],
-          "offset_from_pelvis": [
-            22,
-            -145
-          ],
-          "z_index": 5,
-          "slot": "GAUNTLETS"
-        },
-        "leg_back": {
-          "file": "/assets/sprites/mobs/cmn_mole_person_001/leg_back.png",
-          "width": 175,
-          "height": 290,
-          "bbox": [
-            0,
-            0,
-            175,
-            290
-          ],
-          "pivot_anchor": [
-            0.5,
-            0.05
-          ],
-          "offset_from_pelvis": [
-            -25,
-            -12
-          ],
-          "z_index": 10,
-          "slot": "BOOTS"
-        },
-        "leg_front": {
-          "file": "/assets/sprites/mobs/cmn_mole_person_001/leg_front.png",
-          "width": 190,
-          "height": 290,
-          "bbox": [
-            0,
-            0,
-            190,
-            290
-          ],
-          "pivot_anchor": [
-            0.5,
-            0.05
-          ],
-          "offset_from_pelvis": [
-            30,
-            -5
-          ],
-          "z_index": 15,
-          "slot": "BOOTS"
-        },
-        "torso": {
-          "file": "/assets/sprites/mobs/cmn_mole_person_001/torso.png",
-          "width": 300,
-          "height": 310,
-          "bbox": [
-            0,
-            0,
-            300,
-            310
-          ],
-          "pivot_anchor": [
-            0.5,
-            0.94
-          ],
-          "offset_from_pelvis": [
-            0,
-            0
-          ],
-          "z_index": 20,
-          "slot": "CHEST"
-        },
-        "head": {
-          "file": "/assets/sprites/mobs/cmn_mole_person_001/head.png",
-          "width": 220,
-          "height": 240,
-          "bbox": [
-            0,
-            0,
-            220,
-            240
-          ],
-          "pivot_anchor": [
-            0.28,
-            0.88
-          ],
-          "offset_from_pelvis": [
-            55,
-            -161
-          ],
-          "z_index": 30,
-          "slot": "HEAD"
-        },
-        "arm_front": {
-          "file": "/assets/sprites/mobs/cmn_mole_person_001/arm_front.png",
-          "width": 280,
-          "height": 160,
-          "bbox": [
-            0,
-            0,
-            280,
-            160
-          ],
-          "pivot_anchor": [
-            0.18,
-            0.25
-          ],
-          "offset_from_pelvis": [
-            -20,
-            -150
-          ],
-          "z_index": 40,
-          "slot": "WEAPON"
-        }
-      }
-    },
-    "createdAt": "2026-09-30T00:00:00.000Z",
-    "updatedAt": "2026-09-30T00:00:00.000Z",
-    "dropTable": {
-      "id": "dt_mole_person_001",
-      "solMin": 15,
-      "solMax": 35,
-      "experience": 40,
-      "mobId": "cmn_mole_person_001",
-      "characterLevelId": null,
-      "miningBlockId": null,
-      "createdAt": "2026-09-30T01:45:50.264Z",
-      "updatedAt": "2026-10-02T00:01:15.809Z",
-      "items": [
-        {
-          "id": "cmuq76t5s000913q1muwo7lnn",
-          "dropTableId": "dt_mole_person_001",
-          "itemId": "cmp6aexa30004idpx29gsz12l",
-          "chance": 80,
-          "minQuantity": 1,
-          "maxQuantity": 3,
-          "createdAt": "2026-10-02T00:01:15.809Z",
-          "updatedAt": "2026-10-02T00:01:15.809Z"
-        }
-      ]
-    },
-    "hitStunMs": 250,
-    "stunImmunityMs": 500,
-    "mobEffects": [
-      {
-        "effectId": "cmt27dcbt0000vx8zxmq1sokb",
-        "value": 25,
-        "mobId": "cmn_mole_person_001",
-        "effect": {
-          "id": "cmt27dcbt0000vx8zxmq1sokb",
-          "name": "Mining Speed",
-          "description": "Attack speed with mining tool",
-          "healthGain": false,
-          "staminaGain": false,
-          "miningSpeedModifier": true,
-          "damageModifier": false,
-          "explodes": false,
-          "createdAt": "2026-08-21T00:20:10.026Z",
-          "updatedAt": "2026-09-13T01:41:45.285Z",
-          "toolDamageModifier": false,
-          "pickPowerModifier": false,
-          "knockbackModifier": false
-        }
-      },
-      {
-        "effectId": "cmv_damage_effect_001",
-        "value": 6,
-        "mobId": "cmn_mole_person_001",
-        "effect": {
-          "id": "cmv_damage_effect_001",
-          "name": "Damage",
-          "description": "Damage dealt to mobs per hit (melee and projectiles)",
-          "healthGain": false,
-          "staminaGain": false,
-          "miningSpeedModifier": false,
-          "damageModifier": true,
-          "explodes": false,
-          "createdAt": "2026-10-07T16:00:00.000Z",
-          "updatedAt": "2026-10-07T16:00:00.000Z",
-          "toolDamageModifier": false,
-          "pickPowerModifier": false,
-          "knockbackModifier": false
-        }
-      },
-      {
-        "effectId": "eff_tool_damage",
-        "value": 25,
-        "mobId": "cmn_mole_person_001",
-        "effect": {
-          "id": "eff_tool_damage",
-          "name": "Tool Damage",
-          "description": "Damage dealt to blocks per swing",
-          "healthGain": false,
-          "staminaGain": false,
-          "miningSpeedModifier": false,
-          "damageModifier": false,
-          "toolDamageModifier": true,
-          "pickPowerModifier": false,
-          "knockbackModifier": false,
-          "explodes": false,
-          "createdAt": "2026-10-08T00:00:00.000Z",
-          "updatedAt": "2026-10-08T00:00:00.000Z"
-        }
-      }
-    ]
-  },
-  {
     "id": "cmn1zb9op0000ihw4mgknuvlr",
     "name": "Mario",
     "level": 1,
@@ -289,10 +12,13 @@
     "abilities": null,
     "moveSpeed": 3,
     "jumpForce": 6.5,
+    "hitStunMs": 250,
+    "stunImmunityMs": 500,
     "animations": {
       "url": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_sprite.png",
       "atlasUrl": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_atlas.json"
     },
+    "soundEffects": null,
     "createdAt": "2026-04-06T21:51:48.689Z",
     "updatedAt": "2026-04-06T21:51:48.689Z",
     "dropTable": {
@@ -304,7 +30,7 @@
       "characterLevelId": null,
       "miningBlockId": null,
       "createdAt": "2026-06-22T00:13:19.086Z",
-      "updatedAt": "2026-09-30T01:45:50.239Z",
+      "updatedAt": "2026-10-08T01:04:34.469Z",
       "items": [
         {
           "id": "cmq1lerzw0009q7ocoeo29j4r",
@@ -314,7 +40,7 @@
           "minQuantity": 1,
           "maxQuantity": 1,
           "createdAt": "2026-06-22T00:13:19.102Z",
-          "updatedAt": "2026-09-30T01:45:50.243Z"
+          "updatedAt": "2026-10-08T01:04:34.473Z"
         },
         {
           "id": "cmq1lerzw000aq7oce69fyvsp",
@@ -324,7 +50,7 @@
           "minQuantity": 1,
           "maxQuantity": 1,
           "createdAt": "2026-06-22T00:13:19.124Z",
-          "updatedAt": "2026-09-30T01:45:50.248Z"
+          "updatedAt": "2026-10-08T01:04:34.476Z"
         },
         {
           "id": "cmq1lerzw000bq7ocy6t8mssb",
@@ -334,17 +60,19 @@
           "minQuantity": 1,
           "maxQuantity": 1,
           "createdAt": "2026-06-22T00:13:19.137Z",
-          "updatedAt": "2026-09-30T01:45:50.251Z"
+          "updatedAt": "2026-10-08T01:04:34.480Z"
         }
       ]
     },
-    "hitStunMs": 250,
-    "stunImmunityMs": 500,
     "mobEffects": [
       {
+        "id": "cmv14v0on0001119hncl26jt5",
+        "itemId": null,
+        "mobId": "cmn1zb9op0000ihw4mgknuvlr",
         "effectId": "cmt27dcbt0000vx8zxmq1sokb",
         "value": 50,
-        "mobId": "cmn1zb9op0000ihw4mgknuvlr",
+        "createdAt": "2026-10-09T15:41:34.392Z",
+        "updatedAt": "2026-10-09T15:41:34.392Z",
         "effect": {
           "id": "cmt27dcbt0000vx8zxmq1sokb",
           "name": "Mining Speed",
@@ -353,38 +81,46 @@
           "staminaGain": false,
           "miningSpeedModifier": true,
           "damageModifier": false,
-          "explodes": false,
-          "createdAt": "2026-08-21T00:20:10.026Z",
-          "updatedAt": "2026-09-13T01:41:45.285Z",
           "toolDamageModifier": false,
           "pickPowerModifier": false,
-          "knockbackModifier": false
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-08-21T00:20:10.026Z",
+          "updatedAt": "2026-10-08T01:04:34.183Z"
         }
       },
       {
+        "id": "cmv14v0ou0003119hsnek1nsw",
+        "itemId": null,
+        "mobId": "cmn1zb9op0000ihw4mgknuvlr",
         "effectId": "cmv_damage_effect_001",
         "value": 2,
-        "mobId": "cmn1zb9op0000ihw4mgknuvlr",
+        "createdAt": "2026-10-09T15:41:34.399Z",
+        "updatedAt": "2026-10-09T15:41:34.399Z",
         "effect": {
           "id": "cmv_damage_effect_001",
           "name": "Damage",
-          "description": "Damage dealt to mobs per hit (melee and projectiles)",
+          "description": "Increases damage dealt per hit",
           "healthGain": false,
           "staminaGain": false,
           "miningSpeedModifier": false,
           "damageModifier": true,
-          "explodes": false,
-          "createdAt": "2026-10-07T16:00:00.000Z",
-          "updatedAt": "2026-10-07T16:00:00.000Z",
           "toolDamageModifier": false,
           "pickPowerModifier": false,
-          "knockbackModifier": false
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-10-07T23:25:46.378Z",
+          "updatedAt": "2026-10-08T01:04:34.191Z"
         }
       },
       {
+        "id": "cmv14v0p00005119hlj61s295",
+        "itemId": null,
+        "mobId": "cmn1zb9op0000ihw4mgknuvlr",
         "effectId": "eff_tool_damage",
         "value": 25,
-        "mobId": "cmn1zb9op0000ihw4mgknuvlr",
+        "createdAt": "2026-10-09T15:41:34.404Z",
+        "updatedAt": "2026-10-09T15:41:34.404Z",
         "effect": {
           "id": "eff_tool_damage",
           "name": "Tool Damage",
@@ -397,8 +133,8 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
-          "createdAt": "2026-10-08T00:00:00.000Z",
-          "updatedAt": "2026-10-08T00:00:00.000Z"
+          "createdAt": "2026-10-09T01:51:55.968Z",
+          "updatedAt": "2026-10-09T01:51:55.968Z"
         }
       }
     ]
@@ -416,6 +152,8 @@
     "abilities": null,
     "moveSpeed": 3,
     "jumpForce": 6.5,
+    "hitStunMs": 250,
+    "stunImmunityMs": 500,
     "animations": {
       "parts": {
         "head": {
@@ -569,16 +307,19 @@
         590
       ]
     },
+    "soundEffects": null,
     "createdAt": "2026-04-06T21:51:48.684Z",
     "updatedAt": "2026-08-19T02:49:17.707Z",
     "dropTable": null,
-    "hitStunMs": 250,
-    "stunImmunityMs": 500,
     "mobEffects": [
       {
+        "id": "cmv14v0p40007119hylllgboq",
+        "itemId": null,
+        "mobId": "cmn1zl1bk0001ihw48b0c492z",
         "effectId": "cmt27dcbt0000vx8zxmq1sokb",
         "value": 50,
-        "mobId": "cmn1zl1bk0001ihw48b0c492z",
+        "createdAt": "2026-10-09T15:41:34.409Z",
+        "updatedAt": "2026-10-09T15:41:34.409Z",
         "effect": {
           "id": "cmt27dcbt0000vx8zxmq1sokb",
           "name": "Mining Speed",
@@ -587,38 +328,46 @@
           "staminaGain": false,
           "miningSpeedModifier": true,
           "damageModifier": false,
-          "explodes": false,
-          "createdAt": "2026-08-21T00:20:10.026Z",
-          "updatedAt": "2026-09-13T01:41:45.285Z",
           "toolDamageModifier": false,
           "pickPowerModifier": false,
-          "knockbackModifier": false
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-08-21T00:20:10.026Z",
+          "updatedAt": "2026-10-08T01:04:34.183Z"
         }
       },
       {
+        "id": "cmv14v0p80009119hvphkki4m",
+        "itemId": null,
+        "mobId": "cmn1zl1bk0001ihw48b0c492z",
         "effectId": "cmv_damage_effect_001",
         "value": 20,
-        "mobId": "cmn1zl1bk0001ihw48b0c492z",
+        "createdAt": "2026-10-09T15:41:34.412Z",
+        "updatedAt": "2026-10-09T15:41:34.412Z",
         "effect": {
           "id": "cmv_damage_effect_001",
           "name": "Damage",
-          "description": "Damage dealt to mobs per hit (melee and projectiles)",
+          "description": "Increases damage dealt per hit",
           "healthGain": false,
           "staminaGain": false,
           "miningSpeedModifier": false,
           "damageModifier": true,
-          "explodes": false,
-          "createdAt": "2026-10-07T16:00:00.000Z",
-          "updatedAt": "2026-10-07T16:00:00.000Z",
           "toolDamageModifier": false,
           "pickPowerModifier": false,
-          "knockbackModifier": false
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-10-07T23:25:46.378Z",
+          "updatedAt": "2026-10-08T01:04:34.191Z"
         }
       },
       {
+        "id": "cmv14v0pc000b119htupa29it",
+        "itemId": null,
+        "mobId": "cmn1zl1bk0001ihw48b0c492z",
         "effectId": "eff_tool_damage",
         "value": 25,
-        "mobId": "cmn1zl1bk0001ihw48b0c492z",
+        "createdAt": "2026-10-09T15:41:34.416Z",
+        "updatedAt": "2026-10-09T15:41:34.416Z",
         "effect": {
           "id": "eff_tool_damage",
           "name": "Tool Damage",
@@ -631,8 +380,8 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
-          "createdAt": "2026-10-08T00:00:00.000Z",
-          "updatedAt": "2026-10-08T00:00:00.000Z"
+          "createdAt": "2026-10-09T01:51:55.968Z",
+          "updatedAt": "2026-10-09T01:51:55.968Z"
         }
       }
     ]
@@ -647,22 +396,312 @@
     "defendPercentage": 0,
     "aiType": "STATIONARY",
     "aiConfig": {
+      "spriteUrl": "/assets/sprites/mobs/target_dummy.png",
       "colliderWidth": 0.8,
-      "colliderHeight": 1.25,
       "showHealthBar": false,
-      "spriteUrl": "/assets/sprites/mobs/target_dummy.png"
+      "colliderHeight": 1.25
     },
     "abilities": [],
     "moveSpeed": 0,
     "jumpForce": 0,
+    "hitStunMs": 250,
+    "stunImmunityMs": 500,
     "animations": {
       "url": "/assets/sprites/mobs/target_dummy.png"
     },
+    "soundEffects": null,
     "createdAt": "2026-10-07T00:00:00.000Z",
     "updatedAt": "2026-10-07T00:00:00.000Z",
     "dropTable": null,
+    "mobEffects": []
+  },
+  {
+    "id": "cmn_mole_person_001",
+    "name": "Mole Person",
+    "level": 1,
+    "health": 40,
+    "defense": 2,
+    "attackPercentage": 80,
+    "defendPercentage": 20,
+    "aiType": "CHASE_AND_MINE",
+    "aiConfig": {
+      "mineRange": 1.1,
+      "aggroRange": 12,
+      "attackRange": 1.1,
+      "jumpCooldownMs": 600,
+      "mineCooldownMs": 400
+    },
+    "abilities": [],
+    "moveSpeed": 1,
+    "jumpForce": 6.5,
     "hitStunMs": 250,
     "stunImmunityMs": 500,
-    "mobEffects": []
+    "animations": {
+      "parts": {
+        "head": {
+          "bbox": [
+            0,
+            0,
+            220,
+            240
+          ],
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/head.png",
+          "slot": "HEAD",
+          "width": 220,
+          "height": 240,
+          "z_index": 30,
+          "pivot_anchor": [
+            0.28,
+            0.88
+          ],
+          "offset_from_pelvis": [
+            55,
+            -161
+          ]
+        },
+        "torso": {
+          "bbox": [
+            0,
+            0,
+            300,
+            310
+          ],
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/torso.png",
+          "slot": "CHEST",
+          "width": 300,
+          "height": 310,
+          "z_index": 20,
+          "pivot_anchor": [
+            0.5,
+            0.94
+          ],
+          "offset_from_pelvis": [
+            0,
+            0
+          ]
+        },
+        "arm_back": {
+          "bbox": [
+            0,
+            0,
+            140,
+            270
+          ],
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/arm_back.png",
+          "slot": "GAUNTLETS",
+          "width": 140,
+          "height": 270,
+          "z_index": 5,
+          "pivot_anchor": [
+            0.2,
+            0.2
+          ],
+          "offset_from_pelvis": [
+            22,
+            -145
+          ]
+        },
+        "leg_back": {
+          "bbox": [
+            0,
+            0,
+            175,
+            290
+          ],
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/leg_back.png",
+          "slot": "BOOTS",
+          "width": 175,
+          "height": 290,
+          "z_index": 10,
+          "pivot_anchor": [
+            0.5,
+            0.05
+          ],
+          "offset_from_pelvis": [
+            -25,
+            -12
+          ]
+        },
+        "arm_front": {
+          "bbox": [
+            0,
+            0,
+            280,
+            160
+          ],
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/arm_front.png",
+          "slot": "WEAPON",
+          "width": 280,
+          "height": 160,
+          "z_index": 40,
+          "pivot_anchor": [
+            0.18,
+            0.25
+          ],
+          "offset_from_pelvis": [
+            -20,
+            -150
+          ]
+        },
+        "leg_front": {
+          "bbox": [
+            0,
+            0,
+            190,
+            290
+          ],
+          "file": "/assets/sprites/mobs/cmn_mole_person_001/leg_front.png",
+          "slot": "BOOTS",
+          "width": 190,
+          "height": 290,
+          "z_index": 15,
+          "pivot_anchor": [
+            0.5,
+            0.05
+          ],
+          "offset_from_pelvis": [
+            30,
+            -5
+          ]
+        }
+      },
+      "version": "2.0",
+      "hand_joint": {
+        "offset": [
+          50,
+          80
+        ]
+      },
+      "canvas_size": [
+        1024,
+        1024
+      ],
+      "miningStyle": "hands",
+      "tool_socket": {
+        "scale": 0,
+        "offset": [
+          0,
+          0
+        ],
+        "rotation": 0
+      },
+      "pelvis_origin": [
+        512,
+        590
+      ]
+    },
+    "soundEffects": {
+      "dig": {
+        "soundId": "sfx_mole_dig_001"
+      },
+      "death": {
+        "soundId": "cmv2mk1s7000111o481xi3a2j"
+      },
+      "attack": {
+        "soundId": "sfx_mole_dig_001"
+      },
+      "damage": {
+        "soundId": "cmv2mjwjd000011o4ezf8wqzk"
+      }
+    },
+    "createdAt": "2026-09-30T00:00:00.000Z",
+    "updatedAt": "2026-10-10T16:44:41.872Z",
+    "dropTable": {
+      "id": "dt_mole_person_001",
+      "solMin": 15,
+      "solMax": 35,
+      "experience": 40,
+      "mobId": "cmn_mole_person_001",
+      "characterLevelId": null,
+      "miningBlockId": null,
+      "createdAt": "2026-09-30T01:45:50.264Z",
+      "updatedAt": "2026-10-08T01:04:34.456Z",
+      "items": [
+        {
+          "id": "cmuq76t5s000913q1muwo7lnn",
+          "dropTableId": "dt_mole_person_001",
+          "itemId": "cmp6aexa30004idpx29gsz12l",
+          "chance": 80,
+          "minQuantity": 1,
+          "maxQuantity": 3,
+          "createdAt": "2026-10-02T00:01:15.809Z",
+          "updatedAt": "2026-10-08T01:04:34.460Z"
+        }
+      ]
+    },
+    "mobEffects": [
+      {
+        "id": "cmv14v0pg000d119hhru1zr2x",
+        "itemId": null,
+        "mobId": "cmn_mole_person_001",
+        "effectId": "cmt27dcbt0000vx8zxmq1sokb",
+        "value": 25,
+        "createdAt": "2026-10-09T15:41:34.421Z",
+        "updatedAt": "2026-10-09T15:41:34.421Z",
+        "effect": {
+          "id": "cmt27dcbt0000vx8zxmq1sokb",
+          "name": "Mining Speed",
+          "description": "Attack speed with mining tool",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": true,
+          "damageModifier": false,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-08-21T00:20:10.026Z",
+          "updatedAt": "2026-10-08T01:04:34.183Z"
+        }
+      },
+      {
+        "id": "cmv14v0pk000f119h2sijdwq8",
+        "itemId": null,
+        "mobId": "cmn_mole_person_001",
+        "effectId": "cmv_damage_effect_001",
+        "value": 6,
+        "createdAt": "2026-10-09T15:41:34.424Z",
+        "updatedAt": "2026-10-09T15:41:34.424Z",
+        "effect": {
+          "id": "cmv_damage_effect_001",
+          "name": "Damage",
+          "description": "Increases damage dealt per hit",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": true,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-10-07T23:25:46.378Z",
+          "updatedAt": "2026-10-08T01:04:34.191Z"
+        }
+      },
+      {
+        "id": "cmv14v0pp000h119hr6nfucfn",
+        "itemId": null,
+        "mobId": "cmn_mole_person_001",
+        "effectId": "eff_tool_damage",
+        "value": 25,
+        "createdAt": "2026-10-09T15:41:34.429Z",
+        "updatedAt": "2026-10-09T15:41:34.429Z",
+        "effect": {
+          "id": "eff_tool_damage",
+          "name": "Tool Damage",
+          "description": "Damage dealt to blocks per swing",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": false,
+          "toolDamageModifier": true,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-10-09T01:51:55.968Z",
+          "updatedAt": "2026-10-09T01:51:55.968Z"
+        }
+      }
+    ]
   }
 ]

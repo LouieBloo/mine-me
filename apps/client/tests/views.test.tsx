@@ -42,6 +42,8 @@ vi.mock('../src/contexts/SocketContext', () => ({
   SocketProvider: ({ children }: any) => React.createElement('div', null, children),
   useSocket: () => ({
     isConnected: false,
+    session: { status: 'ready', error: null },
+    retrySession: vi.fn(),
     selectCharacter: vi.fn().mockResolvedValue(undefined),
     joinCity: vi.fn().mockResolvedValue(undefined),
     leaveCity: vi.fn().mockResolvedValue(undefined),

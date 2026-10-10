@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, type ReactNode } from 'react';
+import React, { createContext, useState, useContext, useCallback, type ReactNode } from 'react';
 import type { Character } from '../views/CharacterSelection/CharacterSelection';
 import type { GameCity, PlayerState, CharacterStatUpdate, MiningSessionClientState } from '@mine-me/shared';
 
@@ -34,26 +34,28 @@ function readLocalStorage<T>(key: string): T | null {
     }
 }
 
+/** Persisted player state is only trusted when it belongs to the persisted active character. */
+export function readPersistedGameState(): { character: Character | null; playerState: PlayerState | null } {
+    const character = readLocalStorage<Character>('nvg_active_character');
+    const saved = readLocalStorage<PlayerState>('nvg_player_state');
+    const playerState = character && saved && saved.id === character.id ? saved : null;
+    return { character, playerState };
+}
+
 export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [activeCharacter, setActiveCharacterState] = useState<Character | null>(() =>
-        readLocalStorage<Character>('nvg_active_character')
-    );
+    const [persisted] = useState(readPersistedGameState);
+    const [activeCharacter, setActiveCharacterState] = useState<Character | null>(persisted.character);
 
     // Restore city from persisted playerState so we never flash "Loading..."
-    const [playerState, setPlayerStateRaw] = useState<PlayerState | null>(() =>
-        readLocalStorage<PlayerState>('nvg_player_state')
-    );
+    const [playerState, setPlayerStateRaw] = useState<PlayerState | null>(persisted.playerState);
 
-    const [activeCity, setActiveCity] = useState<GameCity | null>(() => {
-        const ps = readLocalStorage<PlayerState>('nvg_player_state');
-        return ps?.city ?? null;
-    });
+    const [activeCity, setActiveCity] = useState<GameCity | null>(persisted.playerState?.city ?? null);
 
     const [displayPlayerHealth, setDisplayPlayerHealth] = useState<number | null>(null);
     const [miningSession, setMiningSession] = useState<MiningSessionClientState | null>(null);
 
     // Wrap setPlayerState so we also persist it
-    const setPlayerState = (state: PlayerState | null) => {
+    const setPlayerState = useCallback((state: PlayerState | null) => {
         setPlayerStateRaw(state);
         if (state) {
             localStorage.setItem('nvg_player_state', JSON.stringify(state));
@@ -62,12 +64,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } else {
             localStorage.removeItem('nvg_player_state');
         }
-    };
+    }, []);
 
     // Merge a partial stat update into the existing playerState.
     // Fields in CharacterStatUpdate map to either top-level (sol, lear, cityId)
     // or nested attributes (level, combatScore, stamina, ageInDays, etc.).
-    const applyStatUpdate = (updates: CharacterStatUpdate) => {
+    const applyStatUpdate = useCallback((updates: CharacterStatUpdate) => {
         if (updates.status === 'DEAD') {
             setActiveCharacterState(null);
             localStorage.removeItem('nvg_active_character');
@@ -96,22 +98,22 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             localStorage.setItem('nvg_player_state', JSON.stringify(next));
             return next;
         });
-    };
+    }, []);
 
     // setActiveCharacter ONLY updates the active character + localStorage.
     // It must NOT wipe playerState — city switching would hit this path and
     // that must not discard the inventory or any other socket-pushed state.
-    const setActiveCharacter = (char: Character | null) => {
+    const setActiveCharacter = useCallback((char: Character | null) => {
         setActiveCharacterState(char);
         if (char) {
             localStorage.setItem('nvg_active_character', JSON.stringify(char));
         } else {
             localStorage.removeItem('nvg_active_character');
         }
-    };
+    }, []);
 
     // Call this on full logout to wipe everything
-    const clearGameState = () => {
+    const clearGameState = useCallback(() => {
         setActiveCharacterState(null);
         setPlayerStateRaw(null);
         setActiveCity(null);
@@ -119,7 +121,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setMiningSession(null);
         localStorage.removeItem('nvg_active_character');
         localStorage.removeItem('nvg_player_state');
-    };
+    }, []);
 
     return (
         <GameContext.Provider value={{

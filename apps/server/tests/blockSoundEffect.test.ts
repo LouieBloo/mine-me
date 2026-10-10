@@ -24,10 +24,11 @@ let mockBlocks: any[] = [];
 vi.mock('../src/index', () => ({
   prisma: {
     sound: {
-      findFirst: vi.fn().mockResolvedValue(null),
-      create: vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: 's1', ...data })),
-      update: vi.fn(),
-      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findUnique: vi.fn().mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'lib_1' ? { id: 'lib_1', name: 'Crunch', url: '/assets/sounds/Crunch.mp3' } : null)
+      ),
+      create: vi.fn(),
+      deleteMany: vi.fn(),
     },
     miningBlock: {
       findFirst: vi.fn().mockImplementation(({ where }) => {
@@ -85,52 +86,39 @@ describe('Mining Block Sound Effect Endpoints', () => {
     ];
   });
 
-  it('should upload a sound effect for a block', async () => {
-    const audioBuffer = Buffer.from('RIFF....WAVEfmt ....data....');
-
-    const res = await request(app)
-      .post('/api/admin/blocks/block_dirt/sound-effect')
-      .attach('soundEffect', audioBuffer, 'dirt_hit.wav');
+  it('points the block at a library sound', async () => {
+    const res = await request(app).patch('/api/admin/blocks/block_dirt/sound-effect').send({ soundId: 'lib_1' });
 
     expect(res.status).toBe(200);
-    expect(res.body.soundEffectUrl).toMatch(/^\/assets\/sounds\/blocks\/block_dirt_sfx\.wav$/);
-    expect(mockBlocks[0].soundEffectUrl).toMatch(/^\/assets\/sounds\/blocks\/block_dirt_sfx\.wav$/);
-    expect((prisma as any).sound.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ url: '/assets/sounds/blocks/block_dirt_sfx.wav', category: 'BLOCK', type: 'SFX' }),
-    });
+    expect(res.body.soundEffectUrl).toBe('/assets/sounds/Crunch.mp3');
+    expect(mockBlocks[0].soundEffectUrl).toBe('/assets/sounds/Crunch.mp3');
   });
 
-  it('should return 400 when no file is uploaded', async () => {
-    const res = await request(app)
-      .post('/api/admin/blocks/block_dirt/sound-effect');
-
-    expect(res.status).toBe(400);
-    expect(res.body.error).toContain('No sound effect file provided');
+  it('finds the block by its type key too', async () => {
+    const res = await request(app).patch('/api/admin/blocks/dirt/sound-effect').send({ soundId: 'lib_1' });
+    expect(res.status).toBe(200);
   });
 
-  it('should return 404 when block is not found during upload', async () => {
-    const audioBuffer = Buffer.from('fake-audio-data');
-
-    const res = await request(app)
-      .post('/api/admin/blocks/non_existent_block/sound-effect')
-      .attach('soundEffect', audioBuffer, 'stone_hit.mp3');
-
-    expect(res.status).toBe(404);
-  });
-
-  it('should remove a sound effect from a block', async () => {
-    const res = await request(app)
-      .delete('/api/admin/blocks/block_copperium/sound-effect');
+  it('clears the sound without touching the file or the library', async () => {
+    (prisma as any).sound.deleteMany.mockClear();
+    const res = await request(app).patch('/api/admin/blocks/block_copperium/sound-effect').send({ soundId: null });
 
     expect(res.status).toBe(200);
     expect(res.body.soundEffectUrl).toBeNull();
-    expect(mockBlocks[1].soundEffectUrl).toBeNull();
+    expect((prisma as any).sound.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('should return 404 when removing sound effect from non-existent block', async () => {
-    const res = await request(app)
-      .delete('/api/admin/blocks/non_existent_block/sound-effect');
+  it('rejects an unknown sound, a malformed id and an unknown block', async () => {
+    expect((await request(app).patch('/api/admin/blocks/block_dirt/sound-effect').send({ soundId: 'nope' })).status).toBe(404);
+    expect((await request(app).patch('/api/admin/blocks/block_dirt/sound-effect').send({ soundId: 7 })).status).toBe(400);
+    expect((await request(app).patch('/api/admin/blocks/ghost/sound-effect').send({ soundId: 'lib_1' })).status).toBe(404);
+  });
 
-    expect(res.status).toBe(404);
+  it('has no upload or remove endpoint of its own any more (sounds are uploaded to the library)', async () => {
+    const upload = await request(app).post('/api/admin/blocks/block_dirt/sound-effect').attach('soundEffect', Buffer.from('x'), 'a.mp3');
+    const remove = await request(app).delete('/api/admin/blocks/block_copperium/sound-effect');
+    expect(upload.status).toBe(404);
+    expect(remove.status).toBe(404);
+    expect(mockBlocks[1].soundEffectUrl).toBe('/assets/sounds/blocks/copperium_sfx.wav');
   });
 });

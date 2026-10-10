@@ -156,6 +156,13 @@ describe('applySessionData', () => {
     expect(world.weaponAmmoStateRef.current).toEqual({ current: 0, max: 0, isReloading: false });
     applySessionData(payload({ weaponAmmo: { current: 3, max: 6, isReloading: true } }), makeCtx(world));
     expect(world.weaponAmmoStateRef.current).toEqual({ current: 3, max: 6, isReloading: true });
+
+    const onWeaponAmmo = vi.fn();
+    applySessionData(payload({ weaponAmmo: { current: 0, max: 6, isReloading: true } }), makeCtx(world, { onWeaponAmmo }));
+    expect(onWeaponAmmo).toHaveBeenCalledWith({ current: 0, max: 6, isReloading: true });
+    const unarmed = vi.fn();
+    applySessionData(payload({ weaponAmmo: { current: 0, max: 6, isReloading: true } }), makeCtx(world, { hasEquippedWeapon: false, onWeaponAmmo: unarmed }));
+    expect(unarmed).not.toHaveBeenCalled();
   });
 
   it('reports vision and backpack changes, but only when present', () => {

@@ -26,6 +26,7 @@ import { useMiningScene } from './hooks/useMiningScene';
 import { useMiningActions } from './hooks/useMiningActions';
 import { useMiningAmbientEffects } from './hooks/useMiningAmbientEffects';
 import { useMiningStateSync } from './hooks/useMiningStateSync';
+import { ReloadSoundTrigger } from './systems/ReloadSoundTrigger';
 import { usePlayerDamageEvents } from './hooks/usePlayerDamageEvents';
 import { useMiningTicker } from './hooks/useMiningTicker';
 import { TILE_SIZE } from './renderers/MiningTileRenderer';
@@ -330,6 +331,10 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     blockParticleConfigsRef,
   };
 
+  // One trigger shared by the R key and the server's ammo ticks, so a reload sounds once however it starts
+  const reloadSoundRef = useRef<ReloadSoundTrigger | null>(null);
+  if (!reloadSoundRef.current) reloadSoundRef.current = new ReloadSoundTrigger();
+
   const { weaponSoundUrlRef, weaponAmmoStateRef, handleWeaponReload } = useMiningActions({
     world: sceneWorld,
     playerState,
@@ -345,6 +350,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     isThrowingItem,
     activeThrowableItem,
     onDynamiteThrown,
+    reloadSound: reloadSoundRef.current,
   });
 
   const lastWeaponSoundTimeRef = useRef<number>(0);
@@ -415,6 +421,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     soundManager,
     world,
     containersReady,
+    reloadSound: reloadSoundRef.current,
     onVisionChange,
     onBackpackChange,
   });

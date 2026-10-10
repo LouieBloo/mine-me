@@ -1,3 +1,4 @@
+import { GameImage } from '../GameImage/GameImage';
 import React, { useState } from 'react';
 import { useQuickAccess } from '../../contexts/QuickAccessContext';
 import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
@@ -144,21 +145,16 @@ export const QuickAccessBar: React.FC = () => {
                     isDepleted ? 'opacity-40 grayscale' : ''
                   }`}
                 >
-                  {item.iconUrl ? (
-                    <img
-                      src={
-                        item.iconUrl.startsWith('http')
-                          ? item.iconUrl
-                          : `${import.meta.env.VITE_API_URL || ''}${item.iconUrl}`
-                      }
-                      alt={item.name}
-                      className="w-full h-full object-cover scale-90 group-hover:scale-100 transition-transform pointer-events-none"
-                    />
-                  ) : (
-                    <span className="text-xs font-black text-amber-400 text-center uppercase truncate px-1">
-                      {item.name.slice(0, 3)}
-                    </span>
-                  )}
+                  <GameImage
+                    src={item.iconUrl}
+                    alt={item.name}
+                    className="w-full h-full object-cover scale-90 group-hover:scale-100 transition-transform pointer-events-none"
+                    fallback={
+                      <span className="text-xs font-black text-amber-400 text-center uppercase truncate px-1">
+                        {item.name.slice(0, 3)}
+                      </span>
+                    }
+                  />
 
                   {/* Quantity Badge on Bottom Right */}
                   <span

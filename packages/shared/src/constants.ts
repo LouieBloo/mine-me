@@ -1,3 +1,6 @@
+/** Response header the server sets when an admin save worked but the live game definitions could not be reloaded. */
+export const DEFINITIONS_RELOAD_FAILED_HEADER = 'X-Definitions-Reload-Failed';
+
 import type { GearSubType, ItemType, ItemPhysicsConfig, ItemSoundEffectsConfig } from './types';
 
 export const DEFAULT_DYNAMITE_SOUNDS: ItemSoundEffectsConfig = {

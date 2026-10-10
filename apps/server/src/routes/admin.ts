@@ -1,6 +1,7 @@
 import express from 'express';
 import { runValidation } from '../middleware/validation';
 import { adminMiddleware } from '../middleware/auth';
+import { reloadDefinitionsAfterWrite } from '../middleware/definitionReload';
 import * as CityController from '../controllers/admin/city.controller';
 import * as ItemController from '../controllers/admin/item.controller';
 import * as MobController from '../controllers/admin/mob.controller';
@@ -18,6 +19,8 @@ import * as AdminValidation from '../validations/admin.validation';
 
 const adminRouter = express.Router();
 adminRouter.use(adminMiddleware);
+// Admin edits to game content apply to the running server without a restart
+adminRouter.use(reloadDefinitionsAfterWrite);
 
 // CITIES
 adminRouter.get('/cities', CityController.getCities);
@@ -43,11 +46,7 @@ adminRouter.put('/items/:id', runValidation(AdminValidation.itemValidation), Ite
 adminRouter.post('/items/:id/icon', ItemController.itemIconUpload, ItemController.uploadItemIcon);
 adminRouter.post('/items/:id/gear-image', ItemController.itemGearImageUpload, ItemController.uploadItemGearImage);
 adminRouter.post('/items/:id/in-game-sprite', ItemController.itemInGameSpriteUpload, ItemController.uploadItemInGameSprite);
-adminRouter.post('/items/:id/sound-effect', ItemController.itemSoundEffectUpload, ItemController.uploadItemSoundEffect);
-adminRouter.delete('/items/:id/sound-effect', ItemController.removeItemSoundEffect);
-adminRouter.post('/items/:id/sound-effects/:slot', ItemController.itemSoundEffectUpload, ItemController.uploadItemSoundEffect);
 adminRouter.patch('/items/:id/sound-effects/:slot', ItemController.updateItemSoundEffectSlot);
-adminRouter.delete('/items/:id/sound-effects/:slot', ItemController.removeItemSoundEffect);
 
 // MOBS
 adminRouter.get('/mobs', MobController.getMobs);
@@ -56,7 +55,6 @@ adminRouter.post('/mobs', runValidation(AdminValidation.mobValidation), MobContr
 adminRouter.put('/mobs/:id', runValidation(AdminValidation.mobUpdateValidation), MobController.updateMob);
 adminRouter.put('/mobs/:id/skeleton', MobController.updateMobSkeleton);
 adminRouter.patch('/mobs/:id/sound-effects/:slot', MobSoundController.requireMobSoundSlot, MobSoundController.setMobSoundSlot);
-adminRouter.post('/mobs/:id/sound-effects/:slot', MobSoundController.requireMobSoundSlot, MobSoundController.mobSoundEffectUpload, MobSoundController.uploadMobSoundSlot);
 adminRouter.post('/mobs/:id/sprite-atlas', MobController.mobSpriteUpload, MobController.uploadMobSpriteAtlas);
 
 // USERS
@@ -97,8 +95,7 @@ adminRouter.get('/blocks', BlockController.getBlocks);
 adminRouter.get('/blocks/:id', BlockController.getBlock);
 adminRouter.put('/blocks/:id', runValidation(AdminValidation.blockUpdateValidation), BlockController.updateBlock);
 adminRouter.post('/blocks/:id/texture', BlockController.blockTextureUpload, BlockController.uploadBlockTexture);
-adminRouter.post('/blocks/:id/sound-effect', BlockController.blockSoundEffectUpload, BlockController.uploadBlockSoundEffect);
-adminRouter.delete('/blocks/:id/sound-effect', BlockController.removeBlockSoundEffect);
+adminRouter.patch('/blocks/:id/sound-effect', BlockController.setBlockSoundEffect);
 
 // MINING CONFIG
 adminRouter.get('/mining-config', MiningConfigController.getMiningConfig);

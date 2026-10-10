@@ -1,149 +1,89 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import BlockSoundEffectUpload from './BlockSoundEffectUpload';
 import '@testing-library/jest-dom';
+import BlockSoundEffectUpload from './BlockSoundEffectUpload';
+import { ToastProvider } from '../../../../contexts/ToastContext';
 
 const mockFetchWithAuth = vi.fn();
-const mockToastSuccess = vi.fn();
-const mockToastError = vi.fn();
-
 vi.mock('../../../../hooks/useApi', () => ({
-  useApi: () => ({
-    fetchWithAuth: mockFetchWithAuth,
-  }),
+  useApi: () => ({ fetchWithAuth: mockFetchWithAuth }),
 }));
 
-vi.mock('../../../../contexts/ToastContext', () => ({
-  useToast: () => ({
-    success: mockToastSuccess,
-    error: mockToastError,
-  }),
-}));
+const library = [
+  { id: 's1', name: 'Crunch', url: '/assets/sounds/Crunch.mp3', type: 'SFX', category: 'GENERAL', isActive: true },
+  { id: 's2', name: 'Thud', url: '/assets/sounds/blocks/thud.mp3', type: 'SFX', category: 'BLOCK', isActive: true },
+];
+const json = (body: unknown, ok = true) => Promise.resolve({ ok, json: async () => body });
 
-describe('BlockSoundEffectUpload Component', () => {
+const renderIt = (props: Partial<React.ComponentProps<typeof BlockSoundEffectUpload>> = {}) => {
+  const onUploadSuccess = vi.fn();
+  render(
+    <ToastProvider>
+      <BlockSoundEffectUpload blockId="block_dirt" blockName="Dirt" soundEffectUrl={null} onUploadSuccess={onUploadSuccess} {...props} />
+    </ToastProvider>
+  );
+  return { onUploadSuccess };
+};
+
+describe('BlockSoundEffectUpload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.confirm = vi.fn().mockReturnValue(true);
-    window.URL.createObjectURL = vi.fn().mockReturnValue('blob:test-preview');
-    window.URL.revokeObjectURL = vi.fn();
+    mockFetchWithAuth.mockImplementation((url: string) => (url === '/api/admin/sounds' ? json(library) : json({ id: 'block_dirt' })));
   });
 
-  it('renders upload area when soundEffectUrl is missing', () => {
-    const onUploadSuccess = vi.fn();
-    render(
-      <BlockSoundEffectUpload
-        blockId="block_dirt"
-        blockName="Dirt Block"
-        soundEffectUrl={null}
-        onUploadSuccess={onUploadSuccess}
-      />
-    );
-
-    expect(screen.getByRole('heading', { name: /Damage Sound Effect/i })).toBeInTheDocument();
-    expect(screen.getByText(/Select Block Damage Audio File/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Upload Block Damage Sound Effect/i })).toBeInTheDocument();
+  it('offers the whole sound library for the damage sound', async () => {
+    renderIt();
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Crunch' })).toBeInTheDocument());
+    expect(screen.getByRole('option', { name: 'Thud' })).toBeInTheDocument();
   });
 
-  it('renders audio player and remove button when soundEffectUrl is present', () => {
-    const onUploadSuccess = vi.fn();
-    render(
-      <BlockSoundEffectUpload
-        blockId="block_dirt"
-        blockName="Dirt Block"
-        soundEffectUrl="/assets/sounds/blocks/dirt_sfx.wav"
-        onUploadSuccess={onUploadSuccess}
-      />
-    );
+  it('assigns a library sound to the block', async () => {
+    const { onUploadSuccess } = renderIt();
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Crunch' })).toBeInTheDocument());
+    mockFetchWithAuth.mockClear();
+    mockFetchWithAuth.mockImplementation(() => json({ id: 'block_dirt', soundEffectUrl: '/assets/sounds/Crunch.mp3' }));
 
-    expect(screen.getByText(/Active Sound Effect/i)).toBeInTheDocument();
-    expect(screen.getByText(/dirt_sfx\.wav/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Replace/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Remove/i })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Damage Sound sound'), { target: { value: 's1' } });
+
+    await waitFor(() => expect(onUploadSuccess).toHaveBeenCalledWith({ id: 'block_dirt', soundEffectUrl: '/assets/sounds/Crunch.mp3' }));
+    const [url, opts] = mockFetchWithAuth.mock.calls[0];
+    expect(url).toBe('/api/admin/blocks/block_dirt/sound-effect');
+    expect(opts.method).toBe('PATCH');
+    expect(JSON.parse(opts.body)).toEqual({ soundId: 's1' });
   });
 
-  it('calls delete endpoint and notifies success when Remove is clicked', async () => {
-    const onUploadSuccess = vi.fn();
-    mockFetchWithAuth.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ id: 'block_dirt', soundEffectUrl: null }),
+  it('shows the block\'s current sound (matched by url) and clears it', async () => {
+    const { onUploadSuccess } = renderIt({ soundEffectUrl: '/assets/sounds/blocks/thud.mp3' });
+    await waitFor(() => expect(screen.getByLabelText('Damage Sound sound')).toHaveValue('s2'));
+    expect(screen.getByTestId('block-sound-preview-damage')).toHaveAttribute('src', expect.stringContaining('thud.mp3'));
+
+    mockFetchWithAuth.mockClear();
+    mockFetchWithAuth.mockImplementation(() => json({ id: 'block_dirt', soundEffectUrl: null }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    await waitFor(() => expect(onUploadSuccess).toHaveBeenCalled());
+    expect(JSON.parse(mockFetchWithAuth.mock.calls[0][1].body)).toEqual({ soundId: null });
+  });
+
+  it('uploads through the sound library under its own name, then assigns it', async () => {
+    const { onUploadSuccess } = renderIt();
+    await waitFor(() => expect(screen.getByLabelText('Damage Sound sound')).toBeInTheDocument());
+    mockFetchWithAuth.mockClear();
+    mockFetchWithAuth.mockImplementation((url: string, opts?: any) => {
+      if (url === '/api/admin/sounds' && opts?.method === 'POST') return json({ id: 'new1', name: 'Rock Crack' });
+      if (url === '/api/admin/sounds') return json(library);
+      return json({ id: 'block_dirt', soundEffectUrl: '/assets/sounds/Rock_Crack.mp3' });
     });
 
-    render(
-      <BlockSoundEffectUpload
-        blockId="block_dirt"
-        blockName="Dirt Block"
-        soundEffectUrl="/assets/sounds/blocks/dirt_sfx.wav"
-        onUploadSuccess={onUploadSuccess}
-      />
-    );
+    const file = new File(['ID3'], 'Rock Crack.mp3', { type: 'audio/mpeg' });
+    fireEvent.change(screen.getByLabelText('Upload Damage Sound sound'), { target: { files: [file] } });
 
-    const removeBtn = screen.getByRole('button', { name: /Remove/i });
-    fireEvent.click(removeBtn);
-
-    await waitFor(() => {
-      expect(mockFetchWithAuth).toHaveBeenCalledWith('/api/admin/blocks/block_dirt/sound-effect', {
-        method: 'DELETE',
-      });
-      expect(onUploadSuccess).toHaveBeenCalledWith({ id: 'block_dirt', soundEffectUrl: null });
-      expect(mockToastSuccess).toHaveBeenCalledWith('Block sound effect removed successfully!');
-    });
-  });
-
-  it('switches to upload view when Replace is clicked and cancels back', () => {
-    const onUploadSuccess = vi.fn();
-    render(
-      <BlockSoundEffectUpload
-        blockId="block_dirt"
-        blockName="Dirt Block"
-        soundEffectUrl="/assets/sounds/blocks/dirt_sfx.wav"
-        onUploadSuccess={onUploadSuccess}
-      />
-    );
-
-    const replaceBtn = screen.getByRole('button', { name: /Replace/i });
-    fireEvent.click(replaceBtn);
-
-    expect(screen.getByText(/Select Block Damage Audio File/i)).toBeInTheDocument();
-
-    const cancelBtn = screen.getByRole('button', { name: /Cancel/i });
-    fireEvent.click(cancelBtn);
-
-    expect(screen.getByText(/Active Sound Effect/i)).toBeInTheDocument();
-  });
-
-  it('uploads a file successfully', async () => {
-    const onUploadSuccess = vi.fn();
-    mockFetchWithAuth.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ id: 'block_dirt', soundEffectUrl: '/assets/sounds/blocks/block_dirt_sfx.wav' }),
-    });
-
-    const { container } = render(
-      <BlockSoundEffectUpload
-        blockId="block_dirt"
-        blockName="Dirt Block"
-        soundEffectUrl={null}
-        onUploadSuccess={onUploadSuccess}
-      />
-    );
-
-    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-    const testFile = new File(['audio-content'], 'dirt_sfx.wav', { type: 'audio/wav' });
-
-    fireEvent.change(fileInput, { target: { files: [testFile] } });
-
-    expect(screen.getAllByText(/dirt_sfx\.wav/i).length).toBeGreaterThanOrEqual(1);
-
-    const uploadBtn = screen.getByRole('button', { name: /Upload Block Damage Sound Effect/i });
-    fireEvent.click(uploadBtn);
-
-    await waitFor(() => {
-      expect(mockFetchWithAuth).toHaveBeenCalledWith(
-        '/api/admin/blocks/block_dirt/sound-effect',
-        expect.objectContaining({ method: 'POST' })
-      );
-      expect(mockToastSuccess).toHaveBeenCalledWith('Block damage sound effect updated successfully!');
-      expect(onUploadSuccess).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(onUploadSuccess).toHaveBeenCalled());
+    const upload = mockFetchWithAuth.mock.calls.find((c) => c[0] === '/api/admin/sounds' && c[1]?.method === 'POST')!;
+    const form = upload[1].body as FormData;
+    expect(form.get('file')).toBe(file);
+    expect(form.get('category')).toBe('BLOCK');
+    expect(form.get('name')).toBeNull(); // the server names it after the file
+    const assign = mockFetchWithAuth.mock.calls.find((c) => c[0] === '/api/admin/blocks/block_dirt/sound-effect')!;
+    expect(JSON.parse(assign[1].body)).toEqual({ soundId: 'new1' });
   });
 });

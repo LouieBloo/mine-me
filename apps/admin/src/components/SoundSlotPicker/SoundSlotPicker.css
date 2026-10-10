@@ -1,0 +1,14 @@
+.sound-slot-picker audio {
+  outline: none;
+  border-radius: 8px;
+  height: 32px;
+}
+
+.sound-slot-picker select,
+.sound-slot-picker button {
+  transition: all 0.15s ease-in-out;
+}
+
+.sound-slot-picker input[type='checkbox'] {
+  accent-color: #d97706; /* amber-600 */
+}

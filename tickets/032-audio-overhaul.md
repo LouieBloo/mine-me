@@ -34,5 +34,5 @@
 ## Not done / follow-ups
 - Item and block sound pickers still store urls (not library ids); could get the same pick-from-library option.
 - Loop flag is stored per slot but no mob slot is loopable yet.
-- Mob sound edits take effect after a server restart.
+- ~~Mob sound edits take effect after a server restart.~~ Fixed by ticket 036 (admin saves reload the definitions live).
 - The 6 files under `assets/sounds/mobs/cmn_mole_person_001/` duplicate the root mole sounds (3 of them) or are unused whooshes.

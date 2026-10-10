@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useAuth } from './useAuth';
-import { isTokenExpired } from '@mine-me/shared';
+import { isTokenExpired, DEFINITIONS_RELOAD_FAILED_HEADER } from '@mine-me/shared';
+import { DEFINITIONS_RELOAD_FAILED_EVENT } from './definitionsReloadEvent';
 
 export const useApi = () => {
     const { token, logout } = useAuth();
@@ -37,6 +38,11 @@ export const useApi = () => {
                 console.warn('Admin unauthorized request. Logging out.');
                 logout();
                 window.location.href = '/auth';
+            }
+
+            // 3. The save worked, but the running game server could not pick it up
+            if (response.headers?.get?.(DEFINITIONS_RELOAD_FAILED_HEADER)) {
+                window.dispatchEvent(new CustomEvent(DEFINITIONS_RELOAD_FAILED_EVENT));
             }
 
             return response;

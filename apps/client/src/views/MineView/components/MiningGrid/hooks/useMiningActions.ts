@@ -15,6 +15,7 @@ import {
 } from '../input/MouseAction';
 import type { SoundManager } from '../../../../../services/sound';
 import type { MiningClientWorld } from '../systems/MiningClientWorld';
+import { ReloadSoundTrigger } from '../systems/ReloadSoundTrigger';
 
 export interface UseMiningActionsOptions {
   world: Pick<
@@ -49,6 +50,8 @@ export interface UseMiningActionsOptions {
   isThrowingItem?: boolean;
   activeThrowableItem?: GameItem | null;
   onDynamiteThrown?: () => void;
+  /** Shared with the ammo ticks so a reload sounds once however it started. */
+  reloadSound?: ReloadSoundTrigger;
 }
 
 export function useMiningActions({
@@ -66,6 +69,7 @@ export function useMiningActions({
   isThrowingItem = false,
   activeThrowableItem = null,
   onDynamiteThrown,
+  reloadSound: reloadSoundOption,
 }: UseMiningActionsOptions) {
   const {
     playerSpriteRef,
@@ -111,6 +115,10 @@ export function useMiningActions({
   const weaponSoundUrlRef = useRef<string | null>(resolvedSoundUrl);
   weaponSoundUrlRef.current = resolvedSoundUrl;
 
+  const fallbackReloadSoundRef = useRef<ReloadSoundTrigger | null>(null);
+  if (!fallbackReloadSoundRef.current) fallbackReloadSoundRef.current = new ReloadSoundTrigger();
+  const reloadSound = reloadSoundOption ?? fallbackReloadSoundRef.current;
+
   const weaponAmmoStateRef = useRef<{ current: number; max: number; isReloading: boolean }>({
     current: equippedWeapon?.projectileConfig?.magazineSize ?? 6,
     max: equippedWeapon?.projectileConfig?.magazineSize ?? 6,
@@ -125,10 +133,8 @@ export function useMiningActions({
       return;
     }
     try {
-      const reloadSoundUrl = weapon?.soundEffects?.reload?.url;
-      if (reloadSoundUrl) {
-        soundManager.playSfx?.(reloadSoundUrl);
-      }
+      // Instant feedback; the server's own reloads (empty magazine) sound via the ammo ticks
+      reloadSound.trigger(weapon, (url) => soundManager.playSfx?.(url));
 
       weaponAmmoStateRef.current.isReloading = true;
 

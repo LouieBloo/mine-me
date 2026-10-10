@@ -25,6 +25,9 @@ vi.mock('../src/index', () => ({
   prisma: {
     sound: {
       findFirst: vi.fn().mockResolvedValue(null),
+      findUnique: vi.fn().mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'lib_1' ? { id: 'lib_1', name: 'Pistol', url: '/assets/sounds/items/pistol.wav' } : null)
+      ),
       create: vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: 's1', ...data })),
       update: vi.fn(),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -65,70 +68,31 @@ describe('Item Sound Effect Endpoints', () => {
     ];
   });
 
-  it('should upload a sound effect for a weapon item', async () => {
-    const audioBuffer = Buffer.from('RIFF....WAVEfmt ....data....');
-
+  it('assigns a library sound to the legacy single sound field via the throw slot', async () => {
     const res = await request(app)
-      .post('/api/admin/items/item_pickaxe_1/sound-effect')
-      .attach('soundEffect', audioBuffer, 'pickaxe_hit.wav');
+      .patch('/api/admin/items/item_pickaxe_1/sound-effects/throw')
+      .send({ soundId: 'lib_1' });
 
     expect(res.status).toBe(200);
-    expect(res.body.soundEffectUrl).toMatch(/^\/assets\/sounds\/items\/item_pickaxe_1_sfx\.wav$/);
-    expect(mockItems[0].soundEffectUrl).toMatch(/^\/assets\/sounds\/items\/item_pickaxe_1_sfx\.wav$/);
+    expect(res.body.soundEffectUrl).toBe('/assets/sounds/items/pistol.wav');
+    expect(mockItems[0].soundEffectUrl).toBe('/assets/sounds/items/pistol.wav');
   });
 
-  it('adds an uploaded item sound to the sound library as an ITEM sound effect', async () => {
-    await request(app)
-      .post('/api/admin/items/item_pickaxe_1/sound-effect')
-      .attach('soundEffect', Buffer.from('RIFF....WAVEfmt ....data....'), 'pickaxe_hit.wav');
-
-    expect((prisma as any).sound.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        url: '/assets/sounds/items/item_pickaxe_1_sfx.wav',
-        category: 'ITEM',
-        type: 'SFX',
-        name: 'Iron Pickaxe - throw',
-      }),
-    });
-  });
-
-  it('should return 400 when no file is uploaded', async () => {
+  it('returns 404 when the item does not exist', async () => {
     const res = await request(app)
-      .post('/api/admin/items/item_pickaxe_1/sound-effect');
-
-    expect(res.status).toBe(400);
-    expect(res.body.error).toContain('No sound effect file provided');
-  });
-
-  it('should return 404 when item is not found during upload', async () => {
-    const audioBuffer = Buffer.from('fake-mp3-data');
-
-    const res = await request(app)
-      .post('/api/admin/items/non_existent_item/sound-effect')
-      .attach('soundEffect', audioBuffer, 'swing.mp3');
-
+      .patch('/api/admin/items/non_existent_item/sound-effects/throw')
+      .send({ soundId: 'lib_1' });
     expect(res.status).toBe(404);
   });
 
-  it('should remove a sound effect from an item', async () => {
-    mockItems[0].soundEffectUrl = '/assets/sounds/items/item_pickaxe_1_sfx.wav';
-
-    const res = await request(app)
-      .delete('/api/admin/items/item_pickaxe_1/sound-effect');
-
-    expect(res.status).toBe(200);
-    expect(res.body.soundEffectUrl).toBeNull();
-    expect(mockItems[0].soundEffectUrl).toBeNull();
-    expect((prisma as any).sound.deleteMany).toHaveBeenCalledWith({
-      where: { url: '/assets/sounds/items/item_pickaxe_1_sfx.wav' },
-    });
-  });
-
-  it('should return 404 when removing sound effect from non-existent item', async () => {
-    const res = await request(app)
-      .delete('/api/admin/items/non_existent_item/sound-effect');
-
-    expect(res.status).toBe(404);
+  it('has no upload or remove endpoints of its own any more (sounds are uploaded to the library)', async () => {
+    const calls = [
+      request(app).post('/api/admin/items/item_pickaxe_1/sound-effect').attach('soundEffect', Buffer.from('x'), 'a.wav'),
+      request(app).post('/api/admin/items/item_pickaxe_1/sound-effects/reload').attach('soundEffect', Buffer.from('x'), 'a.wav'),
+      request(app).delete('/api/admin/items/item_pickaxe_1/sound-effect'),
+      request(app).delete('/api/admin/items/item_pickaxe_1/sound-effects/reload'),
+    ];
+    for (const res of await Promise.all(calls)) expect(res.status).toBe(404);
   });
 
   describe('Multi-Slot Sound Effects (e.g. Dynamite)', () => {
@@ -142,50 +106,6 @@ describe('Item Sound Effect Endpoints', () => {
         soundEffectUrl: null,
         soundEffects: null,
       });
-    });
-
-    it('should upload sound effect to inGameEffect slot with loop: true', async () => {
-      const audioBuffer = Buffer.from('RIFF....WAVEfmt ....data....');
-
-      const res = await request(app)
-        .post('/api/admin/items/item_dynamite_1/sound-effects/inGameEffect')
-        .field('loop', 'true')
-        .attach('soundEffect', audioBuffer, 'fuse_burning.wav');
-
-      expect(res.status).toBe(200);
-      expect(res.body.soundEffects?.inGameEffect?.url).toMatch(
-        /^\/assets\/sounds\/items\/item_dynamite_1_inGameEffect_sfx\.wav$/
-      );
-      expect(res.body.soundEffects?.inGameEffect?.loop).toBe(true);
-    });
-
-    it('should upload explosion sound and throw sound to their respective slots', async () => {
-      const audioBuffer = Buffer.from('RIFF....WAVEfmt ....data....');
-
-      // Upload explosion
-      const resExp = await request(app)
-        .post('/api/admin/items/item_dynamite_1/sound-effects/explosion')
-        .attach('soundEffect', audioBuffer, 'explosion.wav');
-
-      expect(resExp.status).toBe(200);
-      expect(resExp.body.soundEffects?.explosion?.url).toMatch(
-        /^\/assets\/sounds\/items\/item_dynamite_1_explosion_sfx\.wav$/
-      );
-      expect(resExp.body.soundEffects?.explosion?.loop).toBe(false);
-
-      // Upload throw
-      const resThrow = await request(app)
-        .post('/api/admin/items/item_dynamite_1/sound-effects/throw')
-        .attach('soundEffect', audioBuffer, 'throw.wav');
-
-      expect(resThrow.status).toBe(200);
-      expect(resThrow.body.soundEffects?.throw?.url).toMatch(
-        /^\/assets\/sounds\/items\/item_dynamite_1_throw_sfx\.wav$/
-      );
-      // throw also syncs to soundEffectUrl for backward compatibility
-      expect(resThrow.body.soundEffectUrl).toMatch(
-        /^\/assets\/sounds\/items\/item_dynamite_1_throw_sfx\.wav$/
-      );
     });
 
     it('should patch loop setting for a sound slot via PATCH endpoint', async () => {
@@ -208,20 +128,61 @@ describe('Item Sound Effect Endpoints', () => {
       );
     });
 
-    it('should remove a specific sound slot', async () => {
-      const dynamite = mockItems.find((i) => i.id === 'item_dynamite_1');
-      dynamite.soundEffects = {
-        explosion: {
-          url: '/assets/sounds/items/item_dynamite_1_explosion_sfx.wav',
-          loop: false,
-        },
-      };
+    describe('choosing a sound from the library', () => {
+      beforeEach(() => {
+        (prisma as any).sound.create.mockClear();
+        (prisma as any).sound.deleteMany.mockClear();
+      });
 
-      const res = await request(app)
-        .delete('/api/admin/items/item_dynamite_1/sound-effects/explosion');
+      it('points the slot at a library sound without uploading anything', async () => {
+        const res = await request(app)
+          .patch('/api/admin/items/item_dynamite_1/sound-effects/explosion')
+          .send({ soundId: 'lib_1' });
 
-      expect(res.status).toBe(200);
-      expect(res.body.soundEffects?.explosion?.url).toBeNull();
+        expect(res.status).toBe(200);
+        expect(res.body.soundEffects.explosion.url).toBe('/assets/sounds/items/pistol.wav');
+        expect((prisma as any).sound.create).not.toHaveBeenCalled();
+      });
+
+      it('keeps the legacy soundEffectUrl in step for the throw slot', async () => {
+        const res = await request(app)
+          .patch('/api/admin/items/item_dynamite_1/sound-effects/throw')
+          .send({ soundId: 'lib_1' });
+        expect(res.body.soundEffectUrl).toBe('/assets/sounds/items/pistol.wav');
+      });
+
+      it('keeps the slot loop setting when the sound changes', async () => {
+        const dynamite = mockItems.find((i) => i.id === 'item_dynamite_1');
+        dynamite.soundEffects = { inGameEffect: { url: '/assets/sounds/items/old.wav', loop: true } };
+        const res = await request(app)
+          .patch('/api/admin/items/item_dynamite_1/sound-effects/inGameEffect')
+          .send({ soundId: 'lib_1' });
+        expect(res.body.soundEffects.inGameEffect).toEqual({ url: '/assets/sounds/items/pistol.wav', loop: true });
+      });
+
+      it('clears a slot with soundId null but never deletes the file or its library row', async () => {
+        const dynamite = mockItems.find((i) => i.id === 'item_dynamite_1');
+        dynamite.soundEffects = { explosion: { url: '/assets/sounds/items/pistol.wav', loop: false } };
+        const res = await request(app)
+          .patch('/api/admin/items/item_dynamite_1/sound-effects/explosion')
+          .send({ soundId: null });
+
+        expect(res.status).toBe(200);
+        expect(res.body.soundEffects.explosion.url).toBeNull();
+        expect((prisma as any).sound.deleteMany).not.toHaveBeenCalled();
+      });
+
+      it('rejects an unknown sound and a malformed id', async () => {
+        const missing = await request(app)
+          .patch('/api/admin/items/item_dynamite_1/sound-effects/explosion')
+          .send({ soundId: 'nope' });
+        expect(missing.status).toBe(404);
+
+        const bad = await request(app)
+          .patch('/api/admin/items/item_dynamite_1/sound-effects/explosion')
+          .send({ soundId: 42 });
+        expect(bad.status).toBe(400);
+      });
     });
   });
 });

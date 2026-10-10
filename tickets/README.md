@@ -36,3 +36,10 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Set `
 | [030](030-item-drops-audit.md) | Item drops audit: items not pickable after mass drops | P1 (Done) |
 | [031](031-tick-payload-and-asset-preload.md) | Slim drop tick payloads; greedy asset + sound preload | P2 (Done) |
 | [032](032-audio-overhaul.md) | Audio overhaul: one sound library, mob sound slots | P1 (Done) |
+| [033](033-soft-sunlight-edges.md) | Soft sunlight edges | P2 (Done) |
+| [034](034-sunlight-performance.md) | Sunlight recompute and lightmap churn | P2 (Done) |
+| [035](035-session-startup-races.md) | Session startup races and flaky loading | P1 (Done) |
+| [036](036-live-definition-reload.md) | Apply admin edits without restarting the server | P2 (Done) |
+| [037](037-weapon-sound-wiring.md) | Weapon sound wiring (reload, gunshots) | P2 (Done) |
+| [038](038-item-sound-picker.md) | Item sounds use the shared sound picker | P2 (Done) |
+| [039](039-one-sound-framework.md) | One way to add and assign sounds; sounds keep their own names | P1 (Done) |

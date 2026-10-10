@@ -23,15 +23,7 @@ interface ActiveMuzzleFlashLight {
  */
 export class ProjectileVisualManager {
   private activeFlashes: ActiveMuzzleFlashLight[] = [];
-  private lastLocalShotTime: number = 0;
   private processedGunshotIds: Set<string> = new Set();
-
-  /**
-   * Records a local player shot timestamp to prevent echoing audio on server broadcast acknowledgment.
-   */
-  public recordLocalShot(): void {
-    this.lastLocalShotTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  }
 
   /**
    * Triggers immediate local audiovisual feedback (zero network latency) when the player pulls the trigger.
@@ -45,8 +37,6 @@ export class ProjectileVisualManager {
     soundManager?: SoundManager | null,
     tileSize: number = 48
   ): void {
-    this.recordLocalShot();
-
     // 1. Immediate local audio
     if (soundManager && soundUrl) {
       if (typeof soundManager.playPositionalSfx === 'function') {
@@ -105,8 +95,6 @@ export class ProjectileVisualManager {
   ): void {
     if (!gunshots || gunshots.length === 0) return;
 
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-
     for (const shot of gunshots) {
       // Avoid duplicate processing if we already handled this shot ID
       if (this.processedGunshotIds.has(shot.id)) continue;
@@ -118,13 +106,14 @@ export class ProjectileVisualManager {
         if (first) this.processedGunshotIds.delete(first);
       }
 
+      // The local player's own shots are always played the moment they fire (triggerLocalShot), so
+      // the server's echo is never played again, however long the round trip took
       const isLocalShooter = Boolean(localCharacterId && shot.characterId === localCharacterId);
-      const isVeryRecentLocal = isLocalShooter && now - this.lastLocalShotTime < 350;
 
       const shotPos = shot.muzzlePosition ?? shot.position;
 
       // Remote player gunshot: play positional audio if weapon has sound configured
-      if (!isVeryRecentLocal && soundManager && shot.soundUrl) {
+      if (!isLocalShooter && soundManager && shot.soundUrl) {
         if (typeof soundManager.playPositionalSfx === 'function') {
           soundManager.playPositionalSfx(shot.soundUrl, shotPos);
         } else {
@@ -133,7 +122,7 @@ export class ProjectileVisualManager {
       }
 
       // If remote player fired, spawn muzzle flash, smoke, and dynamic light for spectators
-      if (!isVeryRecentLocal) {
+      if (!isLocalShooter) {
         if (particleEngine) {
           const pixelPos = {
             x: shotPos.x * tileSize,

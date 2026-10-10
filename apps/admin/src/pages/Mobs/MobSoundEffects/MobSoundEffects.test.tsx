@@ -83,20 +83,28 @@ describe('MobSoundEffects', () => {
     expect(JSON.parse(mockFetchWithAuth.mock.calls[0][1].body)).toEqual({ soundId: null });
   });
 
-  it('uploads a new file for a slot and refreshes the library', async () => {
+  it('uploads through the sound library (keeping the file name), then assigns it and refreshes the library', async () => {
     const { onChange } = renderIt();
     await waitFor(() => expect(screen.getByLabelText('Death sound')).toBeInTheDocument());
     mockFetchWithAuth.mockClear();
-    mockFetchWithAuth.mockImplementation((url: string) => (url === '/api/admin/sounds' ? json(library) : json({ id: 'mob1', soundEffects: { death: { soundId: 's9' } } })));
+    mockFetchWithAuth.mockImplementation((url: string, opts?: any) => {
+      if (url === '/api/admin/sounds' && opts?.method === 'POST') return json({ id: 's9', name: 'roar' });
+      if (url === '/api/admin/sounds') return json(library);
+      return json({ id: 'mob1', soundEffects: { death: { soundId: 's9' } } });
+    });
 
     const file = new File(['ID3'], 'roar.mp3', { type: 'audio/mpeg' });
     fireEvent.change(screen.getByLabelText('Upload Death sound'), { target: { files: [file] } });
 
     await waitFor(() => expect(onChange).toHaveBeenCalled());
-    const upload = mockFetchWithAuth.mock.calls.find((c) => c[1]?.method === 'POST')!;
-    expect(upload[0]).toBe('/api/admin/mobs/mob1/sound-effects/death');
-    expect((upload[1].body as FormData).get('soundEffect')).toBe(file);
-    await waitFor(() => expect(mockFetchWithAuth.mock.calls.some((c) => c[0] === '/api/admin/sounds')).toBe(true));
+    const upload = mockFetchWithAuth.mock.calls.find((c) => c[0] === '/api/admin/sounds' && c[1]?.method === 'POST')!;
+    const form = upload[1].body as FormData;
+    expect(form.get('file')).toBe(file);
+    expect(form.get('category')).toBe('MOB');
+    const assign = mockFetchWithAuth.mock.calls.find((c) => String(c[0]).includes('/mobs/mob1/sound-effects/death'))!;
+    expect(assign[1].method).toBe('PATCH');
+    expect(JSON.parse(assign[1].body)).toEqual({ soundId: 's9' });
+    await waitFor(() => expect(mockFetchWithAuth.mock.calls.filter((c) => c[0] === '/api/admin/sounds' && !c[1]?.method).length).toBeGreaterThan(0));
   });
 
   it('surfaces the server error and does not report a change', async () => {

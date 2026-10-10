@@ -1,7 +1,7 @@
-import { Application, Container, Graphics, RenderTexture, Sprite } from 'pixi.js';
+import { Application, BufferImageSource, Container, Graphics, RenderTexture, Sprite, Texture } from 'pixi.js';
 import type { Vector2D, MiningClientTile } from '@mine-me/shared';
 import { LightSource } from './LightSource';
-import { calculateSunlightMap } from './SunlightCalculator';
+import { buildSunlightPixels, calculateSunlightMap, getSunlightSignature } from './SunlightCalculator';
 
 /**
  * Lighting Engine coordinates a 2D Multiplicative Lightmap pipeline in PixiJS v8.
@@ -23,7 +23,10 @@ export class LightingEngine {
   private lightmapSprite: Sprite | null = null;
   private lightsContainer: Container;
   private ambientGraphics: Graphics;
-  private sunlightGraphics: Graphics;
+  private sunlightSprite: Sprite | null = null;
+  private sunlightSource: BufferImageSource | null = null;
+  private sunlightPixels: Uint8Array | undefined;
+  private sunlightSignature: string | null = null;
   private lightsGraphics: Graphics;
 
   private lights: Map<string, LightSource> = new Map();
@@ -63,11 +66,9 @@ export class LightingEngine {
     // Internal offscreen container where all ambient, sun, and light sources are rendered
     this.lightsContainer = new Container();
     this.ambientGraphics = new Graphics();
-    this.sunlightGraphics = new Graphics();
     this.lightsGraphics = new Graphics();
 
     this.lightsContainer.addChild(this.ambientGraphics);
-    this.lightsContainer.addChild(this.sunlightGraphics);
     this.lightsContainer.addChild(this.lightsGraphics);
 
     this.lightsContainer.scale.set(this.lightmapScale);
@@ -139,11 +140,10 @@ export class LightingEngine {
   public updateGrid(grid: MiningClientTile[][], immediate: boolean = false): void {
     if (!grid || grid.length === 0) return;
     this.cachedGrid = grid;
+    // Most grid updates are fog-of-war reveals that don't change which tiles are open air.
+    if (this.sunlightSignature === getSunlightSignature(grid)) return;
     if (immediate) {
-      this.sunlightDirty = false;
-      this.sunlightMap = calculateSunlightMap(grid);
-      this.renderSunlight();
-      this.isLightmapDirty = true;
+      this.recalculateSunlight();
     } else {
       this.sunlightDirty = true;
     }
@@ -151,12 +151,22 @@ export class LightingEngine {
 
   /**
    * Mark sunlight dirty to be recalculated on the next frame ticker update.
+   * Unlike updateGrid this always recalculates (the caller says the tiles changed).
    */
   public markSunlightDirty(grid?: MiningClientTile[][]): void {
     if (grid) {
       this.cachedGrid = grid;
     }
     this.sunlightDirty = true;
+  }
+
+  private recalculateSunlight(): void {
+    if (!this.cachedGrid) return;
+    this.sunlightDirty = false;
+    this.sunlightSignature = getSunlightSignature(this.cachedGrid);
+    this.sunlightMap = calculateSunlightMap(this.cachedGrid);
+    this.renderSunlight();
+    this.isLightmapDirty = true;
   }
 
   /**
@@ -175,10 +185,7 @@ export class LightingEngine {
 
     // 0. Recalculate sunlight if marked dirty by tile reveals or block digging
     if (this.sunlightDirty && this.cachedGrid) {
-      this.sunlightDirty = false;
-      this.sunlightMap = calculateSunlightMap(this.cachedGrid);
-      this.renderSunlight();
-      this.isLightmapDirty = true;
+      this.recalculateSunlight();
     }
 
     // 1. Check flashlight state and movement
@@ -208,7 +215,8 @@ export class LightingEngine {
       this.lights.forEach((light) => {
         if (light.enabled && light.id !== 'player_flashlight') {
           light.update(dt);
-          anyAnimatedLight = true;
+          // Static lights (chest glows, plain torches) don't change, so they don't force a re-render
+          if (light.isAnimated) anyAnimatedLight = true;
         }
       });
       if (anyAnimatedLight) {
@@ -298,58 +306,41 @@ export class LightingEngine {
   }
 
   /**
-   * Render sunlight columns and diffused patches.
-   * Uses continuous vertical slice blending and neighbor-aware wall insets
-   * to eliminate blocky steps and prevent light bleeding onto solid cave walls.
+   * Render the sunlight as a per-pixel field (one pixel per lightmap texel) in a single sprite.
+   * Bilinear interpolation between tile centres gives soft beam edges and penumbras with no
+   * per-tile draw calls; the buffer is updated in place.
    */
   private renderSunlight(): void {
-    const g = this.sunlightGraphics;
-    g.clear();
+    if (!this.sunlightMap || this.sunlightMap.length === 0 || !this.cachedGrid) return;
 
-    if (!this.sunlightMap || this.sunlightMap.length === 0) return;
+    const ppt = Math.max(1, Math.round(this.tileSize * this.lightmapScale));
+    const { pixels, width, height } = buildSunlightPixels(
+      this.sunlightMap,
+      this.cachedGrid,
+      { pixelsPerTile: ppt, color: 0xfffbeb, maxAlpha: 0.95 },
+      this.sunlightPixels
+    );
+    this.sunlightPixels = pixels;
+    if (width === 0 || height === 0) return;
 
-    const maxRenderY = Math.min(this.sunlightMap.length, 12);
-    for (let y = 0; y < maxRenderY; y++) {
-      const row = this.sunlightMap[y];
-      for (let x = 0; x < row.length; x++) {
-        const sun = row[x];
-        if (sun <= 0.01) continue;
-
-        const tilePxX = x * this.tileSize;
-        const tilePxY = y * this.tileSize;
-
-        // Check solid neighbors to prevent light bleeding into solid blocks on the sides
-        const isLeftSolid = x === 0 || (this.sunlightMap[y]?.[x - 1] ?? 0) <= 0.001;
-        const isRightSolid = x === row.length - 1 || (this.sunlightMap[y]?.[x + 1] ?? 0) <= 0.001;
-        const isBottomSolid = y === maxRenderY - 1 || (this.sunlightMap[y + 1]?.[x] ?? 0) <= 0.001;
-
-        // Inset by 2px on solid boundaries so bilinear filtering stays inside the air opening
-        const leftInset = isLeftSolid ? 2 : 0;
-        const rightInset = isRightSolid ? 2 : 0;
-        const bottomInset = isBottomSolid ? 2 : 0;
-
-        const rectX = tilePxX + leftInset;
-        const rectW = this.tileSize - leftInset - rightInset;
-
-        // Soft vertical gradient interpolation between this tile and the tile below
-        const sunTop = sun;
-        const sunNext = y < maxRenderY - 1 ? (this.sunlightMap[y + 1]?.[x] ?? 0) : 0;
-        const sunBottom = sunNext > 0.01 ? sunNext : sun * 0.4;
-
-        const subSteps = 3;
-        const sliceH = (this.tileSize - bottomInset) / subSteps;
-        for (let s = 0; s < subSteps; s++) {
-          const t = (s + 0.5) / subSteps;
-          // Smooth cosine curve interpolation down the tile height
-          const blendT = 0.5 - 0.5 * Math.cos(t * Math.PI);
-          const currentSun = sunTop + (sunBottom - sunTop) * blendT;
-          const alpha = Math.min(1.0, currentSun * 0.95);
-          if (alpha <= 0.01) continue;
-
-          g.rect(rectX, tilePxY + s * sliceH, rectW, sliceH + 0.5);
-          g.fill({ color: 0xfffbeb, alpha });
-        }
-      }
+    if (!this.sunlightSource || this.sunlightSource.pixelWidth !== width || this.sunlightSource.pixelHeight !== height) {
+      this.sunlightSprite?.destroy();
+      this.sunlightSource?.destroy();
+      this.sunlightSource = new BufferImageSource({
+        resource: pixels,
+        width,
+        height,
+        format: 'rgba8unorm',
+        alphaMode: 'premultiplied-alpha',
+        scaleMode: 'linear',
+      });
+      this.sunlightSprite = new Sprite(new Texture({ source: this.sunlightSource }));
+      this.sunlightSprite.width = this.sunlightMap[0].length * this.tileSize;
+      this.sunlightSprite.height = this.sunlightMap.length * this.tileSize;
+      // Sits between the ambient layer and the dynamic lights
+      this.lightsContainer.addChildAt(this.sunlightSprite, 1);
+    } else {
+      this.sunlightSource.update();
     }
   }
 
@@ -409,6 +400,9 @@ export class LightingEngine {
       this.lightmapRT = null;
     }
 
+    this.sunlightSource?.destroy();
+    this.sunlightSource = null;
+    this.sunlightSprite = null;
     this.lightsContainer.destroy({ children: true });
   }
 }

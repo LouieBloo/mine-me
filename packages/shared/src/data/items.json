@@ -1,87 +1,5 @@
 [
   {
-    "id": "cmp6an6oz0007idpxifchh73j",
-    "itemKey": null,
-    "name": "Solium",
-    "description": "Sol",
-    "type": "MATERIAL",
-    "subType": "MINERAL",
-    "vendorBuyPrice": 10,
-    "vendorSellPrice": 10,
-    "userSellPrice": 10,
-    "userBuyPrice": 10,
-    "rarity": "RARE",
-    "iconUrl": null,
-    "gearImageUrl": null,
-    "inGameSpriteUrl": null,
-    "soundEffectUrl": null,
-    "soundEffects": null,
-    "isStartingPiece": false,
-    "experience": 0,
-    "combatScore": 0,
-    "defenseScore": 0,
-    "canBeDamaged": false,
-    "canBeClimbed": false,
-    "throwable": false,
-    "triggerMode": "SINGLE",
-    "particleEffectId": null,
-    "physicsConfig": null,
-    "lightConfig": null,
-    "shootsProjectiles": false,
-    "projectileConfig": null,
-    "inGameScale": 1,
-    "holdOffsetX": 0,
-    "holdOffsetY": 0,
-    "holdRotation": 0,
-    "muzzleOffsetX": 0,
-    "muzzleOffsetY": 0,
-    "createdAt": "2026-05-15T02:24:03.491Z",
-    "updatedAt": "2026-05-15T02:24:03.491Z",
-    "itemEffects": [],
-    "particleEffect": null
-  },
-  {
-    "id": "cmni8ohjt0005xe1alsscf6xp",
-    "itemKey": null,
-    "name": "Basic Sword",
-    "description": "Basic Sword",
-    "type": "GEAR",
-    "subType": "WEAPON",
-    "vendorBuyPrice": 0,
-    "vendorSellPrice": 0,
-    "userSellPrice": 0,
-    "userBuyPrice": 0,
-    "rarity": "LOW",
-    "iconUrl": null,
-    "gearImageUrl": "/assets/gear/cmni8ohjt0005xe1alsscf6xp_gear.png",
-    "inGameSpriteUrl": null,
-    "soundEffectUrl": null,
-    "soundEffects": null,
-    "isStartingPiece": true,
-    "experience": 0,
-    "combatScore": 0,
-    "defenseScore": 0,
-    "canBeDamaged": false,
-    "canBeClimbed": false,
-    "throwable": false,
-    "triggerMode": "SINGLE",
-    "particleEffectId": null,
-    "physicsConfig": null,
-    "lightConfig": null,
-    "shootsProjectiles": false,
-    "projectileConfig": null,
-    "inGameScale": 1,
-    "holdOffsetX": 0,
-    "holdOffsetY": 0,
-    "holdRotation": 0,
-    "muzzleOffsetX": 0,
-    "muzzleOffsetY": 0,
-    "createdAt": "2026-04-06T21:51:48.630Z",
-    "updatedAt": "2026-04-06T21:51:48.630Z",
-    "itemEffects": [],
-    "particleEffect": null
-  },
-  {
     "id": "cmt4m445e0000xx0vdu7ve6q0",
     "itemKey": "torch",
     "name": "Torch",
@@ -369,6 +287,47 @@
     "particleEffect": null
   },
   {
+    "id": "cmni8ohjt0005xe1alsscf6xp",
+    "itemKey": null,
+    "name": "Basic Sword",
+    "description": "Basic Sword",
+    "type": "GEAR",
+    "subType": "WEAPON",
+    "vendorBuyPrice": 0,
+    "vendorSellPrice": 0,
+    "userSellPrice": 0,
+    "userBuyPrice": 0,
+    "rarity": "LOW",
+    "iconUrl": null,
+    "gearImageUrl": "/assets/gear/cmni8ohjt0005xe1alsscf6xp_gear.png",
+    "inGameSpriteUrl": null,
+    "soundEffectUrl": null,
+    "soundEffects": null,
+    "isStartingPiece": true,
+    "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
+    "canBeDamaged": false,
+    "canBeClimbed": false,
+    "throwable": false,
+    "triggerMode": "SINGLE",
+    "particleEffectId": null,
+    "physicsConfig": null,
+    "lightConfig": null,
+    "shootsProjectiles": false,
+    "projectileConfig": null,
+    "inGameScale": 1,
+    "holdOffsetX": 0,
+    "holdOffsetY": 0,
+    "holdRotation": 0,
+    "muzzleOffsetX": 0,
+    "muzzleOffsetY": 0,
+    "createdAt": "2026-04-06T21:51:48.630Z",
+    "updatedAt": "2026-04-06T21:51:48.630Z",
+    "itemEffects": [],
+    "particleEffect": null
+  },
+  {
     "id": "cmnje3cld00068656i26o6j0k",
     "itemKey": null,
     "name": "Blue Leggings",
@@ -490,12 +449,13 @@
     "updatedAt": "2026-06-07T03:46:54.977Z",
     "itemEffects": [
       {
-        "id": "cmuyqka4w0001gih269lhmk0i",
+        "id": "cmuyu3c3m0001iwkldk9q5y16",
         "itemId": "cmq0b6kf500002rdhs7vehh63",
+        "mobId": null,
         "effectId": "cmq0b7ms200012rdh7w3i7tjc",
         "value": 10,
-        "createdAt": "2026-10-07T23:25:46.448Z",
-        "updatedAt": "2026-10-07T23:25:46.448Z",
+        "createdAt": "2026-10-08T01:04:34.306Z",
+        "updatedAt": "2026-10-08T01:04:34.306Z",
         "effect": {
           "id": "cmq0b7ms200012rdh7w3i7tjc",
           "name": "Gain Life",
@@ -504,9 +464,12 @@
           "staminaGain": false,
           "miningSpeedModifier": false,
           "damageModifier": false,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
           "explodes": false,
           "createdAt": "2026-06-22T00:13:18.699Z",
-          "updatedAt": "2026-10-07T23:25:46.359Z"
+          "updatedAt": "2026-10-08T01:04:34.172Z"
         }
       }
     ],
@@ -768,7 +731,7 @@
         "spawnRadius": 30
       },
       "createdAt": "2026-09-13T01:34:00.471Z",
-      "updatedAt": "2026-10-07T23:25:46.399Z"
+      "updatedAt": "2026-10-08T01:04:34.209Z"
     }
   },
   {
@@ -934,12 +897,13 @@
     "updatedAt": "2026-06-07T03:47:37.188Z",
     "itemEffects": [
       {
-        "id": "cmuyqka860007gih2ghggtd7k",
+        "id": "cmuyu3c4z0003iwklvmri71cv",
         "itemId": "cmq1lectq0000q7ocymqq4zd3",
+        "mobId": null,
         "effectId": "cmq1lathh0000w7bkm1lbqp29",
         "value": 50,
-        "createdAt": "2026-10-07T23:25:46.566Z",
-        "updatedAt": "2026-10-07T23:25:46.566Z",
+        "createdAt": "2026-10-08T01:04:34.356Z",
+        "updatedAt": "2026-10-08T01:04:34.356Z",
         "effect": {
           "id": "cmq1lathh0000w7bkm1lbqp29",
           "name": "Gain Stamina",
@@ -948,9 +912,12 @@
           "staminaGain": true,
           "miningSpeedModifier": false,
           "damageModifier": false,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
           "explodes": false,
           "createdAt": "2026-06-22T00:13:18.717Z",
-          "updatedAt": "2026-10-07T23:25:46.366Z"
+          "updatedAt": "2026-10-08T01:04:34.179Z"
         }
       }
     ],
@@ -996,52 +963,13 @@
     "updatedAt": "2026-09-28T23:12:02.475Z",
     "itemEffects": [
       {
-        "id": "cmuyrxa6m0004wdeypa6i24mt",
+        "id": "cmv0b83fa00015i6xu9e5t6bl",
         "itemId": "cmsxycew2000078fxyy1fnqel",
-        "effectId": "cmt27dcbt0000vx8zxmq1sokb",
-        "value": 25,
-        "createdAt": "2026-10-08T00:03:52.654Z",
-        "updatedAt": "2026-10-08T00:03:52.654Z",
-        "effect": {
-          "id": "cmt27dcbt0000vx8zxmq1sokb",
-          "name": "Mining Speed",
-          "description": "Attack speed with mining tool",
-          "healthGain": false,
-          "staminaGain": false,
-          "miningSpeedModifier": true,
-          "damageModifier": false,
-          "explodes": false,
-          "createdAt": "2026-08-21T00:20:10.026Z",
-          "updatedAt": "2026-10-07T23:25:46.370Z"
-        }
-      },
-      {
-        "id": "cmuyrxa6m0005wdeyyea1xcp7",
-        "itemId": "cmsxycew2000078fxyy1fnqel",
-        "effectId": "cmv_damage_effect_001",
-        "value": 25,
-        "createdAt": "2026-10-08T00:03:52.654Z",
-        "updatedAt": "2026-10-08T00:03:52.654Z",
-        "effect": {
-          "id": "cmv_damage_effect_001",
-          "name": "Damage",
-          "description": "Increases damage dealt per hit",
-          "healthGain": false,
-          "staminaGain": false,
-          "miningSpeedModifier": false,
-          "damageModifier": true,
-          "explodes": false,
-          "createdAt": "2026-10-07T23:25:46.378Z",
-          "updatedAt": "2026-10-07T23:25:46.378Z"
-        }
-      },
-      {
-        "id": "ie_pickaxe_tool_damage",
-        "itemId": "cmsxycew2000078fxyy1fnqel",
+        "mobId": null,
         "effectId": "eff_tool_damage",
         "value": 25,
-        "createdAt": "2026-10-08T00:03:52.654Z",
-        "updatedAt": "2026-10-08T00:03:52.654Z",
+        "createdAt": "2026-10-09T01:51:55.990Z",
+        "updatedAt": "2026-10-09T01:51:55.990Z",
         "effect": {
           "id": "eff_tool_damage",
           "name": "Tool Damage",
@@ -1054,8 +982,56 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
-          "createdAt": "2026-10-08T00:00:00.000Z",
-          "updatedAt": "2026-10-08T00:00:00.000Z"
+          "createdAt": "2026-10-09T01:51:55.968Z",
+          "updatedAt": "2026-10-09T01:51:55.968Z"
+        }
+      },
+      {
+        "id": "cmuyu3c5b0005iwklk9muh5la",
+        "itemId": "cmsxycew2000078fxyy1fnqel",
+        "mobId": null,
+        "effectId": "cmt27dcbt0000vx8zxmq1sokb",
+        "value": 25,
+        "createdAt": "2026-10-08T01:04:34.368Z",
+        "updatedAt": "2026-10-08T01:04:34.368Z",
+        "effect": {
+          "id": "cmt27dcbt0000vx8zxmq1sokb",
+          "name": "Mining Speed",
+          "description": "Attack speed with mining tool",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": true,
+          "damageModifier": false,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-08-21T00:20:10.026Z",
+          "updatedAt": "2026-10-08T01:04:34.183Z"
+        }
+      },
+      {
+        "id": "cmuyu3c5f0007iwkl03jx9t11",
+        "itemId": "cmsxycew2000078fxyy1fnqel",
+        "mobId": null,
+        "effectId": "cmv_damage_effect_001",
+        "value": 25,
+        "createdAt": "2026-10-08T01:04:34.371Z",
+        "updatedAt": "2026-10-08T01:04:34.371Z",
+        "effect": {
+          "id": "cmv_damage_effect_001",
+          "name": "Damage",
+          "description": "Increases damage dealt per hit",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": true,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-10-07T23:25:46.378Z",
+          "updatedAt": "2026-10-08T01:04:34.191Z"
         }
       }
     ],
@@ -1103,6 +1079,47 @@
     "particleEffect": null
   },
   {
+    "id": "cmp6an6oz0007idpxifchh73j",
+    "itemKey": null,
+    "name": "Solium",
+    "description": "Sol",
+    "type": "MATERIAL",
+    "subType": "MINERAL",
+    "vendorBuyPrice": 10,
+    "vendorSellPrice": 10,
+    "userSellPrice": 10,
+    "userBuyPrice": 10,
+    "rarity": "RARE",
+    "iconUrl": null,
+    "gearImageUrl": null,
+    "inGameSpriteUrl": null,
+    "soundEffectUrl": null,
+    "soundEffects": null,
+    "isStartingPiece": false,
+    "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
+    "canBeDamaged": false,
+    "canBeClimbed": false,
+    "throwable": false,
+    "triggerMode": "SINGLE",
+    "particleEffectId": null,
+    "physicsConfig": null,
+    "lightConfig": null,
+    "shootsProjectiles": false,
+    "projectileConfig": null,
+    "inGameScale": 1,
+    "holdOffsetX": 0,
+    "holdOffsetY": 0,
+    "holdRotation": 0,
+    "muzzleOffsetX": 0,
+    "muzzleOffsetY": 0,
+    "createdAt": "2026-05-15T02:24:03.491Z",
+    "updatedAt": "2026-05-15T02:24:03.491Z",
+    "itemEffects": [],
+    "particleEffect": null
+  },
+  {
     "id": "cmn_revolver_6shooter",
     "itemKey": "revolver_6shooter",
     "name": "6-Shooter Revolver",
@@ -1124,7 +1141,7 @@
         "loop": false
       },
       "reload": {
-        "url": "/assets/sounds/items/revolver_reload.wav",
+        "url": "/assets/sounds/items/cmn_revolver_6shooter_reload_sfx.mp3",
         "loop": false
       }
     },
@@ -1159,15 +1176,16 @@
     "muzzleOffsetX": 200,
     "muzzleOffsetY": -72,
     "createdAt": "2026-10-01T20:00:00.000Z",
-    "updatedAt": "2026-10-02T23:19:42.604Z",
+    "updatedAt": "2026-10-10T16:55:58.521Z",
     "itemEffects": [
       {
-        "id": "cmv_revolver_damage_001",
+        "id": "cmuyu3c5w0009iwklilcobbm0",
         "itemId": "cmn_revolver_6shooter",
+        "mobId": null,
         "effectId": "cmv_damage_effect_001",
         "value": 35,
-        "createdAt": "2026-10-07T17:00:00.000Z",
-        "updatedAt": "2026-10-07T17:00:00.000Z",
+        "createdAt": "2026-10-08T01:04:34.389Z",
+        "updatedAt": "2026-10-08T01:04:34.389Z",
         "effect": {
           "id": "cmv_damage_effect_001",
           "name": "Damage",
@@ -1176,9 +1194,12 @@
           "staminaGain": false,
           "miningSpeedModifier": false,
           "damageModifier": true,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
           "explodes": false,
-          "createdAt": "2026-10-07T16:00:00.000Z",
-          "updatedAt": "2026-10-07T16:00:00.000Z"
+          "createdAt": "2026-10-07T23:25:46.378Z",
+          "updatedAt": "2026-10-08T01:04:34.191Z"
         }
       }
     ],
@@ -1224,7 +1245,7 @@
         "spawnRadius": 4
       },
       "createdAt": "2026-10-02T04:08:33.858Z",
-      "updatedAt": "2026-10-07T23:25:46.424Z"
+      "updatedAt": "2026-10-08T01:04:34.235Z"
     }
   },
   {
@@ -1336,7 +1357,7 @@
         "spawnRadius": 30
       },
       "createdAt": "2026-09-13T01:34:00.471Z",
-      "updatedAt": "2026-10-07T23:25:46.399Z"
+      "updatedAt": "2026-10-08T01:04:34.209Z"
     }
   },
   {
@@ -1396,6 +1417,149 @@
     "updatedAt": "2026-10-01T20:00:00.000Z",
     "itemEffects": [],
     "particleEffect": null
+  },
+  {
+    "id": "cmtz702uk0001nu7bn2tidnx0",
+    "itemKey": "dynamite",
+    "name": "Dynamite",
+    "description": "Go boom",
+    "type": "CONSUMABLE",
+    "subType": "DYNAMITE",
+    "vendorBuyPrice": 0,
+    "vendorSellPrice": 0,
+    "userSellPrice": 0,
+    "userBuyPrice": 0,
+    "rarity": "LOW",
+    "iconUrl": "/assets/icons/items/cmtz702uk0001nu7bn2tidnx0_icon.png",
+    "gearImageUrl": null,
+    "inGameSpriteUrl": null,
+    "soundEffectUrl": "/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_throw_sfx.mp3",
+    "soundEffects": {
+      "throw": {
+        "url": "/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_throw_sfx.mp3",
+        "loop": false
+      },
+      "explosion": {
+        "url": "/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_explosion_sfx.mp3",
+        "loop": false
+      },
+      "inGameEffect": {
+        "url": "/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_inGameEffect_sfx.mp3",
+        "loop": true
+      }
+    },
+    "isStartingPiece": false,
+    "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
+    "canBeDamaged": false,
+    "canBeClimbed": false,
+    "throwable": true,
+    "triggerMode": "SINGLE",
+    "particleEffectId": "pe_dynamite_fuse_sparks",
+    "physicsConfig": {
+      "mass": 1,
+      "friction": 0.4,
+      "hasPhysics": true,
+      "throwPower": 20.5,
+      "fuseSeconds": 4,
+      "restitution": 0.2,
+      "colliderType": "RECTANGLE",
+      "gravityScale": 1,
+      "allowRotation": true,
+      "colliderWidth": 32,
+      "linearDamping": 0.05,
+      "angularDamping": 0.4,
+      "colliderHeight": 10,
+      "colliderRadius": 8,
+      "colliderOffsetX": 0,
+      "colliderOffsetY": 0,
+      "fuseFlamesEffectId": "pe_dynamite_fuse_flames",
+      "fuseSparksEffectId": "pe_dynamite_fuse_sparks",
+      "explosionFlashEffectId": "pe_dynamite_explosion_flash",
+      "explosionSmokeEffectId": "pe_dynamite_explosion_smoke"
+    },
+    "lightConfig": null,
+    "shootsProjectiles": false,
+    "projectileConfig": null,
+    "inGameScale": 1,
+    "holdOffsetX": 53,
+    "holdOffsetY": 2,
+    "holdRotation": -90,
+    "muzzleOffsetX": 0,
+    "muzzleOffsetY": 0,
+    "createdAt": "2026-09-13T02:26:15.021Z",
+    "updatedAt": "2026-09-29T00:35:14.956Z",
+    "itemEffects": [
+      {
+        "id": "cmuyu3c6l000biwklqehrwf20",
+        "itemId": "cmtz702uk0001nu7bn2tidnx0",
+        "mobId": null,
+        "effectId": "cmud7xntc00009cfye6butpfo",
+        "value": 3,
+        "createdAt": "2026-10-08T01:04:34.414Z",
+        "updatedAt": "2026-10-08T01:04:34.414Z",
+        "effect": {
+          "id": "cmud7xntc00009cfye6butpfo",
+          "name": "Explosion",
+          "description": "Explodes in X radius",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": false,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": true,
+          "createdAt": "2026-09-22T22:01:08.305Z",
+          "updatedAt": "2026-10-08T01:04:34.187Z"
+        }
+      }
+    ],
+    "particleEffect": {
+      "id": "pe_dynamite_fuse_sparks",
+      "name": "Dynamite Fuse Sparks",
+      "description": "Continuous pyrotechnic sparks sputtering from a burning dynamite fuse.",
+      "type": "CONTINUOUS",
+      "config": {
+        "rate": 45,
+        "alpha": {
+          "end": 0,
+          "start": 1
+        },
+        "angle": {
+          "max": 360,
+          "min": 0
+        },
+        "color": {
+          "end": "#f59e0b",
+          "start": "#ffffff"
+        },
+        "scale": {
+          "end": 0.1,
+          "start": 0.65
+        },
+        "shape": "spark",
+        "speed": {
+          "max": 100,
+          "min": 40
+        },
+        "gravity": {
+          "x": 0,
+          "y": 80
+        },
+        "friction": 0.94,
+        "lifetime": {
+          "max": 0.35,
+          "min": 0.15
+        },
+        "blendMode": "add",
+        "emitterType": "continuous",
+        "spawnRadius": 2
+      },
+      "createdAt": "2026-09-22T22:52:28.299Z",
+      "updatedAt": "2026-10-08T01:04:34.217Z"
+    }
   },
   {
     "id": "cmp6ammsn0006idpxgnpsnyk1",
@@ -1489,146 +1653,7 @@
         "spawnRadius": 30
       },
       "createdAt": "2026-09-13T01:34:00.471Z",
-      "updatedAt": "2026-10-07T23:25:46.399Z"
-    }
-  },
-  {
-    "id": "cmtz702uk0001nu7bn2tidnx0",
-    "itemKey": "dynamite",
-    "name": "Dynamite",
-    "description": "Go boom",
-    "type": "CONSUMABLE",
-    "subType": "DYNAMITE",
-    "vendorBuyPrice": 0,
-    "vendorSellPrice": 0,
-    "userSellPrice": 0,
-    "userBuyPrice": 0,
-    "rarity": "LOW",
-    "iconUrl": "/assets/icons/items/cmtz702uk0001nu7bn2tidnx0_icon.png",
-    "gearImageUrl": null,
-    "inGameSpriteUrl": null,
-    "soundEffectUrl": "/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_throw_sfx.mp3",
-    "soundEffects": {
-      "throw": {
-        "url": "/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_throw_sfx.mp3",
-        "loop": false
-      },
-      "explosion": {
-        "url": "/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_explosion_sfx.mp3",
-        "loop": false
-      },
-      "inGameEffect": {
-        "url": "/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_inGameEffect_sfx.mp3",
-        "loop": true
-      }
-    },
-    "isStartingPiece": false,
-    "experience": 0,
-    "combatScore": 0,
-    "defenseScore": 0,
-    "canBeDamaged": false,
-    "canBeClimbed": false,
-    "throwable": true,
-    "triggerMode": "SINGLE",
-    "particleEffectId": "pe_dynamite_fuse_sparks",
-    "physicsConfig": {
-      "mass": 1,
-      "friction": 0.4,
-      "hasPhysics": true,
-      "throwPower": 20.5,
-      "fuseSeconds": 4,
-      "restitution": 0.2,
-      "colliderType": "RECTANGLE",
-      "gravityScale": 1,
-      "allowRotation": true,
-      "colliderWidth": 32,
-      "linearDamping": 0.05,
-      "angularDamping": 0.4,
-      "colliderHeight": 10,
-      "colliderRadius": 8,
-      "colliderOffsetX": 0,
-      "colliderOffsetY": 0,
-      "fuseFlamesEffectId": "pe_dynamite_fuse_flames",
-      "fuseSparksEffectId": "pe_dynamite_fuse_sparks",
-      "explosionFlashEffectId": "pe_dynamite_explosion_flash",
-      "explosionSmokeEffectId": "pe_dynamite_explosion_smoke"
-    },
-    "lightConfig": null,
-    "shootsProjectiles": false,
-    "projectileConfig": null,
-    "inGameScale": 1,
-    "holdOffsetX": 53,
-    "holdOffsetY": 2,
-    "holdRotation": -90,
-    "muzzleOffsetX": 0,
-    "muzzleOffsetY": 0,
-    "createdAt": "2026-09-13T02:26:15.021Z",
-    "updatedAt": "2026-09-29T00:35:14.956Z",
-    "itemEffects": [
-      {
-        "id": "cmuyqka8w0009gih2a2mx26i4",
-        "itemId": "cmtz702uk0001nu7bn2tidnx0",
-        "effectId": "cmud7xntc00009cfye6butpfo",
-        "value": 3,
-        "createdAt": "2026-10-07T23:25:46.592Z",
-        "updatedAt": "2026-10-07T23:25:46.592Z",
-        "effect": {
-          "id": "cmud7xntc00009cfye6butpfo",
-          "name": "Explosion",
-          "description": "Explodes in X radius",
-          "healthGain": false,
-          "staminaGain": false,
-          "miningSpeedModifier": false,
-          "damageModifier": false,
-          "explodes": true,
-          "createdAt": "2026-09-22T22:01:08.305Z",
-          "updatedAt": "2026-10-07T23:25:46.374Z"
-        }
-      }
-    ],
-    "particleEffect": {
-      "id": "pe_dynamite_fuse_sparks",
-      "name": "Dynamite Fuse Sparks",
-      "description": "Continuous pyrotechnic sparks sputtering from a burning dynamite fuse.",
-      "type": "CONTINUOUS",
-      "config": {
-        "rate": 45,
-        "alpha": {
-          "end": 0,
-          "start": 1
-        },
-        "angle": {
-          "max": 360,
-          "min": 0
-        },
-        "color": {
-          "end": "#f59e0b",
-          "start": "#ffffff"
-        },
-        "scale": {
-          "end": 0.1,
-          "start": 0.65
-        },
-        "shape": "spark",
-        "speed": {
-          "max": 100,
-          "min": 40
-        },
-        "gravity": {
-          "x": 0,
-          "y": 80
-        },
-        "friction": 0.94,
-        "lifetime": {
-          "max": 0.35,
-          "min": 0.15
-        },
-        "blendMode": "add",
-        "emitterType": "continuous",
-        "spawnRadius": 2
-      },
-      "createdAt": "2026-09-22T22:52:28.299Z",
-      "updatedAt": "2026-10-07T23:25:46.408Z"
+      "updatedAt": "2026-10-08T01:04:34.209Z"
     }
   }
 ]

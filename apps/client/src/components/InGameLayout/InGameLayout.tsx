@@ -6,44 +6,20 @@ import { useSocket } from '../../contexts/SocketContext';
 import { CharacterPanel } from '../CharacterPanel/CharacterPanel';
 import { InventoryPanel } from '../InventoryPanel/InventoryPanel';
 import { ChatPanel } from '../ChatPanel/ChatPanel';
+import { LoadingSpinner } from '../LoadingSpinner/LoadingSpinner';
 import type { PlayerState, GameCity } from '@mine-me/shared';
 import './InGameLayout.css';
 
 export const InGameLayout = () => {
     const { user } = useAuth();
     const { activeCharacter, playerState, setActiveCity, displayPlayerHealth } = useGame();
-    const { joinCity, leaveCity, onEvent } = useSocket();
-    const cityIdRef = useRef<string | null>(null);
-    const joinedCityIdRef = useRef<string | null>(null);
+    const { session, retrySession, onEvent } = useSocket();
 
-    // -----------------------------------------------------------------------
-    // City room join/leave
-    // Managed here (instead of HomeView) because InGameLayout wraps routes.
-    // -----------------------------------------------------------------------
-    useEffect(() => {
-        if (!activeCharacter?.cityId || !activeCharacter?.id) return;
-
-        const cityId = activeCharacter.cityId;
-
-        // Idempotency guard: prevent double-joining same city (Strict Mode remount).
-        if (joinedCityIdRef.current === cityId) return;
-
-        cityIdRef.current = cityId;
-        joinedCityIdRef.current = cityId;
-
-        joinCity(cityId, activeCharacter.id)
-            .catch((err) => {
-                console.error('[InGameLayout] Failed to join city:', err.message);
-            });
-
-        return () => {
-            if (cityIdRef.current) {
-                leaveCity(cityIdRef.current).catch(() => {});
-                cityIdRef.current = null;
-            }
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeCharacter?.cityId, activeCharacter?.id]);
+    // City room join/leave and character selection are owned by the socket session (SocketContext);
+    // this layout only waits for it. Once it has been ready once, later drops show a banner instead of
+    // unmounting the screen (e.g. a running mine).
+    const hasBeenReadyRef = useRef(false);
+    if (session.status === 'ready') hasBeenReadyRef.current = true;
 
     // city_data arrives after join_city — update activeCity in GameContext.
     useEffect(() => {
@@ -56,6 +32,28 @@ export const InGameLayout = () => {
 
     if (!activeCharacter) {
         return <Navigate to="/characters" replace />;
+    }
+
+    if (!hasBeenReadyRef.current) {
+        if (session.status === 'error') {
+            return (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-slate-900 text-center">
+                    <p className="text-lg font-bold text-red-400">Could not connect to the game</p>
+                    <p className="max-w-md text-sm text-slate-400">{session.error}</p>
+                    <button
+                        onClick={retrySession}
+                        className="cursor-pointer rounded bg-amber-600 px-5 py-2 text-sm font-black uppercase tracking-wider text-white transition-colors hover:bg-amber-500 active:scale-95"
+                    >
+                        Retry
+                    </button>
+                </div>
+            );
+        }
+        return (
+            <LoadingSpinner
+                message={session.status === 'connecting' ? 'Connecting...' : 'Loading your character...'}
+            />
+        );
     }
 
     // Prefer the authoritative socket-pushed state.
@@ -122,6 +120,18 @@ export const InGameLayout = () => {
 
             {/* Center: Dynamic Game Content */}
             <div className="flex-1 relative flex flex-col overflow-hidden">
+                {session.status !== 'ready' && (
+                    <div
+                        role="status"
+                        className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded bg-amber-600/90 px-3 py-1 text-xs font-black uppercase tracking-wider text-white shadow"
+                    >
+                        {session.status === 'error' ? (
+                            <button className="cursor-pointer underline" onClick={retrySession}>Connection lost - retry</button>
+                        ) : (
+                            'Reconnecting...'
+                        )}
+                    </div>
+                )}
                 <Outlet />
             </div>
 

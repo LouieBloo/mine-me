@@ -25,4 +25,12 @@ describe('UploadSoundModal category', () => {
     expect(select.value).toBe('GENERAL');
     expect(Array.from(select.options).map((o) => o.value)).toEqual(['GENERAL', 'MOB', 'ITEM', 'BLOCK']);
   });
+
+  it("fills the name with the file's own name, unchanged, so it is found under that name later", () => {
+    const { container } = renderModal();
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['ID3'], 'Big_Boom-final (2).mp3', { type: 'audio/mpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(screen.getByDisplayValue('Big_Boom-final (2)')).toBeInTheDocument();
+  });
 });

@@ -8,6 +8,7 @@ import {
 } from '@mine-me/shared';
 import type { MiningClientWorld } from '../systems/MiningClientWorld';
 import { EntityDefinitionCache } from '../systems/EntityDefinitionCache';
+import type { ReloadSoundTrigger } from '../systems/ReloadSoundTrigger';
 import {
   createTickEffectState,
   handleStateTick,
@@ -26,6 +27,8 @@ export interface UseMiningStateSyncOptions {
   /** The refs, renderers and engines each server tick updates. */
   world: MiningClientWorld;
   containersReady: boolean;
+  /** Shared with the reload key so a reload sounds once however it started. */
+  reloadSound?: ReloadSoundTrigger;
   onVisionChange?: (newVision: number) => void;
   onBackpackChange?: (newBackpack: MiningBackpackItem[]) => void;
 }
@@ -42,6 +45,7 @@ export function useMiningStateSync({
   soundManager,
   world,
   containersReady,
+  reloadSound,
   onVisionChange,
   onBackpackChange,
 }: UseMiningStateSyncOptions) {
@@ -53,6 +57,9 @@ export function useMiningStateSync({
     particleEngineRef,
     lightingEngineRef,
   } = world;
+  const equippedWeaponRef = useRef(equippedWeapon);
+  equippedWeaponRef.current = equippedWeapon;
+
   const onVisionChangeRef = useRef(onVisionChange);
   onVisionChangeRef.current = onVisionChange;
 
@@ -77,6 +84,8 @@ export function useMiningStateSync({
       containersReady,
       entityDefs: entityDefsRef.current!,
       effects: effectsRef.current,
+      onWeaponAmmo: (ammo) =>
+        reloadSound?.observeAmmo(ammo.isReloading, equippedWeaponRef.current, (url) => soundManager.playSfx?.(url)),
       onVisionChange: (vision) => onVisionChangeRef.current?.(vision),
       onBackpackChange: (backpack) => onBackpackChangeRef.current?.(backpack),
     };

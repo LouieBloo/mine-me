@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { calculateSunlightMap } from './SunlightCalculator';
+import { buildSunlightPixels, calculateSunlightMap, getSunlightRowCount, getSunlightSignature } from './SunlightCalculator';
 import { PointLight } from './PointLight';
 import { SpotLight } from './SpotLight';
 import { LightingEngine } from './LightingEngine';
@@ -331,6 +331,125 @@ describe('LightingEngine', () => {
     engine.update(0.016, { x: 5, y: 5 }, { x: 1, y: 0 });
     expect(mockApp.renderer.render).toHaveBeenCalledTimes(1);
 
+    engine.destroy();
+  });
+});
+
+const makeGrid = (w: number, h: number, isOpen: (x: number, y: number) => boolean): MiningClientTile[][] =>
+  Array.from({ length: h }, (_, y) =>
+    Array.from({ length: w }, (_, x) => ({
+      type: isOpen(x, y) ? MiningTileType.EMPTY : MiningTileType.DIRT,
+      revealed: true,
+    }))
+  );
+
+describe('Sunlight row limiting and signature', () => {
+  it('only builds the rows the sun can reach', () => {
+    const grid = makeGrid(5, 45, () => true);
+    expect(calculateSunlightMap(grid).length).toBe(getSunlightRowCount(45));
+    expect(getSunlightRowCount(45)).toBeLessThan(45);
+  });
+
+  it('signature ignores deep changes and fog state but tracks sun-row transparency', () => {
+    const grid = makeGrid(5, 45, (x, y) => x === 2 && y < 3);
+    const base = getSunlightSignature(grid);
+
+    grid[40][1] = { type: MiningTileType.EMPTY, revealed: true };
+    expect(getSunlightSignature(grid)).toBe(base);
+
+    grid[1][1] = { ...grid[1][1], revealed: false };
+    expect(getSunlightSignature(grid)).toBe(base);
+
+    grid[3][2] = { type: MiningTileType.EMPTY, revealed: true };
+    expect(getSunlightSignature(grid)).not.toBe(base);
+  });
+});
+
+describe('buildSunlightPixels', () => {
+  const opts = { pixelsPerTile: 8, color: 0xffffff, maxAlpha: 1 };
+  const alphaAt = (buf: { pixels: Uint8Array; width: number }, x: number, y: number) =>
+    buf.pixels[(y * buf.width + x) * 4 + 3];
+
+  it('ramps smoothly from a lit shaft into shadowed open air instead of stepping', () => {
+    // Open cavern row 4 wide; sun only enters the left column (x=0) via a shaft, rest is covered
+    const grid = makeGrid(4, 4, (x, y) => (x === 0 ? y < 3 : y === 2 && x < 4) );
+    const map = calculateSunlightMap(grid, 8, 0.6);
+    const buf = buildSunlightPixels(map, grid, opts);
+
+    const row = 2 * 8 + 4; // vertical middle of row 2
+    const values = Array.from({ length: 4 * 8 }, (_, x) => alphaAt(buf, x, row));
+    const maxStep = Math.max(...values.slice(1).map((v, i) => Math.abs(v - values[i])));
+    // No texel-to-texel jump larger than a third of the full range
+    expect(maxStep).toBeLessThan(255 / 3);
+    // and light really does fall off to the right
+    expect(values[2]).toBeGreaterThan(values[20]);
+  });
+
+  it('never lights solid tiles', () => {
+    const grid = makeGrid(3, 4, (x, y) => x === 1 && y < 3);
+    const buf = buildSunlightPixels(calculateSunlightMap(grid, 8, 0.6), grid, opts);
+    for (let y = 0; y < 3 * 8; y++) {
+      for (let x = 0; x < 8; x++) expect(alphaAt(buf, x, y)).toBe(0); // x=0 tile is dirt
+    }
+    expect(alphaAt(buf, 12, 4)).toBeGreaterThan(0);
+  });
+
+  it('solid neighbours do not dim the edge of a lit shaft', () => {
+    const grid = makeGrid(3, 3, (x) => x === 1);
+    const buf = buildSunlightPixels(calculateSunlightMap(grid, 8, 0.6), grid, opts);
+    // Pixel in the shaft right against the wall equals the shaft centre value
+    expect(alphaAt(buf, 8, 3)).toBe(alphaAt(buf, 12, 3));
+  });
+
+  it('reuses the output buffer when the size is unchanged', () => {
+    const grid = makeGrid(3, 3, () => true);
+    const map = calculateSunlightMap(grid, 8, 0.6);
+    const first = buildSunlightPixels(map, grid, opts);
+    const second = buildSunlightPixels(map, grid, opts, first.pixels);
+    expect(second.pixels).toBe(first.pixels);
+  });
+
+  it('returns an empty buffer for an empty map', () => {
+    expect(buildSunlightPixels([], [], opts).pixels.length).toBe(0);
+  });
+});
+
+describe('LightingEngine sunlight gating and animated lights', () => {
+  const mockApp = { renderer: { render: vi.fn() } } as any;
+  const mockContainer = { addChild: vi.fn(), removeChild: vi.fn(), destroy: vi.fn() } as any;
+
+  it('skips recalculation when the open-air layout is unchanged', () => {
+    const engine = new LightingEngine(mockApp, mockContainer, 10, 10, 64);
+    const grid = makeGrid(10, 12, (x, y) => x === 2 && y < 3);
+    engine.updateGrid(grid, true);
+    const eAny = engine as any;
+    expect(eAny.sunlightMap).not.toBeNull();
+
+    // A fog reveal of a deep solid tile changes nothing relevant
+    grid[10][5] = { type: MiningTileType.DIRT, revealed: true };
+    engine.updateGrid(grid);
+    expect(eAny.sunlightDirty).toBe(false);
+
+    // Digging a block in the sun rows does
+    grid[3][2] = { type: MiningTileType.EMPTY, revealed: true };
+    engine.updateGrid(grid);
+    expect(eAny.sunlightDirty).toBe(true);
+    engine.destroy();
+  });
+
+  it('only animated lights force lightmap re-renders on the throttle tick', () => {
+    const engine = new LightingEngine(mockApp, mockContainer, 10, 10, 64);
+    engine.addLight(new PointLight('chest_1_1', { x: 1, y: 1 }));
+    engine.update(0.06);
+    mockApp.renderer.render.mockClear();
+    engine.update(0.06);
+    expect(mockApp.renderer.render).not.toHaveBeenCalled();
+
+    engine.addLight(new PointLight('torch_1_1', { x: 2, y: 1 }, 0xf59e0b, 1, 3, { flicker: { speed: 4, amount: 0.2 } }));
+    engine.update(0.06); // consumes the add-dirty
+    mockApp.renderer.render.mockClear();
+    engine.update(0.06);
+    expect(mockApp.renderer.render).toHaveBeenCalledTimes(1);
     engine.destroy();
   });
 });

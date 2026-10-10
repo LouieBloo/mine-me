@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -96,7 +96,12 @@ describe('installDefinitionsFromDatabase', () => {
 });
 
 describe('loadDefinitionsFromFiles', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'defs-'));
+  // Created per run and removed afterwards (a bare mkdtemp here used to leave a folder behind every run)
+  let tmp: string;
+  beforeAll(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'defs-'));
+  });
+  afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
   const write = (n: string, v: unknown) => fs.writeFileSync(path.join(tmp, n), JSON.stringify(v));
 
   it('reads the three seed files', () => {

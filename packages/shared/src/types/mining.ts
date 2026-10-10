@@ -124,7 +124,7 @@ export const MINING_CONFIG = {
 
   /** Lighting system configuration */
   SUNLIGHT_MAX_DEPTH: 8, // tiles before sunlight fully fades
-  SUNLIGHT_LATERAL_FALLOFF: 0.4, // multiplier per lateral tile
+  SUNLIGHT_LATERAL_FALLOFF: 0.6, // multiplier per lateral tile (gentle so overhang penumbras span ~3 tiles)
   FLASHLIGHT_RADIUS: 11.0, // tiles (scaled with doubled vision range)
   FLASHLIGHT_CONE_ANGLE: 75, // degrees
   FLASHLIGHT_AURA_RADIUS: 3.2, // small 360° aura so player is never blind behind (doubled from 1.6)

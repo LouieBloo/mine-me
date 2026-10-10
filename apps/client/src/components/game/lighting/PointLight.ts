@@ -42,6 +42,10 @@ export class PointLight extends LightSource {
     this.animTimer = (Math.abs(this.hashString(id)) % 100) * 0.1;
   }
 
+  public override get isAnimated(): boolean {
+    return !!(this.flicker || this.pulse);
+  }
+
   public update(dt: number): void {
     if (!this.enabled) return;
     this.animTimer += dt;
