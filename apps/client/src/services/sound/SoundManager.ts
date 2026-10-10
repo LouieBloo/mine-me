@@ -271,6 +271,62 @@ export class SoundManager {
     this.musicPlayer.stop();
   }
 
+  /** A cached one-shot sound effect. `onResult` reports whether it loaded (used by preloading). */
+  private createSfxHowl(fullUrl: string, volume: number, onResult?: (loaded: boolean) => void): Howl {
+    const howl: Howl = new Howl({
+      src: [fullUrl],
+      volume,
+      onload: () => onResult?.(true),
+      onloaderror: (_id, err) => {
+        console.warn(`[SoundManager] Failed to load SFX "${fullUrl}":`, err);
+        if (this.sfxCache.get(fullUrl) === howl) this.sfxCache.delete(fullUrl); // retry on next use
+        onResult?.(false);
+      },
+      onplayerror: (_id, err) => {
+        console.warn(`[SoundManager] Playback blocked for SFX "${fullUrl}":`, err);
+        howl.once('unlock', () => {
+          howl.play();
+        });
+      },
+    });
+    return howl;
+  }
+
+  /**
+   * Downloads and decodes sound effects ahead of time, so the first shot/explosion/footstep plays
+   * the instant it happens. `onEach` is told as each one finishes (for a progress bar). Never rejects: sounds that fail to load are counted, and retried when
+   * first played. Safe to call before the browser's autoplay unlock.
+   */
+  public preloadSfx(
+    srcUrls: string[],
+    onEach?: (loaded: boolean) => void
+  ): Promise<{ loaded: number; failed: number }> {
+    const unique = [...new Set(srcUrls)];
+    const loads = unique.map(
+      (src) =>
+        new Promise<boolean>((settle) => {
+          const resolve = (ok: boolean) => {
+            onEach?.(ok);
+            settle(ok);
+          };
+          const fullUrl = getAssetUrl(src);
+          const existing = this.sfxCache.get(fullUrl);
+          if (existing) {
+            if (existing.state() === 'loaded') return resolve(true);
+            existing.once('load', () => resolve(true));
+            existing.once('loaderror', () => resolve(false));
+            return;
+          }
+          const howl = this.createSfxHowl(fullUrl, this.sfxChannel.getEffectiveVolume(), resolve);
+          this.sfxCache.set(fullUrl, howl);
+        })
+    );
+    return Promise.all(loads).then((results) => {
+      const loaded = results.filter(Boolean).length;
+      return { loaded, failed: results.length - loaded };
+    });
+  }
+
   /**
    * Plays a single-shot sound effect on the SFX channel with built-in deduplication,
    * burst protection, and optional spatial distance falloff / stereo panning.
@@ -335,19 +391,7 @@ export class SoundManager {
     let howl = this.sfxCache.get(fullUrl);
 
     if (!howl) {
-      howl = new Howl({
-        src: [fullUrl],
-        volume: this.sfxChannel.getEffectiveVolume() * volumeScale,
-        onloaderror: (_id, err) => {
-          console.warn(`[SoundManager] Failed to load SFX "${fullUrl}":`, err);
-        },
-        onplayerror: (_id, err) => {
-          console.warn(`[SoundManager] Playback blocked for SFX "${fullUrl}":`, err);
-          howl?.once('unlock', () => {
-            howl?.play();
-          });
-        },
-      });
+      howl = this.createSfxHowl(fullUrl, this.sfxChannel.getEffectiveVolume() * volumeScale);
       this.sfxCache.set(fullUrl, howl);
     } else {
       howl.volume(this.sfxChannel.getEffectiveVolume() * volumeScale);

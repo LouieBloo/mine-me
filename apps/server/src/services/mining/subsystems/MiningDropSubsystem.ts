@@ -84,7 +84,7 @@ export class MiningDropSubsystem {
         iconUrl: itemData?.iconUrl || null,
         inGameSpriteUrl: itemData?.inGameSpriteUrl || null,
         quantity: drop.quantity,
-        physicsConfig: itemData?.physicsConfig,
+        physicsConfig: itemData?.physicsConfig ?? undefined,
         particleEffectId: itemData?.particleEffectId || null,
         lightConfig: itemData?.lightConfig || null,
         inGameScale: typeof itemData?.inGameScale === 'number' ? itemData.inGameScale : 1.0,

@@ -70,20 +70,52 @@ export class MiningProfiler {
 
   private spikeEvents: SpikeEvent[] = [];
   private longTasks: { duration: number; startTime: number; attribution: string }[] = [];
-  private longTaskObserver: any = null;
+  private longTaskObserver: PerformanceObserver | null = null;
 
   private lastHeapBytes: number = 0;
-  public enabled: boolean = true;
+  private _enabled: boolean;
+  private enabledListeners = new Set<(enabled: boolean) => void>();
 
-  constructor(logIntervalMs: number = 5000) {
+  /**
+   * @param enabled Whether to measure at all. The shared instance starts disabled unless the debug
+   *                flag is set (see `isProfilerFlagOn`), so normal play pays nothing for it.
+   */
+  constructor(logIntervalMs: number = 5000, enabled: boolean = true) {
     this.logIntervalMs = logIntervalMs;
-    this.initLongTaskObserver();
+    this._enabled = enabled;
+    if (enabled) this.initLongTaskObserver();
+  }
+
+  public get enabled(): boolean {
+    return this._enabled;
+  }
+
+  public set enabled(value: boolean) {
+    this.setEnabled(value);
+  }
+
+  public setEnabled(value: boolean): void {
+    if (value === this._enabled) return;
+    this._enabled = value;
+    if (value) {
+      this.initLongTaskObserver();
+    } else {
+      this.destroy();
+    }
+    for (const listener of this.enabledListeners) listener(value);
+  }
+
+  /** Calls `listener` whenever profiling is switched on or off. Returns the unsubscribe function. */
+  public subscribe(listener: (enabled: boolean) => void): () => void {
+    this.enabledListeners.add(listener);
+    return () => this.enabledListeners.delete(listener);
   }
 
   /**
    * Listen to browser long tasks (> 50ms) if supported by the browser.
    */
   private initLongTaskObserver(): void {
+    if (this.longTaskObserver) return;
     if (
       typeof window !== 'undefined' &&
       typeof PerformanceObserver !== 'undefined' &&
@@ -92,7 +124,10 @@ export class MiningProfiler {
       try {
         this.longTaskObserver = new PerformanceObserver((entryList) => {
           for (const entry of entryList.getEntries()) {
-            const attribution = (entry as any).attribution?.[0]?.name || entry.name || 'script';
+            const attribution =
+              (entry as PerformanceEntry & { attribution?: { name?: string }[] }).attribution?.[0]?.name ||
+              entry.name ||
+              'script';
             this.longTasks.push({
               duration: entry.duration,
               startTime: entry.startTime,
@@ -111,8 +146,9 @@ export class MiningProfiler {
    * Query JS heap memory in Chromium browsers.
    */
   private getHeapMb(): number | undefined {
-    if (typeof performance !== 'undefined' && (performance as any).memory?.usedJSHeapSize) {
-      return (performance as any).memory.usedJSHeapSize / (1024 * 1024);
+    const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory;
+    if (typeof performance !== 'undefined' && memory?.usedJSHeapSize) {
+      return memory.usedJSHeapSize / (1024 * 1024);
     }
     return undefined;
   }
@@ -411,5 +447,24 @@ export class MiningProfiler {
   }
 }
 
+/**
+ * The profiler is a developer tool: it is on only when asked for, either with the URL parameter
+ * `?miningProfiler=1` or `localStorage.setItem('miningProfiler', '1')`. It can also be switched at
+ * runtime from the console with `miningProfiler.setEnabled(true)`.
+ */
+export function isProfilerFlagOn(): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    if (new URLSearchParams(window.location?.search ?? '').get('miningProfiler') === '1') return true;
+    return window.localStorage?.getItem('miningProfiler') === '1';
+  } catch {
+    return false; // storage blocked or unavailable
+  }
+}
+
 // Global shared instance for mining view
-export const miningProfiler = new MiningProfiler(5000);
+export const miningProfiler = new MiningProfiler(5000, isProfilerFlagOn());
+
+if (typeof window !== 'undefined') {
+  (window as Window & { miningProfiler?: MiningProfiler }).miningProfiler = miningProfiler;
+}

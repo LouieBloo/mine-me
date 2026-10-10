@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { deriveCombatStats } from '@mine-me/shared';
 import { ModularRigEditor } from '../../components/ModularRigEditor/ModularRigEditor';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
@@ -11,12 +12,11 @@ export interface MobListItem {
   name: string;
   level: number;
   health: number;
-  attack: number;
   defense: number;
+  mobEffects?: { value: number; effect?: Record<string, any> }[];
   aiType?: string;
   moveSpeed?: number;
   jumpForce?: number;
-  miningSpeed?: number;
   animations?: any;
 }
 
@@ -160,7 +160,7 @@ export default function MobViewer() {
               HP: {selectedMob.health}
             </span>
             <span className="px-2 py-0.5 rounded-full bg-slate-700 font-bold text-amber-400">
-              ATK: {selectedMob.attack}
+              ATK: {deriveCombatStats(selectedMob.mobEffects).weaponDamage}
             </span>
             <span className="px-2 py-0.5 rounded-full bg-slate-700 font-bold text-sky-400">
               AI: {selectedMob.aiType || 'CHASE_AND_MINE'}

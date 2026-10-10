@@ -9,6 +9,7 @@ import {
   type MiningRemotePlayer,
   type MiningCombatStats,
   type MiningGearLayer,
+  type MiningBackpackItem,
   MINING_CONFIG,
 } from '@mine-me/shared';
 import { toClientGrid } from '../miningMap.service';
@@ -153,7 +154,7 @@ export class MiningSessionManager {
       canExtract: isAtEntrance,
       isMining: session.isMining,
       miningTarget: session.miningTarget || undefined,
-      miningTimeMs: session.miningTimeMs || undefined,
+      miningTotal: session.miningTotal || undefined,
       gameMode: engine.gameMode,
       otherPlayers,
       activeDynamites: engine.activeDynamites.length > 0 ? engine.activeDynamites.map(dynamiteDefinition) : undefined,
@@ -196,7 +197,7 @@ export class MiningSessionManager {
   /**
    * End session and persist temporary loot to character inventory via Prisma.
    */
-  public async endSession(characterId: string): Promise<{ extractedItems: any[] }> {
+  public async endSession(characterId: string): Promise<{ extractedItems: MiningBackpackItem[] }> {
     const roomId = this.playerToRoom.get(characterId);
     if (!roomId) {
       return { extractedItems: [] };

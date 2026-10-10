@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { Assets, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { MiningEntityRenderer, type ActiveFallingRock } from './MiningEntityRenderer';
 import type { MiningDroppedItem, MiningActiveDynamite } from '@mine-me/shared';
 
@@ -142,6 +142,69 @@ describe('MiningEntityRenderer', () => {
     expect(mockSprite.height).toBe(64);
   });
 
+  describe('dropped items with a sprite that is still loading', () => {
+    const item = (over: Partial<MiningDroppedItem> = {}): MiningDroppedItem => ({
+      id: 'drop-img',
+      itemId: 'ore_iron',
+      itemName: 'Iron Ore',
+      iconUrl: null,
+      inGameSpriteUrl: '/assets/test-ore.png',
+      quantity: 1,
+      position: { x: 2, y: 2 },
+      ...over,
+    });
+    let finishLoad: (t: Texture) => void;
+    let failLoad: () => void;
+
+    beforeEach(() => {
+      vi.spyOn(Assets.cache, 'has').mockReturnValue(false);
+      vi.spyOn(Assets, 'load').mockImplementation(
+        () => new Promise((resolve, reject) => { finishLoad = resolve as (t: Texture) => void; failLoad = reject; }) as never
+      );
+    });
+
+    it('shows exactly one sprite per item however many ticks arrive before the texture does', () => {
+      const map = new Map<string, Sprite | Graphics>();
+      for (let tick = 0; tick < 10; tick++) {
+        MiningEntityRenderer.updateDroppedItems(container, [item({ position: { x: 2, y: 2 + tick * 0.1 } })], map, 64);
+      }
+      expect(container.children.length).toBe(1);
+      expect(map.size).toBe(1);
+      expect(Assets.load).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves nothing behind when the item is picked up before its texture arrives', async () => {
+      const map = new Map<string, Sprite | Graphics>();
+      MiningEntityRenderer.updateDroppedItems(container, [item()], map, 64);
+      MiningEntityRenderer.updateDroppedItems(container, [], map, 64); // picked up
+      finishLoad(Texture.WHITE);
+      await Promise.resolve();
+      expect(container.children.length).toBe(0);
+      expect(map.size).toBe(0);
+    });
+
+    it('applies the texture to the tracked sprite once loaded, keeping its size', async () => {
+      const map = new Map<string, Sprite | Graphics>();
+      MiningEntityRenderer.updateDroppedItems(container, [item()], map, 64);
+      const sprite = map.get('drop-img') as Sprite;
+      finishLoad(Texture.WHITE);
+      await Promise.resolve();
+      expect(sprite.texture).toBe(Texture.WHITE);
+      expect(sprite.width).toBe(32);
+      expect(sprite.height).toBe(32);
+    });
+
+    it('falls back to an amber square if the texture fails to load', async () => {
+      const map = new Map<string, Sprite | Graphics>();
+      MiningEntityRenderer.updateDroppedItems(container, [item()], map, 64);
+      const sprite = map.get('drop-img') as Sprite;
+      failLoad();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(sprite.tint).toBe(0xf59e0b);
+      expect(container.children.length).toBe(1);
+    });
+  });
+
   describe('updateActiveDynamites', () => {
     it('renders fallback graphics for active dynamites and updates world coordinates', () => {
       const dynamites: MiningActiveDynamite[] = [
@@ -244,7 +307,7 @@ describe('MiningEntityRenderer', () => {
       expect(container.children.length).toBe(0);
     });
 
-    it('renders Sprite when bulletTexture is provided', () => {
+    it('renders a Sprite using the texture resolved from the projectile\'s own sprite url', () => {
       const projectiles = [
         {
           id: 'proj-2',
@@ -253,13 +316,16 @@ describe('MiningEntityRenderer', () => {
           velocity: { x: 28, y: 2 },
           angle: 0.1,
           damage: 35,
+          spriteUrl: '/ammo/arrow.png',
         },
       ];
       const viewsMap = new Map<string, Container>();
       const mockTexture = Texture.WHITE;
+      const resolve = vi.fn().mockReturnValue(mockTexture);
 
-      MiningEntityRenderer.updateActiveProjectiles(container, projectiles, viewsMap, 64, mockTexture);
+      MiningEntityRenderer.updateActiveProjectiles(container, projectiles, viewsMap, 64, resolve);
 
+      expect(resolve).toHaveBeenCalledWith('/ammo/arrow.png');
       expect(viewsMap.size).toBe(1);
       const view = viewsMap.get('proj-2');
       expect(view).toBeInstanceOf(Container);
@@ -267,6 +333,23 @@ describe('MiningEntityRenderer', () => {
       expect(view?.x).toBe(14 * 64);
       expect(view?.y).toBe(9 * 64);
       expect(view?.rotation).toBe(0.1);
+    });
+
+    it('draws the placeholder capsule (no Sprite) while the ammo sprite is still loading', () => {
+      const projectiles = [{ id: 'p-loading', position: { x: 1, y: 1 }, velocity: { x: 1, y: 0 }, angle: 0, spriteUrl: '/slow.png' }];
+      const viewsMap = new Map<string, Container>();
+      MiningEntityRenderer.updateActiveProjectiles(container, projectiles, viewsMap, 64, () => null);
+      expect(viewsMap.get('p-loading')?.children.some((c) => c instanceof Sprite)).toBe(false);
+    });
+
+    it('each projectile asks for its own sprite (different ammo, different texture)', () => {
+      const resolve = vi.fn().mockReturnValue(null);
+      const projectiles = [
+        { id: 'a', position: { x: 1, y: 1 }, velocity: { x: 1, y: 0 }, angle: 0, spriteUrl: '/bullet.png' },
+        { id: 'b', position: { x: 2, y: 1 }, velocity: { x: 1, y: 0 }, angle: 0, spriteUrl: '/arrow.png' },
+      ];
+      MiningEntityRenderer.updateActiveProjectiles(container, projectiles, new Map(), 64, resolve);
+      expect(resolve.mock.calls.map((c) => c[0])).toEqual(['/bullet.png', '/arrow.png']);
     });
 
     it('updates view alpha when proj.alpha is provided during impact fadeout', () => {

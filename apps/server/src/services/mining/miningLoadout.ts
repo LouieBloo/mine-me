@@ -1,5 +1,11 @@
-import { CharacterModEngine, type MiningCombatStats, type MiningGearLayer } from '@mine-me/shared';
+import { CharacterModEngine, type GearSubType, type MiningCombatStats, type MiningGearLayer } from '@mine-me/shared';
+import type { Prisma } from '@prisma/client';
 import { InventoryService } from '../inventory.service';
+
+/** An inventory row with its item and the item's effects, as the loadout needs them. */
+export type LoadoutInventoryEntry = Prisma.InventoryItemGetPayload<{
+  include: { item: { include: { itemEffects: { include: { effect: true } } } } };
+}>;
 
 export interface MiningLoadout extends MiningCombatStats {
   miningSpeed: number;
@@ -13,10 +19,10 @@ export interface MiningLoadout extends MiningCombatStats {
  * Used at mining_start and whenever equipment changes so the live session never goes stale.
  * `character.inventory` must include each entry's `item` with `itemEffects.effect`.
  */
-export function buildMiningLoadout(character: { inventory: any[] }): MiningLoadout & {
+export function buildMiningLoadout(character: { maxInventorySlots?: number; inventory: LoadoutInventoryEntry[] }): MiningLoadout & {
   clientInventory: ReturnType<typeof InventoryService.mapCharacterInventory>;
 } {
-  const clientInventory = InventoryService.mapCharacterInventory(character as any);
+  const clientInventory = InventoryService.mapCharacterInventory({ maxInventorySlots: character.maxInventorySlots ?? 0, inventory: character.inventory });
   const mods = CharacterModEngine.getModifications(clientInventory.items);
 
   const equippedGear = character.inventory.filter((inv) => inv.equipped && inv.item.type === 'GEAR');
@@ -25,7 +31,7 @@ export function buildMiningLoadout(character: { inventory: any[] }): MiningLoado
     .filter((inv) => inv.item.gearImageUrl)
     .map((inv) => ({
       url: inv.item.gearImageUrl!,
-      subType: inv.item.subType as any,
+      subType: inv.item.subType as GearSubType,
       shootsProjectiles: Boolean(inv.item.shootsProjectiles),
       throwable: Boolean(inv.item.throwable),
       holdOffsetX: inv.item.holdOffsetX ?? 0,

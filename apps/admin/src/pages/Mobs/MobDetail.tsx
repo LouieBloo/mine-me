@@ -5,6 +5,8 @@ import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
 import { DropTableEditor } from '../../components/DropTableEditor/DropTableEditor';
 import { ModularRigEditor } from '../../components/ModularRigEditor/ModularRigEditor';
+import { EffectsEditor } from '../../components/EffectsEditor/EffectsEditor';
+import MobSoundEffects from './MobSoundEffects/MobSoundEffects';
 
 export default function MobDetail() {
   const { id } = useParams<{ id: string }>();
@@ -16,14 +18,13 @@ export default function MobDetail() {
           name: '',
           level: 1,
           health: 10,
-          attack: 1,
           defense: 1,
           attackPercentage: 50,
           defendPercentage: 50,
           aiType: 'CHASE_AND_MINE',
           moveSpeed: 2.5,
           jumpForce: 6.0,
-          miningSpeed: 1.0,
+          mobEffects: [],
           hitStunMs: 250,
           stunImmunityMs: 500,
           dropTable: null,
@@ -31,6 +32,7 @@ export default function MobDetail() {
         }
       : null
   );
+  const [effectsList, setEffectsList] = useState<any[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -54,6 +56,16 @@ export default function MobDetail() {
       });
   }, [id, isNew]);
 
+  useEffect(() => {
+    fetchWithAuth('/api/admin/effects')
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to load effects');
+        return res.json();
+      })
+      .then((json) => setEffectsList(Array.isArray(json) ? json : []))
+      .catch((err) => toast.error(err.message));
+  }, []);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -61,7 +73,11 @@ export default function MobDetail() {
       const endpoint = isNew ? `/api/admin/mobs` : `/api/admin/mobs/${id}`;
       const method = isNew ? 'POST' : 'PUT';
 
-      const payload = { ...data };
+      // Only the effect id and value are saved; the server re-attaches the effect itself
+      const payload = {
+        ...data,
+        mobEffects: (data.mobEffects || []).map((me: any) => ({ effectId: me.effectId, value: me.value })),
+      };
 
       const res = await fetchWithAuth(endpoint, {
         method,
@@ -205,24 +221,6 @@ export default function MobDetail() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                Attack
-              </label>
-              <input
-                type="number"
-                value={data.attack}
-                onChange={(e) => {
-                  setData({ ...data, attack: Number(e.target.value) });
-                  if (errors.attack) setErrors({ ...errors, attack: '' });
-                }}
-                className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${
-                  errors.attack
-                    ? 'border-red-500 ring-1 ring-red-500 bg-red-50'
-                    : 'border-slate-200'
-                }`}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
                 Defense
               </label>
               <input
@@ -311,18 +309,6 @@ export default function MobDetail() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                Mining Speed
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                value={data.miningSpeed ?? 1.0}
-                onChange={(e) => setData({ ...data, miningSpeed: Number(e.target.value) })}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
-              />
-            </div>
-            <div className="space-y-2">
               <label htmlFor="hitStunMs" className="text-xs font-black text-slate-400 uppercase tracking-widest">
                 Hit Stun (ms)
               </label>
@@ -352,6 +338,37 @@ export default function MobDetail() {
               />
               <p className="text-[11px] text-slate-400 font-medium">After a stun ends, how long until it can be stunned again.</p>
             </div>
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Combat Effects</h4>
+              <span className="text-xs text-slate-500 font-medium">
+                Mobs fight and dig like characters do: <strong>Mining Speed</strong> sets the swing rate (25 = 2 swings/s),{' '}
+                <strong>Damage</strong> the hit on players, <strong>Tool Damage</strong> the hit on blocks, and{' '}
+                <strong>Pick Power</strong> the hardest block it can break.
+              </span>
+            </div>
+            <EffectsEditor
+              value={data.mobEffects || []}
+              available={effectsList}
+              onChange={(mobEffects) => setData({ ...data, mobEffects })}
+              ownerLabel="mob"
+            />
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Sound Effects</h4>
+              <span className="text-xs text-slate-500 font-medium">
+                Pick any sound from the Music &amp; Sounds library for each moment, or upload a new one. Changes save immediately.
+              </span>
+            </div>
+            <MobSoundEffects
+              mobId={isNew ? null : id!}
+              soundEffects={data.soundEffects}
+              onChange={(updatedMob) => setData((prev: any) => ({ ...prev, soundEffects: updatedMob?.soundEffects ?? null }))}
+            />
           </div>
 
           <div className="pt-4 border-t border-slate-100">

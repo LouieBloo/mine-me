@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { MiningGameEngine } from './MiningGameEngine';
-import { giveBlockDrops } from './testHelpers';
+import { giveBlockDrops, mobEffects, mobSwing } from './testHelpers';
 import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
 
 describe('mob block digging uses the shared completion path', () => {
@@ -27,14 +27,14 @@ describe('mob block digging uses the shared completion path', () => {
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
   });
 
-  const spawnDigger = (x = 10, y = 14) => engine.spawnMob({ id: 'digger', miningSpeed: 100 }, { x, y });
+  const spawnDigger = (x = 10, y = 14) => engine.spawnMob({ id: 'digger', mobEffects: mobEffects({ miningSpeed: 25, toolDamage: 100 }) }, { x, y });
 
   it('triggers falling rocks above a block a mob digs out', () => {
     engine.grid[15][10] = { type: MiningTileType.DIRT, revealed: true };
     engine.grid[14][10] = { type: MiningTileType.ROCK, revealed: true };
     const mob = spawnDigger(9.5, 15.5);
 
-    engine.handleMobMining(mob, { x: 10, y: 15 }, 1.0);
+    mobSwing(engine, mob, { x: 10, y: 15 });
 
     expect(engine.grid[15][10].type).toBe(MiningTileType.EMPTY);
     expect(engine.activeRocks.length).toBeGreaterThan(0);
@@ -44,8 +44,9 @@ describe('mob block digging uses the shared completion path', () => {
     giveBlockDrops(engine, MiningTileType.CHEST); // this block WOULD drop for anyone but a mob
     engine.grid[15][10] = { type: MiningTileType.CHEST, revealed: true };
     const mob = spawnDigger(9.5, 15.5);
+    mob.stats.toolDamage = 100000; // a chest is tougher than dirt
 
-    engine.handleMobMining(mob, { x: 10, y: 15 }, 100);
+    mobSwing(engine, mob, { x: 10, y: 15 });
 
     expect(engine.grid[15][10].type).toBe(MiningTileType.EMPTY);
     expect(engine.droppedItems).toHaveLength(0);
@@ -65,7 +66,7 @@ describe('mob block digging uses the shared completion path', () => {
     session.miningTarget = { x: 10, y: 15 };
     const mob = spawnDigger(9.5, 15.5);
 
-    engine.handleMobMining(mob, { x: 10, y: 15 }, 1.0);
+    mobSwing(engine, mob, { x: 10, y: 15 });
 
     expect(session.isMining).toBe(false);
     expect(session.miningTarget).toBeNull();
@@ -75,7 +76,7 @@ describe('mob block digging uses the shared completion path', () => {
     engine.grid[15][10] = { type: MiningTileType.DIRT, revealed: true };
     const mob = spawnDigger(9.5, 15.5);
 
-    engine.handleMobMining(mob, { x: 10, y: 15 }, 1.0);
+    mobSwing(engine, mob, { x: 10, y: 15 });
     (engine as any).tick(1 / 30);
 
     const tick = lastTick('p1');
@@ -84,39 +85,49 @@ describe('mob block digging uses the shared completion path', () => {
     );
   });
 
+  describe('pick power', () => {
+    it('a mob below a block\'s required pick power cannot damage it; at or above it can', () => {
+      const spy = vi
+        .spyOn((engine as any).dataManager ?? (engine as any).mobSubsystem['world'].data, 'getBlockRequiredPickPower')
+        .mockReturnValue(2);
+      engine.grid[15][10] = { type: MiningTileType.DIRT, revealed: true };
+      const weak = engine.spawnMob({ id: 'weak', mobEffects: mobEffects({ toolDamage: 100, pickPower: 1 }) }, { x: 9.5, y: 15.5 });
+      mobSwing(engine, weak, { x: 10, y: 15 });
+      expect(engine.grid[15][10].type).toBe(MiningTileType.DIRT);
+      expect(weak.isMining).toBe(false);
+
+      const strong = engine.spawnMob({ id: 'strong', mobEffects: mobEffects({ toolDamage: 100, pickPower: 2 }) }, { x: 9.5, y: 15.5 });
+      mobSwing(engine, strong, { x: 10, y: 15 });
+      expect(engine.grid[15][10].type).toBe(MiningTileType.EMPTY);
+      spy.mockRestore();
+    });
+  });
+
   describe('dig feedback (block hits)', () => {
     const queued = () => (engine.blockSubsystem as any).pendingBlockHits as any[];
 
-    it('batches hits at MOB_DIG_HIT_INTERVAL instead of every tick', () => {
+    it('queues one hit of feedback per swing, sized by the mob\'s Tool Damage', () => {
+      engine.grid[15][10] = { type: MiningTileType.MINERAL, revealed: true };
+      const mob = engine.spawnMob({ id: 'weak', mobEffects: mobEffects({ toolDamage: 7 }) }, { x: 9.5, y: 15.5 });
+      mobSwing(engine, mob, { x: 10, y: 15 });
+      expect(queued()).toHaveLength(1);
+      expect(queued()[0]).toMatchObject({ x: 10, y: 15, source: 'mob', damage: 7 });
+      mobSwing(engine, mob, { x: 10, y: 15 });
+      expect(queued()).toHaveLength(2);
+    });
+
+    it('queues nothing without a swing', () => {
       engine.grid[15][10] = { type: MiningTileType.MINERAL, revealed: true };
       const mob = spawnDigger(9.5, 15.5);
-      mob.miningSpeed = 1; // slow so it won't finish
-      const dt = 0.1;
-      engine.handleMobMining(mob, { x: 10, y: 15 }, dt);
-      engine.handleMobMining(mob, { x: 10, y: 15 }, dt);
-      engine.handleMobMining(mob, { x: 10, y: 15 }, dt);
+      engine.handleMobMining(mob, { x: 10, y: 15 });
       expect(queued()).toHaveLength(0);
-      engine.handleMobMining(mob, { x: 10, y: 15 }, dt);
-      expect(queued()).toHaveLength(1);
-      expect(queued()[0]).toMatchObject({ x: 10, y: 15, source: 'mob' });
-      expect(queued()[0].damage).toBeGreaterThan(0);
     });
 
     it('flushes a final hit when the block breaks', () => {
       engine.grid[15][10] = { type: MiningTileType.DIRT, revealed: true };
       const mob = spawnDigger(9.5, 15.5);
-      engine.handleMobMining(mob, { x: 10, y: 15 }, 1.0);
+      mobSwing(engine, mob, { x: 10, y: 15 });
       expect(queued().filter((h) => h.source === 'mob')).toHaveLength(1);
-    });
-
-    it('resets batching when the mob switches blocks', () => {
-      engine.grid[15][10] = { type: MiningTileType.MINERAL, revealed: true };
-      engine.grid[15][11] = { type: MiningTileType.MINERAL, revealed: true };
-      const mob = spawnDigger(10.5, 15.5);
-      mob.miningSpeed = 1;
-      engine.handleMobMining(mob, { x: 10, y: 15 }, 0.3);
-      engine.handleMobMining(mob, { x: 11, y: 15 }, 0.3); // new target: timer restarts
-      expect(queued()).toHaveLength(0);
     });
 
     it('only sends mob dig hits to players within hearing range; player hits go to everyone', () => {

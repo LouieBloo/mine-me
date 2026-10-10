@@ -50,10 +50,13 @@ export function findCurrencyItem<T extends ItemCategory>(items: readonly T[], cu
  * The same roles as database filters (Prisma `where` fragments for `item`), so queries and the
  * helpers above can never disagree. Plain objects: this package does not depend on Prisma.
  */
+const INSENSITIVE = 'insensitive' as const;
+
 export const ITEM_ROLE_WHERE = {
-  torch: { subType: { equals: 'TORCH', mode: 'insensitive' } },
-  ladder: { subType: { equals: 'LADDER', mode: 'insensitive' } },
+  torch: { subType: { equals: 'TORCH', mode: INSENSITIVE } },
+  ladder: { subType: { equals: 'LADDER', mode: INSENSITIVE } },
+  // Not `as const`: Prisma's `OR` wants a mutable array.
   throwable: {
-    OR: [{ throwable: true }, { subType: { equals: 'DYNAMITE', mode: 'insensitive' } }],
+    OR: [{ throwable: true }, { subType: { equals: 'DYNAMITE', mode: INSENSITIVE } }],
   },
-} as const;
+};

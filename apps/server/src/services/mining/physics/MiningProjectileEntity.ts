@@ -1,24 +1,27 @@
 import { MiningPhysicsBody, type MiningCollisionGrid } from './MiningPhysicsBody';
-import {
-  type Vector2D,
-  type MiningRigidWorld,
-  type ProjectileBodyOptions,
-  isTileSolid,
-  MINING_CONFIG,
-} from '@mine-me/shared';
-import * as planck from 'planck';
+import { type Vector2D, MINING_CONFIG, raycastSolidTiles } from '@mine-me/shared';
 
-export interface ProjectileEntityOptions extends ProjectileBodyOptions {
+/** A bullet does not hit the tiles right at its muzzle, so a shooter pressed against a wall can still fire. */
+const MUZZLE_CLEARANCE = 0.35;
+
+export interface ProjectileEntityOptions {
+  /** Fraction of world gravity applied to the bullet (0 = flies straight). */
+  gravityScale?: number;
+  itemId?: string;
   damage?: number;
   weaponItemId?: string;
   maxLifetime?: number;
+  /** Mobs the bullet passes through before the next one stops it. */
+  pierceCount?: number;
   spriteUrl?: string | null;
   inGameScale?: number;
 }
 
 /**
- * Server-authoritative physics-backed projectile entity (e.g. 6-shooter revolver bullet).
- * Powered by Planck.js rigid body simulation with continuous collision detection (CCD).
+ * Server-authoritative projectile (e.g. 6-shooter revolver bullet).
+ * A plain kinematic body: it integrates its own gravity and every step is tested against the tile
+ * grid with an exact swept ray, so it can neither tunnel nor ricochet. (Planck is for bodies that
+ * tumble and bounce; a bullet dies on first contact.)
  */
 export class MiningProjectileEntity extends MiningPhysicsBody {
   public readonly id: string;
@@ -32,12 +35,19 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
 
   public elapsedTime: number = 0;
   public hasHit: boolean = false;
+  /** True when the bullet ended by timing out or leaving the world rather than hitting something. */
+  public expired: boolean = false;
+  /** Where the bullet was at the start of its last update; with `position` it is the segment it swept. */
+  public previousPosition: Vector2D;
+  /** Collision radius of the bullet itself when tested against mobs. */
+  public readonly hitRadius = 0.12;
   public hitTile?: { x: number; y: number };
   public hitMobId?: string;
+  /** Mobs already damaged by this bullet; a piercing bullet never hits the same one twice. */
+  public readonly hitMobIds = new Set<string>();
+  /** Further mobs the bullet can pass through. */
+  public pierceRemaining: number;
   public angle: number = 0;
-
-  public rigidBody: planck.Body | null = null;
-  private rigidWorld: MiningRigidWorld | null = null;
 
   public readonly initialPosition: Vector2D;
 
@@ -46,9 +56,6 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
   }
   public override set position(pos: Vector2D) {
     this._position = { ...pos };
-    if (this.rigidBody) {
-      this.rigidBody.setPosition(planck.Vec2(pos.x, pos.y));
-    }
   }
 
   public override get velocity(): Vector2D {
@@ -56,9 +63,6 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
   }
   public override set velocity(vel: Vector2D) {
     this._velocity = { ...vel };
-    if (this.rigidBody) {
-      this.rigidBody.setLinearVelocity(planck.Vec2(vel.x, vel.y));
-    }
   }
 
   constructor(
@@ -66,8 +70,7 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
     characterId: string,
     initialPosition: Vector2D,
     initialVelocity: Vector2D,
-    options?: ProjectileEntityOptions,
-    rigidWorld?: MiningRigidWorld
+    options?: ProjectileEntityOptions
   ) {
     super({
       position: { ...initialPosition },
@@ -83,51 +86,36 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
     this.weaponItemId = options?.weaponItemId;
     this.damage = options?.damage ?? 35;
     this.maxLifetime = options?.maxLifetime ?? 3.0;
+    this.pierceRemaining = Math.max(0, Math.floor(options?.pierceCount ?? 0));
     this.spriteUrl = options?.spriteUrl;
     this.inGameScale = typeof options?.inGameScale === 'number' && options.inGameScale > 0 ? options.inGameScale : 1.0;
 
     this.initialPosition = { ...initialPosition };
+    this.previousPosition = { ...initialPosition };
     this._position = { ...initialPosition };
     this._velocity = { ...initialVelocity };
     this.angle = Math.atan2(initialVelocity.y, initialVelocity.x);
-    this.rigidWorld = rigidWorld ?? null;
-
-    if (rigidWorld) {
-      this.rigidBody = rigidWorld.createProjectileBody(
-        id,
-        initialPosition,
-        initialVelocity,
-        options
-      );
-    }
   }
 
   public override update(dt: number, grid?: MiningCollisionGrid): void {
     if (this.hasHit) return;
 
     this.elapsedTime += dt;
+    this.previousPosition = { x: this.position.x, y: this.position.y };
     if (this.elapsedTime >= this.maxLifetime) {
       this.hasHit = true;
-      this.cleanup();
+      this.expired = true;
       return;
     }
 
-    const prevX = this.position.x;
-    const prevY = this.position.y;
+    const prev = this.previousPosition;
 
-    if (this.rigidBody) {
-      const pos = this.rigidBody.getPosition();
-      const vel = this.rigidBody.getLinearVelocity();
-      this.position.x = pos.x;
-      this.position.y = pos.y;
-      this.velocity.x = vel.x;
-      this.velocity.y = vel.y;
-      this.angle = Math.atan2(vel.y, vel.x);
-    } else {
-      // Kinematic fallback
-      this.position.x += this.velocity.x * dt;
-      this.position.y += this.velocity.y * dt;
+    if (this.hasGravity) {
+      this.velocity.y += MINING_CONFIG.GRAVITY * this.gravityScale * dt;
     }
+    this.position.x += this.velocity.x * dt;
+    this.position.y += this.velocity.y * dt;
+    this.angle = Math.atan2(this.velocity.y, this.velocity.x);
 
     // Boundary check (allows open sky flight above ground up to y = -40, and wide horizontal trajectory)
     if (
@@ -137,68 +125,20 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
       this.position.y >= MINING_CONFIG.GRID_HEIGHT + 10
     ) {
       this.hasHit = true;
-      this.cleanup();
+      this.expired = true;
       return;
     }
 
-    // Solid tile collision detection with anti-tunneling sub-stepping
-    if (grid) {
-      const dx = this.position.x - prevX;
-      const dy = this.position.y - prevY;
-      const dist = Math.hypot(dx, dy);
-      const steps = Math.max(1, Math.ceil(dist / 0.25));
-
-      for (let s = 1; s <= steps; s++) {
-        const checkX = prevX + (dx * s) / steps;
-        const checkY = prevY + (dy * s) / steps;
-        const tx = Math.floor(checkX);
-        const ty = Math.floor(checkY);
-
-        // Clearance threshold from muzzle position prevents immediate self-collision with shooter's tile
-        const spawnDist = Math.hypot(
-          checkX - this.initialPosition.x,
-          checkY - this.initialPosition.y
-        );
-        if (spawnDist < 0.35) {
-          continue;
-        }
-
-        // Above ground (ty < 0) is open sky (no collision with ground or bedrock)
-        if (ty < 0) {
-          continue;
-        }
-
-        if (
-          ty >= 0 &&
-          ty < MINING_CONFIG.GRID_HEIGHT &&
-          tx >= 0 &&
-          tx < MINING_CONFIG.GRID_WIDTH
-        ) {
-          const tile = grid[ty]?.[tx];
-          if (tile && isTileSolid(tile.type as any)) {
-            this.hasHit = true;
-            this.hitTile = { x: tx, y: ty };
-            this.position.x = checkX;
-            this.position.y = checkY;
-            this.cleanup();
-            return;
-          }
-        } else if (ty >= 0) {
-          // Cavern boundary outer wall underground
-          this.hasHit = true;
-          this.position.x = Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 0.01, checkX));
-          this.position.y = Math.min(MINING_CONFIG.GRID_HEIGHT - 0.01, checkY);
-          this.cleanup();
-          return;
-        }
-      }
-    }
-  }
-
-  public cleanup(): void {
-    if (this.rigidBody && this.rigidWorld) {
-      this.rigidWorld.destroyBody(this.rigidBody);
-      this.rigidBody = null;
+    if (!grid) return;
+    const hit = raycastSolidTiles(grid, prev, this.position, {
+      ignore: (h) =>
+        Math.hypot(h.point.x - this.initialPosition.x, h.point.y - this.initialPosition.y) < MUZZLE_CLEARANCE,
+    });
+    if (hit) {
+      this.hasHit = true;
+      this.hitTile = hit.tile ?? undefined;
+      this.position.x = hit.point.x;
+      this.position.y = hit.point.y;
     }
   }
 }

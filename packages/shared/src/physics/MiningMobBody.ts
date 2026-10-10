@@ -21,7 +21,7 @@ export class MiningMobBody extends MiningPhysicsBody {
   public isOnLadder: boolean = false;
   public isMining: boolean = false;
   public miningTarget: MiningPosition | null = null;
-  public miningProgressMs: number = 0;
+  public miningProgress: number = 0;
   public collisionX: boolean = false;
 
   constructor(options: MiningMobBodyOptions) {
@@ -58,7 +58,7 @@ export class MiningMobBody extends MiningPhysicsBody {
         }
         const row = grid[ty];
         const tile = row ? row[tx] : undefined;
-        if (tile && isTileClimbable(tile.type as any)) {
+        if (tile && isTileClimbable(tile.type)) {
           const ladderCenterX = tx + 0.5;
           const distToCenter = Math.abs(this.position.x - ladderCenterX);
           if (distToCenter <= MINING_CONFIG.LADDER_GRAB_WIDTH) {
@@ -146,7 +146,7 @@ export class MiningMobBody extends MiningPhysicsBody {
   public stopMining(): void {
     this.isMining = false;
     this.miningTarget = null;
-    this.miningProgressMs = 0;
+    this.miningProgress = 0;
   }
 
   protected override onCollideX(): void {

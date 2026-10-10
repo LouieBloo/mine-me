@@ -1,10 +1,16 @@
 export type SoundType = 'BGM' | 'SFX';
 
+/** Where a library sound is used. Music is `type: 'BGM'`; sound effects are grouped by what plays them. */
+export type SoundCategory = 'GENERAL' | 'ITEM' | 'BLOCK' | 'MOB';
+
+export const SOUND_CATEGORIES: readonly SoundCategory[] = ['GENERAL', 'ITEM', 'BLOCK', 'MOB'];
+
 export interface SoundTrack {
   id: string;
   name: string;
   description?: string | null;
   type: SoundType;
+  category?: SoundCategory;
   url: string;
   fileName: string;
   fileSize: number;
@@ -49,14 +55,23 @@ export interface ItemSoundEffectsConfig {
   [key: string]: SoundEffectSlotConfig | undefined;
 }
 
-export type MobSoundSlot = 'dig' | 'idle' | 'damage';
+export type MobSoundSlot = 'dig' | 'idle' | 'damage' | 'attack' | 'death';
 
-export interface MobSoundEffectsConfig {
-  dig?: SoundEffectSlotConfig;
-  idle?: SoundEffectSlotConfig;
-  damage?: SoundEffectSlotConfig;
-  [key: string]: SoundEffectSlotConfig | undefined;
+/** What the admin stores for one mob slot: a library sound by id (the url is resolved at load). */
+export interface MobSoundSlotRef {
+  soundId?: string | null;
+  loop?: boolean;
 }
+
+export type MobSoundSlotRefs = Partial<Record<MobSoundSlot, MobSoundSlotRef>>;
+
+/** A mob slot after its library sound has been resolved to something the client can play. */
+export interface MobSoundSlotResolved extends SoundEffectSlotConfig {
+  soundId?: string | null;
+  volume?: number;
+}
+
+export type MobSoundEffectsConfig = Partial<Record<MobSoundSlot, MobSoundSlotResolved>>;
 
 export type AudioFalloffModel = 'linear' | 'quadratic' | 'smoothstep' | 'exponential';
 
@@ -126,6 +141,20 @@ export const MINING_SPATIAL_AUDIO_PRESETS = {
     minDistance: 1.5,
     falloffModel: 'linear' as AudioFalloffModel,
     panRange: 10,
+    enablePanning: true,
+  },
+  MOB_ATTACK: {
+    maxDistance: 16,
+    minDistance: 2,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 12,
+    enablePanning: true,
+  },
+  MOB_DEATH: {
+    maxDistance: 18,
+    minDistance: 2,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 12,
     enablePanning: true,
   },
   MOB_DAMAGE: {

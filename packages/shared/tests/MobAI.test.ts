@@ -47,7 +47,6 @@ describe('MobAI System', () => {
         velocity: { x: 0, y: 0 },
         health: 50,
         maxHealth: 50,
-        attack: 10,
         defense: 2,
         isGrounded: true,
         isOnLadder: false,
@@ -78,7 +77,6 @@ describe('MobAI System', () => {
         velocity: { x: 0, y: 0 },
         health: 50,
         maxHealth: 50,
-        attack: 10,
         defense: 2,
         isGrounded: true,
         isOnLadder: false,
@@ -90,7 +88,7 @@ describe('MobAI System', () => {
             health: 100,
           },
         ],
-        config: { attackRange: 1.25, attackCooldownMs: 1000 },
+        config: { attackRange: 1.25 },
       };
 
       const intent = ai.update(0.1, context);
@@ -98,9 +96,11 @@ describe('MobAI System', () => {
       expect(intent.attackTargetId).toBe('char_near');
       expect(intent.animationState).toBe('attack');
 
-      // Next tick immediately after attack should be on cooldown
+      // The AI only reports the target in reach; pacing is the swing timer's job, so it keeps
+      // reporting every tick and does not move into the player.
       const intent2 = ai.update(0.1, context);
-      expect(intent2.isAttacking).toBe(false);
+      expect(intent2.isAttacking).toBe(true);
+      expect(intent2.moveX).toBe(0);
     });
 
     it('chases and navigates towards player in aggro range', () => {
@@ -112,7 +112,6 @@ describe('MobAI System', () => {
         velocity: { x: 0, y: 0 },
         health: 50,
         maxHealth: 50,
-        attack: 10,
         defense: 2,
         isGrounded: true,
         isOnLadder: false,
@@ -145,7 +144,6 @@ describe('MobAI System', () => {
         velocity: { x: 0, y: 0 },
         health: 50,
         maxHealth: 50,
-        attack: 10,
         defense: 2,
         isGrounded: true,
         isOnLadder: false,
@@ -183,7 +181,6 @@ describe('MobAI System', () => {
         velocity: { x: 0, y: 0 },
         health: 50,
         maxHealth: 50,
-        attack: 10,
         defense: 2,
         isGrounded: true,
         isOnLadder: false,
@@ -218,7 +215,6 @@ describe('MobAI System', () => {
         velocity: { x: 0, y: 0 },
         health: 50,
         maxHealth: 50,
-        attack: 10,
         defense: 2,
         isGrounded: true,
         isOnLadder: false,
@@ -253,7 +249,6 @@ describe('MobAI System', () => {
         velocity: { x: 0, y: 0 },
         health: 50,
         maxHealth: 50,
-        attack: 10,
         defense: 2,
         isGrounded: true,
         isOnLadder: false,
@@ -292,7 +287,6 @@ describe('MobAI System', () => {
         velocity: { x: 0, y: 0 },
         health: 50,
         maxHealth: 50,
-        attack: 10,
         defense: 2,
         isGrounded: true,
         isOnLadder: false,

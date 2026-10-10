@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { GameItem, PlayerState, MiningActiveProjectile } from '@mine-me/shared';
+import type { GameItem, PlayerState, } from '@mine-me/shared';
 import {
   DEFAULT_DYNAMITE_SOUNDS,
   getAssetUrl,
@@ -13,35 +13,31 @@ import {
   ThrowableItemAction,
   ShootWeaponAction,
 } from '../input/MouseAction';
-import type { MiningMouseController } from '../input/MiningMouseController';
-import type { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
-import type { ProjectileVisualManager } from '../renderers/ProjectileVisualManager';
-import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
-import type { ModularCharacterSprite } from '../../../../../components/game/sprites';
-import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import type { SoundManager } from '../../../../../services/sound';
-import type { MiningPlayerBody, MiningClientTile } from '@mine-me/shared';
-import type { Container, Texture, Graphics, Sprite } from 'pixi.js';
+import type { MiningClientWorld } from '../systems/MiningClientWorld';
 
 export interface UseMiningActionsOptions {
+  world: Pick<
+    MiningClientWorld,
+    | 'playerSpriteRef'
+    | 'gridContainerRef'
+    | 'mouseControllerRef'
+    | 'gridRef'
+    | 'playerBodyRef'
+    | 'tilesContainerRef'
+    | 'blockTexturesRef'
+    | 'tileGraphicsMap'
+    | 'tileSpritesMap'
+    | 'dynamiteVisualManagerRef'
+    | 'projectileVisualManagerRef'
+    | 'activeProjectilesRef'
+    | 'particleEngineRef'
+    | 'lightingEngineRef'
+    | 'dynamicItemsRef'
+  >;
   playerState: PlayerState;
-  equippedWeapon: any;
-  playerSpriteRef?: React.RefObject<ModularCharacterSprite | null>;
-  gridContainerRef?: React.RefObject<Container | null>;
-  mouseControllerRef: React.MutableRefObject<MiningMouseController>;
-  gridRef: React.MutableRefObject<MiningClientTile[][]>;
-  playerBodyRef: React.MutableRefObject<MiningPlayerBody>;
-  tilesContainerRef: React.RefObject<Container | null>;
+  equippedWeapon: GameItem | null;
   containersReady: boolean;
-  blockTexturesRef: React.MutableRefObject<Map<number, Texture>>;
-  tileGraphicsMap: React.MutableRefObject<Map<string, Graphics>>;
-  tileSpritesMap: React.MutableRefObject<Map<string, Sprite>>;
-  dynamiteVisualManagerRef: React.RefObject<DynamiteVisualManager | null>;
-  projectileVisualManagerRef: React.RefObject<ProjectileVisualManager | null>;
-  activeProjectilesRef?: React.MutableRefObject<MiningActiveProjectile[]>;
-  particleEngineRef: React.RefObject<ParticleEngine | null>;
-  lightingEngineRef: React.RefObject<LightingEngine | null>;
-  dynamicItemsRef?: React.MutableRefObject<any[]>;
   soundManager: SoundManager;
   sendGameEvent: (event: any) => Promise<any>;
 
@@ -56,24 +52,10 @@ export interface UseMiningActionsOptions {
 }
 
 export function useMiningActions({
+  world,
   playerState,
   equippedWeapon,
-  playerSpriteRef,
-  gridContainerRef,
-  mouseControllerRef,
-  gridRef,
-  playerBodyRef,
-  tilesContainerRef,
   containersReady,
-  blockTexturesRef,
-  tileGraphicsMap,
-  tileSpritesMap,
-  dynamiteVisualManagerRef,
-  projectileVisualManagerRef,
-  activeProjectilesRef,
-  particleEngineRef,
-  lightingEngineRef,
-  dynamicItemsRef,
   soundManager,
   sendGameEvent,
   isPlacingTorch = false,
@@ -85,6 +67,23 @@ export function useMiningActions({
   activeThrowableItem = null,
   onDynamiteThrown,
 }: UseMiningActionsOptions) {
+  const {
+    playerSpriteRef,
+    gridContainerRef,
+    mouseControllerRef,
+    gridRef,
+    playerBodyRef,
+    tilesContainerRef,
+    blockTexturesRef,
+    tileGraphicsMap,
+    tileSpritesMap,
+    dynamiteVisualManagerRef,
+    projectileVisualManagerRef,
+    activeProjectilesRef,
+    particleEngineRef,
+    lightingEngineRef,
+    dynamicItemsRef,
+  } = world;
   const [resolvedSoundUrl, setResolvedSoundUrl] = useState<string | null>(
     equippedWeapon?.soundEffects?.shoot?.url || equippedWeapon?.soundEffectUrl || null
   );

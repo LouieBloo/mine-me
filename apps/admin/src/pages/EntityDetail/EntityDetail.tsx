@@ -13,7 +13,7 @@ export const EntityDetail = () => {
 
   const getTemplate = (entityName: string | undefined) => {
     switch (entityName) {
-      case 'mobs': return { name: '', level: 1, health: 10, attack: 1, defense: 1, drops: [] };
+      case 'mobs': return { name: '', level: 1, health: 10, defense: 1, drops: [] };
       case 'items': return { name: '', description: '', type: 'GEAR', subType: 'HEAD', vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW' };
       case 'cities': return { name: '', description: '' };
       case 'users': return { phoneNumber: '', familyName: '', isAdmin: false };

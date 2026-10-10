@@ -23,6 +23,7 @@ export const MineView: React.FC = () => {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [isAssetsLoaded, setIsAssetsLoaded] = useState<boolean>(false);
+  const [loadProgress, setLoadProgress] = useState<number>(0);
   const [sessionKey, setSessionKey] = useState<number>(0);
 
   // Camera Zoom State (persisted in localStorage, default 150%, range 100% - 200%)
@@ -295,6 +296,7 @@ export const MineView: React.FC = () => {
       {/* Atmospheric Loading Screen Overlay */}
       <MiningLoadingScreen
         isLoading={isScreenLoading}
+        progress={isAssetsLoaded ? 1 : loadProgress}
         message="Entering Dungeon Mine..."
         subMessage="Rigging equipment, lighting cavern depths & generating veins..."
       />
@@ -307,6 +309,7 @@ export const MineView: React.FC = () => {
             playerState={playerState}
             onExit={handleExit}
             onAssetsLoaded={handleAssetsLoaded}
+            onLoadProgress={setLoadProgress}
             zoom={zoom}
             onZoomChange={handleZoomChange}
             isPlacingTorch={isPlacingTorch}

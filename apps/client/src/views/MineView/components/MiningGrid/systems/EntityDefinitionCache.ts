@@ -1,5 +1,7 @@
 import type {
   MiningActiveDynamite,
+  MiningDroppedItem,
+  MiningDroppedItemDynamic,
   MiningActiveMob,
   MiningActiveProjectile,
   MiningDynamiteDynamic,
@@ -16,6 +18,7 @@ import type {
 const MOB_DYNAMIC_KEYS = ['position', 'velocity', 'health', 'isFacingLeft', 'isMining', 'miningTarget', 'animationState'] as const;
 const PLAYER_DYNAMIC_KEYS = ['position', 'velocity', 'isMining', 'miningTarget', 'isFacingLeft', 'aimDirection', 'flashlightOn', 'animationState'] as const;
 const PROJECTILE_DYNAMIC_KEYS = ['position', 'velocity', 'angle'] as const;
+const DROPPED_ITEM_DYNAMIC_KEYS = ['position', 'velocity'] as const;
 const DYNAMITE_DYNAMIC_KEYS = ['position', 'velocity', 'angle', 'angularVelocity', 'fuseRemainingSeconds'] as const;
 
 function staticPart<T>(entity: T, dynamicKeys: readonly string[]): T {
@@ -35,12 +38,13 @@ export class EntityDefinitionCache {
   private readonly players = new Map<string, MiningRemotePlayer>();
   private readonly projectiles = new Map<string, MiningActiveProjectile>();
   private readonly dynamites = new Map<string, MiningActiveDynamite>();
+  private readonly droppedItems = new Map<string, MiningDroppedItem>();
   private readonly warned = new Set<string>();
 
   /** Records everything the join snapshot describes. */
-  public seedFromSnapshot(state?: Pick<MiningSessionClientState, 'mobs' | 'otherPlayers' | 'activeDynamites'>): void {
+  public seedFromSnapshot(state?: Partial<Pick<MiningSessionClientState, 'mobs' | 'otherPlayers' | 'activeDynamites' | 'droppedItems'>>): void {
     if (!state) return;
-    this.applySpawned({ mobs: state.mobs, players: state.otherPlayers, dynamites: state.activeDynamites });
+    this.applySpawned({ mobs: state.mobs, players: state.otherPlayers, dynamites: state.activeDynamites, droppedItems: state.droppedItems });
   }
 
   /** Records (or replaces) definitions the server just sent. Call before hydrating the same tick. */
@@ -50,6 +54,9 @@ export class EntityDefinitionCache {
     spawned.players?.forEach((p) => this.players.set(p.characterId, staticPart(p, PLAYER_DYNAMIC_KEYS)));
     spawned.projectiles?.forEach((p) => this.projectiles.set(p.id, staticPart(p, PROJECTILE_DYNAMIC_KEYS)));
     spawned.dynamites?.forEach((d) => this.dynamites.set(d.id, staticPart(d, DYNAMITE_DYNAMIC_KEYS)));
+    spawned.droppedItems?.forEach((i) => {
+      if (i.id) this.droppedItems.set(i.id, staticPart(i, DROPPED_ITEM_DYNAMIC_KEYS));
+    });
   }
 
   /**
@@ -71,6 +78,10 @@ export class EntityDefinitionCache {
 
   public hydrateDynamites(dynamic: MiningDynamiteDynamic[] | undefined): MiningActiveDynamite[] | undefined {
     return this.hydrate('dynamite', this.dynamites, dynamic, (d) => d.id);
+  }
+
+  public hydrateDroppedItems(dynamic: MiningDroppedItemDynamic[] | undefined): MiningDroppedItem[] | undefined {
+    return this.hydrate('dropped item', this.droppedItems, dynamic, (d) => d.id);
   }
 
   private hydrate<D, F>(
@@ -109,6 +120,7 @@ export class EntityDefinitionCache {
     this.players.clear();
     this.projectiles.clear();
     this.dynamites.clear();
+    this.droppedItems.clear();
     this.warned.clear();
   }
 }

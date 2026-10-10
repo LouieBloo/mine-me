@@ -1,3 +1,4 @@
+import { partialDefinitions, testBlockConfig, testDropTable } from './testHelpers';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { MINING_CONFIG, MiningRigidWorld, MiningTileType } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
@@ -190,10 +191,11 @@ describe('block drops are deterministic with a fixed random source', () => {
 
   it('rolls the configured table through the shared roller', () => {
     const original = MiningDataManager.getInstance();
-    MiningDataManager.initialize({
-      items: [], mobs: [],
-      blocks: [{ id: 'b', typeKey: 'CHEST', health: 100, dropTable: { items: [{ itemId: 'gem', chance: 50, minQuantity: 2, maxQuantity: 4 }] } }],
-    });
+    MiningDataManager.initialize(
+      partialDefinitions({
+        blocks: [testBlockConfig({ typeKey: 'CHEST', dropTable: testDropTable([{ itemId: 'gem', chance: 50, minQuantity: 2, maxQuantity: 4 }]) })],
+      })
+    );
     try {
       const drops = new MiningDropSubsystem(stubWorld({ data: MiningDataManager.getInstance() }));
       vi.spyOn(Math, 'random').mockReturnValue(0.4); // 40 < 50: drops; quantity floor(0.4 * 3) + 2 = 3

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '../../../contexts/ToastContext';
 import { useApi } from '../../../hooks/useApi';
 import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
-import type { SoundType, SoundTrack } from '@mine-me/shared';
+import type { SoundCategory, SoundType, SoundTrack } from '@mine-me/shared';
 import './UploadSoundModal.css';
 
 interface UploadSoundModalProps {
@@ -20,6 +20,7 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({ isOpen, onCl
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<SoundType>('BGM');
+  const [category, setCategory] = useState<SoundCategory>('GENERAL');
   const [volume, setVolume] = useState<number>(0.8);
   const [loop, setLoop] = useState<boolean>(true);
   const [isActive, setIsActive] = useState<boolean>(true);
@@ -31,6 +32,7 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({ isOpen, onCl
     setName('');
     setDescription('');
     setType('BGM');
+    setCategory('GENERAL');
     setVolume(0.8);
     setLoop(true);
     setIsActive(true);
@@ -81,6 +83,7 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({ isOpen, onCl
       formData.append('name', name.trim());
       formData.append('description', description.trim());
       formData.append('type', type);
+      formData.append('category', type === 'SFX' ? category : 'GENERAL');
       formData.append('volume', volume.toString());
       formData.append('loop', loop.toString());
       formData.append('isActive', isActive.toString());
@@ -234,6 +237,26 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({ isOpen, onCl
                 <option value="SFX">Sound Effect (SFX)</option>
               </select>
             </div>
+
+            {type === 'SFX' && (
+              <div>
+                <label htmlFor="sound-category" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Used For
+                </label>
+                <select
+                  id="sound-category"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as SoundCategory)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-slate-900 cursor-pointer"
+                  disabled={uploading}
+                >
+                  <option value="GENERAL">General / other</option>
+                  <option value="MOB">Mob</option>
+                  <option value="ITEM">Item</option>
+                  <option value="BLOCK">Block</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">

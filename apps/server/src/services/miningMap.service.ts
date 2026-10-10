@@ -28,15 +28,13 @@ export interface ServerTile {
   revealed: boolean;
   /** Accumulated damage dealt to this block (remaining HP = maxHealth - damage). */
   damage?: number;
-  /** @deprecated Backward compatibility */
-  damageMs?: number;
 }
 
 /**
  * Calculate damage stage (0-4) based on accumulated damage vs dynamic tile max health.
  */
 export function getDamageStage(tile: ServerTile): number {
-  const damageTaken = tile.damage ?? tile.damageMs ?? 0;
+  const damageTaken = tile.damage ?? 0;
   if (damageTaken <= 0 || !canTileBeDamaged(tile.type)) {
     return 0;
   }

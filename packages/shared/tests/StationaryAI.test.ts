@@ -18,7 +18,6 @@ describe('StationaryAI', () => {
       velocity: { x: 0, y: 0 },
       health: 1000000,
       maxHealth: 1000000,
-      attack: 0,
       defense: 0,
       isGrounded: true,
       isOnLadder: false,

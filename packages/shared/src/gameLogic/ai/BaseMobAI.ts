@@ -8,6 +8,30 @@ export interface PlayerTargetInfo {
   health: number;
 }
 
+/** Caps how many A* searches the mobs may start in one tick, so many mobs can't blow the tick budget. */
+export interface PathRequestBudget {
+  /** Takes one search from the budget; false means "ask again next tick". */
+  tryConsume(): boolean;
+}
+
+/** A per-tick counter implementing PathRequestBudget; call `reset` at the start of every tick. */
+export class TickPathBudget implements PathRequestBudget {
+  private readonly perTick: number;
+  private remaining: number;
+  constructor(perTick: number) {
+    this.perTick = perTick;
+    this.remaining = perTick;
+  }
+  public reset(): void {
+    this.remaining = this.perTick;
+  }
+  public tryConsume(): boolean {
+    if (this.remaining <= 0) return false;
+    this.remaining--;
+    return true;
+  }
+}
+
 export interface MobAIContext {
   mobId: string;
   instanceId: string;
@@ -15,13 +39,14 @@ export interface MobAIContext {
   velocity: Vector2D;
   health: number;
   maxHealth: number;
-  attack: number;
   defense: number;
   isGrounded: boolean;
   isOnLadder: boolean;
   grid: MiningCollisionGrid;
   players: PlayerTargetInfo[];
   config?: MobAIConfig;
+  /** Shared per-tick limit on path searches; absent means unlimited. */
+  pathBudget?: PathRequestBudget;
 }
 
 export interface MobActionIntent {

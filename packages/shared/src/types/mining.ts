@@ -1,5 +1,6 @@
-import type { GearSubType, ItemPhysicsConfig, DropTable, ItemSoundEffectsConfig, ItemLightConfig } from './index';
+import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig } from './index';
 import type { ParticleEffect } from './particles';
+import type { SkeletonManifest } from './modularRig';
 
 // ============================================================================
 // Mining Mini-Game Types & Constants
@@ -42,22 +43,31 @@ export const MINING_CONFIG = {
   // Ranged weapons: server-side estimate of the barrel position (tiles from the shoulder along the aim)
   // Mob digging feedback: hit events are batched at this cadence (seconds) and only sent to players
   // within BLOCK_HIT_HEARING_RANGE tiles of the block (rough on-screen/earshot distance; tune as needed)
-  EXPLOSION_MOB_DAMAGE: 50, // flat damage dynamite deals to mobs in its radius (data-driven in ticket 025)
+  EXPLOSION_DEFAULT_DAMAGE: 50, // blast damage at the centre when the explosive item has no Damage effect
+  EXPLOSION_MIN_DAMAGE_FRACTION: 0.25, // fraction of that damage left at the very edge of the radius (linear falloff)
+  EXPLOSION_KNOCKBACK_X: 8.0, // push (tiles/s) away from the centre on anything the blast moves
+  EXPLOSION_KNOCKBACK_Y: -6.0,
   TOOL_NOTICE_COOLDOWN_SECONDS: 3.0, // minimum gap between "your pickaxe is too weak"-style messages
   // Defaults for a mob whose data leaves a stat out (a mob's own value always wins)
   MOB_DEFAULT_MOVE_SPEED: 3.2, // tiles/s
   MOB_DEFAULT_JUMP_FORCE: 8.8,
-  MOB_DEFAULT_MINING_SPEED: 80, // percent of base mining rate
   MOB_DEFAULT_AGGRO_RANGE: 20, // tiles at which it notices a player
   MOB_DEFAULT_ATTACK_RANGE: 1.25, // tiles
-  MOB_DEFAULT_ATTACK_COOLDOWN_MS: 1200,
   MOB_DEFAULT_MINE_RANGE: 2.0, // tiles
+  MOB_PATHS_PER_TICK: 4, // most A* searches all mobs together may start in one tick (the rest wait a tick)
+  MOB_ATTACK_WINDUP_SECONDS: 0.3, // default telegraph between a mob starting an attack and it landing (aiConfig.attackWindupMs overrides)
+  MOB_ATTACK_DODGE_MARGIN: 0.75, // tiles a target must get beyond the attack's start distance during wind-up to dodge it
+  MOB_SEPARATION_SPEED: 4.0, // tiles/s at which overlapping mobs/players are pushed apart (soft collision)
   MOB_HIT_STUN_MS: 250, // default time a mob loses control when hit (a mob's own hitStunMs overrides)
   MOB_STUN_IMMUNITY_MS: 500, // default time after a stun ends during which it can't be stunned again
   MAX_DROPPED_ITEMS: 1000, // hard safety limit per room (items never despawn); drops beyond it are skipped
   MOB_DEATH_LINGER_SECONDS: 1.0, // how long a killed mob stays (inert) so clients can play its death animation
-  MOB_DIG_HIT_INTERVAL: 0.4,
   BLOCK_HIT_HEARING_RANGE: 14,
+  // Interest management: a client is only told about entities inside this box around its player
+  // (more than the screen shows even on a wide monitor, and about as far as a sound carries).
+  INTEREST_RADIUS_X: 28, // tiles either side of the player
+  INTEREST_RADIUS_Y: 20, // tiles above/below
+  INTEREST_HYSTERESIS: 6, // extra tiles an entity already known to the client may drift out before it is dropped
   GUN_MUZZLE_REACH: 0.9,
   // A client-reported muzzle is trusted only within this distance of the server estimate
   GUN_MUZZLE_MAX_DEVIATION: 1.0,
@@ -106,6 +116,8 @@ export const MINING_CONFIG = {
   PLAYER_MINING_REACH: 1.85, // Mining interaction reach radius in tiles (allows adjacent tiles regardless of player sub-tile position)
   MOVE_SPEED: 4.5, // Grid tiles per second
   GRAVITY: 28.0, // Grid tiles per second squared (snappy natural 2D gravity)
+  MAX_ENTITY_SPEED: 60.0, // Hard cap on any body's speed per axis (tiles/s); keeps knockback/blasts sane
+  MAX_STEP_DISPLACEMENT: 0.4, // A body never moves more than this in one collision step (tiles); smaller than any collider half-extent
   TERMINAL_FALL_SPEED: 20.0, // Maximum downward velocity in tiles per second
   JUMP_FORCE: 8.5, // Initial upward velocity for jumping (~1.3 tiles height)
   SIMULATION_TICK_RATE_HZ: 30,
@@ -183,6 +195,8 @@ export interface MiningTileDefinition {
   isClimbable: boolean;
   /** Whether light (sunlight and ambient) passes through this tile */
   isTransparent: boolean;
+  /** Survives explosions, and shields what is behind it from the blast (bedrock-like) */
+  isBlastProof?: boolean;
   /** Default block health (HP) if not configured dynamically in database */
   health?: number;
   /** Default duration in ms (deprecated in favor of health) */
@@ -251,6 +265,7 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     isSolid: false,
     isClimbable: false,
     isTransparent: true,
+    isBlastProof: true,
   },
   [MiningTileType.LADDER]: {
     type: MiningTileType.LADDER,
@@ -304,6 +319,10 @@ export function canTileBeDamaged(type: MiningTileType): boolean {
 
 export function isTileMineable(type: MiningTileType): boolean {
   return getTileDefinition(type).isMineable;
+}
+
+export function isTileBlastProof(type: MiningTileType): boolean {
+  return getTileDefinition(type).isBlastProof === true;
 }
 
 export function isTileSolid(type: MiningTileType): boolean {
@@ -507,7 +526,7 @@ export interface MiningSessionClientState {
   /** If mining, the target tile coordinates. */
   miningTarget?: MiningPosition;
   /** If mining, the total time required in ms. */
-  miningTimeMs?: number;
+  miningTotal?: number;
   /** If mining, the server timestamp when mining started. */
   miningStartedAt?: number;
   /** Current game mode ('singleplayer' or 'multiplayer'). */
@@ -569,6 +588,8 @@ export interface MiningPlayerDamagedEvent {
   knockback: { x: number; y: number };
   knockbackSeconds: number;
   invulnerableSeconds: number;
+  /** Server tick the hit happened on (lets the client tell which position snapshots already include it). */
+  tick: number;
 }
 
 /** A short message to the player about their tool or action (shown as a toast). */
@@ -617,6 +638,9 @@ export type MiningRemotePlayerDynamic = Pick<
   | 'animationState'
 >;
 
+/** A dropped item as ticks carry it: where it is. Its description arrives once in `spawned`. */
+export type MiningDroppedItemDynamic = Pick<MiningDroppedItem, 'position' | 'velocity'> & { id: string };
+
 export type MiningProjectileDynamic = Pick<MiningActiveProjectile, 'id' | 'position' | 'velocity' | 'angle'>;
 
 export type MiningDynamiteDynamic = Pick<
@@ -630,6 +654,7 @@ export interface MiningSpawnedEntities {
   players?: MiningRemotePlayer[];
   projectiles?: MiningActiveProjectile[];
   dynamites?: MiningActiveDynamite[];
+  droppedItems?: MiningDroppedItem[];
 }
 
 /** 30 Hz real-time simulation snapshot emitted by server to client. */
@@ -637,11 +662,21 @@ export interface MiningStateTickPayload {
   tick: number;
   position: Vector2D;
   velocity: Vector2D;
+  /**
+   * Prediction ack for the receiving player: the `sequence` of the input that was in effect for this
+   * tick, and how many server ticks (this one included) it had been in effect. With them the client
+   * knows which of its own predicted steps `position` corresponds to (see PlayerPredictor).
+   */
+  ackSequence: number;
+  ackAge: number;
+  /** Body flags the client cannot derive from position/velocity alone (see PlayerPredictor). */
+  bodyState: { isGrounded: boolean; isOnLadder: boolean; knockbackRemaining: number };
   isMining: boolean;
   miningTarget?: MiningPosition;
-  miningProgressMs?: number;
+  miningProgress?: number;
   temporaryBackpack?: MiningBackpackItem[];
-  droppedItems?: MiningDroppedItem[];
+  /** Where every dropped item is (dynamic fields only), sent only when one moved, appeared or vanished. */
+  droppedItems?: MiningDroppedItemDynamic[];
   fallingRocks?: MiningFallingRock[];
   /** Thrown dynamites in flight (dynamic fields only; definitions arrive once in `spawned`). */
   activeDynamites?: MiningDynamiteDynamic[];
@@ -680,12 +715,18 @@ export type MobAIType = 'CHASE_AND_MINE' | 'PATROL' | 'PASSIVE' | 'STATIONARY' |
 export interface MobAIConfig {
   aggroRange?: number;
   attackRange?: number;
-  attackCooldownMs?: number;
   canMine?: boolean;
   mineRange?: number;
   maxJumpTiles?: number;
   patrolRadius?: number;
   fleeHealthThreshold?: number;
+  /** Telegraph time before an attack lands, in ms (0 = instant). Defaults to MOB_ATTACK_WINDUP_SECONDS. */
+  attackWindupMs?: number;
+  /** Collider size in tiles (overrides the player-sized default). */
+  colliderWidth?: number;
+  colliderHeight?: number;
+  spriteUrl?: string;
+  showHealthBar?: boolean;
 }
 
 /** Waypoint in an A* navigation path across the mine grid. */
@@ -704,17 +745,18 @@ export interface MiningActiveMob {
   velocity: Vector2D;
   health: number;
   maxHealth: number;
-  attack: number;
   defense: number;
   isFacingLeft: boolean;
   isMining: boolean;
   miningTarget?: MiningPosition | null;
   animationState: 'idle' | 'walk' | 'mine' | 'attack' | 'jump' | 'damage' | 'death';
-  animations?: any;
+  animations?: SkeletonManifest | MobAtlas | null;
   spriteUrl?: string;
   colliderWidth?: number;
   colliderHeight?: number;
   showHealthBar?: boolean;
+  /** Playable sound slots (dig, idle, damage, attack, death); sent once with the mob's description. */
+  sounds?: MobSoundEffectsConfig | null;
 }
 
 /**

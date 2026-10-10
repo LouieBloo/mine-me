@@ -2,14 +2,15 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase } from './definitionLoaders';
+import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds } from './definitionLoaders';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 
-const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[] }) =>
+const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; sounds?: any[] }) =>
   ({
     item: { findMany: vi.fn().mockResolvedValue(data.items ?? [{ id: 'i1', name: 'Thing' }]) },
     mob: { findMany: vi.fn().mockResolvedValue(data.mobs ?? [{ id: 'm1', name: 'Mole' }]) },
     miningBlock: { findMany: vi.fn().mockResolvedValue(data.blocks ?? [{ id: 'b1', typeKey: 'DIRT' }]) },
+    sound: { findMany: vi.fn().mockResolvedValue(data.sounds ?? []) },
   }) as any;
 
 describe('loadDefinitionsFromDatabase', () => {
@@ -20,7 +21,7 @@ describe('loadDefinitionsFromDatabase', () => {
     expect(prisma.item.findMany).toHaveBeenCalledWith({
       include: { itemEffects: { include: { effect: true } }, particleEffect: true },
     });
-    expect(prisma.mob.findMany).toHaveBeenCalledWith({ include: { dropTable: { include: { items: true } } } });
+    expect(prisma.mob.findMany).toHaveBeenCalledWith({ include: { dropTable: { include: { items: true } }, mobEffects: { include: { effect: true } } } });
     expect(prisma.miningBlock.findMany).toHaveBeenCalledWith({
       include: { dropTable: { include: { items: true } }, idleParticleEffect: true },
     });
@@ -41,6 +42,37 @@ describe('loadDefinitionsFromDatabase', () => {
     const prisma = fakePrisma({});
     prisma.item.findMany.mockRejectedValue(new Error('connection refused'));
     await expect(loadDefinitionsFromDatabase(prisma)).rejects.toThrow('connection refused');
+  });
+});
+
+describe('mob sounds', () => {
+  const library = [
+    { id: 's1', url: '/assets/sounds/a.mp3', volume: 0.7, isActive: true },
+    { id: 's2', url: '/assets/sounds/b.mp3', volume: 1, isActive: false },
+  ];
+
+  it('resolves stored sound references to playable urls', () => {
+    const [mob] = attachMobSounds([{ id: 'm1', name: 'M', soundEffects: { attack: { soundId: 's1' }, death: { soundId: 's2' } } } as any], library);
+    expect(mob.sounds).toEqual({ attack: { soundId: 's1', url: '/assets/sounds/a.mp3', volume: 0.7, loop: false } });
+  });
+
+  it('keeps plain-url sounds on mobs that have no references (seed JSON)', () => {
+    const seeded = { id: 'm1', name: 'M', sounds: { dig: { url: '/assets/sounds/x.mp3' } } } as any;
+    expect(attachMobSounds([seeded], library)[0].sounds).toEqual({ dig: { url: '/assets/sounds/x.mp3' } });
+  });
+
+  it('is applied by the database loader', async () => {
+    const defs = await loadDefinitionsFromDatabase(
+      fakePrisma({ mobs: [{ id: 'm1', name: 'Mole', soundEffects: { idle: { soundId: 's1' } } }], sounds: library })
+    );
+    expect(defs.mobs[0].sounds?.idle?.url).toBe('/assets/sounds/a.mp3');
+  });
+
+  it('still loads when a referenced sound was deleted', async () => {
+    const defs = await loadDefinitionsFromDatabase(
+      fakePrisma({ mobs: [{ id: 'm1', name: 'Mole', soundEffects: { idle: { soundId: 'gone' } } }] })
+    );
+    expect(defs.mobs[0].sounds).toEqual({});
   });
 });
 

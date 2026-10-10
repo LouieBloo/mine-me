@@ -4,7 +4,6 @@
     "name": "Mole Person",
     "level": 1,
     "health": 40,
-    "attack": 6,
     "defense": 2,
     "attackPercentage": 80,
     "defendPercentage": 20,
@@ -14,13 +13,11 @@
       "attackRange": 1.1,
       "jumpCooldownMs": 600,
       "mineCooldownMs": 400,
-      "attackCooldownMs": 1000,
       "aggroRange": 12
     },
     "abilities": [],
     "moveSpeed": 1,
     "jumpForce": 6.5,
-    "miningSpeed": 25.0,
     "sounds": {
       "dig": {
         "url": "/assets/sounds/cmn_mole_person_dig.mp3",
@@ -215,14 +212,75 @@
       ]
     },
     "hitStunMs": 250,
-    "stunImmunityMs": 500
+    "stunImmunityMs": 500,
+    "mobEffects": [
+      {
+        "effectId": "cmt27dcbt0000vx8zxmq1sokb",
+        "value": 25,
+        "mobId": "cmn_mole_person_001",
+        "effect": {
+          "id": "cmt27dcbt0000vx8zxmq1sokb",
+          "name": "Mining Speed",
+          "description": "Attack speed with mining tool",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": true,
+          "damageModifier": false,
+          "explodes": false,
+          "createdAt": "2026-08-21T00:20:10.026Z",
+          "updatedAt": "2026-09-13T01:41:45.285Z",
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false
+        }
+      },
+      {
+        "effectId": "cmv_damage_effect_001",
+        "value": 6,
+        "mobId": "cmn_mole_person_001",
+        "effect": {
+          "id": "cmv_damage_effect_001",
+          "name": "Damage",
+          "description": "Damage dealt to mobs per hit (melee and projectiles)",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": true,
+          "explodes": false,
+          "createdAt": "2026-10-07T16:00:00.000Z",
+          "updatedAt": "2026-10-07T16:00:00.000Z",
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false
+        }
+      },
+      {
+        "effectId": "eff_tool_damage",
+        "value": 25,
+        "mobId": "cmn_mole_person_001",
+        "effect": {
+          "id": "eff_tool_damage",
+          "name": "Tool Damage",
+          "description": "Damage dealt to blocks per swing",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": false,
+          "toolDamageModifier": true,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-10-08T00:00:00.000Z",
+          "updatedAt": "2026-10-08T00:00:00.000Z"
+        }
+      }
+    ]
   },
   {
     "id": "cmn1zb9op0000ihw4mgknuvlr",
     "name": "Mario",
     "level": 1,
     "health": 30,
-    "attack": 2,
     "defense": 1,
     "attackPercentage": 80,
     "defendPercentage": 20,
@@ -231,7 +289,6 @@
     "abilities": null,
     "moveSpeed": 3,
     "jumpForce": 6.5,
-    "miningSpeed": 50,
     "animations": {
       "url": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_sprite.png",
       "atlasUrl": "/assets/sprites/mobs/cmn1zb9op0000ihw4mgknuvlr_atlas.json"
@@ -282,14 +339,75 @@
       ]
     },
     "hitStunMs": 250,
-    "stunImmunityMs": 500
+    "stunImmunityMs": 500,
+    "mobEffects": [
+      {
+        "effectId": "cmt27dcbt0000vx8zxmq1sokb",
+        "value": 50,
+        "mobId": "cmn1zb9op0000ihw4mgknuvlr",
+        "effect": {
+          "id": "cmt27dcbt0000vx8zxmq1sokb",
+          "name": "Mining Speed",
+          "description": "Attack speed with mining tool",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": true,
+          "damageModifier": false,
+          "explodes": false,
+          "createdAt": "2026-08-21T00:20:10.026Z",
+          "updatedAt": "2026-09-13T01:41:45.285Z",
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false
+        }
+      },
+      {
+        "effectId": "cmv_damage_effect_001",
+        "value": 2,
+        "mobId": "cmn1zb9op0000ihw4mgknuvlr",
+        "effect": {
+          "id": "cmv_damage_effect_001",
+          "name": "Damage",
+          "description": "Damage dealt to mobs per hit (melee and projectiles)",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": true,
+          "explodes": false,
+          "createdAt": "2026-10-07T16:00:00.000Z",
+          "updatedAt": "2026-10-07T16:00:00.000Z",
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false
+        }
+      },
+      {
+        "effectId": "eff_tool_damage",
+        "value": 25,
+        "mobId": "cmn1zb9op0000ihw4mgknuvlr",
+        "effect": {
+          "id": "eff_tool_damage",
+          "name": "Tool Damage",
+          "description": "Damage dealt to blocks per swing",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": false,
+          "toolDamageModifier": true,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-10-08T00:00:00.000Z",
+          "updatedAt": "2026-10-08T00:00:00.000Z"
+        }
+      }
+    ]
   },
   {
     "id": "cmn1zl1bk0001ihw48b0c492z",
     "name": "Dawg",
     "level": 1,
     "health": 50,
-    "attack": 20,
     "defense": 5,
     "attackPercentage": 90,
     "defendPercentage": 10,
@@ -298,7 +416,6 @@
     "abilities": null,
     "moveSpeed": 3,
     "jumpForce": 6.5,
-    "miningSpeed": 50,
     "animations": {
       "parts": {
         "head": {
@@ -456,14 +573,75 @@
     "updatedAt": "2026-08-19T02:49:17.707Z",
     "dropTable": null,
     "hitStunMs": 250,
-    "stunImmunityMs": 500
+    "stunImmunityMs": 500,
+    "mobEffects": [
+      {
+        "effectId": "cmt27dcbt0000vx8zxmq1sokb",
+        "value": 50,
+        "mobId": "cmn1zl1bk0001ihw48b0c492z",
+        "effect": {
+          "id": "cmt27dcbt0000vx8zxmq1sokb",
+          "name": "Mining Speed",
+          "description": "Attack speed with mining tool",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": true,
+          "damageModifier": false,
+          "explodes": false,
+          "createdAt": "2026-08-21T00:20:10.026Z",
+          "updatedAt": "2026-09-13T01:41:45.285Z",
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false
+        }
+      },
+      {
+        "effectId": "cmv_damage_effect_001",
+        "value": 20,
+        "mobId": "cmn1zl1bk0001ihw48b0c492z",
+        "effect": {
+          "id": "cmv_damage_effect_001",
+          "name": "Damage",
+          "description": "Damage dealt to mobs per hit (melee and projectiles)",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": true,
+          "explodes": false,
+          "createdAt": "2026-10-07T16:00:00.000Z",
+          "updatedAt": "2026-10-07T16:00:00.000Z",
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false
+        }
+      },
+      {
+        "effectId": "eff_tool_damage",
+        "value": 25,
+        "mobId": "cmn1zl1bk0001ihw48b0c492z",
+        "effect": {
+          "id": "eff_tool_damage",
+          "name": "Tool Damage",
+          "description": "Damage dealt to blocks per swing",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": false,
+          "toolDamageModifier": true,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "createdAt": "2026-10-08T00:00:00.000Z",
+          "updatedAt": "2026-10-08T00:00:00.000Z"
+        }
+      }
+    ]
   },
   {
     "id": "mob_target_dummy",
     "name": "Target Dummy",
     "level": 1,
     "health": 1000000,
-    "attack": 0,
     "defense": 0,
     "attackPercentage": 0,
     "defendPercentage": 0,
@@ -477,7 +655,6 @@
     "abilities": [],
     "moveSpeed": 0,
     "jumpForce": 0,
-    "miningSpeed": 0,
     "animations": {
       "url": "/assets/sprites/mobs/target_dummy.png"
     },
@@ -485,6 +662,7 @@
     "updatedAt": "2026-10-07T00:00:00.000Z",
     "dropTable": null,
     "hitStunMs": 250,
-    "stunImmunityMs": 500
+    "stunImmunityMs": 500,
+    "mobEffects": []
   }
 ]

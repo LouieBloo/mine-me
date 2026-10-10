@@ -46,18 +46,9 @@ export interface ItemBodyOptions {
   angularDamping?: number;
 }
 
-export interface ProjectileBodyOptions {
-  gravityScale?: number;
-  restitution?: number;
-  friction?: number;
-  density?: number;
-  itemId?: string;
-  inGameScale?: number;
-}
-
 export interface RigidEntityData {
   id: string;
-  type: 'dynamite' | 'rock' | 'projectile' | 'item';
+  type: 'dynamite' | 'rock' | 'item';
 }
 
 /**
@@ -65,6 +56,9 @@ export interface RigidEntityData {
  * Coordinates continuous rigid-body simulation for props (dynamite tumbling, falling rocks, bullets)
  * alongside destructible static tile geometry.
  */
+/** Fixtures sharing a negative group index never collide with each other. */
+export const ITEM_COLLISION_GROUP = -1;
+
 export class MiningRigidWorld {
   public readonly world: planck.World;
   public readonly config: {
@@ -352,43 +346,12 @@ export class MiningRigidWorld {
       density: options?.density ?? 1.0,
       restitution: options?.restitution ?? 0.2,
       friction: options?.friction ?? 0.6,
+      // Items never collide with each other (same negative group), only with tiles and other bodies.
+      // A blast drops hundreds at once; piled-up, they shoved each other into the floor.
+      filterGroupIndex: ITEM_COLLISION_GROUP,
     });
 
     const data: RigidEntityData = { id, type: 'item' };
-    body.setUserData(data);
-
-    return body;
-  }
-
-  /**
-   * Creates a dynamic rigid body for high-speed projectiles (e.g. revolver bullets).
-   * Uses continuous collision detection (bullet: true) to prevent tunneling through tiles.
-   */
-  public createProjectileBody(
-    id: string,
-    position: Vector2D,
-    velocity: Vector2D,
-    options?: ProjectileBodyOptions
-  ): planck.Body {
-    const body = this.world.createBody({
-      type: 'dynamic',
-      position: planck.Vec2(position.x, position.y),
-      linearVelocity: planck.Vec2(velocity.x, velocity.y),
-      bullet: true,
-      gravityScale: options?.gravityScale ?? 0,
-      linearDamping: 0.0,
-      angularDamping: 0.0,
-      fixedRotation: true,
-    });
-
-    body.createFixture({
-      shape: planck.Circle(0.12),
-      density: options?.density ?? 1.0,
-      restitution: options?.restitution ?? 0.1,
-      friction: options?.friction ?? 0.2,
-    });
-
-    const data: RigidEntityData = { id, type: 'projectile' };
     body.setUserData(data);
 
     return body;

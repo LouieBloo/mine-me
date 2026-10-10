@@ -25,6 +25,7 @@ const DEFAULT_PROJECTILE_CONFIG: ProjectileConfigType = {
   reloadTime: 1.5,
   projectileSpeed: 28.0,
   projectileGravityScale: 0.05,
+  pierceCount: 0,
   maxLifetime: 3.0,
   projectileItemId: '',
 };
@@ -276,6 +277,31 @@ export const ItemProjectileConfig: React.FC<ItemProjectileConfigProps> = ({
               />
               <p className="text-[11px] text-slate-500">
                 Bullet drop trajectory influence (0 = direct laser line)
+              </p>
+            </div>
+
+            {/* Pierce Count */}
+            <div className="space-y-1.5 bg-slate-950/40 border border-slate-800/80 p-3.5 rounded-xl">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-300">
+                  Pierce Count
+                </label>
+                <span className="text-xs font-mono font-bold text-orange-400">
+                  {current.pierceCount ?? 0}
+                </span>
+              </div>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="1"
+                value={current.pierceCount ?? 0}
+                onChange={(e) => update({ pierceCount: Math.min(10, Math.max(0, Math.floor(parseFloat(e.target.value) || 0))) })}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm font-mono text-slate-200 focus:border-orange-500"
+                data-testid="pierce-count-input"
+              />
+              <p className="text-[11px] text-slate-500">
+                Extra mobs a bullet passes through (0 = stops at the first)
               </p>
             </div>
           </div>

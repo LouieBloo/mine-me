@@ -39,14 +39,14 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
 
   // Local state loop for mining progress bar
   useEffect(() => {
-    if (!sessionState.isMining || !sessionState.miningTimeMs || !sessionState.miningStartedAt) {
+    if (!sessionState.isMining || !sessionState.miningTotal || !sessionState.miningStartedAt) {
       setMiningProgress(0);
       return;
     }
 
     let frameId: number;
     const start = sessionState.miningStartedAt;
-    const total = sessionState.miningTimeMs;
+    const total = sessionState.miningTotal;
 
     const update = () => {
       const elapsed = Date.now() - start;
@@ -60,7 +60,7 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
 
     update();
     return () => cancelAnimationFrame(frameId);
-  }, [sessionState.isMining, sessionState.miningTimeMs, sessionState.miningStartedAt]);
+  }, [sessionState.isMining, sessionState.miningTotal, sessionState.miningStartedAt]);
 
   const handleExitClick = () => {
     if (sessionState.canExtract) {

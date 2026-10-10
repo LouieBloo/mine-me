@@ -1,7 +1,7 @@
 import { MINING_CONFIG, isTileSolid, type Vector2D, type MiningTileType } from '../types/mining';
 
 export interface MiningCollisionGrid {
-  [y: number]: { [x: number]: { type: MiningTileType | number } };
+  [y: number]: { [x: number]: { type: MiningTileType } };
 }
 
 export interface PhysicsBodyOptions {
@@ -103,7 +103,7 @@ export abstract class MiningPhysicsBody {
     for (let tx = minTileX; tx <= maxTileX; tx++) {
       if (tx < 0 || tx >= MINING_CONFIG.GRID_WIDTH) continue;
       const tile = row[tx];
-      if (tile && isTileSolid(tile.type as any)) {
+      if (tile && isTileSolid(tile.type)) {
         return { isGrounded: true, floorTileY };
       }
     }
@@ -113,8 +113,24 @@ export abstract class MiningPhysicsBody {
 
   /**
    * Physics simulation step for dt seconds.
+   *
+   * Speed is capped at MAX_ENTITY_SPEED and the step is split so that no sub-step moves the body
+   * further than MAX_STEP_DISPLACEMENT, which keeps a fast body (knockback, blast) from tunnelling
+   * through a thin wall. Slow bodies run a single step, exactly as before.
    */
   public update(dt: number, grid: MiningCollisionGrid): void {
+    const cap = MINING_CONFIG.MAX_ENTITY_SPEED;
+    this.velocity.x = Math.max(-cap, Math.min(cap, this.velocity.x));
+    this.velocity.y = Math.max(-cap, Math.min(cap, this.velocity.y));
+
+    const maxDisplacement = Math.max(Math.abs(this.velocity.x), Math.abs(this.velocity.y)) * dt;
+    const steps = Math.max(1, Math.ceil(maxDisplacement / MINING_CONFIG.MAX_STEP_DISPLACEMENT));
+    const subDt = dt / steps;
+    for (let i = 0; i < steps; i++) this.step(subDt, grid);
+  }
+
+  /** One collision-resolved integration step (axis-separated: vertical, then horizontal). */
+  private step(dt: number, grid: MiningCollisionGrid): void {
     // 1. Ground stability check:
     // If the body is marked as grounded and not jumping upward, verify whether solid ground remains underneath.
     if (this.isGrounded && this.velocity.y >= 0) {
@@ -211,7 +227,7 @@ export abstract class MiningPhysicsBody {
 
         const row = grid[ty];
         const tile = row ? row[tx] : undefined;
-        if (tile && isTileSolid(tile.type as any)) {
+        if (tile && isTileSolid(tile.type)) {
           return true;
         }
       }

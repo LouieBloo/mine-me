@@ -8,6 +8,7 @@ import {
   type MiningPosition,
 } from '../../types/mining';
 import type { MiningCollisionGrid } from '../../physics/MiningPhysicsBody';
+import { MinHeap } from '../../utils/MinHeap';
 
 export interface MiningPathfinderOptions {
   /** Whether the entity can mine through solid destructible blocks */
@@ -52,7 +53,7 @@ export class MiningPathfinder {
       if (y < 0) return false;
       const row = grid[y];
       const tile = row ? row[x] : undefined;
-      return tile ? isTileSolid(tile.type as any) : false;
+      return tile ? isTileSolid(tile.type) : false;
     };
 
     let sx = Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.floor(start.x)));
@@ -73,16 +74,17 @@ export class MiningPathfinder {
       return [];
     }
 
-    const key = (x: number, y: number) => `${x},${y}`;
+    // Cells are keyed by a single number (no string building in the hot loop)
+    const key = (x: number, y: number) => y * MINING_CONFIG.GRID_WIDTH + x;
     const heuristic = (x: number, y: number) => Math.abs(x - gx) + Math.abs(y - gy);
 
-    // Min-Priority Queue for open set
-    const openSet: PathNode[] = [];
-    const openMap = new Map<string, PathNode>();
-    const closedSet = new Set<string>();
+    // Open set: a binary heap with lazy deletion (a better route to a cell pushes a fresh entry;
+    // the stale one is skipped when it surfaces).
+    const openSet = new MinHeap<PathNode>();
+    const closedSet = new Set<number>();
 
-    const cameFrom = new Map<string, { parentKey: string; waypoint: MiningPathWaypoint }>();
-    const gScores = new Map<string, number>();
+    const cameFrom = new Map<number, { parentKey: number; waypoint: MiningPathWaypoint }>();
+    const gScores = new Map<number, number>();
 
     const startNode: PathNode = {
       x: sx,
@@ -93,8 +95,7 @@ export class MiningPathfinder {
       action: 'WALK',
     };
 
-    openSet.push(startNode);
-    openMap.set(key(sx, sy), startNode);
+    openSet.push(startNode, startNode.f);
     gScores.set(key(sx, sy), 0);
 
     let closestNode: PathNode = startNode;
@@ -106,7 +107,7 @@ export class MiningPathfinder {
       if (y < 0) return false;
       const row = grid[y];
       const tile = row ? row[x] : undefined;
-      return tile ? isTileSolid(tile.type as any) : false;
+      return tile ? isTileSolid(tile.type) : false;
     };
 
     const isClimbable = (x: number, y: number): boolean => {
@@ -115,7 +116,7 @@ export class MiningPathfinder {
       }
       const row = grid[y];
       const tile = row ? row[x] : undefined;
-      return tile ? isTileClimbable(tile.type as any) : false;
+      return tile ? isTileClimbable(tile.type) : false;
     };
 
     const isMineable = (x: number, y: number): boolean => {
@@ -124,14 +125,14 @@ export class MiningPathfinder {
       }
       const row = grid[y];
       const tile = row ? row[x] : undefined;
-      return tile ? isTileMineable(tile.type as any) : false;
+      return tile ? isTileMineable(tile.type) : false;
     };
 
     const getMineCost = (x: number, y: number): number => {
       const row = grid[y];
       const tile = row ? row[x] : undefined;
       if (!tile) return 1.0;
-      const health = getTileMaxHealth(tile.type as any);
+      const health = getTileMaxHealth(tile.type);
       return 1.0 + health / 100;
     };
 
@@ -139,14 +140,12 @@ export class MiningPathfinder {
       return y + 1 >= MINING_CONFIG.GRID_HEIGHT || isSolid(x, y + 1) || isClimbable(x, y);
     };
 
-    while (openSet.length > 0 && iterations < maxSearchDepth) {
-      iterations++;
-
-      // Pop lowest f score
-      openSet.sort((a, b) => a.f - b.f);
-      const current = openSet.shift()!;
+    while (openSet.size > 0 && iterations < maxSearchDepth) {
+      // Pop lowest f score, skipping entries made stale by a better route or already expanded
+      const current = openSet.pop()!;
       const currentKey = key(current.x, current.y);
-      openMap.delete(currentKey);
+      if (closedSet.has(currentKey) || current.g > (gScores.get(currentKey) ?? Infinity)) continue;
+      iterations++;
       closedSet.add(currentKey);
 
       // Track closest node to target
@@ -280,15 +279,7 @@ export class MiningPathfinder {
             waypoint: { x: n.x, y: n.y, action: n.action },
           });
 
-          const existingOpen = openMap.get(nKey);
-          if (existingOpen) {
-            existingOpen.g = tentativeG;
-            existingOpen.f = tentativeG + h;
-            existingOpen.action = n.action;
-          } else {
-            openSet.push(nextNode);
-            openMap.set(nKey, nextNode);
-          }
+          openSet.push(nextNode, nextNode.f);
         }
       }
     }
@@ -298,8 +289,8 @@ export class MiningPathfinder {
   }
 
   private static reconstructPath(
-    cameFrom: Map<string, { parentKey: string; waypoint: MiningPathWaypoint }>,
-    endKey: string
+    cameFrom: Map<number, { parentKey: number; waypoint: MiningPathWaypoint }>,
+    endKey: number
   ): MiningPathWaypoint[] {
     const path: MiningPathWaypoint[] = [];
     let curr = endKey;

@@ -1,25 +1,41 @@
 import {
   BaseMobAI,
   MINING_CONFIG,
+  advanceSwing,
+  swingsPerSecond,
+  canBreakBlock,
+  deriveCombatStats,
+  knockbackImpulse,
+  type EffectEntry,
+  type EntityCombatStats,
+  type SwingState,
   MiningMobBody,
   MiningTileType,
   MobAIRegistry,
   isTileMineable,
   isTileSolid,
   type MiningActiveMob,
+  type Mob,
   type MiningPosition,
   type MobAIContext,
   type Vector2D,
   knockbackAway,
   rollDropTable,
+  type DropTableData,
+  type PlayerTargetInfo,
+  TickPathBudget,
+  getMobSpriteUrl,
+  type MobAIConfig,
+  type MobAIType,
 } from '@mine-me/shared';
 import { isInBounds, type ServerMiningGrid } from '../../miningMap.service';
 import type { MiningPlayerSession } from './MiningPlayerManager';
 import type { MiningWorld } from '../MiningWorld';
 import { isSegmentBlocked } from './miningGeometry';
 import { toActiveMob } from '../MiningEntitySync';
+import { separateBodies, type SeparationParticipant } from './mobSeparation';
 
-export interface MiningActiveMobSession {
+export interface MiningActiveMobSession extends SwingState {
   id: string;
   mobId: string;
   name: string;
@@ -27,22 +43,30 @@ export interface MiningActiveMobSession {
   ai: BaseMobAI;
   health: number;
   maxHealth: number;
-  attack: number;
   defense: number;
-  miningSpeed: number;
-  attackCooldownMs: number;
-  dropTable?: any;
-  animations?: any;
+  /** Mining Speed / Damage / Tool Damage / Pick Power / Knockback, from the mob's effects. */
+  stats: EntityCombatStats;
+  dropTable?: DropTableData | null;
+  animations?: Mob['animations'];
+  /** Playable sound slots resolved from the sound library; sent to clients with the mob. */
+  sounds?: Mob['sounds'];
   animationState: 'idle' | 'walk' | 'mine' | 'attack' | 'jump' | 'damage' | 'death';
   isFacingLeft: boolean;
   isMining: boolean;
   miningTarget: MiningPosition | null;
-  miningProgressMs: number;
+  miningProgress: number;
   mineRange: number;
   /** AI settings (from the mob's aiConfig, defaulting to MINING_CONFIG.MOB_DEFAULT_*). */
   canMine: boolean;
   aggroRange: number;
   attackRange: number;
+  /** Telegraph time between starting an attack and it landing, in seconds (0 = instant). */
+  attackWindupSeconds: number;
+  /** Seconds left in the current attack wind-up (0 = not winding up). */
+  attackWindupRemaining: number;
+  /** Who the current wind-up is aimed at, and how far away they were when it began. */
+  attackTargetId?: string;
+  attackStartDistance: number;
   /** How long a hit takes control away from this mob (0 = can't be stunned). */
   hitStunMs: number;
   /** After a stun ends, how long until it can be stunned again. */
@@ -55,17 +79,40 @@ export interface MiningActiveMobSession {
   colliderWidth?: number;
   colliderHeight?: number;
   showHealthBar?: boolean;
-  /** Dig feedback batching state (see MINING_CONFIG.MOB_DIG_HIT_INTERVAL). */
-  digTargetKey?: string | null;
-  digHitTimer?: number;
-  digHitDamage?: number;
   /** Seconds left before a killed mob is removed (set when it dies). */
   deathTimer?: number;
+}
+
+/** What `spawnMob` needs to know about a mob; a database `Mob` satisfies it, and so do test fixtures. */
+export interface MobSpawnData {
+  id?: string;
+  name?: string;
+  level?: number;
+  health?: number;
+  defense?: number;
+  aiType?: MobAIType | string;
+  moveSpeed?: number;
+  jumpForce?: number;
+  /** The mob's attached effects; every combat stat comes from here (see `deriveCombatStats`). */
+  mobEffects?: readonly EffectEntry[];
+  aiConfig?: MobAIConfig | null;
+  mineRange?: number;
+  hitStunMs?: number;
+  stunImmunityMs?: number;
+  animations?: Mob['animations'];
+  sounds?: Mob['sounds'];
+  dropTable?: DropTableData | null;
+  spriteUrl?: string;
+  colliderWidth?: number;
+  colliderHeight?: number;
+  showHealthBar?: boolean;
 }
 
 export class MiningMobSubsystem {
   public activeMobs: Map<string, MiningActiveMobSession> = new Map();
   public mobCounter = 0;
+  /** Limits how many mobs may start an A* search in one tick. */
+  private readonly pathBudget = new TickPathBudget(MINING_CONFIG.MOB_PATHS_PER_TICK);
 
   constructor(private readonly world: MiningWorld) {}
 
@@ -74,28 +121,7 @@ export class MiningMobSubsystem {
   }
 
   public spawnMob(
-    mobData: {
-      id?: string;
-      name?: string;
-      level?: number;
-      health?: number;
-      attack?: number;
-      defense?: number;
-      aiType?: string;
-      moveSpeed?: number;
-      jumpForce?: number;
-      miningSpeed?: number;
-      aiConfig?: any;
-      mineRange?: number;
-      hitStunMs?: number;
-      stunImmunityMs?: number;
-      animations?: any;
-      dropTable?: any;
-      spriteUrl?: string;
-      colliderWidth?: number;
-      colliderHeight?: number;
-      showHealthBar?: boolean;
-    },
+    mobData: MobSpawnData,
     position: Vector2D
   ): MiningActiveMobSession {
     this.mobCounter++;
@@ -141,32 +167,36 @@ export class MiningMobSubsystem {
       ai,
       health: mobData.health ?? 50,
       maxHealth: mobData.health ?? 50,
-      attack: mobData.attack ?? 10,
       defense: mobData.defense ?? 2,
-      miningSpeed: MiningMobSubsystem.nonNegative(mobData.miningSpeed, MINING_CONFIG.MOB_DEFAULT_MINING_SPEED),
-      attackCooldownMs: MiningMobSubsystem.nonNegative(
-        aiConfig.attackCooldownMs,
-        MINING_CONFIG.MOB_DEFAULT_ATTACK_COOLDOWN_MS
-      ),
+      stats: deriveCombatStats(mobData.mobEffects),
+      swingCooldown: 0,
+      swungThisTick: false,
       canMine: aiConfig.canMine !== false,
       aggroRange: MiningMobSubsystem.nonNegative(aiConfig.aggroRange, MINING_CONFIG.MOB_DEFAULT_AGGRO_RANGE),
       attackRange: MiningMobSubsystem.nonNegative(aiConfig.attackRange, MINING_CONFIG.MOB_DEFAULT_ATTACK_RANGE),
+      attackWindupSeconds: MiningMobSubsystem.nonNegative(
+        aiConfig.attackWindupMs !== undefined ? aiConfig.attackWindupMs / 1000 : undefined,
+        MINING_CONFIG.MOB_ATTACK_WINDUP_SECONDS
+      ),
+      attackWindupRemaining: 0,
+      attackStartDistance: 0,
       hitStunMs: MiningMobSubsystem.nonNegative(mobData.hitStunMs, MINING_CONFIG.MOB_HIT_STUN_MS),
       stunImmunityMs: MiningMobSubsystem.nonNegative(mobData.stunImmunityMs, MINING_CONFIG.MOB_STUN_IMMUNITY_MS),
       dropTable: mobData.dropTable,
       animations: mobData.animations,
+      sounds: mobData.sounds,
       animationState: 'idle',
       isFacingLeft: false,
       isMining: false,
       miningTarget: null,
-      miningProgressMs: 0,
+      miningProgress: 0,
       mineRange: MiningMobSubsystem.nonNegative(
-        aiConfig.mineRange ?? (mobData as any).mineRange,
+        aiConfig.mineRange ?? mobData.mineRange,
         MINING_CONFIG.MOB_DEFAULT_MINE_RANGE
       ),
       spriteUrl:
         mobData.spriteUrl ??
-        (mobData as any).animations?.url ??
+        getMobSpriteUrl(mobData.animations) ??
         mobData.aiConfig?.spriteUrl,
       colliderWidth: colW,
       colliderHeight: colH,
@@ -226,6 +256,14 @@ export class MiningMobSubsystem {
   public updateActiveMobs(dt: number): void {
     if (this.activeMobs.size === 0) return;
     const { grid, players } = this.world;
+    this.pathBudget.reset();
+    // One snapshot of the players for every mob this tick, rather than one array per mob
+    const playerTargets: PlayerTargetInfo[] = Array.from(players.values()).map((p) => ({
+      characterId: p.characterId,
+      characterName: p.characterName,
+      position: { x: p.playerBody.position.x, y: p.playerBody.position.y },
+      health: p.health,
+    }));
 
     for (const mob of this.activeMobs.values()) {
       if (mob.health <= 0) {
@@ -239,6 +277,7 @@ export class MiningMobSubsystem {
 
       if (mob.hitStunDurationMs && mob.hitStunDurationMs > 0) {
         mob.hitStunDurationMs -= dt * 1000;
+        this.cancelAttack(mob); // a stunned mob loses its attack
         mob.animationState = 'damage';
         mob.mobBody.velocity.x *= 0.92;
         mob.mobBody.update(dt, grid);
@@ -250,6 +289,11 @@ export class MiningMobSubsystem {
         continue;
       }
 
+      if (mob.attackWindupRemaining > 0) {
+        this.updateAttackWindup(mob, dt);
+        continue;
+      }
+
       const aiContext: MobAIContext = {
         mobId: mob.mobId,
         instanceId: mob.id,
@@ -257,23 +301,17 @@ export class MiningMobSubsystem {
         velocity: { x: mob.mobBody.velocity.x, y: mob.mobBody.velocity.y },
         health: mob.health,
         maxHealth: mob.maxHealth,
-        attack: mob.attack,
         defense: mob.defense,
         isGrounded: mob.mobBody.isGrounded,
         isOnLadder: mob.mobBody.isOnLadder,
         grid,
-        players: Array.from(players.values()).map((p) => ({
-          characterId: p.characterId,
-          characterName: p.characterName,
-          position: { x: p.playerBody.position.x, y: p.playerBody.position.y },
-          health: p.health,
-        })),
+        players: playerTargets,
+        pathBudget: this.pathBudget,
         config: {
           canMine: mob.canMine,
           mineRange: mob.mineRange,
           aggroRange: mob.aggroRange,
           attackRange: mob.attackRange,
-          attackCooldownMs: mob.attackCooldownMs,
         },
       };
 
@@ -289,43 +327,120 @@ export class MiningMobSubsystem {
       mob.mobBody.update(dt, grid);
       mob.isFacingLeft = mob.mobBody.isFacingLeft;
 
-      if (intent.isAttacking && intent.attackTargetId) {
-        mob.animationState = 'attack';
-        const targetPlayer = players.get(intent.attackTargetId);
-        // Solid tiles between the mob and the player block the attack (no hitting through walls)
-        if (
-          targetPlayer &&
-          !targetPlayer.isDead &&
-          !isSegmentBlocked(grid, mob.mobBody.position, targetPlayer.playerBody.position)
-        ) {
-          this.attackPlayer(mob, targetPlayer);
-        }
+      // What the mob wants to hit this tick: a player in reach, else a block in reach.
+      const targetPlayer = intent.isAttacking && intent.attackTargetId ? players.get(intent.attackTargetId) : undefined;
+      const canAttack = Boolean(targetPlayer && !targetPlayer.isDead);
+      const mineTarget =
+        !canAttack && intent.isMining && intent.miningTarget &&
+        BaseMobAI.isWithinReach(mob.mobBody.position, intent.miningTarget, mob.mineRange)
+          ? intent.miningTarget
+          : null;
+
+      // One swing timer for both (the same Mining Speed stat players use).
+      advanceSwing(mob, dt, canAttack || mineTarget !== null, mob.stats.miningSpeed);
+
+      if (canAttack && targetPlayer) {
+        this.stopMobMining(mob);
+        this.faceToward(mob, targetPlayer.playerBody.position.x);
+        mob.animationState = mob.swungThisTick ? 'attack' : 'idle';
+        if (mob.swungThisTick) this.beginAttack(mob, targetPlayer);
+      } else if (mineTarget) {
+        mob.isMining = true;
+        mob.miningTarget = mineTarget;
+        mob.animationState = 'mine';
+        this.faceToward(mob, mineTarget.x);
+        this.handleMobMining(mob, mineTarget);
       } else if (intent.isMining && intent.miningTarget) {
-        const inReach = BaseMobAI.isWithinReach(
-          mob.mobBody.position,
-          intent.miningTarget,
-          mob.mineRange
-        );
-        if (inReach) {
-          mob.isMining = true;
-          mob.miningTarget = intent.miningTarget;
-          mob.animationState = 'mine';
-          if (intent.miningTarget.x < mob.mobBody.position.x) {
-            mob.isFacingLeft = true;
-            mob.mobBody.isFacingLeft = true;
-          } else if (intent.miningTarget.x > mob.mobBody.position.x) {
-            mob.isFacingLeft = false;
-            mob.mobBody.isFacingLeft = false;
-          }
-          this.handleMobMining(mob, intent.miningTarget, dt);
-        } else {
-          this.stopMobMining(mob);
-          mob.animationState = 'walk';
-        }
+        // Wants to dig but the block is out of reach
+        this.stopMobMining(mob);
+        mob.animationState = 'walk';
       } else {
         this.stopMobMining(mob);
         mob.animationState = intent.animationState;
       }
+    }
+
+    this.separateMobs(dt);
+  }
+
+  /** Starts an attack: instantly for a 0 wind-up, otherwise a telegraph during which the mob stands still. */
+  private beginAttack(mob: MiningActiveMobSession, target: MiningPlayerSession): void {
+    // Never longer than most of one swing, so the telegraph can't throttle the mob's attack rate
+    const windup = Math.min(mob.attackWindupSeconds, 0.8 / swingsPerSecond(mob.stats.miningSpeed));
+    mob.attackTargetId = target.characterId;
+    mob.attackStartDistance = this.distanceBetween(mob, target);
+    if (windup <= 0) {
+      this.resolveAttack(mob);
+      return;
+    }
+    mob.attackWindupRemaining = windup;
+    mob.mobBody.velocity.x = 0;
+  }
+
+  /** Counts down the telegraph; the hit lands (or whiffs) when it ends. The mob is rooted meanwhile. */
+  private updateAttackWindup(mob: MiningActiveMobSession, dt: number): void {
+    const { grid, players } = this.world;
+    advanceSwing(mob, dt, false, mob.stats.miningSpeed); // the swing clock keeps running
+    mob.attackWindupRemaining -= dt;
+    mob.animationState = 'attack';
+    mob.mobBody.velocity.x = 0;
+    mob.mobBody.update(dt, grid);
+    const target = mob.attackTargetId ? players.get(mob.attackTargetId) : undefined;
+    if (target && !target.isDead) this.faceToward(mob, target.playerBody.position.x);
+    if (mob.attackWindupRemaining <= 0) {
+      mob.attackWindupRemaining = 0;
+      this.resolveAttack(mob);
+    }
+  }
+
+  private cancelAttack(mob: MiningActiveMobSession): void {
+    mob.attackWindupRemaining = 0;
+    mob.attackTargetId = undefined;
+  }
+
+  /**
+   * The attack lands only if its target is still alive, still reachable (they may have dodged out
+   * of range during the wind-up), and no solid tile is in between.
+   */
+  private resolveAttack(mob: MiningActiveMobSession): void {
+    const target = mob.attackTargetId ? this.world.players.get(mob.attackTargetId) : undefined;
+    this.cancelAttack(mob);
+    if (!target || target.isDead) return;
+    const reach = Math.max(mob.attackRange, mob.attackStartDistance) + MINING_CONFIG.MOB_ATTACK_DODGE_MARGIN;
+    if (this.distanceBetween(mob, target) > reach) return;
+    // Solid tiles between the mob and the player block the attack (no hitting through walls)
+    if (isSegmentBlocked(this.world.grid, mob.mobBody.position, target.playerBody.position)) return;
+    this.attackPlayer(mob, target);
+  }
+
+  private distanceBetween(mob: MiningActiveMobSession, player: MiningPlayerSession): number {
+    return Math.hypot(
+      player.playerBody.position.x - mob.mobBody.position.x,
+      player.playerBody.position.y - mob.mobBody.position.y
+    );
+  }
+
+  /** Soft collision so mobs spread out instead of stacking on each other or on a player. */
+  private separateMobs(dt: number): void {
+    const participants: SeparationParticipant[] = [];
+    for (const mob of this.activeMobs.values()) {
+      if (mob.health <= 0) continue;
+      participants.push({ id: mob.id, body: mob.mobBody, movable: mob.mobBody.moveSpeed > 0 });
+    }
+    for (const player of this.world.players.values()) {
+      if (player.isDead) continue;
+      participants.push({ id: player.characterId, body: player.playerBody, movable: false });
+    }
+    separateBodies(participants, dt, this.world.grid);
+  }
+
+  private faceToward(mob: MiningActiveMobSession, targetX: number): void {
+    if (targetX < mob.mobBody.position.x) {
+      mob.isFacingLeft = true;
+      mob.mobBody.isFacingLeft = true;
+    } else if (targetX > mob.mobBody.position.x) {
+      mob.isFacingLeft = false;
+      mob.mobBody.isFacingLeft = false;
     }
   }
 
@@ -353,12 +468,14 @@ export class MiningMobSubsystem {
   private stopMobMining(mob: MiningActiveMobSession): void {
     mob.isMining = false;
     mob.miningTarget = null;
-    mob.digTargetKey = null;
-    mob.digHitTimer = 0;
-    mob.digHitDamage = 0;
   }
 
-  public handleMobMining(mob: MiningActiveMobSession, target: MiningPosition, dt: number): void {
+  /**
+   * Digs `target` if the mob swung this tick: one swing deals the mob's Tool Damage, exactly as a
+   * player's swing does. Out-of-reach or unmineable targets (and blocks too hard for the mob's
+   * Pick Power) stop the dig without damage.
+   */
+  public handleMobMining(mob: MiningActiveMobSession, target: MiningPosition): void {
     const grid = this.world.grid;
     if (!isInBounds(target.x, target.y)) {
       this.stopMobMining(mob);
@@ -367,7 +484,7 @@ export class MiningMobSubsystem {
 
     if (!BaseMobAI.isWithinReach(mob.mobBody.position, target, mob.mineRange)) {
       this.stopMobMining(mob);
-      mob.miningProgressMs = 0;
+      mob.miningProgress = 0;
       return;
     }
 
@@ -377,10 +494,17 @@ export class MiningMobSubsystem {
       return;
     }
 
+    const required = this.world.data.getBlockRequiredPickPower(tile.type);
+    if (!canBreakBlock(mob.stats.pickPower, required)) {
+      this.stopMobMining(mob);
+      return;
+    }
+
+    if (!mob.swungThisTick || mob.stats.toolDamage <= 0) return;
+
     const tileType = tile.type;
-    const damageDealt = (mob.miningSpeed || 80) * 2 * dt;
     const result = this.world.damage.damageTile(target.x, target.y, {
-      amount: damageDealt,
+      amount: mob.stats.toolDamage,
       type: 'mining',
       source: { kind: 'mob', id: mob.id, name: mob.name, position: { x: mob.mobBody.position.x, y: mob.mobBody.position.y } },
     });
@@ -388,51 +512,43 @@ export class MiningMobSubsystem {
       this.stopMobMining(mob);
       return;
     }
-    mob.miningProgressMs = result.tileDamage;
+    mob.miningProgress = result.tileDamage;
 
-    // Batch digging feedback so nearby players hear/see it without a 30 Hz event stream
-    const key = `${target.x},${target.y}`;
-    if (mob.digTargetKey !== key) {
-      mob.digTargetKey = key;
-      mob.digHitTimer = 0;
-      mob.digHitDamage = 0;
-    }
-    mob.digHitTimer = (mob.digHitTimer ?? 0) + dt;
-    mob.digHitDamage = (mob.digHitDamage ?? 0) + damageDealt;
-
-    if (mob.digHitTimer >= MINING_CONFIG.MOB_DIG_HIT_INTERVAL || result.destroyed) {
-      this.world.blocks.queueBlockHit({
-        x: target.x,
-        y: target.y,
-        tileType,
-        damage: mob.digHitDamage,
-        source: 'mob',
-      });
-      mob.digHitTimer = 0;
-      mob.digHitDamage = 0;
-    }
+    // One hit of feedback per swing so nearby players hear/see it
+    this.world.blocks.queueBlockHit({
+      x: target.x,
+      y: target.y,
+      tileType,
+      damage: mob.stats.toolDamage,
+      source: 'mob',
+    });
 
     if (result.destroyed) {
       this.stopMobMining(mob);
-      mob.miningProgressMs = 0;
+      mob.miningProgress = 0;
     }
   }
 
   /** A mob's melee attack connects: damage plus a push away from the mob. */
   private attackPlayer(mob: MiningActiveMobSession, player: MiningPlayerSession): void {
+    if (mob.stats.weaponDamage <= 0) return;
     const from = mob.mobBody.position;
+    const dir = Math.sign(player.playerBody.position.x - from.x) || (player.isFacingLeft ? 1 : -1);
     this.world.damage.applyDamage(
       { kind: 'player', id: player.characterId },
       {
-        amount: Math.max(1, mob.attack),
+        amount: mob.stats.weaponDamage,
         type: 'melee',
         source: { kind: 'mob', id: mob.id, name: mob.name, position: { x: from.x, y: from.y } },
-        knockback: knockbackAway(
-          from.x,
-          player.playerBody.position.x,
-          { x: MINING_CONFIG.PLAYER_HIT_KNOCKBACK_X, y: MINING_CONFIG.PLAYER_HIT_KNOCKBACK_Y },
-          player.isFacingLeft ? 1 : -1
-        ),
+        knockback:
+          mob.stats.knockback > 0
+            ? knockbackImpulse(mob.stats.knockback, dir > 0 ? 1 : -1)
+            : knockbackAway(
+                from.x,
+                player.playerBody.position.x,
+                { x: MINING_CONFIG.PLAYER_HIT_KNOCKBACK_X, y: MINING_CONFIG.PLAYER_HIT_KNOCKBACK_Y },
+                player.isFacingLeft ? 1 : -1
+              ),
       }
     );
   }

@@ -6,6 +6,6 @@ export default defineConfig({
     globals: true,
     pool: 'forks',
     include: ['**/*.{test,spec}.ts'],
-    setupFiles: ['./tests/setup/definitions.ts'],
+    setupFiles: ['./tests/setup/assetsRoot.ts', './tests/setup/definitions.ts'],
   },
 })

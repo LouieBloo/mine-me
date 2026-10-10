@@ -18,20 +18,31 @@ export interface MiningCombatStats {
   knockback: number;
 }
 
-type EffectFlag =
+export type EffectFlag =
   | 'miningSpeedModifier'
   | 'damageModifier'
   | 'toolDamageModifier'
   | 'pickPowerModifier'
   | 'knockbackModifier';
 
-export function sumItemEffect(item: GameItem | null | undefined, flag: EffectFlag): number {
-  if (!item || !Array.isArray(item.itemEffects)) return 0;
+/** One attached effect: an item's or a mob's `ObjectEffects` row (the effect flags plus a value). */
+export interface EffectEntry {
+  value?: number | null;
+  effect?: Partial<Record<EffectFlag, boolean | null>> | null;
+}
+
+/** Sum of the value of every entry whose effect has `flag` set. */
+export function sumEffects(entries: readonly EffectEntry[] | null | undefined, flag: EffectFlag): number {
+  if (!Array.isArray(entries)) return 0;
   let total = 0;
-  for (const ie of item.itemEffects) {
-    if (ie.effect?.[flag]) total += ie.value || 0;
+  for (const entry of entries) {
+    if (entry.effect?.[flag]) total += entry.value || 0;
   }
   return total;
+}
+
+export function sumItemEffect(item: GameItem | null | undefined, flag: EffectFlag): number {
+  return sumEffects(item?.itemEffects, flag);
 }
 
 /** Damage dealt to blocks per swing. */

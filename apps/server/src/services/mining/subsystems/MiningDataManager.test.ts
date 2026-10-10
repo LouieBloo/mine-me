@@ -1,8 +1,9 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { MiningDataManager, type GameDefinitions } from './MiningDataManager';
 import { MiningTileType } from '@mine-me/shared';
+import { partialDefinitions } from '../testHelpers';
 
-const defs: GameDefinitions = {
+const defs: GameDefinitions = partialDefinitions({
   items: [
     { id: 'cuid-sol', itemKey: 'sol', name: 'Sol', type: 'CURRENCY' },
     { id: 'cuid-dyn', itemKey: null, name: 'Dynamite', subType: 'DYNAMITE', physicsConfig: { fuseSeconds: 2 }, soundEffects: { throw: { url: '/t.mp3' } },
@@ -14,7 +15,7 @@ const defs: GameDefinitions = {
     { id: 'b1', typeKey: 'DIRT', health: 80, dropTable: null },
     { id: 'b2', typeKey: 'ROCK', health: 0 },
   ],
-};
+});
 
 describe('MiningDataManager (in-memory definitions)', () => {
   const dm = new MiningDataManager(defs);
@@ -30,11 +31,9 @@ describe('MiningDataManager (in-memory definitions)', () => {
   });
 
   it('prefers an exact id over another item whose key/name matches', () => {
-    const m = new MiningDataManager({
-      items: [{ id: 'a', itemKey: 'b', name: 'x' }, { id: 'b', itemKey: null, name: 'y' }],
-      mobs: [],
-      blocks: [],
-    });
+    const m = new MiningDataManager(
+      partialDefinitions({ items: [{ id: 'a', itemKey: 'b', name: 'x' }, { id: 'b', itemKey: null, name: 'y' }] })
+    );
     expect(m.getItemData('b')?.id).toBe('b');
   });
 

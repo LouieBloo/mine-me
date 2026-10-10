@@ -1,7 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MiningPlayerBody, type MiningClientTile, MiningTileType, type MiningActiveProjectile } from '@mine-me/shared';
-import { useMiningTicker } from './useMiningTicker';
-import { renderHook } from '@testing-library/react';
+import { useMiningTicker as useWorldTicker, type UseMiningTickerOptions } from './useMiningTicker';
+import type { MiningClientWorld } from '../systems/MiningClientWorld';
+
+/**
+ * These tests describe the ticker's inputs as one flat bag of refs. The hook takes them as a
+ * `world` plus a few options, so split the bag here instead of rewriting every scenario.
+ */
+function useMiningTicker(flat: Record<string, unknown>) {
+  const { app, sessionState, soundManager, miningSwingSpeed, ...refs } = flat;
+  return useWorldTicker({
+    app,
+    sessionState,
+    soundManager,
+    miningSwingSpeed,
+    world: refs as unknown as MiningClientWorld,
+  } as UseMiningTickerOptions);
+}
+import { renderHook, act } from '@testing-library/react';
+import { miningProfiler } from '../utils/MiningProfiler';
+import { MiningPredictionState } from '../systems/MiningPredictionState';
 
 describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
   let mockApp: any;
@@ -95,7 +113,10 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
     miningTargetRef = { current: null };
   });
 
-  it('immediately advances player body position on client frame when right key is pressed (Zero Input Lag)', () => {
+  let predictionRef: any;
+
+  const mount = () => {
+    predictionRef = { current: new MiningPredictionState(playerBodyRef.current, keysPressedRef.current) };
     renderHook(() =>
       useMiningTicker({
         app: mockApp,
@@ -115,231 +136,177 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
         lightingEngineRef,
         cameraRef,
         playerBodyRef,
+        predictionRef,
         gridRef,
         keysPressedRef,
         isMiningRef,
         miningTargetRef,
       })
     );
-
     expect(tickerCallbacks.length).toBe(1);
+  };
+  /** Changing the keys always bumps the input sequence, exactly as the real input handlers do. */
+  const press = (change: Record<string, boolean>) => {
+    Object.assign(keysPressedRef.current, change);
+    keysPressedRef.current.sequence++;
+  };
+  const frames = (n: number) => { for (let i = 0; i < n; i++) tickerCallbacks[0](); };
+  const stalePayload = (over: object = {}) => ({
+    tick: 1, position: { x: 3.5, y: 4 }, velocity: { x: 0, y: 0 }, ackSequence: 999, ackAge: 1,
+    bodyState: { isGrounded: true, isOnLadder: false, knockbackRemaining: 0 }, ...over,
+  });
 
-    // Press right
-    keysPressedRef.current.right = true;
-
-    // Advance 1 frame (16.67ms = 0.01667s)
-    tickerCallbacks[0]();
-
-    // Player position should have immediately increased (predicted movement minus initial server reconciliation nudge)
+  it('moves the predicted body within a couple of frames of a key press, and the sprite follows it', () => {
+    mount();
+    press({ right: true });
+    frames(3); // 60 fps frames; the body steps at the server's 30 Hz
     expect(playerBodyRef.current.position.x).toBeGreaterThan(2.05);
-
-    // Sprite container pixel position should immediately reflect predicted coordinates
-    expect(playerContainer.x).toBeCloseTo(playerBodyRef.current.position.x * 64, 2);
+    // The sprite is drawn through the partial step after the body's last one, so it is at or just ahead of the body
+    expect(playerContainer.x).toBeGreaterThanOrEqual(playerBodyRef.current.position.x * 64 - 1e-6);
   });
 
-  it('smoothly reconciles predicted position towards authoritative server position on small drift', () => {
-    renderHook(() =>
-      useMiningTicker({
-        app: mockApp,
-        playerContainerRef: { current: playerContainer },
-        gridContainerRef: { current: gridContainer },
-        fallingRocksContainerRef: { current: null },
-        currentRenderPosRef,
-        targetServerPosRef,
-        isFacingLeftRef,
-        playerFacingDirRef,
-        playerSpriteRef,
-        activeFallingRocksRef,
-        fallingRockGraphicsMap,
-        debugGraphicsRef,
-        showDebugRef,
-        flashlightRef,
-        lightingEngineRef,
-        cameraRef,
-        playerBodyRef,
-        gridRef,
-        keysPressedRef,
-        isMiningRef,
-        miningTargetRef,
-      })
-    );
-
-    // Simulate minor server discrepancy: server says player is at 2.05, client is at 2.0
-    playerBodyRef.current.position.x = 2.0;
-    targetServerPosRef.current.x = 2.05;
-
-    // Step 1 frame without movement input
-    tickerCallbacks[0]();
-
-    // Client body should have been softly pulled towards 2.05 without popping
-    expect(playerBodyRef.current.position.x).toBeGreaterThan(2.0);
-    expect(playerBodyRef.current.position.x).toBeLessThanOrEqual(2.05);
+  it('moves the sprite on the very first frame after a key press, before any whole step has run', () => {
+    mount();
+    const startX = playerContainer.x;
+    press({ right: true });
+    frames(1); // one 60 fps frame: half a step
+    expect(predictionRef.current.predictor.steps).toBeLessThanOrEqual(1);
+    expect(playerContainer.x).toBeGreaterThan(startX);
   });
 
-  it('snaps immediately to authoritative server position on large divergence (> 1.2 tiles)', () => {
-    renderHook(() =>
-      useMiningTicker({
-        app: mockApp,
-        playerContainerRef: { current: playerContainer },
-        gridContainerRef: { current: gridContainer },
-        fallingRocksContainerRef: { current: null },
-        currentRenderPosRef,
-        targetServerPosRef,
-        isFacingLeftRef,
-        playerFacingDirRef,
-        playerSpriteRef,
-        activeFallingRocksRef,
-        fallingRockGraphicsMap,
-        debugGraphicsRef,
-        showDebugRef,
-        flashlightRef,
-        lightingEngineRef,
-        cameraRef,
-        playerBodyRef,
-        gridRef,
-        keysPressedRef,
-        isMiningRef,
-        miningTargetRef,
-      })
-    );
-
-    // Server repositions player (e.g. respawn or teleport) to 8.0, 2.0
-    targetServerPosRef.current = { x: 8.0, y: 2.0 };
-    playerBodyRef.current.position = { x: 2.0, y: 4.0 };
-
-    tickerCallbacks[0]();
-
-    // Should snap instantly
-    expect(playerBodyRef.current.position.x).toBe(8.0);
-    expect(playerBodyRef.current.position.y).toBe(2.0);
-    expect(playerContainer.x).toBe(8.0 * 64);
+  it('keeps the prediction when the server snapshot agrees with it', () => {
+    mount();
+    press({ right: true });
+    frames(8);
+    const steps = predictionRef.current.predictor.steps;
+    const rec = predictionRef.current.predictor;
+    // The server agrees: same input, same age -> same place. Re-simulate the same steps independently.
+    const mirror = new MiningPlayerBody({ x: 2, y: 4 });
+    for (let i = 0; i < steps; i++) {
+      mirror.processInputs({ ...keysPressedRef.current, right: i >= 0 }, gridRef.current);
+      mirror.update(1 / 30, gridRef.current);
+    }
+    predictionRef.current.offer({
+      tick: steps, position: { ...mirror.position }, velocity: { ...mirror.velocity },
+      ackSequence: keysPressedRef.current.sequence, ackAge: steps,
+      bodyState: { isGrounded: mirror.isGrounded, isOnLadder: mirror.isOnLadder, knockbackRemaining: 0 },
+    });
+    // the press happened before any step, so the first step used sequence 1 at age 1 -> `steps` steps in
+    frames(1);
+    expect(rec.correctionCount).toBe(0);
   });
 
-  it('does not allow lagging server positions to pull player backwards when actively walking into a wall', () => {
-    // Set a solid wall at tile (4, 4)
+  it('corrects to the server\'s position on a real disagreement and replays the steps since', () => {
+    mount();
+    frames(6); // standing still: 3 steps at 60 fps
+    const steps = predictionRef.current.predictor.steps;
+    expect(steps).toBeGreaterThan(0);
+    // Server says the player is somewhere else entirely at step 1 (e.g. teleport/respawn)
+    predictionRef.current.offer(stalePayload({ tick: 1, position: { x: 8, y: 2 }, ackSequence: 0, ackAge: 1 }));
+    frames(1);
+    expect(predictionRef.current.predictor.correctionCount).toBe(1);
+    expect(playerBodyRef.current.position.x).toBeCloseTo(8, 1);
+    expect(playerContainer.x).toBeCloseTo(8 * 64, -1);
+    // No smoothing for a teleport: nothing left to blend
+    expect(predictionRef.current.predictor.renderOffset).toEqual({ x: 0, y: 0 });
+  });
+
+  it('does not let a snapshot it cannot line up pull the player backwards while walking into a wall', () => {
     gridRef.current[4][4].type = MiningTileType.DIRT;
-
-    renderHook(() =>
-      useMiningTicker({
-        app: mockApp,
-        playerContainerRef: { current: playerContainer },
-        gridContainerRef: { current: gridContainer },
-        fallingRocksContainerRef: { current: null },
-        currentRenderPosRef,
-        targetServerPosRef,
-        isFacingLeftRef,
-        playerFacingDirRef,
-        playerSpriteRef,
-        activeFallingRocksRef,
-        fallingRockGraphicsMap,
-        debugGraphicsRef,
-        showDebugRef,
-        flashlightRef,
-        lightingEngineRef,
-        cameraRef,
-        playerBodyRef,
-        gridRef,
-        keysPressedRef,
-        isMiningRef,
-        miningTargetRef,
-      })
-    );
-
-    // Player resting at y=4.5625 (above floor y=5), right in front of wall at x=4
+    mount();
     const flushWallX = 4.0 - playerBodyRef.current.halfWidth;
     playerBodyRef.current.position.x = flushWallX;
     playerBodyRef.current.position.y = 5.0 - playerBodyRef.current.halfHeight;
     playerBodyRef.current.isGrounded = true;
-
-    // Server is lagging behind at x=3.5
-    targetServerPosRef.current = { x: 3.5, y: 5.0 - playerBodyRef.current.halfHeight };
-
-    // Player continues holding right into the wall
-    keysPressedRef.current.right = true;
-
-    // Run 10 ticks
+    press({ right: true });
     for (let i = 0; i < 10; i++) {
-      tickerCallbacks[0]();
+      predictionRef.current.offer(stalePayload());
+      frames(1);
     }
-
-    // Player must remain flush against the wall and NOT get pulled backward to 3.5
     expect(playerBodyRef.current.position.x).toBeCloseTo(flushWallX, 3);
-    expect(playerContainer.x).toBeCloseTo(flushWallX * 64, 2);
   });
 
-  it('does not allow trailing server position to pull player backward during a jump (camera spasm fix)', () => {
-    renderHook(() =>
-      useMiningTicker({
-        app: mockApp,
-        playerContainerRef: { current: playerContainer },
-        gridContainerRef: { current: gridContainer },
-        fallingRocksContainerRef: { current: null },
-        currentRenderPosRef,
-        targetServerPosRef,
-        isFacingLeftRef,
-        playerFacingDirRef,
-        playerSpriteRef,
-        activeFallingRocksRef,
-        fallingRockGraphicsMap,
-        debugGraphicsRef,
-        showDebugRef,
-        flashlightRef,
-        lightingEngineRef,
-        cameraRef,
-        playerBodyRef,
-        gridRef,
-        keysPressedRef,
-        isMiningRef,
-        miningTargetRef,
-      })
-    );
-
-    // Ground the player above floor at y=5
+  it('follows a smooth jump arc and is not dragged down by a stale snapshot', () => {
+    mount();
     const groundedY = 5.0 - playerBodyRef.current.halfHeight;
     playerBodyRef.current.position = { x: 2, y: groundedY };
     playerBodyRef.current.isGrounded = true;
-    playerBodyRef.current.velocity = { x: 0, y: 0 };
-    targetServerPosRef.current = { x: 2, y: groundedY };
-
-    // Press jump
-    keysPressedRef.current.jump = true;
-
-    // Step one frame to initiate the jump
-    tickerCallbacks[0]();
-
-    // Player should now be airborne (moving upward)
+    press({ jump: true });
+    frames(4);
     expect(playerBodyRef.current.isGrounded).toBe(false);
     expect(playerBodyRef.current.velocity.y).toBeLessThan(0);
-    const posAfterJumpFrame = playerBodyRef.current.position.y;
-
-    // Release jump key
-    keysPressedRef.current.jump = false;
-
-    // Simulate a stale server position that's still at the ground (server hasn't processed the jump yet)
-    // This 0.3 tile error is well within the 0.8 tile airborne suppression threshold
-    targetServerPosRef.current = { x: 2, y: posAfterJumpFrame + 0.3 };
-
-    // Step several frames while airborne
-    const positionsY: number[] = [];
-    for (let i = 0; i < 5; i++) {
-      tickerCallbacks[0]();
-      positionsY.push(playerBodyRef.current.position.y);
+    press({ jump: false });
+    const ys: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      predictionRef.current.offer(stalePayload({ position: { x: 2, y: groundedY } }));
+      frames(1);
+      ys.push(playerBodyRef.current.position.y);
     }
+    expect(Math.min(...ys)).toBeLessThan(groundedY - 0.1); // it went up
+    for (let i = 1; i < ys.length; i++) expect(Math.abs(ys[i] - ys[i - 1])).toBeLessThan(0.5);
+  });
+});
 
-    // The player should continue following a smooth jump arc upward (positions getting smaller = going up)
-    // WITHOUT being pulled back down toward the stale server position.
-    // If reconciliation were active, positionsY would oscillate or move downward.
-    for (let i = 1; i < positionsY.length; i++) {
-      // During the upward phase of the jump, each frame's Y should be <= previous
-      // (ascending = decreasing Y, or at worst the apex where it briefly equals)
-      // We just need to confirm the trajectory is smooth, not jerked back down
-      const delta = positionsY[i] - positionsY[i - 1];
-      // Delta should be consistent frame-to-frame (no sudden reversal from reconciliation pull)
-      expect(Math.abs(delta)).toBeLessThan(0.5); // No large jumps from reconciliation
-    }
+describe('useMiningTicker - profiler render patch', () => {
+  const mountWith = (renderer: any) => {
+    const callbacks: (() => void)[] = [];
+    const app: any = {
+      renderer,
+      ticker: { deltaMS: 16.67, add: vi.fn((cb) => callbacks.push(cb)), remove: vi.fn() },
+      screen: { width: 800, height: 600 },
+    };
+    return renderHook(() =>
+      useMiningTicker({
+        app,
+        playerContainerRef: { current: { x: 0, y: 0 } as any },
+        gridContainerRef: { current: { x: 0, y: 0 } as any },
+        fallingRocksContainerRef: { current: null },
+        currentRenderPosRef: { current: { x: 2, y: 4 } },
+        targetServerPosRef: { current: { x: 2, y: 4 } },
+        isFacingLeftRef: { current: false },
+        playerFacingDirRef: { current: { x: 1, y: 0 } },
+        playerSpriteRef: { current: null },
+        activeFallingRocksRef: { current: [] },
+        fallingRockGraphicsMap: { current: new Map() },
+        debugGraphicsRef: { current: null },
+        showDebugRef: { current: false },
+        flashlightRef: { current: null },
+        lightingEngineRef: { current: null },
+        cameraRef: { current: null },
+      } as any)
+    );
+  };
 
-    // The client should NOT have been snapped to the stale server Y position
-    expect(playerBodyRef.current.position.y).not.toBeCloseTo(posAfterJumpFrame + 0.3, 1);
+  afterEach(() => miningProfiler.setEnabled(false));
+
+  it('leaves renderer.render alone during normal play', () => {
+    miningProfiler.setEnabled(false);
+    const original = vi.fn();
+    const renderer = { render: original };
+    mountWith(renderer);
+    expect(renderer.render).toBe(original);
+  });
+
+  it('wraps renderer.render while profiling is on, and restores it on unmount', () => {
+    miningProfiler.setEnabled(true);
+    const original = vi.fn();
+    const renderer = { render: original };
+    const { unmount } = mountWith(renderer);
+    expect(renderer.render).not.toBe(original);
+    unmount();
+    expect(renderer.render).toBe(original);
+  });
+
+  it('follows the profiler being switched on and off while mounted', () => {
+    miningProfiler.setEnabled(false);
+    const original = vi.fn();
+    const renderer = { render: original };
+    mountWith(renderer);
+    expect(renderer.render).toBe(original);
+    act(() => miningProfiler.setEnabled(true));
+    expect(renderer.render).not.toBe(original);
+    act(() => miningProfiler.setEnabled(false));
+    expect(renderer.render).toBe(original);
   });
 });
 

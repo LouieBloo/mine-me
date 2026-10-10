@@ -1,6 +1,8 @@
 import { vi } from 'vitest';
-import { MINING_CONFIG, knockbackAway, type DamageEvent, type DamageResult, type MiningTileType, type Vector2D } from '@mine-me/shared';
+import { MINING_CONFIG, knockbackAway, type DropTable, type MiningBlockConfig, type EffectEntry, type EntityCombatStats, type DamageEvent, type DamageResult, type MiningTileType, type Vector2D } from '@mine-me/shared';
 import type { MiningGameEngine } from './MiningGameEngine';
+import type { MiningActiveMobSession } from './subsystems/MiningMobSubsystem';
+import type { GameDefinitions } from './subsystems/MiningDataManager';
 
 /** Test helper: hit a mob through the damage pipeline. */
 export function hitMob(
@@ -57,16 +59,59 @@ export function giveBlockDrops(
   vi.spyOn(engine.dataManager, 'getBlockConfig').mockImplementation((type: MiningTileType) =>
     type === tileType
       ? {
-          ...(original(type) ?? { typeKey: 'TEST', health: 100 }),
-          dropTable: {
-            items: items.map((i) => ({
+          ...(original(type) ?? testBlockConfig({ typeKey: 'TEST' as MiningBlockConfig['typeKey'] })),
+          dropTable: testDropTable(
+            items.map((i) => ({
               itemId: i.itemId,
               chance: i.chance ?? 100,
               minQuantity: i.quantity ?? 1,
               maxQuantity: i.quantity ?? 1,
-            })),
-          },
+            }))
+          ),
         }
       : original(type)
   );
+}
+
+/** Test helper: the effect list that gives a mob these combat stats (what the admin app attaches). */
+export function mobEffects(stats: Partial<EntityCombatStats>): EffectEntry[] {
+  const flags: Record<keyof EntityCombatStats, string> = {
+    miningSpeed: 'miningSpeedModifier',
+    toolDamage: 'toolDamageModifier',
+    weaponDamage: 'damageModifier',
+    pickPower: 'pickPowerModifier',
+    knockback: 'knockbackModifier',
+  };
+  return (Object.keys(stats) as (keyof EntityCombatStats)[]).map((key) => ({
+    value: stats[key],
+    effect: { [flags[key]]: true },
+  }));
+}
+
+/** Test helper: make a mob take one swing at a block (the mob's swing timer is bypassed). */
+export function mobSwing(
+  engine: MiningGameEngine,
+  mob: MiningActiveMobSession,
+  target: { x: number; y: number }
+): void {
+  mob.swungThisTick = true;
+  engine.handleMobMining(mob, target);
+}
+
+/**
+ * Test helper: definitions built from partial fixtures (a test only spells out the fields it cares
+ * about). The cast lives here so production code keeps the strict `GameDefinitions` type.
+ */
+export function partialDefinitions(defs: { items?: object[]; mobs?: object[]; blocks?: object[] }): GameDefinitions {
+  return { items: [], mobs: [], blocks: [], ...defs } as unknown as GameDefinitions;
+}
+
+/** Test helper: a drop table that rolls only the given entries (no Sol, no experience). */
+export function testDropTable(items: DropTable['items']): DropTable {
+  return { solMin: 0, solMax: 0, experience: 0, items };
+}
+
+/** Test helper: a complete block config; a test only spells out the fields it cares about. */
+export function testBlockConfig(overrides: Partial<MiningBlockConfig> & Pick<MiningBlockConfig, 'typeKey'>): MiningBlockConfig {
+  return { id: `block_${overrides.typeKey.toLowerCase()}`, name: overrides.typeKey, health: 100, staminaCost: 0, ...overrides };
 }

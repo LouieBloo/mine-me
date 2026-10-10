@@ -48,4 +48,26 @@ describe('MiningLoadingScreen', () => {
 
     vi.useRealTimers();
   });
+
+  describe('progress bar', () => {
+    it('is hidden when no progress is given', () => {
+      render(<MiningLoadingScreen isLoading={true} />);
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    });
+
+    it('shows the percentage, as a bar width and for screen readers', () => {
+      render(<MiningLoadingScreen isLoading={true} progress={0.426} />);
+      const bar = screen.getByRole('progressbar');
+      expect(bar).toHaveAttribute('aria-valuenow', '43');
+      expect(screen.getByTestId('mining-loading-bar')).toHaveStyle({ width: '43%' });
+      expect(screen.getByText('43%')).toBeInTheDocument();
+    });
+
+    it('clamps out-of-range progress to 0..100%', () => {
+      const { rerender } = render(<MiningLoadingScreen isLoading={true} progress={-2} />);
+      expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+      rerender(<MiningLoadingScreen isLoading={true} progress={7} />);
+      expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
+    });
+  });
 });

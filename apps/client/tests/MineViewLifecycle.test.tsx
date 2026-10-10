@@ -279,11 +279,14 @@ describe('MineView Navigation & Session Lifecycle', () => {
     const { unmount } = renderHook(() =>
       useMiningInput({
         sendGameEvent: rejectingSendGameEvent,
-        playerSpriteRef: { current: null },
-        flashlightRef: { current: null },
-        showDebugRef: { current: false },
-        playerFacingDirRef: { current: { x: 1, y: 0 } },
-        isFacingLeftRef: { current: false },
+        world: {
+          playerSpriteRef: { current: null },
+          flashlightRef: { current: null },
+          showDebugRef: { current: false },
+          playerFacingDirRef: { current: { x: 1, y: 0 } },
+          isFacingLeftRef: { current: false },
+          mouseControllerRef: { current: null as never },
+        },
         zoom: 1.5,
       })
     );

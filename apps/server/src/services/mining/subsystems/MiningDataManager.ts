@@ -4,15 +4,18 @@ import {
   SOL_CURRENCY_SUBTYPE,
   findCurrencyItem,
   isThrowableItem,
+  type GameItem,
+  type Mob,
+  type MiningBlockConfig,
   type ItemPhysicsConfig,
   type ItemSoundEffectsConfig,
 } from '@mine-me/shared';
 
 /** Static game definitions, in the shape the admin tools / Prisma produce. */
 export interface GameDefinitions {
-  items: any[];
-  mobs: any[];
-  blocks: any[];
+  items: GameItem[];
+  mobs: Mob[];
+  blocks: MiningBlockConfig[];
 }
 
 const TILE_TYPE_KEYS: Record<number, string> = {
@@ -35,18 +38,18 @@ const TILE_TYPE_KEYS: Record<number, string> = {
 export class MiningDataManager {
   private static instance: MiningDataManager | null = null;
 
-  private readonly items: any[];
-  private readonly mobs: any[];
-  private readonly blocksByTypeKey = new Map<string, any>();
+  private readonly items: GameItem[];
+  private readonly mobs: Mob[];
+  private readonly blocksByTypeKey = new Map<string, MiningBlockConfig>();
 
-  private readonly itemsById = new Map<string, any>();
-  private readonly itemsByKey = new Map<string, any>();
-  private readonly itemsByIdLower = new Map<string, any>();
-  private readonly itemsByKeyLower = new Map<string, any>();
-  private readonly itemsByNameLower = new Map<string, any>();
+  private readonly itemsById = new Map<string, GameItem>();
+  private readonly itemsByKey = new Map<string, GameItem>();
+  private readonly itemsByIdLower = new Map<string, GameItem>();
+  private readonly itemsByKeyLower = new Map<string, GameItem>();
+  private readonly itemsByNameLower = new Map<string, GameItem>();
 
-  private readonly mobsById = new Map<string, any>();
-  private readonly mobsByNameLower = new Map<string, any>();
+  private readonly mobsById = new Map<string, Mob>();
+  private readonly mobsByNameLower = new Map<string, Mob>();
 
   constructor(definitions: GameDefinitions) {
     this.items = definitions.items;
@@ -70,7 +73,7 @@ export class MiningDataManager {
     }
   }
 
-  private static putFirst(map: Map<string, any>, key: unknown, value: any): void {
+  private static putFirst<T>(map: Map<string, T>, key: unknown, value: T): void {
     if (typeof key === 'string' && key.length > 0 && !map.has(key)) map.set(key, value);
   }
 
@@ -101,7 +104,7 @@ export class MiningDataManager {
   /**
    * Helper to retrieve block configuration by tile type.
    */
-  public getBlockConfig(tileType: MiningTileType): any {
+  public getBlockConfig(tileType: MiningTileType): MiningBlockConfig | undefined {
     const key = TILE_TYPE_KEYS[tileType];
     return key ? this.blocksByTypeKey.get(key) : undefined;
   }
@@ -128,14 +131,14 @@ export class MiningDataManager {
   /**
    * All item definitions.
    */
-  public getItems(): any[] {
+  public getItems(): GameItem[] {
     return this.items;
   }
 
   /**
    * Item definition by ID, itemKey, or name (exact matches first, then case-insensitive).
    */
-  public getItemData(itemId: string): any {
+  public getItemData(itemId: string): GameItem | undefined {
     if (typeof itemId !== 'string') return undefined;
     const query = itemId.toLowerCase();
     return (
@@ -151,15 +154,15 @@ export class MiningDataManager {
    * Helper to retrieve configured item physics for any item.
    */
   public getItemPhysicsConfig(itemId: string): ItemPhysicsConfig | undefined {
-    return this.getItemData(itemId)?.physicsConfig;
+    return this.getItemData(itemId)?.physicsConfig ?? undefined;
   }
 
   /**
    * The item used when a throw does not say what is being thrown: the first throwable item in
    * the item table.
    */
-  public getDefaultThrowable(): any {
-    return this.items.find((item: any) => isThrowableItem(item));
+  public getDefaultThrowable(): GameItem | undefined {
+    return this.items.find((item) => isThrowableItem(item));
   }
 
   /**
@@ -167,12 +170,12 @@ export class MiningDataManager {
    * has any, otherwise the built-in defaults.
    */
   public getDynamiteItemPhysicsConfig(): ItemPhysicsConfig {
-    const throwable = this.items.find((item: any) => isThrowableItem(item) && item.physicsConfig);
+    const throwable = this.items.find((item) => isThrowableItem(item) && item.physicsConfig);
     return (throwable?.physicsConfig as ItemPhysicsConfig | undefined) ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG;
   }
 
   /** The currency item with this subType (Sol by default), looked up by category, not by id or name. */
-  public getCurrencyItem(subType: string = SOL_CURRENCY_SUBTYPE): any {
+  public getCurrencyItem(subType: string = SOL_CURRENCY_SUBTYPE): GameItem | undefined {
     return findCurrencyItem(this.items, subType);
   }
 
@@ -184,14 +187,11 @@ export class MiningDataManager {
     if (!item) return undefined;
     if (item.itemEffects && Array.isArray(item.itemEffects)) {
       const explodeEffect = item.itemEffects.find(
-        (ie: any) => ie.effect?.explodes === true && ie.value > 0
+        (ie) => ie.effect?.explodes === true && ie.value > 0
       );
       if (explodeEffect) {
         return Number(explodeEffect.value);
       }
-    }
-    if (item.physicsConfig && typeof item.physicsConfig.explosionRadius === 'number') {
-      return item.physicsConfig.explosionRadius;
     }
     return undefined;
   }
@@ -200,13 +200,13 @@ export class MiningDataManager {
    * Helper to retrieve configured soundEffects for any item.
    */
   public getItemSoundEffects(itemId: string): ItemSoundEffectsConfig | undefined {
-    return this.getItemData(itemId)?.soundEffects;
+    return this.getItemData(itemId)?.soundEffects ?? undefined;
   }
 
   /**
    * Mob definition by ID or (case-insensitive) name.
    */
-  public getMobData(mobId: string): any {
+  public getMobData(mobId: string): Mob | undefined {
     if (typeof mobId !== 'string') return undefined;
     return this.mobsById.get(mobId) ?? this.mobsByNameLower.get(mobId.toLowerCase());
   }

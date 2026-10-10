@@ -4,6 +4,8 @@ import { syncJson, buildDropTableUpsert } from '../../services/admin.service';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import { getSoundsDir, resolveAssetUrl } from '../../config/assetPaths';
+import { tryRegisterSoundFile, tryUnregisterSoundFile } from '../../services/soundLibrary.service';
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -32,7 +34,7 @@ export const blockTextureUpload = upload.single('texture');
 
 const soundEffectStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const dir = path.join(__dirname, '../../../../../packages/shared/assets/sounds/blocks');
+    const dir = getSoundsDir('blocks');
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -214,6 +216,14 @@ export const uploadBlockSoundEffect = async (req: Request, res: Response) => {
     }
 
     const soundEffectUrl = `/assets/sounds/blocks/${file.filename}`;
+    await tryRegisterSoundFile(prisma, {
+      url: soundEffectUrl,
+      fileName: file.filename,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+      category: 'BLOCK',
+      name: `${(block as any).name} - mining`,
+    });
 
     const updatedBlock = await prisma.miningBlock.update({
       where: { id: block.id },
@@ -259,7 +269,7 @@ export const removeBlockSoundEffect = async (req: Request, res: Response) => {
     }
 
     if ((block as any).soundEffectUrl) {
-      const filePath = path.join(__dirname, '../../../../../packages/shared', (block as any).soundEffectUrl);
+      const filePath = resolveAssetUrl((block as any).soundEffectUrl);
       if (fs.existsSync(filePath)) {
         try {
           fs.unlinkSync(filePath);
@@ -267,6 +277,7 @@ export const removeBlockSoundEffect = async (req: Request, res: Response) => {
           console.warn('Could not remove sound effect file:', e);
         }
       }
+      await tryUnregisterSoundFile(prisma, (block as any).soundEffectUrl);
     }
 
     const updatedBlock = await prisma.miningBlock.update({

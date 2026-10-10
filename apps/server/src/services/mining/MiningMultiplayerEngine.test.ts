@@ -174,10 +174,10 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
     (engine as any).tick(0.15);
 
     const tile = engine.grid[0][target.x];
-    expect(tile.damageMs).toBeCloseTo(50, 1);
+    expect(tile.damage).toBeCloseTo(50, 1);
 
-    expect(p1.miningProgressMs).toBeCloseTo(50, 1);
-    expect(p2.miningProgressMs).toBeCloseTo(50, 1);
+    expect(p1.miningProgress).toBeCloseTo(50, 1);
+    expect(p2.miningProgress).toBeCloseTo(50, 1);
 
     // Another 150ms tick: both swing again, total 100 >= 100 HP, block should break!
     (engine as any).tick(0.15);

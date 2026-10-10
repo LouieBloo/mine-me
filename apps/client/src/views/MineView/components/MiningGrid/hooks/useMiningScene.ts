@@ -22,6 +22,14 @@ import {
 } from '@mine-me/shared';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
+import { ProjectileTextureCache } from '../systems/ProjectileTextureCache';
+import {
+  collectAssetUrls,
+  fetchAssetManifest,
+  preloadMiningAssets,
+  type AssetLists,
+  type SfxPreloader,
+} from '../systems/MiningAssetPreloader';
 
 export interface UseMiningSceneOptions {
   app: Application | null;
@@ -31,6 +39,10 @@ export interface UseMiningSceneOptions {
   isFacingLeftRef: React.MutableRefObject<boolean>;
   zoom: number;
   onAssetsLoaded?: () => void;
+  /** Loading progress, 0 to 1, never going backwards; 1 once everything is ready. */
+  onLoadProgress?: (fraction: number) => void;
+  /** When given, every sound effect in the game is loaded before the loading screen goes away. */
+  soundManager?: SfxPreloader;
   onDynamicItemsLoaded?: (items: any[]) => void;
 }
 
@@ -42,6 +54,8 @@ export function useMiningScene({
   isFacingLeftRef,
   zoom,
   onAssetsLoaded,
+  onLoadProgress,
+  soundManager,
   onDynamicItemsLoaded,
 }: UseMiningSceneOptions) {
   const [containersReady, setContainersReady] = useState<boolean>(false);
@@ -74,8 +88,8 @@ export function useMiningScene({
   const dynamiteTextureRef = useRef<Texture | null>(null);
   const projectilesContainerRef = useRef<Container | null>(null);
   const projectileGraphicsMap = useRef<Map<string, Sprite | Graphics>>(new Map());
-  const bulletTextureRef = useRef<Texture | null>(null);
-  const bulletScaleRef = useRef<number>(1.0);
+  // Projectile sprites come from the server with each shot (the equipped weapon's ammo item)
+  const projectileTexturesRef = useRef<ProjectileTextureCache | null>(new ProjectileTextureCache());
   const dynamicItemsRef = useRef<any[]>([]);
 
   const playerSpriteRef = useRef<ModularCharacterSprite | null>(null);
@@ -97,6 +111,8 @@ export function useMiningScene({
     }
   }, [gearLayers]);
 
+  const onLoadProgressRef = useRef(onLoadProgress);
+  onLoadProgressRef.current = onLoadProgress;
   const onAssetsLoadedRef = useRef(onAssetsLoaded);
   useEffect(() => {
     onAssetsLoadedRef.current = onAssetsLoaded;
@@ -247,6 +263,17 @@ export function useMiningScene({
 
     // Load assets in parallel: cave tiling background, dirt block texture + modular character sprite with gear
     const loadAllAssets = async () => {
+      // Start listing every image and sound on the server right away; it is used once the item and block data is in
+      const manifestPromise = fetchAssetManifest();
+      // Progress: scene built 5%, block data in 10%, item data in 15%, then the preload fills the rest
+      let progress = 0;
+      const report = (fraction: number) => {
+        if (fraction <= progress) return;
+        progress = Math.min(1, fraction);
+        onLoadProgressRef.current?.(progress);
+      };
+      report(0.05);
+      let publicBlocks: unknown[] = [];
       const dirtBgUrl = getAssetUrl('/assets/mining/underground-dirt-bg.jpg');
       const bgPromise = Assets.load(dirtBgUrl)
         .then((texture) => {
@@ -272,6 +299,8 @@ export function useMiningScene({
         const res = await fetch(getAssetUrl('/api/public/blocks'));
         if (res.ok) {
           const blocks = await res.json();
+          publicBlocks = blocks;
+          report(0.1);
           for (const blk of blocks) {
             const tileType = MiningTileType[blk.typeKey as keyof typeof MiningTileType];
             if (tileType !== undefined) {
@@ -389,6 +418,7 @@ export function useMiningScene({
           const items = await itemsRes.json();
           if (Array.isArray(items)) {
             dynamicItems = items;
+            report(0.15);
             dynamicItemsRef.current = items;
             DynamiteVisualManager.setCustomItems(items);
             onDynamicItemsLoaded?.(items);
@@ -442,20 +472,6 @@ export function useMiningScene({
         })
         .catch(() => {});
 
-      // Load bullet texture dynamically for projectile bullet rendering
-      const bulletItem = dynamicItems.find(
-        (i) => i.id === 'cmn_bullet_gun_round' || i.itemKey === 'gun_bullet' || i.name?.toLowerCase().includes('bullet')
-      );
-      if (bulletItem && typeof bulletItem.inGameScale === 'number' && bulletItem.inGameScale > 0) {
-        bulletScaleRef.current = bulletItem.inGameScale;
-      }
-      const bulletIconUrl = getAssetUrl(bulletItem?.inGameSpriteUrl || bulletItem?.iconUrl || '/assets/sprites/items/gun_bullet_ingame.png');
-      Assets.load(bulletIconUrl)
-        .then((texture) => {
-          bulletTextureRef.current = texture;
-        })
-        .catch(() => {});
-
       const spritePromise = (async () => {
         try {
           await sprite.load();
@@ -490,7 +506,29 @@ export function useMiningScene({
         }
       })();
 
-      await Promise.allSettled([bgPromise, spritePromise, ...blockPromises]);
+      // Greedy preload: every image and sound effect the game could use, so nothing is fetched mid-game
+      const preloadPromise = soundManager
+        ? (async () => {
+            const manifest = await manifestPromise;
+            const referenced = collectAssetUrls(dynamicItems, publicBlocks, initialSessionState.mobs);
+            const lists: AssetLists = {
+              images: [...new Set([...manifest.images, ...referenced.images])],
+              sounds: [...new Set([...manifest.sounds, ...referenced.sounds])],
+            };
+            const summary = await preloadMiningAssets({
+              lists,
+              soundManager,
+              onProgress: (done, total) => report(0.15 + 0.8 * (done / total)),
+            });
+            console.info(
+              `[MiningGrid] Preloaded ${summary.images.loaded}/${lists.images.length} images and ${summary.sounds.loaded}/${lists.sounds.length} sounds` +
+                (summary.timedOut ? ' (stopped waiting; the rest keeps loading)' : '')
+            );
+          })().catch((err) => console.warn('[MiningGrid] Asset preload failed:', err))
+        : Promise.resolve();
+
+      await Promise.allSettled([bgPromise, spritePromise, preloadPromise, ...blockPromises]);
+      report(1);
       if (gridContainerRef.current) {
         onAssetsLoadedRef.current?.();
       }
@@ -565,8 +603,7 @@ export function useMiningScene({
     dynamiteTextureRef,
     projectilesContainerRef,
     projectileGraphicsMap,
-    bulletTextureRef,
-    bulletScaleRef,
+    projectileTexturesRef,
     dynamicItemsRef,
     playerSpriteRef,
     remotePlayerRendererRef,

@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import { useApi } from '../../hooks/useApi';
-import { getAssetUrl, type SoundTrack, type SoundType } from '@mine-me/shared';
+import { getAssetUrl } from '@mine-me/shared';
+import { FILTERS, matchesFilter, type Filter, type SoundRow } from './soundFilters';
 import { UploadSoundModal } from './UploadSoundModal/UploadSoundModal';
 import './Music.css';
 
 export default function Music() {
-  const [tracks, setTracks] = useState<SoundTrack[]>([]);
+  const [tracks, setTracks] = useState<SoundRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [typeFilter, setTypeFilter] = useState<'ALL' | SoundType>('ALL');
+  const [filter, setFilter] = useState<Filter>('ALL');
+  const [syncing, setSyncing] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -18,13 +20,12 @@ export default function Music() {
 
   const fetchTracks = () => {
     setLoading(true);
-    const query = typeFilter === 'ALL' ? '' : `?type=${typeFilter}`;
-    fetchWithAuth(`/api/admin/sounds${query}`)
+    fetchWithAuth('/api/admin/sounds')
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch sound tracks');
         return res.json();
       })
-      .then((data: SoundTrack[]) => {
+      .then((data: SoundRow[]) => {
         setTracks(data);
         setLoading(false);
       })
@@ -36,9 +37,34 @@ export default function Music() {
 
   useEffect(() => {
     fetchTracks();
-  }, [typeFilter]);
+  }, []);
 
-  const handleToggleActive = async (track: SoundTrack) => {
+  const visibleTracks = tracks.filter((t) => matchesFilter(t, filter));
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/sounds/sync', { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || 'Failed to sync the sound library');
+      }
+      const report = await res.json();
+      const added = report.added?.length ?? 0;
+      const missing = report.missing?.length ?? 0;
+      toast.success(
+        `${added} new sound${added === 1 ? '' : 's'} added to the library` +
+          (missing > 0 ? `; ${missing} library entr${missing === 1 ? 'y has' : 'ies have'} no file on disk` : '')
+      );
+      if (added > 0) fetchTracks();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to sync the sound library');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleToggleActive = async (track: SoundRow) => {
     const newActive = !track.isActive;
     // Optimistic update
     setTracks(prev => prev.map(t => t.id === track.id ? { ...t, isActive: newActive } : t));
@@ -62,7 +88,7 @@ export default function Music() {
     }
   };
 
-  const handleDelete = async (track: SoundTrack) => {
+  const handleDelete = async (track: SoundRow) => {
     if (!window.confirm(`Are you sure you want to delete track "${track.name}"? This action cannot be undone.`)) {
       return;
     }
@@ -74,7 +100,8 @@ export default function Music() {
       });
 
       if (!res.ok) {
-        throw new Error('Failed to delete sound track');
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || 'Failed to delete sound track');
       }
 
       setTracks(prev => prev.filter(t => t.id !== track.id));
@@ -100,47 +127,41 @@ export default function Music() {
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">MUSIC & SOUNDS</h2>
           <p className="text-slate-500 font-medium">Manage background music playlists, ambient audio, and sound effects.</p>
         </div>
-        <button
-          onClick={() => setIsUploadModalOpen(true)}
-          className="cursor-pointer px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center space-x-2"
-        >
-          <span>🎵</span>
-          <span>Upload Sound Track</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            title="Add any sound files found on disk that are not in the library yet"
+            className="cursor-pointer px-5 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all shadow-sm flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syncing ? <LoadingSpinner size={16} /> : <span>🔄</span>}
+            <span>{syncing ? 'Syncing...' : 'Sync from disk'}</span>
+          </button>
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            className="cursor-pointer px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center space-x-2"
+          >
+            <span>🎵</span>
+            <span>Upload Sound Track</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex space-x-2 border-b border-slate-200 pb-2">
-        <button
-          onClick={() => setTypeFilter('ALL')}
-          className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-lg transition-colors ${
-            typeFilter === 'ALL'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
-        >
-          All Tracks ({tracks.length})
-        </button>
-        <button
-          onClick={() => setTypeFilter('BGM')}
-          className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-lg transition-colors ${
-            typeFilter === 'BGM'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
-        >
-          Background Music (BGM)
-        </button>
-        <button
-          onClick={() => setTypeFilter('SFX')}
-          className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-lg transition-colors ${
-            typeFilter === 'SFX'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
-        >
-          Sound Effects (SFX)
-        </button>
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+        {FILTERS.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+              filter === key
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            {label} ({tracks.filter((t) => matchesFilter(t, key)).length})
+          </button>
+        ))}
       </div>
 
       {/* Content Table */}
@@ -149,7 +170,7 @@ export default function Music() {
           <div className="flex justify-center items-center py-24">
             <LoadingSpinner size={60} />
           </div>
-        ) : tracks.length === 0 ? (
+        ) : visibleTracks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center px-4">
             <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-3xl mb-3">
               🎧
@@ -173,6 +194,7 @@ export default function Music() {
                   <th className="py-4 px-6">Preview Player</th>
                   <th className="py-4 px-6">Track Info</th>
                   <th className="py-4 px-6">Type</th>
+                  <th className="py-4 px-6">Used By</th>
                   <th className="py-4 px-6">File Size</th>
                   <th className="py-4 px-6">Preset Vol</th>
                   <th className="py-4 px-6">Active</th>
@@ -180,7 +202,7 @@ export default function Music() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {tracks.map((track) => (
+                {visibleTracks.map((track) => (
                   <tr key={track.id} className="hover:bg-slate-50/70 transition-colors">
                     {/* Audio Player Preview */}
                     <td className="py-4 px-6">
@@ -214,6 +236,24 @@ export default function Music() {
                       >
                         {track.type}
                       </span>
+                      {track.type === 'SFX' && (
+                        <span className="ml-1.5 inline-block px-2 py-1 text-[10px] font-black uppercase tracking-wider rounded-md bg-slate-100 text-slate-600">
+                          {track.category ?? 'GENERAL'}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Used By */}
+                    <td className="py-4 px-6 text-xs text-slate-600 max-w-xs">
+                      {track.usedBy && track.usedBy.length > 0 ? (
+                        <ul className="space-y-0.5">
+                          {track.usedBy.map((u) => (
+                            <li key={u} className="truncate" title={u}>{u}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="text-slate-400">Not used</span>
+                      )}
                     </td>
 
                     {/* File Size */}

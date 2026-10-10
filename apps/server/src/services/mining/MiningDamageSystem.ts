@@ -81,6 +81,7 @@ export class MiningDamageSystem {
         knockback,
         knockbackSeconds: knockback.x !== 0 || knockback.y !== 0 ? MINING_CONFIG.PLAYER_HIT_KNOCKBACK_SECONDS : 0,
         invulnerableSeconds: MINING_CONFIG.PLAYER_HIT_INVULNERABILITY,
+        tick: this.world.tick,
       };
       session.socket.emit('player_damaged', hurt);
     }
@@ -110,7 +111,6 @@ export class MiningDamageSystem {
     const amount = event.amount; // tiles have no modifiers yet (pickaxe power etc. come with ticket 012)
     const prevStage = getDamageStage(tile);
     tile.damage = (tile.damage || 0) + amount;
-    tile.damageMs = tile.damage;
 
     const maxHealth = this.world.data.getBlockMaxHealth(tile.type);
     if (tile.damage >= maxHealth) {

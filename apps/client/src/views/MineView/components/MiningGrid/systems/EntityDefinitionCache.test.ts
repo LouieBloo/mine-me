@@ -6,8 +6,8 @@ const v = (x = 0, y = 0) => ({ x, y });
 
 const mobDef = (over: Partial<MiningActiveMob> = {}): MiningActiveMob => ({
   id: 'm1', mobId: 'mole', name: 'Mole', position: v(1, 1), velocity: v(), health: 40, maxHealth: 40,
-  attack: 5, defense: 2, isFacingLeft: false, isMining: true, miningTarget: { x: 3, y: 3 },
-  animationState: 'mine', animations: { parts: ['big', 'manifest'] }, spriteUrl: '/mole.png',
+  defense: 2, isFacingLeft: false, isMining: true, miningTarget: { x: 3, y: 3 },
+  animationState: 'mine', animations: { url: '/mole-atlas.png', atlasUrl: '/mole-atlas.json' }, spriteUrl: '/mole.png',
   colliderWidth: 1, colliderHeight: 1.25, showHealthBar: true, ...over,
 });
 const mobTick = (over: any = {}) => ({
@@ -29,7 +29,7 @@ describe('EntityDefinitionCache', () => {
       cache.applySpawned({ mobs: [mobDef()] });
       const [m] = cache.hydrateMobs([mobTick()])!;
       expect(m).toMatchObject({
-        name: 'Mole', maxHealth: 40, animations: { parts: ['big', 'manifest'] }, spriteUrl: '/mole.png', // static
+        name: 'Mole', maxHealth: 40, animations: { url: '/mole-atlas.png', atlasUrl: '/mole-atlas.json' }, spriteUrl: '/mole.png', // static
         position: v(5, 5), health: 30, isFacingLeft: true, animationState: 'walk', // dynamic
       });
     });
@@ -39,6 +39,18 @@ describe('EntityDefinitionCache', () => {
       const [m] = cache.hydrateMobs([mobTick()])!; // tick omits miningTarget, as JSON would
       expect(m.isMining).toBe(false);
       expect(m.miningTarget).toBeUndefined();
+    });
+
+    it('keeps a mob\'s sound slots from its spawn description on every tick', () => {
+      const sounds = { attack: { url: '/assets/sounds/a.mp3', volume: 1, loop: false } };
+      cache.applySpawned({ mobs: [mobDef({ sounds })] });
+      expect(cache.hydrateMobs([mobTick()])![0].sounds).toEqual(sounds);
+      expect(cache.hydrateMobs([mobTick()])![0].sounds).toEqual(sounds);
+    });
+
+    it('hydrates a mob that has no sounds', () => {
+      cache.applySpawned({ mobs: [mobDef()] });
+      expect(cache.hydrateMobs([mobTick()])![0].sounds).toBeUndefined();
     });
 
     it('later ticks keep using the same definition', () => {
@@ -157,6 +169,28 @@ describe('EntityDefinitionCache', () => {
     it('tolerates a missing or partial snapshot', () => {
       expect(() => cache.seedFromSnapshot(undefined)).not.toThrow();
       expect(() => cache.seedFromSnapshot({})).not.toThrow();
+    });
+  });
+
+  describe('dropped items', () => {
+    const item = { id: 'd1', itemId: 'gem', itemName: 'Gem', iconUrl: '/g.png', quantity: 2, position: { x: 0, y: 0 } } as any;
+
+    it('merges the described item with where the tick says it is', () => {
+      cache.applySpawned({ droppedItems: [item] });
+      expect(cache.hydrateDroppedItems([{ id: 'd1', position: { x: 4, y: 5 } }])).toEqual([{ ...item, position: { x: 4, y: 5 } }]);
+    });
+
+    it('is seeded by the join snapshot and forgets an item once a tick no longer lists it', () => {
+      cache.seedFromSnapshot({ droppedItems: [item] });
+      expect(cache.hydrateDroppedItems([{ id: 'd1', position: { x: 1, y: 1 } }])).toHaveLength(1);
+      expect(cache.hydrateDroppedItems([])).toEqual([]);
+      expect(cache.hydrateDroppedItems([{ id: 'd1', position: { x: 1, y: 1 } }])).toEqual([]); // definition gone
+    });
+
+    it('does nothing when the tick says nothing about items', () => {
+      cache.applySpawned({ droppedItems: [item] });
+      expect(cache.hydrateDroppedItems(undefined)).toBeUndefined();
+      expect(cache.hydrateDroppedItems([{ id: 'd1', position: { x: 1, y: 1 } }])).toHaveLength(1);
     });
   });
 

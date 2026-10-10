@@ -1,7 +1,10 @@
+import { isInInterest, roundWire, type Vector2D } from '@mine-me/shared';
 import type {
   MiningActiveDynamite,
   MiningActiveMob,
   MiningActiveProjectile,
+  MiningDroppedItem,
+  MiningDroppedItemDynamic,
   MiningDynamiteDynamic,
   MiningMobDynamic,
   MiningProjectileDynamic,
@@ -28,6 +31,11 @@ export interface KnownEntities {
   players: Map<string, number>;
   projectiles: Set<string>;
   dynamites: Set<string>;
+  droppedItems: Set<string>;
+  /** Ids in the dropped-item list last sent, to tell when what is in view has changed. */
+  droppedItemsSent: Set<string>;
+  /** The weapon ammo status last sent, as a string; ammo is only resent when it changes. */
+  weaponAmmoSent: string | null;
 }
 
 export const createKnownEntities = (): KnownEntities => ({
@@ -35,9 +43,13 @@ export const createKnownEntities = (): KnownEntities => ({
   players: new Map(),
   projectiles: new Set(),
   dynamites: new Set(),
+  droppedItems: new Set(),
+  droppedItemsSent: new Set(),
+  weaponAmmoSent: null,
 });
 
-const vec = (v: { x: number; y: number }) => ({ x: v.x, y: v.y });
+/** Other entities' positions and velocities go over the wire to 1/100: plenty for drawing. */
+const vec = (v: { x: number; y: number }) => ({ x: roundWire(v.x), y: roundWire(v.y) });
 
 // ---- Mobs -------------------------------------------------------------------------------------
 
@@ -61,9 +73,9 @@ export function toActiveMob(mob: MiningActiveMobSession): MiningActiveMob {
     mobId: mob.mobId,
     name: mob.name,
     maxHealth: mob.maxHealth,
-    attack: mob.attack,
     defense: mob.defense,
     animations: mob.animations,
+    sounds: mob.sounds,
     spriteUrl: mob.spriteUrl,
     colliderWidth: mob.colliderWidth,
     colliderHeight: mob.colliderHeight,
@@ -74,7 +86,7 @@ export function toActiveMob(mob: MiningActiveMobSession): MiningActiveMob {
 // ---- Projectiles ------------------------------------------------------------------------------
 
 export function projectileDynamic(p: MiningProjectileEntity): MiningProjectileDynamic {
-  return { id: p.id, position: vec(p.position), velocity: vec(p.velocity), angle: p.angle };
+  return { id: p.id, position: vec(p.position), velocity: vec(p.velocity), angle: roundWire(p.angle) };
 }
 
 export function projectileDefinition(p: MiningProjectileEntity): MiningActiveProjectile {
@@ -96,9 +108,9 @@ export function dynamiteDynamic(d: MiningDynamiteEntity): MiningDynamiteDynamic 
     id: d.id,
     position: vec(d.position),
     velocity: vec(d.velocity),
-    angle: d.angle,
-    angularVelocity: d.angularVelocity,
-    fuseRemainingSeconds: d.fuseRemainingSeconds,
+    angle: roundWire(d.angle),
+    angularVelocity: roundWire(d.angularVelocity),
+    fuseRemainingSeconds: roundWire(d.fuseRemainingSeconds),
   };
 }
 
@@ -111,6 +123,12 @@ export function dynamiteDefinition(d: MiningDynamiteEntity): MiningActiveDynamit
     soundEffects: d.soundEffects,
     inGameScale: d.inGameScale,
   };
+}
+
+// ---- Dropped items ----------------------------------------------------------------------------
+
+export function droppedItemDynamic(item: MiningDroppedItem & { id: string }): MiningDroppedItemDynamic {
+  return { id: item.id, position: vec(item.position) };
 }
 
 // ---- Remote players ---------------------------------------------------------------------------
@@ -139,6 +157,7 @@ export interface WorldEntities {
   mobs: MiningActiveMobSession[];
   projectiles: MiningProjectileEntity[];
   dynamites: MiningDynamiteEntity[];
+  droppedItems?: MiningDroppedItem[];
   /** The other players in the room (never the recipient). */
   others: MiningPlayerSession[];
 }
@@ -147,6 +166,8 @@ export interface WorldEntities {
  * Works out which entity definitions this session still needs, records them as sent, and forgets
  * entities that no longer exist so ids can't leak. Returns undefined when there is nothing new.
  */
+const hasId = (item: MiningDroppedItem): item is MiningDroppedItem & { id: string } => typeof item.id === 'string';
+
 export function collectSpawned(known: KnownEntities, world: WorldEntities): MiningSpawnedEntities | undefined {
   const spawned: MiningSpawnedEntities = {};
 
@@ -175,6 +196,9 @@ export function collectSpawned(known: KnownEntities, world: WorldEntities): Mini
   const dynamites = diff(known.dynamites, world.dynamites, dynamiteDefinition);
   if (dynamites) spawned.dynamites = dynamites;
 
+  const items = diff(known.droppedItems, (world.droppedItems ?? []).filter(hasId), (item) => item);
+  if (items) spawned.droppedItems = items;
+
   // Players are re-sent when their gear version changes (they can equip gear mid-run)
   const freshPlayers: MiningRemotePlayer[] = [];
   const presentPlayers = new Set<string>();
@@ -189,4 +213,25 @@ export function collectSpawned(known: KnownEntities, world: WorldEntities): Mini
   if (freshPlayers.length > 0) spawned.players = freshPlayers;
 
   return Object.keys(spawned).length > 0 ? spawned : undefined;
+}
+
+// ---- Interest management ----------------------------------------------------------------------
+
+/**
+ * The items a player at `center` should be told about: those inside their interest box, with a
+ * little extra room for ones the client already knows (`wasKnown`) so they do not flicker at the edge.
+ */
+export function inView<T>(
+  center: Vector2D,
+  items: readonly T[],
+  position: (item: T) => Vector2D,
+  wasKnown: (item: T) => boolean = () => false
+): T[] {
+  return items.filter((item) => isInInterest(center, position(item), wasKnown(item)));
+}
+
+/** Whether the set of dropped items in view differs from the list last sent (something entered or left). */
+export function droppedListChanged(known: KnownEntities, visibleIds: readonly string[]): boolean {
+  if (visibleIds.length !== known.droppedItemsSent.size) return true;
+  return visibleIds.some((id) => !known.droppedItemsSent.has(id));
 }

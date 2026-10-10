@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MiningProfiler } from './MiningProfiler';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MiningProfiler, isProfilerFlagOn } from './MiningProfiler';
 
 describe('MiningProfiler', () => {
   let profiler: MiningProfiler;
@@ -63,5 +63,61 @@ describe('MiningProfiler', () => {
 
     expect(consoleSpy).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
+  });
+});
+
+describe('MiningProfiler switch', () => {
+  it('measures nothing while disabled, and starts measuring when enabled', () => {
+    const profiler = new MiningProfiler(5000, false);
+    profiler.beginFrame(1000);
+    profiler.endFrame(1002);
+    expect(profiler.getStats(1002).frameCount).toBe(0);
+
+    profiler.setEnabled(true);
+    profiler.beginFrame(2000);
+    profiler.endFrame(2002);
+    profiler.beginFrame(2016);
+    profiler.endFrame(2018);
+    expect(profiler.getStats(2018).frameCount).toBeGreaterThan(0);
+  });
+
+  it('tells subscribers when it is switched, once per real change, and stops after unsubscribe', () => {
+    const profiler = new MiningProfiler(5000, false);
+    const listener = vi.fn();
+    const off = profiler.subscribe(listener);
+    profiler.setEnabled(true);
+    profiler.setEnabled(true); // no change
+    profiler.enabled = false; // the property switches it too
+    expect(listener.mock.calls).toEqual([[true], [false]]);
+    off();
+    profiler.setEnabled(true);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('isProfilerFlagOn', () => {
+  afterEach(() => {
+    window.localStorage.removeItem('miningProfiler');
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('is off by default', () => {
+    expect(isProfilerFlagOn()).toBe(false);
+  });
+
+  it('is on with the localStorage flag', () => {
+    window.localStorage.setItem('miningProfiler', '1');
+    expect(isProfilerFlagOn()).toBe(true);
+  });
+
+  it('is on with the URL parameter', () => {
+    window.history.replaceState({}, '', '/?miningProfiler=1');
+    expect(isProfilerFlagOn()).toBe(true);
+  });
+
+  it('is off when storage throws', () => {
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+    expect(isProfilerFlagOn()).toBe(false);
+    spy.mockRestore();
   });
 });

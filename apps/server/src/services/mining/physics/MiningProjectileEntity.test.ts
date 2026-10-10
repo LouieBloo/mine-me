@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MiningProjectileEntity } from './MiningProjectileEntity';
-import { MiningTileType, MINING_CONFIG, MiningRigidWorld } from '@mine-me/shared';
+import { MiningTileType, MINING_CONFIG } from '@mine-me/shared';
 import type { ServerMiningGrid } from '../../miningMap.service';
 
 function createEmptyGrid(): ServerMiningGrid {
@@ -90,27 +90,44 @@ describe('MiningProjectileEntity', () => {
     expect(proj.hasHit).toBe(true);
   });
 
-  it('integrates seamlessly with MiningRigidWorld Planck.js physics simulation', () => {
-    const rigidWorld = new MiningRigidWorld();
-    const proj = new MiningProjectileEntity(
-      'proj-phys-1',
-      'char-1',
-      { x: 5, y: 5 },
-      { x: 15, y: 0 },
-      { gravityScale: 0 },
-      rigidWorld
-    );
+  it('cannot tunnel through a one-tile wall in a single large step, and stops at its face', () => {
+    grid[5][8] = { type: MiningTileType.ROCK, revealed: true };
+    const proj = new MiningProjectileEntity('proj-fast', 'char-1', { x: 2, y: 5.5 }, { x: 300, y: 0 });
 
-    expect(proj.rigidBody).not.toBeNull();
+    proj.update(0.1, grid); // 30 tiles in one step
 
-    // Step physics world
-    rigidWorld.step(0.1);
-    proj.update(0.1, grid);
+    expect(proj.hasHit).toBe(true);
+    expect(proj.hitTile).toEqual({ x: 8, y: 5 });
+    expect(proj.position.x).toBeCloseTo(8, 6);
+  });
 
-    expect(proj.position.x).toBeGreaterThan(5.0);
-    proj.cleanup();
-    expect(proj.rigidBody).toBeNull();
-    rigidWorld.destroy();
+  it('is pulled down by gravityScale, and flies straight at scale 0', () => {
+    const falling = new MiningProjectileEntity('proj-g', 'char-1', { x: 5, y: 5 }, { x: 10, y: 0 }, { gravityScale: 1 });
+    const straight = new MiningProjectileEntity('proj-s', 'char-1', { x: 5, y: 5 }, { x: 10, y: 0 }, { gravityScale: 0 });
+    for (let i = 0; i < 10; i++) {
+      falling.update(0.05, grid);
+      straight.update(0.05, grid);
+    }
+    expect(falling.velocity.y).toBeCloseTo(MINING_CONFIG.GRAVITY * 0.5, 3);
+    expect(falling.position.y).toBeGreaterThan(5);
+    expect(straight.position.y).toBe(5);
+    expect(straight.velocity.y).toBe(0);
+  });
+
+  it('does not hit the tile at its own muzzle, but hits the next one', () => {
+    grid[5][5] = { type: MiningTileType.ROCK, revealed: true }; // shooter pressed against a block
+    grid[5][9] = { type: MiningTileType.ROCK, revealed: true };
+    const proj = new MiningProjectileEntity('proj-m', 'char-1', { x: 4.9, y: 5.5 }, { x: 40, y: 0 });
+    proj.update(0.2, grid);
+    expect(proj.hitTile).toEqual({ x: 9, y: 5 });
+  });
+
+  it('stops at the cavern wall underground', () => {
+    const proj = new MiningProjectileEntity('proj-w', 'char-1', { x: 1, y: 5.5 }, { x: -100, y: 0 });
+    proj.update(0.05, grid);
+    expect(proj.hasHit).toBe(true);
+    expect(proj.hitTile).toBeUndefined();
+    expect(proj.position.x).toBeCloseTo(0, 6);
   });
 
   it('allows flight in open sky above ground (y < 0) without triggering collision or boundary cleanup prematurely', () => {

@@ -35,6 +35,8 @@ export interface MiningWorld {
   readonly players: ReadonlyMap<string, MiningPlayerSession>;
   /** Simulation time in seconds (advances one fixed step per tick). */
   readonly simTime: number;
+  /** Number of simulation ticks run so far. */
+  readonly tick: number;
 
   // ---- Collaborating systems ------------------------------------------------------------------
   readonly playerManager: MiningPlayerManager;

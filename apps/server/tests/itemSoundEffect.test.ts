@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { adminRouter } from '../src/routes/admin';
+import { prisma } from '../src/index';
 
 // Mock auth middleware
 vi.mock('../src/middleware/auth', () => ({
@@ -22,6 +23,12 @@ let mockItems: any[] = [];
 
 vi.mock('../src/index', () => ({
   prisma: {
+    sound: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: 's1', ...data })),
+      update: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     item: {
       findUnique: vi.fn().mockImplementation(({ where }) => {
         const found = mockItems.find((i) => i.id === where.id);
@@ -70,6 +77,21 @@ describe('Item Sound Effect Endpoints', () => {
     expect(mockItems[0].soundEffectUrl).toMatch(/^\/assets\/sounds\/items\/item_pickaxe_1_sfx\.wav$/);
   });
 
+  it('adds an uploaded item sound to the sound library as an ITEM sound effect', async () => {
+    await request(app)
+      .post('/api/admin/items/item_pickaxe_1/sound-effect')
+      .attach('soundEffect', Buffer.from('RIFF....WAVEfmt ....data....'), 'pickaxe_hit.wav');
+
+    expect((prisma as any).sound.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        url: '/assets/sounds/items/item_pickaxe_1_sfx.wav',
+        category: 'ITEM',
+        type: 'SFX',
+        name: 'Iron Pickaxe - throw',
+      }),
+    });
+  });
+
   it('should return 400 when no file is uploaded', async () => {
     const res = await request(app)
       .post('/api/admin/items/item_pickaxe_1/sound-effect');
@@ -97,6 +119,9 @@ describe('Item Sound Effect Endpoints', () => {
     expect(res.status).toBe(200);
     expect(res.body.soundEffectUrl).toBeNull();
     expect(mockItems[0].soundEffectUrl).toBeNull();
+    expect((prisma as any).sound.deleteMany).toHaveBeenCalledWith({
+      where: { url: '/assets/sounds/items/item_pickaxe_1_sfx.wav' },
+    });
   });
 
   it('should return 404 when removing sound effect from non-existent item', async () => {

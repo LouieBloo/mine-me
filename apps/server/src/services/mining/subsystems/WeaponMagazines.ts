@@ -1,3 +1,5 @@
+import type { ItemProjectileConfig } from '@mine-me/shared';
+
 /** Fallbacks used only when a weapon's projectileConfig omits a field. */
 export const DEFAULT_WEAPON_LIMITS = {
   magazineSize: 6,
@@ -24,8 +26,8 @@ export interface WeaponLimits {
 }
 
 /** Reads a weapon's limits from its (database-backed) item definition. */
-export function resolveWeaponLimits(weaponItem: { projectileConfig?: any } | undefined): WeaponLimits {
-  const cfg = weaponItem?.projectileConfig ?? {};
+export function resolveWeaponLimits(weaponItem: { projectileConfig?: Partial<ItemProjectileConfig> | null } | undefined): WeaponLimits {
+  const cfg: Partial<ItemProjectileConfig> = weaponItem?.projectileConfig ?? {};
   const positive = (v: unknown, fallback: number) => (typeof v === 'number' && v > 0 ? v : fallback);
   return {
     maxAmmo: Math.floor(positive(cfg.magazineSize, DEFAULT_WEAPON_LIMITS.magazineSize)),

@@ -54,8 +54,8 @@ export const handleMiningExit = async (
           : 'You left the mine with nothing.',
       },
     };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 };
 

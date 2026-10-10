@@ -35,8 +35,8 @@ export interface MiningLocalSimulationContext {
   projectilesContainer?: Container | null;
   activeProjectilesRef?: React.MutableRefObject<MiningActiveProjectile[]>;
   projectileGraphicsMap?: Map<string, Sprite | Graphics>;
-  bulletTexture?: Texture | null;
-  bulletScale?: number;
+  /** Resolves a projectile's server-sent sprite url to a loaded texture (null until loaded). */
+  resolveProjectileTexture?: ((spriteUrl: string | null | undefined) => Texture | null) | null;
   projectileVisualManager?: ProjectileVisualManager | null;
 
   droppedItemVisualManager?: DroppedItemVisualManager | null;
@@ -64,8 +64,7 @@ export class MiningLocalSimulationSystem {
       projectilesContainer,
       activeProjectilesRef,
       projectileGraphicsMap,
-      bulletTexture,
-      bulletScale,
+      resolveProjectileTexture,
       projectileVisualManager,
       droppedItemVisualManager,
       droppedItems,
@@ -256,8 +255,7 @@ export class MiningLocalSimulationSystem {
         activeProjectilesRef.current,
         projectileGraphicsMap,
         TILE_SIZE,
-        bulletTexture,
-        bulletScale
+        resolveProjectileTexture
       );
     }
 

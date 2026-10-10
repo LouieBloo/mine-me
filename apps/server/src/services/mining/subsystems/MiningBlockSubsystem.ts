@@ -72,8 +72,8 @@ export class MiningBlockSubsystem {
     session.miningTarget = { x: target.x, y: target.y };
     const maxHealth = this.world.data.getBlockMaxHealth(tile.type);
     session.targetMaxHealth = maxHealth;
-    session.miningTimeMs = maxHealth;
-    session.miningProgressMs = tile.damage ?? tile.damageMs ?? 0;
+    session.miningTotal = maxHealth;
+    session.miningProgress = tile.damage ?? 0;
     // Swing timing lives in MiningPlayerManager.advanceSwings (shared with melee), and persists
     // across clicks, so tapping can't swing faster than holding.
     return true;
@@ -83,7 +83,7 @@ export class MiningBlockSubsystem {
     if (!session) return;
     session.isMining = false;
     session.miningTarget = null;
-    session.miningProgressMs = 0;
+    session.miningProgress = 0;
   }
 
   /** Returns the tile a ladder would be placed on, or null if placement is not allowed. */
@@ -122,7 +122,7 @@ export class MiningBlockSubsystem {
     const tile = this.world.grid[pos.y][pos.x];
     tile.type = MiningTileType.LADDER;
     tile.revealed = true;
-    tile.damageMs = 0;
+    tile.damage = 0;
 
     this.world.pushTileUpdate({
       x: pos.x,
@@ -159,7 +159,7 @@ export class MiningBlockSubsystem {
     const tile = this.world.grid[target.y][target.x];
     tile.type = MiningTileType.TORCH;
     tile.revealed = true;
-    tile.damageMs = 0;
+    tile.damage = 0;
 
     this.world.pushTileUpdate({
       x: target.x,
@@ -265,7 +265,7 @@ export class MiningBlockSubsystem {
         if (result.applied) {
           if (!result.destroyed) {
             for (const miner of miners) {
-              miner.miningProgressMs = result.tileDamage;
+              miner.miningProgress = result.tileDamage;
             }
           }
           this.pendingBlockHits.push({

@@ -5,6 +5,7 @@ import { adminRouter } from '../src/routes/admin';
 import { publicRouter } from '../src/routes/public';
 import fs from 'fs';
 import path from 'path';
+import { getSoundsDir } from '../src/config/assetPaths';
 
 // Mock syncJson
 export const mockSyncJson = vi.fn();
@@ -19,9 +20,13 @@ vi.mock('../src/middleware/auth', () => ({
 }));
 
 let mockSounds: any[] = [];
+let mockMobs: any[] = [];
 
 vi.mock('../src/index', () => ({
   prisma: {
+    mob: { findMany: vi.fn().mockImplementation(() => Promise.resolve(mockMobs)) },
+    item: { findMany: vi.fn().mockResolvedValue([]) },
+    miningBlock: { findMany: vi.fn().mockResolvedValue([]) },
     sound: {
       findMany: vi.fn().mockImplementation(({ where } = {}) => {
         let results = [...mockSounds];
@@ -33,6 +38,7 @@ vi.mock('../src/index', () => ({
         }
         return Promise.resolve(results);
       }),
+      findFirst: vi.fn().mockImplementation(({ where }) => Promise.resolve(mockSounds.find(s => s.url === where.url) || null)),
       findUnique: vi.fn().mockImplementation(({ where }) => {
         const found = mockSounds.find(s => s.id === where.id);
         return Promise.resolve(found || null);
@@ -74,6 +80,7 @@ app.use('/api/public', publicRouter);
 
 describe('Sound Admin & Public API', () => {
   beforeEach(() => {
+    mockMobs = [];
     mockSounds = [
       {
         id: 'sound_1',
@@ -182,6 +189,30 @@ describe('Sound Admin & Public API', () => {
     expect(res.body.volume).toBe(0.65);
     expect(res.body.isActive).toBe(false);
     expect(mockSyncJson).toHaveBeenCalledWith('sounds.json', expect.any(Array));
+  });
+
+  it('DELETE /admin/sounds/:id - refuses while a mob slot uses the sound', async () => {
+    mockMobs = [{ name: 'Mole', soundEffects: { death: { soundId: 'sound_2' } } }];
+    const res = await request(app).delete('/admin/sounds/sound_2');
+    expect(res.status).toBe(409);
+    expect(res.body.usedBy).toEqual(['Mob: Mole (death)']);
+    expect(mockSounds.find(s => s.id === 'sound_2')).toBeDefined();
+  });
+
+  it('GET /admin/sounds - reports what uses each sound', async () => {
+    mockMobs = [{ name: 'Mole', soundEffects: { idle: { soundId: 'sound_1' } } }];
+    const res = await request(app).get('/admin/sounds');
+    expect(res.body.find((s: any) => s.id === 'sound_1').usedBy).toEqual(['Mob: Mole (idle)']);
+    expect(res.body.find((s: any) => s.id === 'sound_2').usedBy).toEqual([]);
+  });
+
+  it('POST /admin/sounds/sync - registers files found in the sounds folder', async () => {
+    fs.mkdirSync(getSoundsDir('mobs'), { recursive: true });
+    fs.writeFileSync(getSoundsDir('mobs', 'growl.mp3'), 'x');
+    const res = await request(app).post('/admin/sounds/sync');
+    expect(res.status).toBe(200);
+    expect(res.body.added).toContainEqual({ url: '/assets/sounds/mobs/growl.mp3', category: 'MOB' });
+    expect(mockSounds.some(s => s.url === '/assets/sounds/mobs/growl.mp3' && s.category === 'MOB')).toBe(true);
   });
 
   it('DELETE /admin/sounds/:id - deletes sound', async () => {

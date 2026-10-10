@@ -257,7 +257,7 @@ describe('handleMiningThrowDynamite', () => {
       id: 'inv-dyn-1',
       characterId: 'char-dyn-1',
       quantity: 5,
-      item: { id: 'dyn-item-id', name: 'Dynamite', subType: 'DYNAMITE' },
+      item: { id: 'dyn-item-id', name: 'Dynamite', subType: 'DYNAMITE', itemEffects: [] },
     });
     (prisma.character.findUnique as any).mockResolvedValue({
       id: 'char-dyn-1',
@@ -281,7 +281,7 @@ describe('handleMiningThrowDynamite', () => {
       id: 'inv-dyn-last',
       characterId: 'char-dyn-1',
       quantity: 1,
-      item: { id: 'dyn-item-id', name: 'Dynamite', subType: 'DYNAMITE' },
+      item: { id: 'dyn-item-id', name: 'Dynamite', subType: 'DYNAMITE', itemEffects: [] },
     });
     (prisma.character.findUnique as any).mockResolvedValue({
       id: 'char-dyn-1',

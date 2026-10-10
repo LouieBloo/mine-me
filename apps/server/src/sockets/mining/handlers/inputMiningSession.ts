@@ -57,7 +57,7 @@ export const handleMiningInteract = async (
     data: {
       isMining: session?.isMining ?? false,
       miningTarget: session?.miningTarget ?? null,
-      miningTimeMs: session?.miningTimeMs ?? 0,
+      miningTotal: session?.miningTotal ?? 0,
     },
   };
 };

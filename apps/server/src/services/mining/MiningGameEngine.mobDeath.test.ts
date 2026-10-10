@@ -23,6 +23,8 @@ describe('mob death state', () => {
       for (let y = 18; y <= 20; y++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
       engine.grid[21][x] = { type: MiningTileType.DIRT, revealed: true };
     }
+    // Mobs are only sent to players near them
+    engine.players.get(cid)!.playerBody.position = { x: 20.5, y: 20.5 };
     return engine.spawnMob(
       { id: 'victim', name: 'Victim', health: 30, attack: 10, dropTable: { solMin: 5, solMax: 5, items: [] }, ...extra },
       { x: 24.5, y: 21 }

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { adminRouter } from '../src/routes/admin';
+import { prisma } from '../src/index';
 
 // Mock auth middleware
 vi.mock('../src/middleware/auth', () => ({
@@ -22,6 +23,12 @@ let mockBlocks: any[] = [];
 
 vi.mock('../src/index', () => ({
   prisma: {
+    sound: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: 's1', ...data })),
+      update: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     miningBlock: {
       findFirst: vi.fn().mockImplementation(({ where }) => {
         const found = mockBlocks.find(b =>
@@ -88,6 +95,9 @@ describe('Mining Block Sound Effect Endpoints', () => {
     expect(res.status).toBe(200);
     expect(res.body.soundEffectUrl).toMatch(/^\/assets\/sounds\/blocks\/block_dirt_sfx\.wav$/);
     expect(mockBlocks[0].soundEffectUrl).toMatch(/^\/assets\/sounds\/blocks\/block_dirt_sfx\.wav$/);
+    expect((prisma as any).sound.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ url: '/assets/sounds/blocks/block_dirt_sfx.wav', category: 'BLOCK', type: 'SFX' }),
+    });
   });
 
   it('should return 400 when no file is uploaded', async () => {

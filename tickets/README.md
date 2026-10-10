@@ -22,14 +22,17 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Set `
 | [016](016-dropped-item-despawn.md) | Dropped item despawn and cap | P2 (Hard limit done; despawn deferred) |
 | [017](017-remove-primary-session-facade.md) | Remove single-player facade from MiningGameEngine | P2 (Done) |
 | [018](018-world-context-and-spawn-drop.md) | MiningWorldContext and single spawnDrop API | P2 (Done) |
-| [019](019-hardcoded-names-and-magic-numbers.md) | Remove hard-coded item names and magic numbers | P2 (In progress; see Remaining in ticket) |
-| [020](020-typing-and-naming-debt.md) | Replace any types and fix misleading names | P3 |
-| [021](021-physics-sweep-and-projectile-dedupe.md) | Swept movement and single projectile collision model | P3 |
-| [022](022-projectile-mob-hitbox.md) | Projectile vs mob uses real collider and swept test | P3 |
-| [023](023-mob-collisions-and-attack-windup.md) | Mob/player/mob-mob collision and attack wind-up | P3 |
-| [024](024-pathfinding-performance.md) | Pathfinding performance and staggering | P3 |
-| [025](025-dynamite-behavior.md) | Dynamite blast rules (damage, falloff, players, rocks) | P3 |
-| [026](026-client-prediction-reconciliation.md) | Proper client prediction with input replay | P3 |
-| [027](027-client-hook-options-refactor.md) | Reduce ref-passing in useMiningTicker/useMiningStateSync | P3 |
-| [028](028-profiler-patch-gating.md) | Gate renderer.render monkey-patch behind debug flag | P3 |
+| [019](019-hardcoded-names-and-magic-numbers.md) | Remove hard-coded item names and magic numbers | P2 (Done) |
+| [020](020-typing-and-naming-debt.md) | Replace any types and fix misleading names | P3 (Done) |
+| [021](021-physics-sweep-and-projectile-dedupe.md) | Swept movement and single projectile collision model | P3 (Done) |
+| [022](022-projectile-mob-hitbox.md) | Projectile vs mob uses real collider and swept test | P3 (Done) |
+| [023](023-mob-collisions-and-attack-windup.md) | Mob/player/mob-mob collision and attack wind-up | P3 (Done) |
+| [024](024-pathfinding-performance.md) | Pathfinding performance and staggering | P3 (Done) |
+| [025](025-dynamite-behavior.md) | Dynamite blast rules (damage, falloff, players, rocks) | P3 (Done) |
+| [026](026-client-prediction-reconciliation.md) | Proper client prediction with input replay | P3 (Done) |
+| [027](027-client-hook-options-refactor.md) | Reduce ref-passing in useMiningTicker/useMiningStateSync | P3 (Done) |
+| [028](028-profiler-patch-gating.md) | Gate renderer.render monkey-patch behind debug flag | P3 (Done) |
 | [029](029-definitions-from-database.md) | Load game definitions (items, mobs, blocks) from Postgres, not JSON files | P1 (Done) |
+| [030](030-item-drops-audit.md) | Item drops audit: items not pickable after mass drops | P1 (Done) |
+| [031](031-tick-payload-and-asset-preload.md) | Slim drop tick payloads; greedy asset + sound preload | P2 (Done) |
+| [032](032-audio-overhaul.md) | Audio overhaul: one sound library, mob sound slots | P1 (Done) |

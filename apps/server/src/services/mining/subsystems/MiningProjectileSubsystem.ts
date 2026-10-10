@@ -3,11 +3,15 @@ import {
   type MiningGunshotEvent,
   type Vector2D,
   getItemDamageEffect,
+  type GameItem,
+  type ItemProjectileConfig,
+  segmentAabbEntryTime,
 } from '@mine-me/shared';
 import { isInBounds } from '../../miningMap.service';
 import { MiningProjectileEntity } from '../physics/MiningProjectileEntity';
 import { resolveMuzzlePosition } from './miningMuzzle';
 import type { MiningPlayerSession } from './MiningPlayerManager';
+import type { MiningActiveMobSession } from './MiningMobSubsystem';
 import { WeaponMagazines, resolveWeaponLimits } from './WeaponMagazines';
 import type { MiningWorld } from '../MiningWorld';
 
@@ -26,7 +30,7 @@ export class MiningProjectileSubsystem {
   constructor(private readonly world: MiningWorld) {}
 
   /** The ranged weapon definition a player currently has equipped, if any. */
-  private resolveEquippedWeapon(session: MiningPlayerSession): any | undefined {
+  private resolveEquippedWeapon(session: MiningPlayerSession): GameItem | undefined {
     const weapon = session.equippedWeaponId ? this.world.data.getItemData(session.equippedWeaponId) : undefined;
     return weapon && weapon.shootsProjectiles === true ? weapon : undefined;
   }
@@ -48,7 +52,7 @@ export class MiningProjectileSubsystem {
 
     const characterId = session.characterId;
     // 1. The weapon is whatever the server knows the character has equipped (never client-supplied)
-    const { data, grid, rigidWorld, simTime } = this.world;
+    const { data, grid, simTime } = this.world;
     const weaponItem = this.resolveEquippedWeapon(session);
     if (!weaponItem) {
       return { success: false, error: 'No ranged weapon equipped.' };
@@ -56,7 +60,7 @@ export class MiningProjectileSubsystem {
 
     // Limits come from the weapon's database-backed definition; each weapon has its own magazine
     const limits = resolveWeaponLimits(weaponItem);
-    const projConfig = weaponItem.projectileConfig ?? {};
+    const projConfig: Partial<ItemProjectileConfig> = weaponItem.projectileConfig ?? {};
     const mag = this.magazines.get(characterId, weaponItem.id, limits);
 
     // 2. Check if reloading
@@ -138,8 +142,8 @@ export class MiningProjectileSubsystem {
         spriteUrl: bulletSpriteUrl,
         inGameScale: bulletScale,
         gravityScale: projConfig.projectileGravityScale ?? 0.05,
-      },
-      rigidWorld
+        pierceCount: projConfig.pierceCount,
+      }
     );
 
     this.activeProjectiles.push(projectile);
@@ -218,21 +222,31 @@ export class MiningProjectileSubsystem {
     for (const proj of this.activeProjectiles) {
       proj.update(dt, grid);
 
-      // 2. Check collision against active mobs if not already hit a solid tile
-      if (!proj.hasHit) {
+      // 2. Swept test against every living mob's collider along the path travelled this step (the path
+      //    already stops at a wall, so a mob behind a wall is not hit). Mobs are hit nearest first; a
+      //    piercing bullet carries on through as many as it has left, otherwise the first one stops it.
+      if (!proj.expired) {
+        const { previousPosition: from, position: to } = proj;
+        const along: { mob: MiningActiveMobSession; t: number }[] = [];
         for (const mob of mobList) {
-          if (mob.health > 0 && mob.animationState !== 'death') {
-            const mobX = mob.mobBody.position.x;
-            const mobY = mob.mobBody.position.y;
-            const dist = Math.hypot(proj.position.x - mobX, proj.position.y - mobY);
-            if (dist < 0.7) {
-              proj.hasHit = true;
-              proj.hitMobId = mob.id;
-              this.world.damage.applyDamage({ kind: 'mob', id: mob.id }, hitEvent(proj));
-              proj.cleanup();
-              break;
-            }
+          if (mob.health <= 0 || mob.animationState === 'death' || proj.hitMobIds.has(mob.id)) continue;
+          const body = mob.mobBody;
+          const t = segmentAabbEntryTime(from, to, body.position, body.halfWidth, body.halfHeight, proj.hitRadius);
+          if (t !== null) along.push({ mob, t });
+        }
+        along.sort((m, n) => m.t - n.t);
+        for (const { mob, t } of along) {
+          proj.hitMobIds.add(mob.id);
+          this.world.damage.applyDamage({ kind: 'mob', id: mob.id }, hitEvent(proj));
+          if (proj.pierceRemaining > 0) {
+            proj.pierceRemaining--;
+            continue;
           }
+          proj.position = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+          proj.hasHit = true;
+          proj.hitTile = undefined; // the mob was reached first
+          proj.hitMobId = mob.id;
+          break;
         }
       }
 

@@ -1,35 +1,17 @@
 import { useEffect, useRef } from 'react';
-import type { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
-import type { ModularCharacterSprite } from '../../../../../components/game/sprites';
-import type { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
-import type { MiningMobRenderer } from '../renderers/MiningMobRenderer';
-import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
+import type { Application } from 'pixi.js';
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
-import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
-import type { Camera2D } from '../../../../../components/game/camera/Camera2D';
-import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
-import type { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
-import type { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
-import type { ProjectileVisualManager } from '../renderers/ProjectileVisualManager';
 import type { SoundManager } from '../../../../../services/sound';
 import {
   MINING_CONFIG,
   DEFAULT_MINING_SWING_SPEED,
-  type Vector2D,
   type MiningSessionClientState,
-  type MiningClientTile,
-  type MiningInputState,
-  type MiningPosition,
-  type MiningActiveDynamite,
-  type MiningActiveProjectile,
-  type MiningDroppedItem,
-  type MiningPlayerBody,
 } from '@mine-me/shared';
-import type { ActiveFallingRock } from '../renderers/MiningEntityRenderer';
 import { miningProfiler } from '../utils/MiningProfiler';
-import type { MiningMouseController } from '../input/MiningMouseController';
+import { installRenderInstrumentation } from '../utils/renderInstrumentation';
 
 // Frame Systems
+import type { MiningClientWorld } from '../systems/MiningClientWorld';
 import { MiningPredictionSystem } from '../systems/MiningPredictionSystem';
 import { MiningLocalSimulationSystem } from '../systems/MiningLocalSimulationSystem';
 import { MiningReticleRenderer } from '../systems/MiningReticleRenderer';
@@ -37,99 +19,64 @@ import { MiningDebugRenderer } from '../systems/MiningDebugRenderer';
 
 export interface UseMiningTickerOptions {
   app: Application | null;
-  playerContainerRef: React.RefObject<Container | null>;
-  gridContainerRef: React.RefObject<Container | null>;
-  fallingRocksContainerRef: React.RefObject<Container | null>;
-  currentRenderPosRef: React.MutableRefObject<Vector2D>;
-  targetServerPosRef: React.MutableRefObject<Vector2D>;
-  isFacingLeftRef: React.MutableRefObject<boolean>;
-  playerFacingDirRef: React.MutableRefObject<Vector2D>;
-  playerSpriteRef: React.RefObject<ModularCharacterSprite | null>;
-  remotePlayerRendererRef?: React.RefObject<MiningRemotePlayerRenderer | null>;
-  mobRendererRef?: React.RefObject<MiningMobRenderer | null>;
-  activeFallingRocksRef: React.MutableRefObject<ActiveFallingRock[]>;
-  fallingRockGraphicsMap: React.MutableRefObject<Map<string, Sprite | Graphics>>;
-  dynamitesContainerRef?: React.RefObject<Container | null>;
-  activeDynamitesRef?: React.MutableRefObject<MiningActiveDynamite[]>;
-  dynamiteGraphicsMap?: React.MutableRefObject<Map<string, Sprite | Graphics>>;
-  dynamiteTextureRef?: React.RefObject<Texture | null>;
-  dynamiteVisualManagerRef?: React.RefObject<DynamiteVisualManager | null>;
-  projectilesContainerRef?: React.RefObject<Container | null>;
-  activeProjectilesRef?: React.MutableRefObject<MiningActiveProjectile[]>;
-  projectileGraphicsMap?: React.MutableRefObject<Map<string, Sprite | Graphics>>;
-  bulletTextureRef?: React.RefObject<Texture | null>;
-  bulletScaleRef?: React.MutableRefObject<number> | React.RefObject<number>;
-  projectileVisualManagerRef?: React.RefObject<ProjectileVisualManager | null>;
-  droppedItemVisualManagerRef?: React.RefObject<DroppedItemVisualManager | null>;
-  droppedItemsRef?: React.MutableRefObject<MiningDroppedItem[]>;
-  reticleGraphicsRef?: React.RefObject<Graphics | null>;
-  mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
-  debugGraphicsRef: React.RefObject<Graphics | null>;
-  showDebugRef: React.MutableRefObject<boolean>;
-  flashlightRef: React.RefObject<SpotLight | null>;
-  lightingEngineRef: React.RefObject<LightingEngine | null>;
-  cameraRef: React.RefObject<Camera2D | null>;
-  particleEngineRef?: React.RefObject<ParticleEngine | null>;
-  playerBodyRef?: React.MutableRefObject<MiningPlayerBody | null>;
-  gridRef?: React.MutableRefObject<MiningClientTile[][]>;
-  keysPressedRef?: React.MutableRefObject<MiningInputState>;
-  isMiningRef?: React.MutableRefObject<boolean>;
-  miningTargetRef?: React.MutableRefObject<MiningPosition | null>;
-  blockTexturesRef?: React.MutableRefObject<Map<number, Texture>>;
+  /** The refs, renderers and engines the frame systems read and update. */
+  world: MiningClientWorld;
   sessionState?: MiningSessionClientState;
   soundManager?: SoundManager | null;
-  weaponSoundUrlRef?: React.MutableRefObject<string | null>;
-  lastWeaponSoundTimeRef?: React.MutableRefObject<number>;
+  /** Swings per second used to pace the swing animation and its sound. */
   miningSwingSpeed?: number;
 }
 
 export function useMiningTicker({
   app,
-  playerContainerRef,
-  gridContainerRef,
-  fallingRocksContainerRef,
-  currentRenderPosRef,
-  targetServerPosRef,
-  isFacingLeftRef,
-  playerFacingDirRef,
-  playerSpriteRef,
-  remotePlayerRendererRef,
-  mobRendererRef,
-  activeFallingRocksRef,
-  fallingRockGraphicsMap,
-  dynamitesContainerRef,
-  activeDynamitesRef,
-  dynamiteGraphicsMap,
-  dynamiteTextureRef,
-  dynamiteVisualManagerRef,
-  projectilesContainerRef,
-  activeProjectilesRef,
-  projectileGraphicsMap,
-  bulletTextureRef,
-  bulletScaleRef,
-  projectileVisualManagerRef,
-  droppedItemVisualManagerRef,
-  droppedItemsRef,
-  reticleGraphicsRef,
-  mouseControllerRef,
-  debugGraphicsRef,
-  showDebugRef,
-  flashlightRef,
-  lightingEngineRef,
-  cameraRef,
-  particleEngineRef,
-  playerBodyRef,
-  gridRef,
-  keysPressedRef,
-  isMiningRef,
-  miningTargetRef,
-  blockTexturesRef,
+  world,
   sessionState,
   soundManager,
-  weaponSoundUrlRef,
-  lastWeaponSoundTimeRef,
   miningSwingSpeed,
 }: UseMiningTickerOptions) {
+  const {
+    playerContainerRef,
+    gridContainerRef,
+    fallingRocksContainerRef,
+    currentRenderPosRef,
+    targetServerPosRef,
+    isFacingLeftRef,
+    playerFacingDirRef,
+    playerSpriteRef,
+    remotePlayerRendererRef,
+    mobRendererRef,
+    activeFallingRocksRef,
+    fallingRockGraphicsMap,
+    dynamitesContainerRef,
+    activeDynamitesRef,
+    dynamiteGraphicsMap,
+    dynamiteTextureRef,
+    dynamiteVisualManagerRef,
+    projectilesContainerRef,
+    activeProjectilesRef,
+    projectileGraphicsMap,
+    projectileTexturesRef,
+    projectileVisualManagerRef,
+    droppedItemVisualManagerRef,
+    droppedItemsRef,
+    reticleGraphicsRef,
+    mouseControllerRef,
+    debugGraphicsRef,
+    showDebugRef,
+    flashlightRef,
+    lightingEngineRef,
+    cameraRef,
+    particleEngineRef,
+    playerBodyRef,
+    predictionRef,
+    gridRef,
+    keysPressedRef,
+    isMiningRef,
+    miningTargetRef,
+    blockTexturesRef,
+    weaponSoundUrlRef,
+    lastWeaponSoundTimeRef,
+  } = world;
   const animTimeRef = useRef<number>(0);
   const lastSwingTimeRef = useRef<number>(0);
   const lastSwingSoundTimeRef = useRef<number>(0);
@@ -137,23 +84,20 @@ export function useMiningTicker({
   useEffect(() => {
     if (!app) return;
 
-    // Instrument renderer.render to accurately measure offscreen lightmap and main stage rendering
+    // Profiling wraps renderer.render, so it is installed only while the profiler is switched on
+    // (debug flag) and removed again when it is switched off
     const renderer = app.renderer;
-    let originalRender: any = null;
-    if (renderer && typeof renderer.render === 'function') {
-      originalRender = renderer.render.bind(renderer);
-      renderer.render = (opts: any) => {
-        const isOffscreen = !!opts?.target;
-        const sectionName = isOffscreen ? 'Lightmap FBO Render' : 'Pixi Stage Render';
-        miningProfiler.startSection(sectionName);
-        const res = originalRender(opts);
-        miningProfiler.endSection();
-        if (!isOffscreen) {
-          miningProfiler.endFrame();
-        }
-        return res;
-      };
-    }
+    let restoreRender: (() => void) | null = null;
+    const syncRenderInstrumentation = () => {
+      if (miningProfiler.enabled && !restoreRender && renderer && typeof renderer.render === 'function') {
+        restoreRender = installRenderInstrumentation(renderer, miningProfiler);
+      } else if (!miningProfiler.enabled && restoreRender) {
+        restoreRender();
+        restoreRender = null;
+      }
+    };
+    syncRenderInstrumentation();
+    const unsubscribeProfiler = miningProfiler.subscribe(syncRenderInstrumentation);
 
     const tickerCallback = () => {
       miningProfiler.beginFrame();
@@ -186,6 +130,7 @@ export function useMiningTicker({
       MiningPredictionSystem.update(
         {
           playerBody,
+          prediction: predictionRef?.current ?? null,
           grid,
           inputs,
           targetPos,
@@ -193,7 +138,7 @@ export function useMiningTicker({
           playerContainer,
           soundManager,
         },
-        dt
+        app.ticker.deltaMS / 1000
       );
 
       // 2. Camera Tracking
@@ -320,8 +265,7 @@ export function useMiningTicker({
           projectilesContainer: projectilesContainerRef?.current,
           activeProjectilesRef,
           projectileGraphicsMap: projectileGraphicsMap?.current,
-          bulletTexture: bulletTextureRef?.current,
-          bulletScale: typeof bulletScaleRef?.current === 'number' ? bulletScaleRef.current : 1.0,
+          resolveProjectileTexture: projectileTexturesRef?.current?.get,
           projectileVisualManager: projectileVisualManagerRef?.current,
           droppedItemVisualManager: droppedItemVisualManagerRef?.current,
           droppedItems: droppedItemsRef?.current,
@@ -419,7 +363,8 @@ export function useMiningTicker({
       // 10. Particle Engine
       particleEngineRef?.current?.update(dt);
 
-      if (!renderer || !originalRender) {
+      // With the render hook installed it ends the frame; otherwise (or when profiling is off, a no-op) end it here
+      if (!restoreRender) {
         miningProfiler.endFrame();
       }
     };
@@ -427,9 +372,9 @@ export function useMiningTicker({
     app.ticker.add(tickerCallback);
     return () => {
       app.ticker.remove(tickerCallback);
-      if (renderer && originalRender) {
-        renderer.render = originalRender;
-      }
+      unsubscribeProfiler();
+      restoreRender?.();
+      restoreRender = null;
       lightingEngineRef.current?.removeLight('torch_preview');
       dynamiteVisualManagerRef?.current?.destroy(
         particleEngineRef?.current,

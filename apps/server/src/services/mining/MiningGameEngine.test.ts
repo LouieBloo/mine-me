@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MiningGameEngine } from './MiningGameEngine';
-import { giveBlockDrops } from './testHelpers';
-import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
+import { giveBlockDrops, mobEffects, mobSwing, testBlockConfig, testDropTable } from './testHelpers';
+import { MINING_CONFIG, MiningTileType, blastDamageAt } from '@mine-me/shared';
 import { hitMob, hitPlayer } from './testHelpers';
 
 describe('MiningGameEngine', () => {
@@ -377,6 +377,34 @@ describe('MiningGameEngine', () => {
     expect(engine.grid[6][12].type).toBe(MiningTileType.LADDER);
   });
 
+  it('clears leftover block damage when a ladder or torch is placed on a tile', () => {
+    const engine = new MiningGameEngine({ characterId: 'char-1', cityId: 'city-1', seed: 12345, socket: mockSocket });
+    engine.getPlayer('char-1')!.playerBody.position = { x: 12.5, y: 5.5 };
+    engine.grid[5][12] = { type: MiningTileType.EMPTY, revealed: true, damage: 40 };
+    engine.grid[5][13] = { type: MiningTileType.EMPTY, revealed: true, damage: 40 };
+
+    expect(engine.placeLadder('char-1')).toBe(true);
+    expect(engine.placeTorch('char-1', { x: 13, y: 5 })).toBe(true);
+
+    expect(engine.grid[5][12].damage).toBe(0);
+    expect(engine.grid[5][13].damage).toBe(0);
+  });
+
+  it('clears block damage on tiles an explosion destroys', () => {
+    const engine = new MiningGameEngine({ characterId: 'char-1', cityId: 'city-1', seed: 12345, socket: mockSocket });
+    engine.grid[10][10] = { type: MiningTileType.DIRT, revealed: true, damage: 30 };
+
+    engine.throwDynamite('char-1', { target: { x: 10, y: 10 }, forceRatio: 1.0, explosionRadius: 3 });
+    const dynamite = engine.activeDynamites[0];
+    dynamite.position = { x: 10, y: 10 };
+    dynamite.velocity = { x: 0, y: 0 };
+    dynamite.hasGravity = false;
+    (engine as any).tick(4.1);
+
+    expect(engine.grid[10][10].type).toBe(MiningTileType.EMPTY);
+    expect(engine.grid[10][10].damage).toBe(0);
+  });
+
   it('allows mining adjacent blocks while climbing/holding on a ladder', () => {
     const engine = new MiningGameEngine({
       characterId: 'char-1',
@@ -474,10 +502,10 @@ describe('MiningGameEngine', () => {
 
     // Speed 100 = 8 swings/sec (125ms per swing), 25 damage per swing. First swing lands immediately.
     (engine as any).tick(0.125);
-    expect(engine.getPlayer('char-1')!.miningProgressMs).toBeCloseTo(25, 0);
+    expect(engine.getPlayer('char-1')!.miningProgress).toBeCloseTo(25, 0);
     (engine as any).tick(0.125);
     (engine as any).tick(0.125);
-    expect(engine.getPlayer('char-1')!.miningProgressMs).toBeCloseTo(75, 0);
+    expect(engine.getPlayer('char-1')!.miningProgress).toBeCloseTo(75, 0);
     expect(engine.getPlayer('char-1')!.isMining).toBe(true);
 
     // 4th swing breaks the 100 HP block
@@ -513,7 +541,7 @@ describe('MiningGameEngine', () => {
 
     // Speed 200 = 16 swings/sec (62.5ms per swing), 25 damage per swing
     (engine as any).tick(0.0625);
-    expect(engine.getPlayer('char-1')!.miningProgressMs).toBeCloseTo(25, 0);
+    expect(engine.getPlayer('char-1')!.miningProgress).toBeCloseTo(25, 0);
     (engine as any).tick(0.0625);
     (engine as any).tick(0.0625);
     (engine as any).tick(0.0625);
@@ -571,7 +599,7 @@ describe('MiningGameEngine', () => {
     // First swing lands immediately; next after 0.5s. 2 swings at 1 dmg each => 2 damage.
     (engine as any).tick(0.5);
     (engine as any).tick(0.5);
-    expect(engine.getPlayer('char-1')!.miningProgressMs).toBeCloseTo(2.0, 1);
+    expect(engine.getPlayer('char-1')!.miningProgress).toBeCloseTo(2.0, 1);
   });
 
   it('places a torch tile within 1 tile distance and verifies non-solid collision', () => {
@@ -785,13 +813,13 @@ describe('MiningGameEngine', () => {
       dynamite.position = { x: 10, y: 10 };
       dynamite.velocity = { x: 0, y: 0 };
       dynamite.hasGravity = false;
-
       // 3.9 seconds elapse: not yet exploded
       (engine as any).tick(3.9);
       expect(engine.activeDynamites).toHaveLength(1);
       expect(engine.grid[10][10].type).toBe(MiningTileType.DIRT);
 
-      // Another 0.2 seconds elapse (total 4.1s): exploded!
+      // Another 0.2 seconds elapse (total 4.1s): exploded! (Explosions are only sent to players near them)
+      engine.players.get('char-1')!.playerBody.position = { x: 10, y: 10 };
       (engine as any).tick(0.2);
 
       // 1. Dynamite removed from active world
@@ -939,17 +967,15 @@ describe('MiningGameEngine', () => {
       });
 
       // Mock block config with a dropTable that drops 2 distinct entries
-      vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue({
+      vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue(testBlockConfig({
         id: 'block_copperium',
         typeKey: 'COPPERIUM',
         name: 'Copperium Ore',
-        dropTable: {
-          items: [
+        dropTable: testDropTable([
             { itemId: 'copper_ore', chance: 100, minQuantity: 1, maxQuantity: 1 },
             { itemId: 'gold_coin', chance: 100, minQuantity: 5, maxQuantity: 5 },
-          ],
-        },
-      });
+          ]),
+      }));
 
       engine.grid[5][10] = { type: MiningTileType.COPPERIUM, revealed: true };
       engine.blockSubsystem.completeMiningBlock({ x: 10, y: 5 });
@@ -978,15 +1004,13 @@ describe('MiningGameEngine', () => {
         socket: mockSocket,
       });
 
-      vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue({
+      vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue(testBlockConfig({
         id: 'block_mineral',
         typeKey: 'MINERAL',
-        dropTable: {
-          items: [
+        dropTable: testDropTable([
             { itemId: 'copper_ore', chance: 100, minQuantity: 1, maxQuantity: 1 },
-          ],
-        },
-      });
+          ]),
+      }));
 
       // Place a block in the blast zone
       engine.grid[10][11] = { type: MiningTileType.MINERAL, revealed: true };
@@ -1012,15 +1036,13 @@ describe('MiningGameEngine', () => {
         socket: mockSocket,
       });
 
-      vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue({
+      vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue(testBlockConfig({
         id: 'block_chest',
         typeKey: 'CHEST',
-        dropTable: {
-          items: [
+        dropTable: testDropTable([
             { itemId: 'gold_coin', chance: 100, minQuantity: 10, maxQuantity: 10 },
-          ],
-        },
-      });
+          ]),
+      }));
 
       engine.grid[2][5] = { type: MiningTileType.CHEST, revealed: true };
       engine.blockSubsystem.completeMiningBlock({ x: 5, y: 2 });
@@ -1059,15 +1081,13 @@ describe('MiningGameEngine', () => {
         socket: mockSocket,
       });
 
-      vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue({
+      vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue(testBlockConfig({
         id: 'block_rock',
         typeKey: 'ROCK',
-        dropTable: {
-          items: [
+        dropTable: testDropTable([
             { itemId: 'sol', chance: 100, minQuantity: 5, maxQuantity: 5 },
-          ],
-        },
-      });
+          ]),
+      }));
 
       engine.grid[2][5] = { type: MiningTileType.ROCK, revealed: true };
       engine.blockSubsystem.completeMiningBlock({ x: 5, y: 2 });
@@ -1174,7 +1194,7 @@ describe('MiningGameEngine', () => {
           id: 'mob_mole_1',
           name: 'Mole Person',
           health: 60,
-          attack: 15,
+          mobEffects: mobEffects({ weaponDamage: 15 }),
           defense: 5,
           aiType: 'CHASE_AND_MINE',
           moveSpeed: 3.5,
@@ -1281,8 +1301,10 @@ describe('MiningGameEngine', () => {
 
       engine.explodeDynamite(fakeDynamite);
 
-      // Mob should have taken 50 damage from blast
-      expect(mob.health).toBe(50);
+      // Mob took the blast damage for its distance from the centre (see blastDamageAt)
+      const expected = blastDamageAt(Math.hypot(mob.mobBody.position.x - 10, mob.mobBody.position.y - 10), 3, MINING_CONFIG.EXPLOSION_DEFAULT_DAMAGE);
+      expect(mob.health).toBeCloseTo(100 - expected, 6);
+      expect(mob.health).toBeLessThan(100);
     });
 
     it('hits mobs in pointing direction with melee swing (Terraria style)', () => {
@@ -1556,7 +1578,7 @@ describe('MiningGameEngine', () => {
         {
           id: 'mob_miner',
           name: 'Mole Person',
-          miningSpeed: 100, // 100% mining speed
+          mobEffects: mobEffects({ miningSpeed: 25, toolDamage: 100 }), // one swing breaks dirt
         },
         { x: 10, y: 14 }
       );
@@ -1565,15 +1587,15 @@ describe('MiningGameEngine', () => {
       mob.miningTarget = { x: 10, y: 15 };
       mob.mobBody.startMining({ x: 10, y: 15 });
 
-      // Run mining update for 1.0 second (DIRT mine time is 500ms)
-      engine.handleMobMining(mob, { x: 10, y: 15 }, 1.0);
+      // One swing deals the mob's Tool Damage (dirt has 100 health)
+      mobSwing(engine, mob, { x: 10, y: 15 });
 
       // Tile should now be EMPTY
       expect(engine.grid[15][10].type).toBe(MiningTileType.EMPTY);
       expect(mob.isMining).toBe(false);
     });
 
-    it('uses a mob\'s mining speed exactly as given (a percentage, never silently rescaled)', () => {
+    it('digs with its Tool Damage per swing, exactly as given (never silently rescaled)', () => {
       const engine = new MiningGameEngine({
         characterId: 'char-1',
         cityId: 'city-1',
@@ -1584,20 +1606,33 @@ describe('MiningGameEngine', () => {
 
       engine.grid[15][10] = { type: MiningTileType.DIRT, revealed: true };
 
-      // 1.2 means 1.2%, not "120%": small values used to be multiplied by 100 behind the author's back
-      const slow = engine.spawnMob({ id: 'mob_mole_slow', name: 'Mole Person', miningSpeed: 1.2 }, { x: 10, y: 14 });
-      expect(slow.miningSpeed).toBe(1.2);
-
-      const fast = engine.spawnMob({ id: 'mob_mole_speed', name: 'Mole Person', miningSpeed: 120 }, { x: 10, y: 14 });
-      expect(fast.miningSpeed).toBe(120);
-
-      fast.isMining = true;
-      fast.miningTarget = { x: 10, y: 15 };
-      // Dirt takes 100 damage; at 120 the mob deals 240 per second, so half a second breaks it
-      engine.handleMobMining(fast, { x: 10, y: 15 }, 0.5);
-
+      const weak = engine.spawnMob({ id: 'mob_mole_weak', name: 'Mole Person', mobEffects: mobEffects({ toolDamage: 30 }) }, { x: 10, y: 14 });
+      expect(weak.stats.toolDamage).toBe(30);
+      mobSwing(engine, weak, { x: 10, y: 15 });
+      expect(engine.grid[15][10].type).toBe(MiningTileType.DIRT); // 30 of 100 health
+      mobSwing(engine, weak, { x: 10, y: 15 });
+      mobSwing(engine, weak, { x: 10, y: 15 });
+      expect(engine.grid[15][10].type).toBe(MiningTileType.DIRT); // 90 of 100
+      mobSwing(engine, weak, { x: 10, y: 15 });
       expect(engine.grid[15][10].type).toBe(MiningTileType.EMPTY);
-      expect(fast.isMining).toBe(false);
+
+      engine.grid[15][10] = { type: MiningTileType.DIRT, revealed: true };
+      const strong = engine.spawnMob({ id: 'mob_mole_strong', name: 'Mole Person', mobEffects: mobEffects({ toolDamage: 120 }) }, { x: 10, y: 14 });
+      mobSwing(engine, strong, { x: 10, y: 15 });
+      expect(engine.grid[15][10].type).toBe(MiningTileType.EMPTY);
+      expect(strong.isMining).toBe(false);
+
+      // No swing, no damage (the swing timer decides when a mob may hit)
+      engine.grid[15][10] = { type: MiningTileType.DIRT, revealed: true };
+      strong.swungThisTick = false;
+      engine.handleMobMining(strong, { x: 10, y: 15 });
+      expect(engine.grid[15][10].type).toBe(MiningTileType.DIRT);
+      expect(engine.grid[15][10].damage ?? 0).toBe(0);
+
+      // A mob without a Tool Damage effect cannot dig
+      const bare = engine.spawnMob({ id: 'mob_bare', name: 'Bare' }, { x: 10, y: 14 });
+      mobSwing(engine, bare, { x: 10, y: 15 });
+      expect(engine.grid[15][10].damage ?? 0).toBe(0);
     });
 
     it('getActiveMobs returns correctly formatted mob payloads', () => {
@@ -1614,7 +1649,6 @@ describe('MiningGameEngine', () => {
           id: 'mob_mole_test',
           name: 'Mole Person',
           health: 75,
-          attack: 12,
         },
         { x: 12, y: 18 }
       );
@@ -1624,7 +1658,6 @@ describe('MiningGameEngine', () => {
       expect(activeMobs[0].id).toBe(mob.id);
       expect(activeMobs[0].name).toBe('Mole Person');
       expect(activeMobs[0].health).toBe(75);
-      expect(activeMobs[0].attack).toBe(12);
     });
 
     it('populates cavern mobs respecting mapConfig count and minDepth', () => {
@@ -1768,12 +1801,12 @@ describe('MiningGameEngine', () => {
       engine.grid[20][20] = { type: MiningTileType.DIRT, revealed: true };
 
       // Attempt to mine block across the map
-      engine.handleMobMining(mob, { x: 20, y: 20 }, 0.033);
+      mobSwing(engine, mob, { x: 20, y: 20 });
 
       expect(mob.isMining).toBe(false);
       expect(mob.miningTarget).toBeNull();
       // Block should not take damage
-      expect(engine.grid[20][20].damageMs).toBeUndefined();
+      expect(engine.grid[20][20].damage).toBeUndefined();
     });
 
     it('allows mob mining when target tile is within reach', () => {
@@ -1786,16 +1819,16 @@ describe('MiningGameEngine', () => {
 
       // Spawn mob at (5.5, 5.5)
       const mob = engine.spawnMob(
-        { id: 'mole_near', name: 'Mole', miningSpeed: 100 },
+        { id: 'mole_near', name: 'Mole', mobEffects: mobEffects({ toolDamage: 25 }) },
         { x: 5.5, y: 5.5 }
       );
 
       // Block is immediately adjacent at (6, 5)
       engine.grid[5][6] = { type: MiningTileType.DIRT, revealed: true };
 
-      engine.handleMobMining(mob, { x: 6, y: 5 }, 0.033);
+      mobSwing(engine, mob, { x: 6, y: 5 });
 
-      expect(engine.grid[5][6].damageMs).toBeGreaterThan(0);
+      expect(engine.grid[5][6].damage).toBeGreaterThan(0);
     });
   });
 });

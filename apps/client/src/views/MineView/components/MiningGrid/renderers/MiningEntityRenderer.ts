@@ -43,40 +43,27 @@ export class MiningEntityRenderer {
           existing.width = targetSize;
           existing.height = targetSize;
         }
+      } else if (spriteUrl) {
+        // The sprite is created and tracked right now and its texture arrives later. Creating it
+        // only after the load would let every tick in the meantime start another sprite for the
+        // same item, orphaning all but the last (they could never be removed again).
+        const sprite = new Sprite(Texture.EMPTY);
+        sprite.anchor.set(0.5);
+        sprite.width = targetSize;
+        sprite.height = targetSize;
+        sprite.x = itemX;
+        sprite.y = itemY;
+        droppedItemsContainer.addChild(sprite);
+        droppedSpritesMap.set(key, sprite);
+        MiningEntityRenderer.applyItemTexture(sprite, getAssetUrl(spriteUrl));
       } else {
-        if (spriteUrl) {
-          const loadSprite = async () => {
-            try {
-              const url = getAssetUrl(spriteUrl);
-              const texture = await Assets.load(url);
-              const sprite = new Sprite(texture);
-              sprite.anchor.set(0.5);
-              sprite.width = targetSize;
-              sprite.height = targetSize;
-              sprite.x = itemX;
-              sprite.y = itemY;
-              droppedItemsContainer.addChild(sprite);
-              droppedSpritesMap.set(key, sprite);
-            } catch {
-              const graphics = new Graphics();
-              graphics.rect(-targetSize / 2, -targetSize / 2, targetSize, targetSize);
-              graphics.fill(0xf59e0b);
-              graphics.x = itemX;
-              graphics.y = itemY;
-              droppedItemsContainer.addChild(graphics);
-              droppedSpritesMap.set(key, graphics);
-            }
-          };
-          loadSprite();
-        } else {
-          const graphics = new Graphics();
-          graphics.rect(-targetSize / 2, -targetSize / 2, targetSize, targetSize);
-          graphics.fill(0xf59e0b);
-          graphics.x = itemX;
-          graphics.y = itemY;
-          droppedItemsContainer.addChild(graphics);
-          droppedSpritesMap.set(key, graphics);
-        }
+        const graphics = new Graphics();
+        graphics.rect(-targetSize / 2, -targetSize / 2, targetSize, targetSize);
+        graphics.fill(0xf59e0b);
+        graphics.x = itemX;
+        graphics.y = itemY;
+        droppedItemsContainer.addChild(graphics);
+        droppedSpritesMap.set(key, graphics);
       }
     });
 
@@ -87,6 +74,27 @@ export class MiningEntityRenderer {
         droppedSpritesMap.delete(key);
       }
     });
+  }
+
+  /** Gives a dropped-item sprite its texture once loaded; a failed load leaves an amber square. */
+  private static applyItemTexture(sprite: Sprite, url: string): void {
+    const apply = (texture: Texture, tint = 0xffffff) => {
+      if (sprite.destroyed) return; // the item was picked up while the texture loaded
+      const { width, height } = sprite;
+      sprite.texture = texture;
+      sprite.tint = tint;
+      sprite.width = width;
+      sprite.height = height;
+    };
+    const cached = Assets.cache.has(url) ? (Assets.get(url) as Texture | undefined) : undefined;
+    if (cached) {
+      apply(cached);
+      return;
+    }
+    Assets.load(url).then(
+      (texture: Texture) => apply(texture),
+      () => apply(Texture.WHITE, 0xf59e0b)
+    );
   }
 
   public static updateFallingRocks(
@@ -228,14 +236,15 @@ export class MiningEntityRenderer {
   }
 
   /**
-   * Render and update active flying projectiles (bullets) in world pixel coordinates.
+   * Render and update active flying projectiles (bullets) in world pixel coordinates. Each one is
+   * drawn with the sprite the server attached to it (the equipped weapon's ammo item).
    */
   public static updateActiveProjectiles(
     projectilesContainer: Container,
     activeProjectiles: MiningActiveProjectile[],
     projectileGraphicsMap: Map<string, Container>,
     tileSize: number = TILE_SIZE,
-    bulletTexture?: Texture | null,
+    resolveTexture?: ((spriteUrl: string | null | undefined) => Texture | null) | null,
     defaultScale: number = 1.0
   ): void {
     const activeKeys = new Set<string>();
@@ -260,7 +269,8 @@ export class MiningEntityRenderer {
         tracer.fill({ color: 0xfffbeb, alpha: 0.95 });
         bulletCompound.addChild(tracer);
 
-        // 2. Bullet head sprite or glowing capsule
+        // 2. Ammo sprite (the one the server says this shot fired) or a glowing capsule
+        const bulletTexture = resolveTexture?.(proj.spriteUrl) ?? null;
         if (bulletTexture) {
           const sprite = new Sprite(bulletTexture);
           sprite.anchor.set(0.5);

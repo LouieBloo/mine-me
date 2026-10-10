@@ -53,10 +53,22 @@ describe('dropped items are only re-sent when something changes', () => {
     expect(engine.droppedItems.every((i) => Math.abs(i.velocity?.y ?? 0) < 0.01)).toBe(true);
   });
 
+  it('ticks carry only ids and positions; each item is described once, in `spawned`', () => {
+    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    tick(30);
+    const described = ticks.flatMap((t) => t.spawned?.droppedItems ?? []);
+    expect(described.map((d: any) => d.id).sort()).toEqual(engine.droppedItems.map((d) => d.id).sort());
+    for (const t of ticks.filter((t) => t.droppedItems)) {
+      for (const d of t.droppedItems) expect(Object.keys(d).sort()).toEqual(['id', 'position']);
+    }
+    expect(new Set(described.map((d: any) => d.id)).size).toBe(described.length); // never described twice
+  });
+
   it('every send carries the full current list (so late changes are never lost)', () => {
+    const before = ticks.length;
     engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
     tick(5);
-    const withList = ticks.filter((t) => t.droppedItems);
+    const withList = ticks.slice(before).filter((t) => t.droppedItems);
     expect(withList.length).toBeGreaterThan(0);
     for (const t of withList) expect(t.droppedItems.length).toBe(engine.droppedItems.length);
   });

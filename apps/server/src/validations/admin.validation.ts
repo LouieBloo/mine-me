@@ -54,8 +54,10 @@ export const mobValidation = [
   body('name').trim().notEmpty().withMessage('Mob Name is required'),
   body('level').isInt({ min: 1 }).withMessage('Level must be >= 1'),
   body('health').isInt({ min: 1 }).withMessage('Health must be >= 1'),
-  body('attack').isInt({ min: 0 }).withMessage('Attack must be >= 0'),
   body('defense').isInt({ min: 0 }).withMessage('Defense must be >= 0'),
+  body('mobEffects').optional().isArray().withMessage('Mob Effects must be an array'),
+  body('mobEffects.*.effectId').isString().notEmpty().withMessage('Each mob effect needs an effectId'),
+  body('mobEffects.*.value').isInt().withMessage('Each mob effect value must be a whole number'),
   body('hitStunMs').optional().isInt({ min: 0, max: 5000 }).withMessage('Hit Stun must be between 0 and 5000 ms'),
   body('stunImmunityMs').optional().isInt({ min: 0, max: 10000 }).withMessage('Stun Immunity must be between 0 and 10000 ms')
 ];
@@ -64,8 +66,10 @@ export const mobUpdateValidation = [
   body('name').optional().trim().notEmpty().withMessage('Mob Name cannot be empty'),
   body('level').optional().isInt({ min: 1 }).withMessage('Level must be >= 1'),
   body('health').optional().isInt({ min: 1 }).withMessage('Health must be >= 1'),
-  body('attack').optional().isInt({ min: 0 }).withMessage('Attack must be >= 0'),
   body('defense').optional().isInt({ min: 0 }).withMessage('Defense must be >= 0'),
+  body('mobEffects').optional().isArray().withMessage('Mob Effects must be an array'),
+  body('mobEffects.*.effectId').isString().notEmpty().withMessage('Each mob effect needs an effectId'),
+  body('mobEffects.*.value').isInt().withMessage('Each mob effect value must be a whole number'),
   body('hitStunMs').optional().isInt({ min: 0, max: 5000 }).withMessage('Hit Stun must be between 0 and 5000 ms'),
   body('stunImmunityMs').optional().isInt({ min: 0, max: 10000 }).withMessage('Stun Immunity must be between 0 and 10000 ms')
 ];

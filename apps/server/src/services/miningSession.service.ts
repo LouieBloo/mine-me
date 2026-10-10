@@ -211,7 +211,7 @@ export async function processMove(
 export function startMining(
   session: MiningSession,
   target: MiningPosition,
-): { miningTimeMs: number } {
+): { miningTotal: number } {
   const tile = session.grid[target.y][target.x];
 
   // Validate tile is minable
@@ -229,16 +229,16 @@ export function startMining(
     throw new Error('Target must be adjacent to the player.');
   }
 
-  const miningTimeMs: number = getTileMineTime(tile.type);
+  const miningTotal: number = getTileMineTime(tile.type);
 
   session.pendingAction = {
     type: 'MINING',
     target,
     startTime: Date.now(),
-    requiredTimeMs: miningTimeMs,
+    requiredTimeMs: miningTotal,
   };
 
-  return { miningTimeMs };
+  return { miningTotal };
 }
 
 /**
@@ -448,7 +448,7 @@ export function buildClientState(session: MiningSession): MiningSessionClientSta
       session.position.y === MINING_CONFIG.ENTRANCE_Y,
     isMining: session.pendingAction?.type === 'MINING',
     miningTarget: session.pendingAction?.target,
-    miningTimeMs: session.pendingAction?.requiredTimeMs,
+    miningTotal: session.pendingAction?.requiredTimeMs,
     miningStartedAt: session.pendingAction?.startTime,
   };
 }

@@ -20,7 +20,7 @@ describe('resolveWeaponLimits', () => {
     };
     expect(resolveWeaponLimits(undefined)).toEqual(expected);
     expect(resolveWeaponLimits({})).toEqual(expected);
-    expect(resolveWeaponLimits({ projectileConfig: { magazineSize: 0, fireRate: -1, reloadTime: 'x' } })).toEqual(expected);
+    expect(resolveWeaponLimits({ projectileConfig: { magazineSize: 0, fireRate: -1, reloadTime: 'x' as unknown as number } })).toEqual(expected);
   });
 
   it('floors fractional magazine sizes', () => {

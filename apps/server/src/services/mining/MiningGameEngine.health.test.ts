@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
-import { hitMob, hitPlayer } from './testHelpers';
+import { hitMob, hitPlayer, mobEffects } from './testHelpers';
 
 describe('player health, damage, knockback and death', () => {
   const cid = 'hp-char';
@@ -156,13 +156,13 @@ describe('player health, damage, knockback and death', () => {
     };
     const spawnAdjacentMob = (attack = 12) => {
       const { p } = arena();
-      const mob = engine.spawnMob({ id: 'biter', name: 'Biter', attack, health: 50 }, { x: p.x + 0.8, y: 21 });
+      const mob = engine.spawnMob({ id: 'biter', name: 'Biter', mobEffects: mobEffects({ weaponDamage: attack }), health: 50 }, { x: p.x + 0.8, y: 21 });
       return mob;
     };
 
     it('damages a player in range by the mob attack stat and knocks them away', () => {
       const mob = spawnAdjacentMob(12);
-      tick(2);
+      tick(12); // the attack is telegraphed first (wind-up), then lands
       expect(me().health).toBe(88);
       const hit = emitted('player_damaged')[0];
       expect(hit).toMatchObject({ damage: 12, sourceId: mob.id, sourceName: 'Biter' });
@@ -172,7 +172,7 @@ describe('player health, damage, knockback and death', () => {
 
     it('does not hit again within the mob attack cooldown / invulnerability window', () => {
       spawnAdjacentMob(12);
-      tick(10);
+      tick(14);
       expect(me().health).toBe(88);
     });
 
@@ -193,15 +193,15 @@ describe('player health, damage, knockback and death', () => {
 
       it('lands when nothing is in between (control)', () => {
         const { p } = arena();
-        const mob = engine.spawnMob({ id: 'biter', name: 'Biter', attack: 12 }, { x: p.x + 2, y: 21 });
+        const mob = engine.spawnMob({ id: 'biter', name: 'Biter', mobEffects: mobEffects({ weaponDamage: 12 }) }, { x: p.x + 2, y: 21 });
         forceAttack(mob);
-        tick();
+        tick(12);
         expect(me().health).toBe(88);
       });
 
       it('is blocked by solid tiles between the mob and the player', () => {
         const { cx, cy, p } = arena();
-        const mob = engine.spawnMob({ id: 'biter', name: 'Biter', attack: 12 }, { x: cx + 4.5, y: 21 });
+        const mob = engine.spawnMob({ id: 'biter', name: 'Biter', mobEffects: mobEffects({ weaponDamage: 12 }) }, { x: cx + 4.5, y: 21 });
         for (let y = cy - 2; y <= cy; y++) engine.grid[y][cx + 2] = { type: MiningTileType.ROCK, revealed: true };
         forceAttack(mob);
         tick(3);
@@ -221,7 +221,7 @@ describe('player health, damage, knockback and death', () => {
 
     it('a mob hit that kills ends the run', () => {
       spawnAdjacentMob(500);
-      tick(3);
+      tick(12);
       expect(onDeath).toHaveBeenCalledWith(cid);
     });
   });

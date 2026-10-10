@@ -2,7 +2,12 @@ import {
   DEFAULT_DYNAMITE_SOUNDS,
   MINING_CONFIG,
   MiningTileType,
+  blastDamageAt,
   calculateThrowVelocity,
+  getItemDamageEffect,
+  isTileBlastProof,
+  knockbackAway,
+  type DamageEvent,
   type ItemPhysicsConfig,
   type ItemSoundEffectsConfig,
   type MiningExplosionEvent,
@@ -124,7 +129,7 @@ export class MiningExplosiveSubsystem {
     const cx = Math.round(dynamite.position.x);
     const cy = Math.round(dynamite.position.y);
     const radiusSq = radius * radius;
-    const affectedCols = new Set<number>();
+    const clearedByCol = new Map<number, number[]>();
 
     // Queue authoritative explosion event for all clients in room
     this.pendingExplosions.push({
@@ -134,30 +139,65 @@ export class MiningExplosiveSubsystem {
       soundUrl: dynamite.soundEffects?.explosion?.url ?? DEFAULT_DYNAMITE_SOUNDS.explosion?.url,
     });
 
-    // 1. Excavate all blocks in explosion radius
+    const origin = { x: dynamite.position.x, y: dynamite.position.y };
+    const source: DamageEvent['source'] = {
+      kind: 'explosion',
+      id: dynamite.id,
+      ownerId: dynamite.ownerId,
+      itemId: dynamite.itemId,
+      position: origin,
+    };
+    // Blast strength comes from the explosive's own Damage effect; the config value is the fallback
+    const baseDamage =
+      getItemDamageEffect(dynamite.itemId ? this.world.data.getItemData(dynamite.itemId) : undefined) ||
+      MINING_CONFIG.EXPLOSION_DEFAULT_DAMAGE;
+
+    // 1. Hurt everything alive in the radius, players and mobs alike. Walls do not stop the damage:
+    //    distance is the only thing that reduces it (see blastDamageAt).
+    const hurt = (position: Vector2D): { amount: number; knockback: Vector2D } | null => {
+      const amount = blastDamageAt(Math.hypot(position.x - origin.x, position.y - origin.y), radius, baseDamage);
+      if (amount <= 0) return null;
+      return {
+        amount,
+        knockback: knockbackAway(origin.x, position.x, {
+          x: MINING_CONFIG.EXPLOSION_KNOCKBACK_X,
+          y: MINING_CONFIG.EXPLOSION_KNOCKBACK_Y,
+        }),
+      };
+    };
+    for (const mob of Array.from(this.world.mobs.activeMobs.values())) {
+      if (mob.health <= 0) continue;
+      const blast = hurt(mob.mobBody.position);
+      if (blast) this.world.damage.applyDamage({ kind: 'mob', id: mob.id }, { ...blast, type: 'explosive', source });
+    }
+    for (const session of Array.from(this.world.players.values())) {
+      if (session.isDead) continue;
+      const blast = hurt(session.playerBody.position);
+      if (blast) this.world.damage.applyDamage({ kind: 'player', id: session.characterId }, { ...blast, type: 'explosive', source });
+    }
+
+    // 2. Excavate the blocks in the radius, except blast-proof ones (the entrance)
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
-        if (dx * dx + dy * dy <= radiusSq) {
-          const tx = cx + dx;
-          const ty = cy + dy;
-          if (isInBounds(tx, ty)) {
-            const tile = grid[ty][tx];
-            if (tile.type !== MiningTileType.ENTRANCE && tile.type !== MiningTileType.EMPTY) {
-              const previousType = tile.type;
-              tile.type = MiningTileType.EMPTY;
-              tile.revealed = true;
-              tile.damageMs = 0;
-              rigidWorld.removeTileCollider(tx, ty);
-              this.world.pushTileUpdate({ x: tx, y: ty, type: MiningTileType.EMPTY, damageStage: 0 });
-              affectedCols.add(tx);
-              this.world.drops.spawnBlockDrops(tx, ty, previousType);
-            }
-          }
-        }
+        if (dx * dx + dy * dy > radiusSq) continue;
+        const tx = cx + dx;
+        const ty = cy + dy;
+        if (!isInBounds(tx, ty)) continue;
+        const tile = grid[ty][tx];
+        if (tile.type === MiningTileType.EMPTY || isTileBlastProof(tile.type)) continue;
+
+        const previousType = tile.type;
+        tile.type = MiningTileType.EMPTY;
+        tile.revealed = true;
+        tile.damage = 0;
+        rigidWorld.removeTileCollider(tx, ty);
+        this.world.pushTileUpdate({ x: tx, y: ty, type: MiningTileType.EMPTY, damageStage: 0 });
+        clearedByCol.set(tx, [...(clearedByCol.get(tx) ?? []), ty]);
+        this.world.drops.spawnBlockDrops(tx, ty, previousType);
       }
     }
 
-    // 2. Interrupt any player currently mining a block inside the blast zone
+    // 2.5. Interrupt any player currently mining a block inside the blast zone
     for (const session of this.world.players.values()) {
       if (session.isMining && session.miningTarget) {
         const dtx = session.miningTarget.x - cx;
@@ -168,37 +208,10 @@ export class MiningExplosiveSubsystem {
       }
     }
 
-    // 2.5. Damage active mobs caught within blast radius
-    for (const mob of this.world.mobs.activeMobs.values()) {
-      const mdx = mob.mobBody.position.x - cx;
-      const mdy = mob.mobBody.position.y - cy;
-      if (mdx * mdx + mdy * mdy <= radiusSq) {
-        this.world.damage.applyDamage(
-          { kind: 'mob', id: mob.id },
-          {
-            amount: MINING_CONFIG.EXPLOSION_MOB_DAMAGE,
-            type: 'explosive',
-            source: {
-              kind: 'explosion',
-              id: dynamite.id,
-              ownerId: dynamite.ownerId,
-              itemId: dynamite.itemId,
-              position: { x: dynamite.position.x, y: dynamite.position.y },
-            },
-          }
-        );
-      }
-    }
-
-    // 3. Trigger falling rocks above the cleared cavern columns
-    for (const col of affectedCols) {
-      let highestClearedY = cy + radius;
-      for (let y = Math.max(0, cy - radius); y <= Math.min(MINING_CONFIG.GRID_HEIGHT - 1, cy + radius); y++) {
-        if (grid[y][col].type === MiningTileType.EMPTY) {
-          highestClearedY = Math.min(highestClearedY, y);
-        }
-      }
-      this.world.rocks.checkAndTriggerFallingRocks(col, highestClearedY);
+    // 3. Rocks resting above any cleared tile start to fall - not just above the topmost one in a
+    //    column, since a rock can sit between two cleared tiles
+    for (const [col, ys] of clearedByCol) {
+      for (const y of ys) this.world.rocks.checkAndTriggerFallingRocks(col, y);
     }
 
     // 4. Invalidate line of sight caches

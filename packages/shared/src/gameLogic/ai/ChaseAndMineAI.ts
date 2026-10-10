@@ -2,6 +2,19 @@ import { BaseMobAI, type MobAIContext, type MobActionIntent, type PlayerTargetIn
 import { MiningPathfinder } from '../pathfinding/MiningPathfinder';
 import { isTileSolid, type MiningPathWaypoint } from '../../types/mining';
 
+const MIN_PATH_INTERVAL = 1.0;
+const PATH_INTERVAL_JITTER = 0.5;
+
+/** Stable pseudo-random number in [0, 1) derived from a string. */
+function hashToUnit(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 1000) / 1000;
+}
+
 /**
  * Intelligent Mob AI behavior that chases player characters through the cavern.
  * Navigates tunnels, leaps across platforms/gaps, climbs ladders, and excavates
@@ -10,12 +23,17 @@ import { isTileSolid, type MiningPathWaypoint } from '../../types/mining';
 export class ChaseAndMineAI extends BaseMobAI {
   private path: MiningPathWaypoint[] = [];
   private pathTimer: number = 0;
-  private attackCooldown: number = 0;
   private currentWaypointIndex: number = 0;
   private lastTargetPos: { x: number; y: number } | null = null;
+  /** Seconds between periodic re-paths; differs a little per mob so a crowd doesn't re-path on the same tick. */
+  private readonly pathInterval: number;
+
+  constructor(mobId: string, instanceId: string) {
+    super(mobId, instanceId);
+    this.pathInterval = MIN_PATH_INTERVAL + hashToUnit(instanceId) * PATH_INTERVAL_JITTER;
+  }
 
   public update(dt: number, context: MobAIContext): MobActionIntent {
-    this.attackCooldown = Math.max(0, this.attackCooldown - dt);
     this.pathTimer = Math.max(0, this.pathTimer - dt);
 
     const aggroRange = context.config?.aggroRange ?? 20.0;
@@ -23,7 +41,6 @@ export class ChaseAndMineAI extends BaseMobAI {
     const canMine = context.config?.canMine ?? true;
     const mineRange = context.config?.mineRange ?? 2.0;
     const maxJumpTiles = context.config?.maxJumpTiles ?? 1;
-    const attackCooldownSec = (context.config?.attackCooldownMs ?? 1200) / 1000;
 
     // 1. Locate nearest living player
     let nearestPlayer: PlayerTargetInfo | null = null;
@@ -62,41 +79,26 @@ export class ChaseAndMineAI extends BaseMobAI {
     // 2. In Melee Attack Range
     if (shortestDist <= attackRange) {
       this.path = [];
-      const facing = Math.sign(dx) || 1;
-      const canAttack = this.attackCooldown <= 0;
-
-      if (canAttack) {
-        this.attackCooldown = attackCooldownSec;
-        return {
-          moveX: facing,
-          jump: false,
-          climbUp: false,
-          climbDown: false,
-          isMining: false,
-          miningTarget: null,
-          isAttacking: true,
-          attackTargetId: nearestPlayer.characterId,
-          animationState: 'attack',
-        };
-      } else {
-        return {
-          moveX: 0,
-          jump: false,
-          climbUp: false,
-          climbDown: false,
-          isMining: false,
-          miningTarget: null,
-          isAttacking: false,
-          animationState: 'idle',
-        };
-      }
+      // Always report the target in reach; how often it actually swings is the swing timer's job
+      // (the same Mining Speed rate players use), not the AI's.
+      return {
+        moveX: 0,
+        jump: false,
+        climbUp: false,
+        climbDown: false,
+        isMining: false,
+        miningTarget: null,
+        isAttacking: true,
+        attackTargetId: nearestPlayer.characterId,
+        animationState: 'attack',
+      };
     }
 
     // Helper to check if a tile is currently solid
     const isTileObstacle = (tx: number, ty: number): boolean => {
       const row = context.grid[ty];
       const tile = row ? row[tx] : undefined;
-      return tile ? isTileSolid(tile.type as any) : false;
+      return tile ? isTileSolid(tile.type) : false;
     };
 
     // 3. Path Recalculation
@@ -117,7 +119,9 @@ export class ChaseAndMineAI extends BaseMobAI {
       Math.abs(this.lastTargetPos.y - targetTile.y) > 1.5;
 
     // Do not interrupt an active block excavation on the periodic timer
-    if (!isActivelyMining && (this.pathTimer <= 0 || targetMoved || this.currentWaypointIndex >= this.path.length)) {
+    const needsPath = this.pathTimer <= 0 || targetMoved || this.currentWaypointIndex >= this.path.length;
+    // Over the tick's search budget: keep the current path and ask again next tick
+    if (!isActivelyMining && needsPath && (context.pathBudget?.tryConsume() ?? true)) {
       this.path = MiningPathfinder.findPath(
         { x: context.position.x, y: context.position.y },
         targetTile,
@@ -125,7 +129,7 @@ export class ChaseAndMineAI extends BaseMobAI {
         { canMine, maxJumpTiles }
       );
       this.currentWaypointIndex = 0;
-      this.pathTimer = 1.0;
+      this.pathTimer = this.pathInterval;
       this.lastTargetPos = targetTile;
     }
 

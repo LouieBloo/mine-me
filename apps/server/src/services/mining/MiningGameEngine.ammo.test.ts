@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MiningDataManager } from './subsystems/MiningDataManager';
+import { partialDefinitions } from './testHelpers';
 import { MINING_CONFIG } from '@mine-me/shared';
 
 const gun = (id: string, magazineSize: number, reloadTime: number, fireRate = 100) => ({
@@ -32,11 +33,11 @@ describe('per-weapon ammo', () => {
 
   beforeEach(() => {
     original = MiningDataManager.getInstance();
-    MiningDataManager.initialize({
-      items: [...original.getItems(), gun('gunA', 2, 1.0), gun('gunB', 4, 2.0), { id: 'club', name: 'club', type: 'GEAR', subType: 'WEAPON' }],
-      mobs: [],
-      blocks: [],
-    });
+    MiningDataManager.initialize(
+      partialDefinitions({
+        items: [...original.getItems(), gun('gunA', 2, 1.0), gun('gunB', 4, 2.0), { id: 'club', name: 'club', type: 'GEAR', subType: 'WEAPON' }],
+      })
+    );
     ticks = [];
     socket = { connected: true, emit: (e: string, p: any) => e === 'mining_state_tick' && ticks.push(p) };
     engine = new MiningGameEngine({

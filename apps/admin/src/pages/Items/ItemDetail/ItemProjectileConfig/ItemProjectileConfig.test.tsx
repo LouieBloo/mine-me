@@ -109,4 +109,25 @@ describe('ItemProjectileConfig', () => {
       expect.objectContaining({ projectileItemId: 'cmn_bullet_gun_round' })
     );
   });
+
+  it('edits the pierce count as a whole number between 0 and 10', () => {
+    const onChange = vi.fn();
+    render(
+      <ItemProjectileConfig
+        shootsProjectiles={true}
+        projectileConfig={{ magazineSize: 6, fireRate: 2.5 }}
+        availableItems={mockAvailableItems}
+        onToggleShootsProjectiles={() => {}}
+        onChangeConfig={onChange}
+      />
+    );
+    const input = screen.getByTestId('pierce-count-input');
+    expect((input as HTMLInputElement).value).toBe('0');
+    fireEvent.change(input, { target: { value: '2.7' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ pierceCount: 2 }));
+    fireEvent.change(input, { target: { value: '99' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ pierceCount: 10 }));
+    fireEvent.change(input, { target: { value: '-3' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ pierceCount: 0 }));
+  });
 });

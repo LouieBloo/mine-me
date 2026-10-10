@@ -4,11 +4,14 @@ import { syncJson } from '../../services/admin.service';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
-
-const soundsDir = path.join(__dirname, '../../../../../packages/shared/assets/sounds');
+import { SOUND_CATEGORIES } from '@mine-me/shared';
+import { syncSoundLibrary } from '../../services/soundLibrary.service';
+import { buildSoundUsageIndex, usageForSound } from '../../services/soundUsage.service';
+import { getSoundsDir } from '../../config/assetPaths';
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
+    const soundsDir = getSoundsDir();
     fs.mkdirSync(soundsDir, { recursive: true });
     cb(null, soundsDir);
   },
@@ -40,14 +43,20 @@ const upload = multer({
   limits: { fileSize: 35 * 1024 * 1024 } // 35 MB max for music tracks
 });
 
+const isCategory = (value: unknown): value is (typeof SOUND_CATEGORIES)[number] =>
+  typeof value === 'string' && (SOUND_CATEGORIES as readonly string[]).includes(value);
+
 export const soundUploadMiddleware = upload.single('file');
 
 export const getSounds = async (req: Request, res: Response) => {
   try {
-    const { type } = req.query;
+    const { type, category } = req.query;
     const whereClause: any = {};
     if (type && typeof type === 'string' && (type === 'BGM' || type === 'SFX')) {
       whereClause.type = type;
+    }
+    if (typeof category === 'string' && isCategory(category)) {
+      whereClause.category = category;
     }
 
     const sounds = await prisma.sound.findMany({
@@ -55,7 +64,15 @@ export const getSounds = async (req: Request, res: Response) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    res.json(sounds);
+    // Where each sound is used; a failure here only hides the "used by" column
+    let usage: Awaited<ReturnType<typeof buildSoundUsageIndex>> | null = null;
+    try {
+      usage = await buildSoundUsageIndex(prisma);
+    } catch (usageErr) {
+      console.warn('Could not work out sound usage:', usageErr);
+    }
+
+    res.json(sounds.map((sound: any) => ({ ...sound, usedBy: usage ? usageForSound(usage, sound) : [] })));
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch sounds' });
   }
@@ -91,6 +108,7 @@ export const uploadSound = async (req: Request, res: Response) => {
       name,
       description,
       type = 'BGM',
+      category,
       volume = '1.0',
       loop = 'true',
       isActive = 'true'
@@ -107,6 +125,7 @@ export const uploadSound = async (req: Request, res: Response) => {
         name: soundName,
         description: description?.trim() || null,
         type: type === 'SFX' ? 'SFX' : 'BGM',
+        category: isCategory(category) ? category : 'GENERAL',
         url: soundUrl,
         fileName: file.filename,
         fileSize: file.size,
@@ -130,7 +149,7 @@ export const uploadSound = async (req: Request, res: Response) => {
 export const updateSound = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, type, volume, loop, isActive } = req.body;
+    const { name, description, type, category, volume, loop, isActive } = req.body;
 
     const existing = await prisma.sound.findUnique({ where: { id } });
     if (!existing) {
@@ -144,6 +163,7 @@ export const updateSound = async (req: Request, res: Response) => {
         ...(name !== undefined && { name: name.trim() }),
         ...(description !== undefined && { description: description?.trim() || null }),
         ...(type !== undefined && (type === 'BGM' || type === 'SFX') && { type }),
+        ...(isCategory(category) && { category }),
         ...(volume !== undefined && { volume: Math.max(0, Math.min(1, parseFloat(volume))) }),
         ...(loop !== undefined && { loop: Boolean(loop) }),
         ...(isActive !== undefined && { isActive: Boolean(isActive) })
@@ -169,11 +189,18 @@ export const deleteSound = async (req: Request, res: Response) => {
       return;
     }
 
+    // A sound something plays cannot be deleted out from under it
+    const usedBy = usageForSound(await buildSoundUsageIndex(prisma), sound);
+    if (usedBy.length > 0) {
+      res.status(409).json({ error: `"${sound.name}" is still used by: ${usedBy.join(', ')}`, usedBy });
+      return;
+    }
+
     // Delete record from DB
     await prisma.sound.delete({ where: { id } });
 
     // Clean up physical file from disk
-    const filePath = path.join(soundsDir, sound.fileName);
+    const filePath = path.join(getSoundsDir(), sound.fileName);
     if (fs.existsSync(filePath)) {
       try {
         fs.unlinkSync(filePath);
@@ -188,5 +215,20 @@ export const deleteSound = async (req: Request, res: Response) => {
     res.json({ message: 'Sound deleted successfully', id });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to delete sound' });
+  }
+};
+
+/** Registers audio files on disk that have no library row. `?dryRun=true` only reports. */
+export const syncSounds = async (req: Request, res: Response) => {
+  try {
+    const dryRun = req.query.dryRun === 'true';
+    const report = await syncSoundLibrary(prisma, getSoundsDir(), { dryRun });
+    if (!dryRun && report.added.length > 0) {
+      syncJson('sounds.json', await prisma.sound.findMany());
+    }
+    res.json({ dryRun, ...report });
+  } catch (err: any) {
+    console.error('Error syncing sounds:', err);
+    res.status(500).json({ error: err.message || 'Failed to sync sounds' });
   }
 };

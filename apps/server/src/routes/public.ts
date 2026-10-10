@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
+import path from 'path';
 import { prisma } from '../index';
+import { buildAssetManifest, memoizeManifest } from '../services/assetManifest.service';
 
 export const publicRouter = Router();
 
@@ -64,6 +66,27 @@ publicRouter.get('/sounds/bgm', async (req: Request, res: Response): Promise<any
       orderBy: { createdAt: 'asc' }
     });
     return res.json(bgmTracks);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+const ASSETS_ROOT = path.join(__dirname, '../../../../packages/shared/assets');
+
+// The world-map art is not part of the mine; background music is streamed, so it is not preloaded.
+const getAssetManifest = memoizeManifest(async () => {
+  const bgm = await prisma.sound.findMany({ where: { type: 'BGM' }, select: { url: true } });
+  return buildAssetManifest(ASSETS_ROOT, {
+    excludeDirs: ['cities'],
+    excludeUrls: bgm.map((t: { url: string }) => t.url),
+  });
+}, 60_000);
+
+// GET /api/public/assets/manifest
+// Every image and sound effect the mine can use, so the client can load them all up front.
+publicRouter.get('/assets/manifest', async (req: Request, res: Response): Promise<any> => {
+  try {
+    return res.json(await getAssetManifest());
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

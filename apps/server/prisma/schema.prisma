@@ -162,7 +162,6 @@ model Mob {
   name             String
   level            Int
   health           Int
-  attack           Int
   defense          Int
   attackPercentage Int        @default(50)
   defendPercentage Int        @default(50)
@@ -171,13 +170,15 @@ model Mob {
   abilities        Json?
   moveSpeed        Float      @default(3.0)
   jumpForce        Float      @default(6.5)
-  miningSpeed      Float      @default(50.0)
   hitStunMs        Int        @default(250)
   stunImmunityMs   Int        @default(500)
   animations       Json?
+  /// Per-slot sound references: { dig: { soundId, loop? }, idle, damage, attack, death }
+  soundEffects     Json?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   dropTable        DropTable? @relation("MobDrops")
+  mobEffects       ObjectEffects[]
 }
 
 model Accomplishment {
@@ -220,14 +221,17 @@ model Effect {
 model ObjectEffects {
   id        String   @id @default(cuid())
   itemId    String?
+  mobId     String?
   effectId  String
   value     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   effect    Effect   @relation(fields: [effectId], references: [id], onDelete: Cascade)
   item      Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  mob       Mob?     @relation(fields: [mobId], references: [id], onDelete: Cascade)
 
   @@unique([itemId, effectId])
+  @@unique([mobId, effectId])
 }
 
 model MiningBlock {
@@ -334,11 +338,20 @@ enum SoundType {
   SFX
 }
 
+/// Where a sound is used. Music is `type = BGM`; sound effects are grouped by what plays them.
+enum SoundCategory {
+  GENERAL
+  ITEM
+  BLOCK
+  MOB
+}
+
 model Sound {
   id          String    @id @default(cuid())
   name        String
   description String?
   type        SoundType @default(BGM)
+  category    SoundCategory @default(GENERAL)
   url         String
   fileName    String
   fileSize    Int       @default(0)

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { MINING_CONFIG, MiningTileType, type DamageEvent } from '@mine-me/shared';
+import { MINING_CONFIG, MiningTileType, blastDamageAt, type DamageEvent } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
-import { giveBlockDrops, hitMob } from './testHelpers';
+import { giveBlockDrops, hitMob, mobEffects, mobSwing } from './testHelpers';
 
 const ev = (over: Partial<DamageEvent> = {}): DamageEvent => ({
   amount: 10,
@@ -33,7 +33,7 @@ describe('MiningDamageSystem', () => {
     me().playerBody.position = { x: 22.5, y: 21 - me().playerBody.halfHeight };
     me().playerBody.isGrounded = true;
   };
-  const spawn = (x = 25.5, extra: any = {}) => engine.spawnMob({ id: 'm', name: 'Mole', health: 100, attack: 5, ...extra }, { x, y: 21 });
+  const spawn = (x = 25.5, extra: any = {}) => engine.spawnMob({ id: 'm', name: 'Mole', health: 100, mobEffects: mobEffects({ weaponDamage: 5, toolDamage: 25, miningSpeed: 25 }), ...extra }, { x, y: 21 });
 
   beforeEach(() => {
     socket = { connected: true, emit: vi.fn() };
@@ -249,19 +249,21 @@ describe('MiningDamageSystem', () => {
       expect(hit!.event).toMatchObject({ type: 'ranged', source: { kind: 'projectile', ownerId: cid } });
     });
 
-    it('explosions: type explosive, credited to the thrower, flat configured damage', () => {
+    it('explosions: type explosive, credited to the thrower, damage falls off with distance', () => {
       const mob = spawn(24.5);
+      const mobPos = { ...mob.mobBody.position }; // before the blast pushes it
       engine.throwDynamite(cid, { target: { x: 24.5, y: 20 }, forceRatio: 0.05, explosionRadius: 3, itemId: 'dynamite' });
       const dyn = engine.activeDynamites[0];
       dyn.position.x = 24.5;
       dyn.position.y = 20;
       dyn.fuseRemainingSeconds = 0.01;
       tick(3);
-      const hit = hits.find((h) => h.kind === 'entity' && h.event.type === 'explosive');
+      const hit = hits.find((h) => h.kind === 'entity' && h.target.kind === 'mob' && h.event.type === 'explosive');
       expect(hit).toBeDefined();
-      expect(hit!.event.amount).toBe(MINING_CONFIG.EXPLOSION_MOB_DAMAGE);
+      const expected = blastDamageAt(Math.hypot(mobPos.x - 24.5, mobPos.y - 20), 3, MINING_CONFIG.EXPLOSION_DEFAULT_DAMAGE);
+      expect(hit!.event.amount).toBeCloseTo(expected, 6);
       expect(hit!.event.source).toMatchObject({ kind: 'explosion', ownerId: cid, itemId: 'dynamite' });
-      expect(mob.health).toBe(100 - MINING_CONFIG.EXPLOSION_MOB_DAMAGE);
+      expect(mob.health).toBeCloseTo(100 - expected, 6);
     });
 
     it('pickaxe swings on blocks: type mining, credited to the player', () => {
@@ -276,15 +278,15 @@ describe('MiningDamageSystem', () => {
 
     it('mobs digging: type mining, credited to the mob', () => {
       engine.grid[20][26] = { type: MiningTileType.DIRT, revealed: true };
-      const mob = spawn(25.5, { miningSpeed: 100 });
-      engine.handleMobMining(mob, { x: 26, y: 20 }, 0.1);
+      const mob = spawn(25.5);
+      mobSwing(engine, mob, { x: 26, y: 20 });
       const hit = hits.find((h) => h.kind === 'tile');
       expect(hit!.event).toMatchObject({ type: 'mining', source: { kind: 'mob', id: mob.id } });
     });
 
     it('mob attacks: type melee, credited to the mob, knocking the player away', () => {
-      const mob = spawn(23.4, { attack: 7 });
-      tick(2);
+      const mob = spawn(23.4, { mobEffects: mobEffects({ weaponDamage: 7 }) });
+      tick(12);
       const hit = hits.find((h) => h.kind === 'entity' && h.target.kind === 'player');
       expect(hit).toBeDefined();
       expect(hit!.event).toMatchObject({ type: 'melee', amount: 7, source: { kind: 'mob', id: mob.id, name: 'Mole' } });

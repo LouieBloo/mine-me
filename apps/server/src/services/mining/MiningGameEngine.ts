@@ -1,6 +1,8 @@
 import { Socket } from 'socket.io';
 import {
   MINING_CONFIG,
+  isInInterest,
+  roundWire,
   MiningTileType,
   type MiningBackpackItem,
   type MiningDroppedItem,
@@ -34,6 +36,9 @@ import { MiningDamageSystem } from './MiningDamageSystem';
 import type { MiningWorld } from './MiningWorld';
 import {
   collectSpawned,
+  droppedItemDynamic,
+  droppedListChanged,
+  inView,
   dynamiteDynamic,
   mobDynamic,
   playerDynamic,
@@ -606,6 +611,9 @@ export class MiningGameEngine {
       get players() {
         return engine.playerManager.players;
       },
+      get tick() {
+        return engine.tickCount;
+      },
       get simTime() {
         return engine.elapsedTimeSeconds;
       },
@@ -649,8 +657,8 @@ export class MiningGameEngine {
     this.mobSubsystem.updateActiveMobs(dt);
   }
 
-  public handleMobMining(mob: MiningActiveMobSession, target: MiningPosition, dt: number): void {
-    this.mobSubsystem.handleMobMining(mob, target, dt);
+  public handleMobMining(mob: MiningActiveMobSession, target: MiningPosition): void {
+    this.mobSubsystem.handleMobMining(mob, target);
   }
 
   public killMob(mob: MiningActiveMobSession): void {
@@ -687,42 +695,77 @@ export class MiningGameEngine {
   }
 
   private broadcastStateTick(): void {
-    const fallingRockPayloads: MiningFallingRock[] = this.activeRocks.map((r) => ({
-      id: r.id,
-      position: { x: r.position.x, y: r.position.y },
-      velocity: { x: r.velocity.x, y: r.velocity.y },
-      angle: r.angle,
-    }));
-
-    // Dynamic fields only: static descriptions are sent once per client in `spawned` (MiningEntitySync)
-    const dynamitePayloads = this.activeDynamites.map(dynamiteDynamic);
-    const projectilePayloads = this.activeProjectiles.map(projectileDynamic);
     const mobSessions = Array.from(this.activeMobs.values());
-    const activeMobsPayload = mobSessions.map(mobDynamic);
+    const allDroppedItems = this.droppedItems.filter(
+      (i): i is typeof i & { id: string } => typeof i.id === 'string'
+    );
     const explosionsToSend = this.explosiveSubsystem.consumePendingExplosions();
     const gunshotsToSend = this.projectileSubsystem.consumePendingGunshots();
     const allBlockHits = this.blockSubsystem.consumePendingBlockHits();
+    const dropsDirty = this.dropSubsystem.droppedItemsDirty;
 
     for (const session of this.players.values()) {
       if (!session.socket || !session.socket.connected) continue;
 
-      const others = Array.from(this.players.values()).filter((p) => p.characterId !== session.characterId);
+      // Interest management: this client is only told about what is near its player, and only
+      // dynamic fields (static descriptions are sent once, in `spawned`; see MiningEntitySync)
+      const center = session.playerBody.position;
+      const known = session.known;
+      const mobsNear = inView(center, mobSessions, (m) => m.mobBody.position, (m) => known.mobs.has(m.id));
+      const projectilesNear = inView(center, this.activeProjectiles, (p) => p.position, (p) => known.projectiles.has(p.id));
+      const dynamitesNear = inView(center, this.activeDynamites, (d) => d.position, (d) => known.dynamites.has(d.id));
+      const dropsNear = inView(center, allDroppedItems, (i) => i.position, (i) => known.droppedItems.has(i.id));
+      const rocksNear = inView(center, this.activeRocks, (r) => r.position);
+      const others = inView(
+        center,
+        Array.from(this.players.values()).filter((p) => p.characterId !== session.characterId),
+        (p) => p.playerBody.position,
+        (p) => known.players.has(p.characterId)
+      );
+      const fallingRockPayloads: MiningFallingRock[] = rocksNear.map((r) => ({
+        id: r.id,
+        position: { x: roundWire(r.position.x), y: roundWire(r.position.y) },
+        velocity: { x: roundWire(r.velocity.x), y: roundWire(r.velocity.y) },
+        angle: roundWire(r.angle),
+      }));
+      const dynamitePayloads = dynamitesNear.map(dynamiteDynamic);
+      const projectilePayloads = projectilesNear.map(projectileDynamic);
       const otherPlayers = others.map(playerDynamic);
-      const spawned = collectSpawned(session.known, {
-        mobs: mobSessions,
-        projectiles: this.activeProjectiles,
-        dynamites: this.activeDynamites,
+      const explosionsNear = explosionsToSend.filter((e) => isInInterest(center, e.position));
+      const gunshotsNear = gunshotsToSend.filter((g) => isInInterest(center, g.position));
+
+      const spawned = collectSpawned(known, {
+        mobs: mobsNear,
+        projectiles: projectilesNear,
+        dynamites: dynamitesNear,
+        droppedItems: dropsNear,
         others,
       });
 
+      // Where the items in view are: sent when one moved/appeared/left, or when the view moved over others
+      const dropIds = dropsNear.map((i) => i.id);
+      const sendDrops = dropsDirty || droppedListChanged(known, dropIds);
+      const droppedItemsPayload = sendDrops ? dropsNear.map(droppedItemDynamic) : undefined;
+      if (sendDrops) known.droppedItemsSent = new Set(dropIds);
+
       const blockHitsToSend = this.blockHitsFor(session, allBlockHits);
 
-      const weaponAmmoPayload = this.projectileSubsystem.getAmmoStatus(session);
+      const ammo = this.projectileSubsystem.getAmmoStatus(session);
+      const ammoKey = ammo ? `${ammo.current}/${ammo.max}/${ammo.isReloading}` : null;
+      const weaponAmmoPayload = ammo && ammoKey !== known.weaponAmmoSent ? ammo : null;
+      known.weaponAmmoSent = ammoKey;
 
       const payload: MiningStateTickPayload = {
         tick: this.tickCount,
         position: { x: session.playerBody.position.x, y: session.playerBody.position.y },
         velocity: { x: session.playerBody.velocity.x, y: session.playerBody.velocity.y },
+        ackSequence: session.inputs.sequence,
+        ackAge: session.inputAge,
+        bodyState: {
+          isGrounded: session.playerBody.isGrounded,
+          isOnLadder: session.playerBody.isOnLadder,
+          knockbackRemaining: session.playerBody.knockbackRemaining,
+        },
         isMining: session.isMining,
         miningTarget: session.miningTarget ?? undefined,
         revealedTiles: this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined,
@@ -730,14 +773,14 @@ export class MiningGameEngine {
         activeDynamites: dynamitePayloads.length > 0 ? dynamitePayloads : undefined,
         activeProjectiles: projectilePayloads.length > 0 ? projectilePayloads : undefined,
         // Always sent (even when empty) so clients can tell "none" from "unchanged"
-        mobs: activeMobsPayload,
-        explosions: explosionsToSend.length > 0 ? explosionsToSend : undefined,
-        gunshots: gunshotsToSend.length > 0 ? gunshotsToSend : undefined,
+        mobs: mobsNear.map(mobDynamic),
+        explosions: explosionsNear.length > 0 ? explosionsNear : undefined,
+        gunshots: gunshotsNear.length > 0 ? gunshotsNear : undefined,
         blockHits: blockHitsToSend.length > 0 ? blockHitsToSend : undefined,
         otherPlayers,
         spawned,
         weaponAmmo: weaponAmmoPayload ?? undefined,
-        droppedItems: this.dropSubsystem.droppedItemsDirty ? this.droppedItems : undefined,
+        droppedItems: droppedItemsPayload,
         temporaryBackpack: session.backpackDirty ? session.temporaryBackpack : undefined,
       };
 

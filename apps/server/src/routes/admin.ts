@@ -4,6 +4,7 @@ import { adminMiddleware } from '../middleware/auth';
 import * as CityController from '../controllers/admin/city.controller';
 import * as ItemController from '../controllers/admin/item.controller';
 import * as MobController from '../controllers/admin/mob.controller';
+import * as MobSoundController from '../controllers/admin/mobSound.controller';
 import * as UserController from '../controllers/admin/user.controller';
 import * as InventoryController from '../controllers/admin/inventory.controller';
 import * as CharacterController from '../controllers/admin/character.controller';
@@ -54,6 +55,8 @@ adminRouter.get('/mobs/:id', MobController.getMob);
 adminRouter.post('/mobs', runValidation(AdminValidation.mobValidation), MobController.createMob);
 adminRouter.put('/mobs/:id', runValidation(AdminValidation.mobUpdateValidation), MobController.updateMob);
 adminRouter.put('/mobs/:id/skeleton', MobController.updateMobSkeleton);
+adminRouter.patch('/mobs/:id/sound-effects/:slot', MobSoundController.requireMobSoundSlot, MobSoundController.setMobSoundSlot);
+adminRouter.post('/mobs/:id/sound-effects/:slot', MobSoundController.requireMobSoundSlot, MobSoundController.mobSoundEffectUpload, MobSoundController.uploadMobSoundSlot);
 adminRouter.post('/mobs/:id/sprite-atlas', MobController.mobSpriteUpload, MobController.uploadMobSpriteAtlas);
 
 // USERS
@@ -113,6 +116,7 @@ adminRouter.delete('/particle-effects/:id', ParticleEffectController.deleteParti
 // SOUNDS & MUSIC
 adminRouter.get('/sounds', SoundController.getSounds);
 adminRouter.get('/sounds/:id', SoundController.getSound);
+adminRouter.post('/sounds/sync', SoundController.syncSounds);
 adminRouter.post('/sounds', SoundController.soundUploadMiddleware, SoundController.uploadSound);
 adminRouter.put('/sounds/:id', SoundController.updateSound);
 adminRouter.delete('/sounds/:id', SoundController.deleteSound);

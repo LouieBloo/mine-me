@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MiningSessionManager } from './MiningSessionManager';
-import { collectSpawned, createKnownEntities, toActiveMob } from './MiningEntitySync';
+import { collectSpawned,
+  droppedItemDynamic, createKnownEntities, toActiveMob } from './MiningEntitySync';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 
 vi.mock('../../index', () => ({ prisma: { character: { update: vi.fn() } } }));
@@ -32,9 +33,9 @@ describe('entity description sent once, dynamic fields every tick', () => {
 
   describe('mobs', () => {
     it('describes a mob once, then sends only dynamic fields', () => {
-      const mob = engine.spawnMob({ id: 'mole', name: 'Mole', health: 40, animations: { big: 'manifest' }, spriteUrl: '/m.png' }, { x: 10, y: 15 });
+      const mob = engine.spawnMob({ id: 'mole', name: 'Mole', health: 40, animations: { url: '/big.png', atlasUrl: '/big.json' }, spriteUrl: '/m.png' }, { x: 10, y: 15 });
       tick();
-      expect(last(a).spawned.mobs).toEqual([expect.objectContaining({ id: mob.id, name: 'Mole', animations: { big: 'manifest' }, maxHealth: 40 })]);
+      expect(last(a).spawned.mobs).toEqual([expect.objectContaining({ id: mob.id, name: 'Mole', animations: { url: '/big.png', atlasUrl: '/big.json' }, maxHealth: 40 })]);
 
       tick();
       expect(last(a).spawned).toBeUndefined();
@@ -45,6 +46,15 @@ describe('entity description sent once, dynamic fields every tick', () => {
       const DYNAMIC = ['animationState', 'health', 'id', 'isFacingLeft', 'isMining', 'miningTarget', 'position', 'velocity'];
       expect(Object.keys(dynamic).every((k) => DYNAMIC.includes(k))).toBe(true);
       expect(Object.keys(dynamic)).toEqual(expect.arrayContaining(['id', 'position', 'velocity', 'health', 'animationState']));
+    });
+
+    it('sends a mob\'s sound slots once with its description, never per tick', () => {
+      const sounds = { attack: { soundId: 's1', url: '/assets/sounds/a.mp3', volume: 1, loop: false } };
+      const mob = engine.spawnMob({ id: 'growler', name: 'Growler', sounds }, { x: 10, y: 15 });
+      tick();
+      expect(last(a).spawned.mobs).toEqual([expect.objectContaining({ id: mob.id, sounds })]);
+      tick();
+      expect(wire(last(a).mobs)[0]).not.toHaveProperty('sounds');
     });
 
     it('describes a mob that appears later, exactly once', () => {
@@ -188,7 +198,7 @@ describe('entity description sent once, dynamic fields every tick', () => {
   describe('payload size', () => {
     it('keeps a steady-state tick far smaller than re-sending every description', () => {
       // Real mob data, including its full animation manifest
-      const mole = MiningDataManager.getInstance().getMobData('Mole Person');
+      const mole = MiningDataManager.getInstance().getMobData('Mole Person')!;
       expect(mole?.animations).toBeDefined();
       for (let i = 0; i < 20; i++) engine.spawnMob(mole, { x: 5 + (i % 15), y: 15 });
 
@@ -241,5 +251,20 @@ describe('collectSpawned', () => {
     collectSpawned(known, { mobs: [], projectiles: [], dynamites: [], others: [] });
     expect(known.mobs.size).toBe(0);
     expect(known.players.size).toBe(0);
+  });
+
+  it('describes a dropped item once, then never again while it stays on the floor', () => {
+    const known = createKnownEntities();
+    const item = { id: 'd1', itemId: 'gem', itemName: 'Gem', iconUrl: '/g.png', quantity: 1, position: { x: 1, y: 1 } } as any;
+    const world = { mobs: [], projectiles: [], dynamites: [], others: [], droppedItems: [item] };
+    expect(collectSpawned(known, world)?.droppedItems).toEqual([item]);
+    expect(collectSpawned(known, world)).toBeUndefined();
+    collectSpawned(known, { ...world, droppedItems: [] }); // picked up
+    expect(known.droppedItems.size).toBe(0);
+  });
+
+  it('puts only an id and a position (to 1/100 tile) in a dropped item\'s dynamic part', () => {
+    const dyn = droppedItemDynamic({ id: 'd1', itemId: 'gem', itemName: 'Gem', iconUrl: null, quantity: 1, position: { x: 1.23456, y: 7.891 }, inGameSpriteUrl: '/x.png' });
+    expect(dyn).toEqual({ id: 'd1', position: { x: 1.23, y: 7.89 } });
   });
 });

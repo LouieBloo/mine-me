@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
-import { hitMob } from './testHelpers';
+import { hitMob, mobEffects, mobSwing } from './testHelpers';
 
 describe('mob hit stun (no stun-lock)', () => {
   const cid = 'stun-char';
@@ -14,7 +14,7 @@ describe('mob hit stun (no stun-lock)', () => {
       engine.grid[21][x] = { type: MiningTileType.DIRT, revealed: true };
     }
     // Far from the player so it just stands around instead of attacking
-    return engine.spawnMob({ id: 'm', name: 'Mole', health: 100000, attack: 1, ...extra }, { x: 26.5, y: 21 });
+    return engine.spawnMob({ id: 'm', name: 'Mole', health: 100000, mobEffects: mobEffects({ weaponDamage: 1, toolDamage: 25, miningSpeed: 25 }), ...extra }, { x: 26.5, y: 21 });
   };
 
   beforeEach(() => {
@@ -117,19 +117,18 @@ describe('mob hit stun (no stun-lock)', () => {
     expect(mob.mobBody.velocity).toMatchObject({ x: 4.5, y: -3.2 });
   });
 
-  it('a stun interrupts digging and clears the dig feedback batching', () => {
-    const mob = spawn({ miningSpeed: 1 }); // (clears the room, so place the block afterwards)
+  it('a stun interrupts digging', () => {
+    const mob = spawn(); // (clears the room, so place the block afterwards)
     engine.grid[20][27] = { type: MiningTileType.DIRT, revealed: true };
-    // The AI step marks the mob as digging; the dig itself batches feedback per target
+    // The AI step marks the mob as digging
     mob.isMining = true;
     mob.miningTarget = { x: 27, y: 20 };
-    engine.handleMobMining(mob, { x: 27, y: 20 }, 0.1);
-    expect(mob.digTargetKey).toBe('27,20');
+    mobSwing(engine, mob, { x: 27, y: 20 });
+    expect(mob.isMining).toBe(true);
 
     hitMob(engine, mob.id, 1);
     expect(mob.isMining).toBe(false);
     expect(mob.miningTarget).toBeNull();
-    expect(mob.digTargetKey).toBeNull();
   });
 
   it('a hit that is ignored for stun (already stunned) does not interrupt anything new', () => {

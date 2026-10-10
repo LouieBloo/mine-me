@@ -5,6 +5,8 @@ import { ITEM_TYPES, ITEM_SUBTYPES, ITEM_RARITIES } from '@mine-me/shared';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import { getSoundsDir, resolveAssetUrl } from '../../config/assetPaths';
+import { tryRegisterSoundFile, tryUnregisterSoundFile } from '../../services/soundLibrary.service';
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -62,7 +64,7 @@ export const itemInGameSpriteUpload = uploadInGameSprite.single('inGameSprite');
 
 const itemSoundEffectStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const dir = path.join(__dirname, '../../../../../packages/shared/assets/sounds/items');
+    const dir = getSoundsDir('items');
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -348,6 +350,14 @@ export const uploadItemSoundEffect = async (req: Request, res: Response) => {
     }
 
     const soundEffectUrl = `/assets/sounds/items/${file.filename}`;
+    await tryRegisterSoundFile(prisma, {
+      url: soundEffectUrl,
+      fileName: file.filename,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+      category: 'ITEM',
+      name: `${(item as any).name} - ${slot}`,
+    });
     const rawEffects = (item as any).soundEffects;
     const currentSoundEffects: Record<string, any> =
       rawEffects && typeof rawEffects === 'object' ? { ...rawEffects } : {};
@@ -482,7 +492,7 @@ export const removeItemSoundEffect = async (req: Request, res: Response) => {
     const slotUrl =
       currentSoundEffects[slot]?.url || (slot === 'throw' ? (item as any).soundEffectUrl : null);
     if (slotUrl) {
-      const filePath = path.join(__dirname, '../../../../../packages/shared', slotUrl);
+      const filePath = resolveAssetUrl(slotUrl);
       if (fs.existsSync(filePath)) {
         try {
           fs.unlinkSync(filePath);
@@ -490,6 +500,7 @@ export const removeItemSoundEffect = async (req: Request, res: Response) => {
           console.warn('Could not remove sound effect file:', e);
         }
       }
+      await tryUnregisterSoundFile(prisma, slotUrl);
     }
 
     currentSoundEffects[slot] = {

@@ -172,7 +172,7 @@ describe('tool stats: one swing, separate tool/weapon damage, pick power, knockb
   describe('pick power', () => {
     const setRequired = (type: MiningTileType, required: number) => {
       const dm = MiningDataManager.getInstance();
-      const cfg = dm.getBlockConfig(type);
+      const cfg = dm.getBlockConfig(type)!;
       const original = cfg.requiredPickPower;
       cfg.requiredPickPower = required;
       return () => { cfg.requiredPickPower = original; };

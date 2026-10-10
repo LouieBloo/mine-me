@@ -102,7 +102,7 @@ export const handleMiningStart = async (
       success: true,
       data: { sessionState },
     };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 };

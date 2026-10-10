@@ -185,6 +185,7 @@ async function main() {
       colliderWidth,
       colliderHeight,
       showHealthBar,
+      mobEffects,
       ...mobRoot
     } = mobData;
     await prisma.mob.upsert({
@@ -192,6 +193,16 @@ async function main() {
       update: mobRoot,
       create: mobRoot,
     });
+
+    // Combat stats are effects, exactly as for items
+    if (mobEffects && mobEffects.length > 0) {
+      await prisma.objectEffects.deleteMany({ where: { mobId: mobRoot.id } });
+      for (const me of mobEffects) {
+        await prisma.objectEffects.create({
+          data: { mobId: mobRoot.id, effectId: me.effectId, value: me.value },
+        });
+      }
+    }
 
     if (dropTable) {
       await seedDropTable(dropTable, { mobId: mobRoot.id });

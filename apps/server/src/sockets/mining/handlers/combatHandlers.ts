@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../../../index';
-import { ITEM_ROLE_WHERE, type GameEventResult, type Vector2D, sanitizeWorldPoint } from '@mine-me/shared';
+import { ITEM_ROLE_WHERE, type GameEventResult, type ItemPhysicsConfig, type ItemSoundEffectsConfig, type Vector2D, sanitizeWorldPoint } from '@mine-me/shared';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
 import { broadcastInventory, consumeInventoryItem, refundInventoryItem } from './inventoryActions';
 
@@ -34,13 +34,13 @@ export const handleMiningThrowDynamite = async (
       : undefined;
 
   // 1. Check the character owns the specified item and that it is throwable
-  const inventoryItemToThrow: any = await prisma.inventoryItem.findFirst({
+  const inventoryItemToThrow = await prisma.inventoryItem.findFirst({
     where: {
       characterId,
       itemId: payload.itemId,
       quantity: { gt: 0 },
       item: ITEM_ROLE_WHERE.throwable,
-    } as any,
+    },
     include: {
       item: {
         include: {
@@ -62,12 +62,11 @@ export const handleMiningThrowDynamite = async (
   }
 
   // 3. Launch throwable item in server engine (calculates throw trajectory & starts fuse)
-  const itemPhysicsConfig = ((inventoryItemToThrow.item as any).physicsConfig as any) || undefined;
-  const explodeEffect = (inventoryItemToThrow.item as any)?.itemEffects?.find(
-    (ie: any) => ie.effect?.explodes === true && ie.value > 0
-  );
+  const thrownItem = inventoryItemToThrow.item;
+  const itemPhysicsConfig = (thrownItem.physicsConfig as ItemPhysicsConfig | null) ?? undefined;
+  const explodeEffect = thrownItem.itemEffects.find((ie) => ie.effect?.explodes === true && ie.value > 0);
   const explosionRadius = explodeEffect ? Number(explodeEffect.value) : undefined;
-  const soundEffects = (inventoryItemToThrow.item as any)?.soundEffects || undefined;
+  const soundEffects = (thrownItem.soundEffects as ItemSoundEffectsConfig | null) ?? undefined;
 
   const thrown = engine.throwDynamite(characterId, {
     target: throwTarget,

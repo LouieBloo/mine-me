@@ -6,8 +6,10 @@ import {
   type MiningPosition,
   type Vector2D,
   getAssetUrl,
-  MobSoundProfileRegistry,
+  getMobSpriteUrl,
+  isSkeletonManifest,
   MINING_SPATIAL_AUDIO_PRESETS,
+  type MobSoundSlot,
 } from '@mine-me/shared';
 import type { SoundManager } from '../../../../../services/sound';
 import { TILE_SIZE } from './MiningTileRenderer';
@@ -35,7 +37,17 @@ export interface MobInstance {
   colliderHeight?: number;
   showHealthBar?: boolean;
   hitWobbleTimer?: number;
+  /** Playable sound slots sent with the mob (dig, idle, damage, attack, death). */
+  sounds?: MiningActiveMob['sounds'];
 }
+
+const SLOT_SPATIAL: Record<MobSoundSlot, (typeof MINING_SPATIAL_AUDIO_PRESETS)[keyof typeof MINING_SPATIAL_AUDIO_PRESETS]> = {
+  dig: MINING_SPATIAL_AUDIO_PRESETS.MOB_DIGGING,
+  idle: MINING_SPATIAL_AUDIO_PRESETS.MOB_IDLE,
+  damage: MINING_SPATIAL_AUDIO_PRESETS.MOB_DAMAGE,
+  attack: MINING_SPATIAL_AUDIO_PRESETS.MOB_ATTACK,
+  death: MINING_SPATIAL_AUDIO_PRESETS.MOB_DEATH,
+};
 
 /**
  * Manages Pixi rendering, skeletal sprite instances, position interpolation,
@@ -63,6 +75,31 @@ export class MiningMobRenderer {
 
   public setFloatingTextManager(ftm: FloatingTextManager | null): void {
     this.floatingTextManager = ftm;
+  }
+
+  /**
+   * Plays one of a mob's sound slots at its position. Silent when the slot has no sound (the
+   * default for mobs nobody has configured) or there is no sound manager.
+   */
+  private playMobSound(instance: MobInstance, slot: MobSoundSlot): void {
+    const slotConfig = instance.sounds?.[slot];
+    if (!slotConfig?.url || !this.soundManager) return;
+    const options = {
+      spatial: SLOT_SPATIAL[slot],
+      ...(slotConfig.volume !== undefined && { volumeScale: slotConfig.volume }),
+    };
+    const position = { x: instance.currentPos.x + 0.5, y: instance.currentPos.y + 0.5 };
+    if (typeof this.soundManager.playPositionalSfx === 'function') {
+      this.soundManager.playPositionalSfx(slotConfig.url, position, options);
+    } else {
+      this.soundManager.playSfx(slotConfig.url, { position, ...options });
+    }
+  }
+
+  /** Starts fetching a mob's sounds the first time it is seen, so its first growl isn't late. */
+  private preloadMobSounds(sounds: MiningActiveMob['sounds']): void {
+    const urls = Object.values(sounds ?? {}).flatMap((slot) => (slot?.url ? [slot.url] : []));
+    if (urls.length > 0) this.soundManager?.preloadSfx?.(urls);
   }
 
   public getMobCount(): number {
@@ -100,6 +137,7 @@ export class MiningMobRenderer {
       let instance = this.mobs.get(mobData.id);
 
       if (!instance) {
+        this.preloadMobSounds(mobData.sounds);
         const mobContainer = new Container();
         mobContainer.x = mobData.position.x * TILE_SIZE;
         mobContainer.y = mobData.position.y * TILE_SIZE;
@@ -111,7 +149,7 @@ export class MiningMobRenderer {
 
         const spriteUrl =
           mobData.spriteUrl ||
-          (mobData.animations && !mobData.animations.parts ? mobData.animations.url : undefined);
+          getMobSpriteUrl(mobData.animations);
 
         if (spriteUrl) {
           // Single-sprite entity (e.g. Target Dummy, static objects)
@@ -140,6 +178,7 @@ export class MiningMobRenderer {
             isLoaded: false,
             lastDigSoundTime: 0,
             lastIdleSoundTime: now + Math.random() * 3000,
+            sounds: mobData.sounds,
             colliderWidth: mobData.colliderWidth,
             colliderHeight: mobData.colliderHeight,
             showHealthBar,
@@ -171,7 +210,7 @@ export class MiningMobRenderer {
         } else {
           // Modular entity skeletal puppet (e.g. Mole Person)
           const sprite = new ModularEntitySprite(mobContainer, {
-            manifestData: mobData.animations?.parts ? mobData.animations : undefined,
+            manifestData: isSkeletonManifest(mobData.animations) ? mobData.animations : undefined,
           });
 
           instance = {
@@ -192,6 +231,7 @@ export class MiningMobRenderer {
             isLoaded: false,
             lastDigSoundTime: 0,
             lastIdleSoundTime: now + Math.random() * 3000,
+            sounds: mobData.sounds,
             colliderWidth: mobData.colliderWidth,
             colliderHeight: mobData.colliderHeight,
             showHealthBar,
@@ -224,6 +264,11 @@ export class MiningMobRenderer {
             });
         }
       } else {
+        if (mobData.sounds) instance.sounds = mobData.sounds;
+        // A swing starts the moment the mob's state becomes 'attack'
+        if (mobData.animationState === 'attack' && instance.animationState !== 'attack') {
+          this.playMobSound(instance, 'attack');
+        }
         instance.targetPos.x = mobData.position.x;
         instance.targetPos.y = mobData.position.y;
         instance.isFacingLeft = mobData.isFacingLeft;
@@ -250,21 +295,8 @@ export class MiningMobRenderer {
             instance.hitWobbleTimer = 220;
           }
 
-          const profile = MobSoundProfileRegistry.getProfile(instance.mobId);
-          const damageSound = profile?.getSlot('damage')?.defaultUrl;
-          if (damageSound && this.soundManager) {
-            const soundPos = { x: instance.currentPos.x + 0.5, y: instance.currentPos.y + 0.5 };
-            if (typeof this.soundManager.playPositionalSfx === 'function') {
-              this.soundManager.playPositionalSfx(damageSound, soundPos, {
-                spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_DAMAGE,
-              });
-            } else {
-              this.soundManager.playSfx(damageSound, {
-                position: soundPos,
-                spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_DAMAGE,
-              });
-            }
-          }
+          // The killing blow plays the death sound instead of the hurt sound
+          this.playMobSound(instance, mobData.health <= 0 ? 'death' : 'damage');
         }
 
         if (instance.health !== mobData.health || instance.maxHealth !== mobData.maxHealth) {
@@ -350,48 +382,17 @@ export class MiningMobRenderer {
 
       // Audio triggers
       if (this.soundManager) {
-        const profile = MobSoundProfileRegistry.getProfile(instance.mobId);
-        const soundPos = { x: instance.currentPos.x + 0.5, y: instance.currentPos.y + 0.5 };
-
-        // 1. Digging / Clawing sound
+        // 1. Digging / clawing
         const isCurrentlyMining = instance.isMining || instance.animationState === 'mine';
-        if (isCurrentlyMining) {
-          if (now - instance.lastDigSoundTime >= 360) {
-            instance.lastDigSoundTime = now;
-            const digSound = profile?.getSlot('dig')?.defaultUrl;
-            if (digSound) {
-              if (typeof this.soundManager.playPositionalSfx === 'function') {
-                this.soundManager.playPositionalSfx(digSound, soundPos, {
-                  spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_DIGGING,
-                });
-              } else {
-                this.soundManager.playSfx(digSound, {
-                  position: soundPos,
-                  spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_DIGGING,
-                });
-              }
-            }
-          }
+        if (isCurrentlyMining && now - instance.lastDigSoundTime >= 360) {
+          instance.lastDigSoundTime = now;
+          this.playMobSound(instance, 'dig');
         }
 
-        // 2. Ambient idle snuffle sound
-        if (instance.animationState === 'idle' && !isCurrentlyMining) {
-          if (now - instance.lastIdleSoundTime >= 6500) {
-            instance.lastIdleSoundTime = now + (Math.random() * 2000 - 1000);
-            const idleSound = profile?.getSlot('idle')?.defaultUrl;
-            if (idleSound) {
-              if (typeof this.soundManager.playPositionalSfx === 'function') {
-                this.soundManager.playPositionalSfx(idleSound, soundPos, {
-                  spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_IDLE,
-                });
-              } else {
-                this.soundManager.playSfx(idleSound, {
-                  position: soundPos,
-                  spatial: MINING_SPATIAL_AUDIO_PRESETS.MOB_IDLE,
-                });
-              }
-            }
-          }
+        // 2. Ambient idle
+        if (instance.animationState === 'idle' && !isCurrentlyMining && now - instance.lastIdleSoundTime >= 6500) {
+          instance.lastIdleSoundTime = now + (Math.random() * 2000 - 1000);
+          this.playMobSound(instance, 'idle');
         }
       }
     }

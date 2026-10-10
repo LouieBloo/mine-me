@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { describeEffectKinds, getEffectKind } from '../../Effects/effectKinds';
+import { EffectsEditor } from '../../../components/EffectsEditor/EffectsEditor';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../contexts/ToastContext';
 import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
@@ -331,134 +331,12 @@ export default function ItemDetail() {
                   )}
                 </div>
                 
-                {/* Add effect form */}
-                <div className="flex gap-4 items-end flex-wrap">
-                  <div className="flex-grow min-w-[200px] space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Effect</label>
-                    <select
-                      id="effect-select"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-lg font-bold text-slate-800 cursor-pointer"
-                    >
-                      <option value="">-- Choose an Effect --</option>
-                      {effectsList.map(eff => (
-                        <option key={eff.id} value={eff.id}>
-                          {eff.name} {describeEffectKinds(eff)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="w-24 space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Value</label>
-                    <input
-                      type="number"
-                      id="effect-value-input"
-                      defaultValue="10"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-lg font-bold text-slate-800"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const selectEl = document.getElementById('effect-select') as HTMLSelectElement;
-                      const valueEl = document.getElementById('effect-value-input') as HTMLInputElement;
-                      if (!selectEl || !valueEl || !selectEl.value) return;
-                      
-                      const effectId = selectEl.value;
-                      const val = Number(valueEl.value);
-                      
-                      const selectedEffect = effectsList.find(e => e.id === effectId);
-                      if (!selectedEffect) return;
-
-                      // Check if already exists
-                      const exists = (data.itemEffects || []).some((ie: any) => ie.effectId === effectId);
-                      if (exists) {
-                        toast.error('This effect is already added to the item.');
-                        return;
-                      }
-
-                      const newEffects = [...(data.itemEffects || []), {
-                        effectId,
-                        value: val,
-                        effect: selectedEffect
-                      }];
-                      setData({ ...data, itemEffects: newEffects });
-                      selectEl.value = '';
-                    }}
-                    className="cursor-pointer px-5 py-2.5 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-all text-sm active:scale-95"
-                  >
-                    Add Effect
-                  </button>
-                </div>
-
-                {/* List of current effects */}
-                <div className="space-y-2 pt-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Active Effects ({ (data.itemEffects || []).length })
-                  </label>
-                  {(data.itemEffects || []).length === 0 ? (
-                    <p className="text-slate-400 text-xs italic">No effects configured for this item.</p>
-                  ) : (
-                    <div className="divide-y divide-slate-100 bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                      {(data.itemEffects || []).map((ie: any, idx: number) => (
-                        <div
-                          key={ie.effectId || idx}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 gap-3 hover:bg-slate-50/70 transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-slate-800">{ie.effect?.name || 'Effect'}</span>
-                              <span
-                                className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                  getEffectKind(ie.effect)?.badge ?? 'text-slate-700 bg-slate-100 border border-slate-200'
-                                }`}
-                              >
-                                {getEffectKind(ie.effect)?.short ?? 'Modifier'}
-                              </span>
-                            </div>
-                            {ie.effect?.description && (
-                              <p className="text-slate-500 text-xs mt-0.5">{ie.effect.description}</p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-3 self-end sm:self-auto">
-                            <div className="flex items-center gap-1.5 bg-slate-100/90 px-3 py-1.5 rounded-lg border border-slate-200">
-                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                Value
-                              </label>
-                              <input
-                                type="number"
-                                value={ie.value ?? ''}
-                                onChange={(e) => {
-                                  const newVal = e.target.value === '' ? 0 : Number(e.target.value);
-                                  const updated = (data.itemEffects || []).map((itemEff: any, i: number) =>
-                                    (itemEff.effectId === ie.effectId || i === idx)
-                                      ? { ...itemEff, value: newVal }
-                                      : itemEff
-                                  );
-                                  setData({ ...data, itemEffects: updated });
-                                }}
-                                className="w-20 px-2 py-1 bg-white border border-slate-200 focus:border-blue-500 rounded font-bold text-slate-800 text-sm text-right focus:ring-1 focus:ring-blue-500 outline-none"
-                              />
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newEffects = (data.itemEffects || []).filter(
-                                  (itemEff: any, i: number) => itemEff.effectId !== ie.effectId && i !== idx
-                                );
-                                setData({ ...data, itemEffects: newEffects });
-                              }}
-                              className="cursor-pointer px-2.5 py-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg font-bold text-xs transition-colors"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <EffectsEditor
+                  value={data.itemEffects || []}
+                  available={effectsList}
+                  onChange={(itemEffects) => setData({ ...data, itemEffects })}
+                  ownerLabel="item"
+                />
               </div>
             )}
 

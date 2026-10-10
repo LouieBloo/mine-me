@@ -1,29 +1,29 @@
 import { useEffect } from 'react';
-import type { Container, Texture, Graphics, Sprite } from 'pixi.js';
 import {
-  type MiningClientTile,
   MiningTileType,
   MINING_CONFIG,
   DEFAULT_PARTICLE_EFFECTS,
 } from '@mine-me/shared';
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
-import type { EmitterHandle, ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
-import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
+import type { MiningClientWorld } from '../systems/MiningClientWorld';
 
 export interface UseMiningAmbientEffectsOptions {
+  world: Pick<
+    MiningClientWorld,
+    | 'tilesContainerRef'
+    | 'gridRef'
+    | 'blockTexturesRef'
+    | 'tileGraphicsMap'
+    | 'tileSpritesMap'
+    | 'lightingEngineRef'
+    | 'particleEngineRef'
+    | 'blockParticleConfigsRef'
+    | 'torchEmittersRef'
+    | 'blockEmittersRef'
+  >;
   containersReady: boolean;
   tileTextureLoaded: number;
-  tilesContainerRef: React.RefObject<Container | null>;
-  gridRef: React.MutableRefObject<MiningClientTile[][]>;
-  blockTexturesRef: React.MutableRefObject<Map<number, Texture>>;
-  tileGraphicsMap: React.MutableRefObject<Map<string, Graphics>>;
-  tileSpritesMap: React.MutableRefObject<Map<string, Sprite>>;
-  lightingEngineRef: React.RefObject<LightingEngine | null>;
-  particleEngineRef: React.RefObject<ParticleEngine | null>;
-  blockParticleConfigsRef: React.MutableRefObject<Map<number, any>>;
-  torchEmittersRef: React.MutableRefObject<Map<string, EmitterHandle>>;
-  blockEmittersRef: React.MutableRefObject<Map<string, EmitterHandle>>;
 }
 
 /**
@@ -31,19 +31,22 @@ export interface UseMiningAmbientEffectsOptions {
  * (chest lights, torch lights & flame particles, ambient ore sparkles).
  */
 export function useMiningAmbientEffects({
+  world,
   containersReady,
   tileTextureLoaded,
-  tilesContainerRef,
-  gridRef,
-  blockTexturesRef,
-  tileGraphicsMap,
-  tileSpritesMap,
-  lightingEngineRef,
-  particleEngineRef,
-  blockParticleConfigsRef,
-  torchEmittersRef,
-  blockEmittersRef,
 }: UseMiningAmbientEffectsOptions) {
+  const {
+    tilesContainerRef,
+    gridRef,
+    blockTexturesRef,
+    tileGraphicsMap,
+    tileSpritesMap,
+    lightingEngineRef,
+    particleEngineRef,
+    blockParticleConfigsRef,
+    torchEmittersRef,
+    blockEmittersRef,
+  } = world;
   useEffect(() => {
     const tilesContainer = tilesContainerRef.current;
     if (!tilesContainer || !containersReady) return;

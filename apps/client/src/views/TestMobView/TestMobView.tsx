@@ -3,7 +3,7 @@ import { Application } from '@pixi/react';
 import { Application as PixiApplication } from 'pixi.js';
 import { useApi } from '../../hooks/useApi';
 import { MobSprite } from '../../components/game/MobSprite/MobSprite';
-import { MOB_ANIMATION_KEYS } from '@mine-me/shared';
+import { MOB_ANIMATION_KEYS, deriveCombatStats } from '@mine-me/shared';
 import type { Mob, MobAtlas } from '@mine-me/shared';
 import './TestMobView.css';
 
@@ -206,7 +206,7 @@ export const TestMobView = () => {
             </div>
             <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5">
               <span className="text-[10px] text-slate-500 font-bold uppercase block">ATK</span>
-              <span className="text-red-400 font-black text-sm">{selectedMob.attack}</span>
+              <span className="text-red-400 font-black text-sm">{deriveCombatStats(selectedMob.mobEffects).weaponDamage}</span>
             </div>
             <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5">
               <span className="text-[10px] text-slate-500 font-bold uppercase block">DEF</span>

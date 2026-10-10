@@ -1,0 +1,13 @@
+@reference "../../index.css";
+
+.effects-editor {
+  @apply space-y-4;
+}
+
+.effects-editor-row {
+  @apply flex flex-col sm:flex-row sm:items-center justify-between p-3.5 gap-3 transition-colors;
+}
+
+.effects-editor-row:hover {
+  @apply bg-slate-50/70;
+}

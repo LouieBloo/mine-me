@@ -1,5 +1,5 @@
 import type { GameItem } from '../types';
-import { sumItemEffect } from './combatStats';
+import { deriveCombatStats } from './entityStats';
 
 export interface CharacterModifications {
   combatScore: number;
@@ -37,11 +37,12 @@ export class CharacterModEngine {
         if (item.combatScore) mods.combatScore += item.combatScore;
         if (item.defenseScore) mods.defenseScore += item.defenseScore;
 
-        mods.miningSpeed += sumItemEffect(item, 'miningSpeedModifier');
-        mods.toolDamage += sumItemEffect(item, 'toolDamageModifier');
-        mods.weaponDamage += sumItemEffect(item, 'damageModifier');
-        mods.pickPower += sumItemEffect(item, 'pickPowerModifier');
-        mods.knockback += sumItemEffect(item, 'knockbackModifier');
+        const stats = deriveCombatStats(item.itemEffects);
+        mods.miningSpeed += stats.miningSpeed;
+        mods.toolDamage += stats.toolDamage;
+        mods.weaponDamage += stats.weaponDamage;
+        mods.pickPower += stats.pickPower;
+        mods.knockback += stats.knockback;
       }
     }
 

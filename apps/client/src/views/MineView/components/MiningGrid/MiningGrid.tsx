@@ -32,6 +32,8 @@ import { TILE_SIZE } from './renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from './renderers/DynamiteVisualManager';
 import { DroppedItemVisualManager } from './renderers/DroppedItemVisualManager';
 import { ProjectileVisualManager } from './renderers/ProjectileVisualManager';
+import { MiningPredictionState } from './systems/MiningPredictionState';
+import type { MiningClientWorld } from './systems/MiningClientWorld';
 import './MiningGrid.css';
 
 interface MiningGridProps {
@@ -39,6 +41,7 @@ interface MiningGridProps {
   playerState: PlayerState;
   onExit: () => void;
   onAssetsLoaded?: () => void;
+  onLoadProgress?: (fraction: number) => void;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
   isPlacingTorch?: boolean;
@@ -59,6 +62,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   sessionState: initialSessionState,
   playerState,
   onAssetsLoaded,
+  onLoadProgress,
   zoom = 1.5,
   onZoomChange,
   isPlacingTorch = false,
@@ -87,6 +91,14 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const playerBodyRef = useRef<MiningPlayerBody>(
     new MiningPlayerBody(initialSessionState.position)
   );
+
+  // Fixed-step prediction + reconciliation for the local player (wraps the body above)
+  const predictionRef = useRef<MiningPredictionState | null>(null);
+  if (!predictionRef.current) {
+    predictionRef.current = new MiningPredictionState(playerBodyRef.current, {
+      up: false, down: false, left: false, right: false, jump: false, miningKey: false, sequence: 0,
+    });
+  }
 
   // Interaction and mining state refs
   const isMiningRef = useRef<boolean>(initialSessionState.isMining ?? false);
@@ -249,8 +261,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     dynamiteTextureRef,
     projectilesContainerRef,
     projectileGraphicsMap,
-    bulletTextureRef,
-    bulletScaleRef,
+    projectileTexturesRef,
     dynamicItemsRef,
     playerSpriteRef,
     remotePlayerRendererRef,
@@ -268,6 +279,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     isFacingLeftRef,
     zoom,
     onAssetsLoaded,
+    onLoadProgress,
+    soundManager,
     onDynamicItemsLoaded: setDynamicItems,
   });
 
@@ -292,16 +305,13 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   }, []);
 
   // Configure Active Mouse Actions (Torch, Ladder, Throwables, Shooting, Weapon Sounds & Reload)
-  const { weaponSoundUrlRef, weaponAmmoStateRef, handleWeaponReload } = useMiningActions({
-    playerState,
-    equippedWeapon,
+  const sceneWorld = {
     playerSpriteRef,
     gridContainerRef,
     mouseControllerRef,
     gridRef,
     playerBodyRef,
     tilesContainerRef,
-    containersReady,
     blockTexturesRef,
     tileGraphicsMap,
     tileSpritesMap,
@@ -311,6 +321,20 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     particleEngineRef,
     lightingEngineRef,
     dynamicItemsRef,
+    flashlightRef,
+    showDebugRef,
+    playerFacingDirRef,
+    isFacingLeftRef,
+    torchEmittersRef,
+    blockEmittersRef,
+    blockParticleConfigsRef,
+  };
+
+  const { weaponSoundUrlRef, weaponAmmoStateRef, handleWeaponReload } = useMiningActions({
+    world: sceneWorld,
+    playerState,
+    equippedWeapon,
+    containersReady,
     soundManager,
     sendGameEvent,
     isPlacingTorch,
@@ -321,20 +345,15 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     isThrowingItem,
     activeThrowableItem,
     onDynamiteThrown,
-    });
+  });
 
   const lastWeaponSoundTimeRef = useRef<number>(0);
 
   // Real-time Input Controls Hook (Keyboard movement, debug toggle, camera zoom, flashlight toggle, weapon reload)
   const { keysPressedRef } = useMiningInput({
+    world: sceneWorld,
     sendGameEvent,
-    playerSpriteRef,
-    flashlightRef,
-    showDebugRef,
     onToggleDebug,
-    playerFacingDirRef,
-    isFacingLeftRef,
-    mouseControllerRef,
     zoom,
     onZoomChange,
     onVisionChange,
@@ -343,110 +362,68 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
 
   // Initial Full-Grid Render & Initial Dynamic Ambient Tile Lights/Emitters
   useMiningAmbientEffects({
+    world: sceneWorld,
     containersReady,
     tileTextureLoaded,
-    tilesContainerRef,
-    gridRef,
-    blockTexturesRef,
-    tileGraphicsMap,
-    tileSpritesMap,
-    lightingEngineRef,
-    particleEngineRef,
-    blockParticleConfigsRef,
-    torchEmittersRef,
-    blockEmittersRef,
   });
 
   // Hit knockback from the server is applied to the predicted player body
-  usePlayerDamageEvents({ onEvent, playerBodyRef });
+  usePlayerDamageEvents({ onEvent, playerBodyRef, predictorRef: predictionRef });
 
   // Real-time 30 Hz server ticks subscription (updates refs & graphics incrementally with ZERO React re-renders)
+  // Everything the per-tick and per-frame systems share, in one object
+  const world: MiningClientWorld = {
+    ...sceneWorld,
+    predictionRef,
+    keysPressedRef,
+    isMiningRef,
+    miningTargetRef,
+    currentRenderPosRef,
+    targetServerPosRef,
+    activeFallingRocksRef,
+    activeDynamitesRef,
+    droppedItemsRef,
+    weaponAmmoStateRef,
+    weaponSoundUrlRef,
+    lastWeaponSoundTimeRef,
+    cameraRef,
+    fallingRocksContainerRef,
+    droppedItemsContainerRef,
+    dynamitesContainerRef,
+    projectilesContainerRef,
+    playerContainerRef,
+    reticleGraphicsRef,
+    debugGraphicsRef,
+    droppedSpritesMap,
+    fallingRockGraphicsMap,
+    dynamiteGraphicsMap,
+    projectileGraphicsMap,
+    dynamiteTextureRef,
+    projectileTexturesRef,
+    blockSoundsRef,
+    playerSpriteRef,
+    remotePlayerRendererRef,
+    mobRendererRef,
+    droppedItemVisualManagerRef,
+  };
+
   useMiningStateSync({
     onEvent,
     initialSessionState,
     playerState,
     equippedWeapon,
     soundManager,
-    gridRef,
-    playerBodyRef,
-    targetServerPosRef,
-    isMiningRef,
-    miningTargetRef,
-    activeFallingRocksRef,
-    activeDynamitesRef,
-    activeProjectilesRef,
-    droppedItemsRef,
-    weaponAmmoStateRef,
-    weaponSoundUrlRef,
-    lastWeaponSoundTimeRef,
-    mouseControllerRef,
-    tilesContainerRef,
-    droppedItemsContainerRef,
+    world,
     containersReady,
-    blockTexturesRef,
-    tileGraphicsMap,
-    tileSpritesMap,
-    droppedSpritesMap,
-    remotePlayerRendererRef,
-    mobRendererRef,
-    lightingEngineRef,
-    particleEngineRef,
-    blockParticleConfigsRef,
-    blockSoundsRef,
-    torchEmittersRef,
-    blockEmittersRef,
-    dynamiteVisualManagerRef,
-    projectileVisualManagerRef,
-    droppedItemVisualManagerRef,
     onVisionChange,
     onBackpackChange,
-    });
+  });
 
   // 60+ FPS Frame Ticker Loop Hook
   useMiningTicker({
     app,
-    playerContainerRef,
-    gridContainerRef,
-    fallingRocksContainerRef,
-    currentRenderPosRef,
-    targetServerPosRef,
-    isFacingLeftRef,
-    playerFacingDirRef,
-    playerSpriteRef,
-    remotePlayerRendererRef,
-    mobRendererRef,
-    activeFallingRocksRef,
-    fallingRockGraphicsMap,
-    dynamitesContainerRef,
-    activeDynamitesRef,
-    dynamiteGraphicsMap,
-    dynamiteTextureRef,
-    dynamiteVisualManagerRef,
-    projectilesContainerRef,
-    activeProjectilesRef,
-    projectileGraphicsMap,
-    bulletTextureRef,
-    bulletScaleRef,
-    projectileVisualManagerRef,
-    droppedItemVisualManagerRef,
-    droppedItemsRef,
-    reticleGraphicsRef,
-    mouseControllerRef,
-    debugGraphicsRef,
-    showDebugRef,
-    flashlightRef,
-    lightingEngineRef,
-    cameraRef,
-    particleEngineRef,
-    playerBodyRef,
-    gridRef,
-    keysPressedRef,
-    isMiningRef,
-    miningTargetRef,
-    blockTexturesRef,
+    world,
     soundManager,
-    weaponSoundUrlRef,
-    lastWeaponSoundTimeRef,
     miningSwingSpeed: effectiveMiningSwingSpeed,
   });
 

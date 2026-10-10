@@ -170,7 +170,7 @@ describe('handlers: race & failure behaviour', () => {
     it('does not spawn a dynamite when a concurrent request consumed the last one', async () => {
       const socket = mkSocket('throw-race');
       const engine = miningSessionManager.createSession('throw-race', 'city', socket, true);
-      inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'dyn', quantity: 1, item: { id: 'dyn', subType: 'DYNAMITE' } });
+      inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'dyn', quantity: 1, item: { id: 'dyn', subType: 'DYNAMITE', itemEffects: [] } });
       inv.updateMany.mockResolvedValue({ count: 0 });
 
       const res = await handleMiningThrowDynamite(io, socket, { target: { x: 5, y: 5 }, itemId: 'dyn' });
@@ -183,7 +183,7 @@ describe('handlers: race & failure behaviour', () => {
     it('refunds when the engine fails to launch', async () => {
       const socket = mkSocket('throw-refund');
       const engine = miningSessionManager.createSession('throw-refund', 'city', socket, true);
-      inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'dyn', quantity: 1, item: { id: 'dyn', subType: 'DYNAMITE' } });
+      inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'dyn', quantity: 1, item: { id: 'dyn', subType: 'DYNAMITE', itemEffects: [] } });
       vi.spyOn(engine, 'throwDynamite').mockReturnValue(false);
 
       const res = await handleMiningThrowDynamite(io, socket, { target: { x: 5, y: 5 }, itemId: 'dyn' });
@@ -199,7 +199,7 @@ describe('handlers: race & failure behaviour', () => {
     it('clamps forceRatio and ignores non-finite values', async () => {
       const socket = mkSocket('throw-force');
       const engine = miningSessionManager.createSession('throw-force', 'city', socket, true);
-      inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'dyn', quantity: 3, item: { id: 'dyn', subType: 'DYNAMITE' } });
+      inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'dyn', quantity: 3, item: { id: 'dyn', subType: 'DYNAMITE', itemEffects: [] } });
       const spy = vi.spyOn(engine, 'throwDynamite');
 
       await handleMiningThrowDynamite(io, socket, { target: { x: 5, y: 5 }, itemId: 'dyn', forceRatio: 99 });

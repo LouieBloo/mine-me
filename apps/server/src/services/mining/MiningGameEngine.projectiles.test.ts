@@ -202,4 +202,115 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
 
     expect(mob.health).toBe(990);
   });
+
+  describe('hits mobs by their real collider, swept along the path', () => {
+    const fire = (pos: { x: number; y: number }, vel: { x: number; y: number }, dt = 0.033, pierceCount?: number) => {
+      const proj = new MiningProjectileEntity('p', 'char-shooter-1', pos, vel, { damage: 10, pierceCount });
+      engine.activeProjectiles = [proj];
+      (engine as any).tick(dt);
+      return proj;
+    };
+    const clearSky = () => {
+      for (const m of Array.from(engine.activeMobs.values())) engine.activeMobs.delete(m.id);
+    };
+
+    it('a fast bullet does not skip over a mob in a single step', () => {
+      clearSky();
+      const mob = engine.spawnMob({ id: 'm', name: 'M', health: 100, colliderWidth: 0.6, colliderHeight: 0.6 }, { x: 20.5, y: 0 });
+      const y = mob.mobBody.position.y;
+      const proj = fire({ x: 10, y }, { x: 600, y: 0 }); // ~20 tiles in one 33ms step
+      expect(proj.hitMobId).toBe(mob.id);
+      expect(mob.health).toBe(90);
+    });
+
+    it('hits a tall mob well above its centre but misses a short one at the same height', () => {
+      clearSky();
+      const tall = engine.spawnMob({ id: 't', name: 'Tall', health: 100, colliderWidth: 0.6, colliderHeight: 3 }, { x: 20.5, y: 0 });
+      const aimY = tall.mobBody.position.y - 1.2; // 1.2 above the centre: inside a 3-tall box (half 1.5)
+      const proj = fire({ x: 10, y: aimY }, { x: 600, y: 0 });
+      expect(proj.hitMobId).toBe(tall.id);
+
+      clearSky();
+      const short = engine.spawnMob({ id: 's', name: 'Short', health: 100, colliderWidth: 0.6, colliderHeight: 0.6 }, { x: 20.5, y: 0 });
+      const missY = short.mobBody.position.y - 1.2;
+      const miss = fire({ x: 10, y: missY }, { x: 600, y: 0 });
+      expect(miss.hitMobId).toBeUndefined();
+      expect(short.health).toBe(100);
+    });
+
+    it('a wide mob is hit from further off-axis horizontally-long than the old 0.7 circle allowed', () => {
+      clearSky();
+      const wide = engine.spawnMob({ id: 'w', name: 'Wide', health: 100, colliderWidth: 3, colliderHeight: 0.6 }, { x: 20.5, y: 0 });
+      // Bullet coming down from above lands 1.3 to the side of the centre: old 0.7 circle misses, the box catches it
+      const proj = fire({ x: wide.mobBody.position.x + 1.3, y: wide.mobBody.position.y - 3 }, { x: 0, y: 200 });
+      expect(proj.hitMobId).toBe(wide.id);
+    });
+
+    it('a wall in front of the mob stops the bullet first', () => {
+      clearSky();
+      const mob = engine.spawnMob({ id: 'm2', name: 'M', health: 100 }, { x: 20.5, y: 20 });
+      const y = mob.mobBody.position.y;
+      for (let x = 0; x < 30; x++) engine.grid[Math.floor(y)][x] = { type: MiningTileType.EMPTY, revealed: true };
+      engine.grid[Math.floor(y)][15] = { type: MiningTileType.ROCK, revealed: true };
+      const proj = fire({ x: 10, y }, { x: 600, y: 0 });
+      expect(proj.hitMobId).toBeUndefined();
+      expect(proj.hitTile).toEqual({ x: 15, y: Math.floor(y) });
+      expect(mob.health).toBe(100);
+    });
+
+    it('the first of two mobs along the path takes the hit', () => {
+      clearSky();
+      const near = engine.spawnMob({ id: 'n', name: 'N', health: 100 }, { x: 14.5, y: 0 });
+      const far = engine.spawnMob({ id: 'f', name: 'F', health: 100 }, { x: 24.5, y: 0 });
+      const y = near.mobBody.position.y;
+      far.mobBody.position = { x: 24.5, y };
+      const proj = fire({ x: 10, y }, { x: 600, y: 0 });
+      expect(proj.hitMobId).toBe(near.id);
+      expect(far.health).toBe(100);
+    });
+
+    describe('piercing', () => {
+      const lineUp = (xs: number[], rowY = 0) => {
+        clearSky();
+        const mobs = xs.map((x, i) => engine.spawnMob({ id: `pm${i}`, name: 'P', health: 100 }, { x, y: rowY }));
+        const y = mobs[0].mobBody.position.y;
+        for (const m of mobs) m.mobBody.position = { x: m.mobBody.position.x, y };
+        return { mobs, y };
+      };
+
+      it('a bullet without pierce stops at the first mob', () => {
+        const { mobs, y } = lineUp([14.5, 18.5]);
+        fire({ x: 10, y }, { x: 600, y: 0 });
+        expect(mobs[0].health).toBe(90);
+        expect(mobs[1].health).toBe(100);
+      });
+
+      it('passes through as many mobs as its pierce count, then stops at the next', () => {
+        const { mobs, y } = lineUp([14.5, 18.5, 22.5]);
+        const proj = fire({ x: 10, y }, { x: 600, y: 0 }, 0.033, 1);
+        expect(mobs.map((m) => m.health)).toEqual([90, 90, 100]);
+        expect(proj.hitMobId).toBe(mobs[1].id);
+        expect(proj.hasHit).toBe(true);
+      });
+
+      it('keeps flying after using up fewer mobs than its pierce count, and never hits one mob twice', () => {
+        const { mobs, y } = lineUp([14.5]);
+        const proj = new MiningProjectileEntity('p', 'char-shooter-1', { x: 10, y }, { x: 60, y: 0 }, { damage: 10, pierceCount: 2 });
+        engine.activeProjectiles = [proj];
+        for (let i = 0; i < 20; i++) (engine as any).tick(0.033);
+        expect(mobs[0].health).toBe(90);
+        expect(proj.pierceRemaining).toBe(1);
+      });
+
+      it('a wall still stops a piercing bullet', () => {
+        const { mobs, y } = lineUp([14.5, 22.5], 20);
+        for (let x = 0; x < 30; x++) engine.grid[Math.floor(y)][x] = { type: MiningTileType.EMPTY, revealed: true };
+        engine.grid[Math.floor(y)][18] = { type: MiningTileType.ROCK, revealed: true };
+        const proj = fire({ x: 10, y }, { x: 600, y: 0 }, 0.033, 5);
+        expect(mobs[0].health).toBe(90);
+        expect(mobs[1].health).toBe(100);
+        expect(proj.hitTile).toEqual({ x: 18, y: Math.floor(y) });
+      });
+    });
+  });
 });

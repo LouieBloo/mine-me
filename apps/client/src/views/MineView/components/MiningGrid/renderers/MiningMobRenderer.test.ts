@@ -56,7 +56,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 40,
         maxHealth: 40,
-        attack: 6,
+        
         defense: 2,
         isFacingLeft: false,
         isMining: false,
@@ -70,7 +70,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 1, y: 0 },
         health: 30,
         maxHealth: 30,
-        attack: 2,
+        
         defense: 1,
         isFacingLeft: true,
         isMining: true,
@@ -103,7 +103,7 @@ describe('MiningMobRenderer', () => {
       velocity: { x: 0, y: 0 },
       health: 10,
       maxHealth: 40,
-      attack: 6,
+      
       defense: 2,
       isFacingLeft: false,
       isMining: false,
@@ -132,7 +132,7 @@ describe('MiningMobRenderer', () => {
       velocity: { x: 0, y: 0 },
       health: 40,
       maxHealth: 40,
-      attack: 6,
+      
       defense: 2,
       isFacingLeft: false,
       isMining: false,
@@ -162,7 +162,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 40,
         maxHealth: 40,
-        attack: 6,
+        
         defense: 2,
         isFacingLeft: false,
         isMining: false,
@@ -176,7 +176,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 30,
         maxHealth: 30,
-        attack: 2,
+        
         defense: 1,
         isFacingLeft: false,
         isMining: false,
@@ -197,7 +197,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 1, y: 0 },
         health: 25,
         maxHealth: 40,
-        attack: 6,
+        
         defense: 2,
         isFacingLeft: true,
         isMining: true,
@@ -228,7 +228,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 40,
         maxHealth: 40,
-        attack: 6,
+        
         defense: 2,
         isFacingLeft: false,
         isMining: false,
@@ -251,7 +251,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 40,
         maxHealth: 40,
-        attack: 6,
+        
         defense: 2,
         isFacingLeft: false,
         isMining: false,
@@ -279,7 +279,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 40,
         maxHealth: 40,
-        attack: 6,
+        
         defense: 2,
         isFacingLeft: false,
         isMining: false,
@@ -295,102 +295,128 @@ describe('MiningMobRenderer', () => {
   describe('Mob Sound Effects Triggers', () => {
     let mockSoundManager: any;
 
+    const SOUNDS = {
+      dig: { url: '/assets/sounds/dig.mp3', volume: 1 },
+      idle: { url: '/assets/sounds/idle.mp3', volume: 1 },
+      damage: { url: '/assets/sounds/damage.mp3', volume: 0.5 },
+      attack: { url: '/assets/sounds/attack.mp3', volume: 1 },
+      death: { url: '/assets/sounds/death.mp3', volume: 1 },
+    };
+
+    const makeMob = (overrides: Partial<MiningActiveMob> = {}): MiningActiveMob => ({
+      id: 'mob-mole',
+      mobId: 'any_mob',
+      name: 'Some Mob',
+      position: { x: 4, y: 7 },
+      velocity: { x: 0, y: 0 },
+      health: 40,
+      maxHealth: 40,
+      defense: 2,
+      isFacingLeft: false,
+      isMining: false,
+      animationState: 'idle',
+      sounds: SOUNDS,
+      ...overrides,
+    });
+    const urlsPlayed = () => mockSoundManager.playPositionalSfx.mock.calls.map((c: any[]) => c[0]);
+
     beforeEach(() => {
       mockSoundManager = {
         playPositionalSfx: vi.fn(),
         playSfx: vi.fn(),
+        preloadSfx: vi.fn(),
       };
     });
 
-    it('triggers positional damage sound when mob takes damage', () => {
+    it('plays the mob-supplied damage sound at the mob, scaled by the sound volume', () => {
       renderer.tick(0.016, mockSoundManager);
-
-      const initialMob: MiningActiveMob = {
-        id: 'mob-mole',
-        mobId: 'cmn_mole_person_001',
-        name: 'Mole Person',
-        position: { x: 4, y: 7 },
-        velocity: { x: 0, y: 0 },
-        health: 40,
-        maxHealth: 40,
-        attack: 6,
-        defense: 2,
-        isFacingLeft: false,
-        isMining: false,
-        animationState: 'idle',
-      };
-
-      renderer.updateMobs([initialMob]);
+      renderer.updateMobs([makeMob()]);
       expect(mockSoundManager.playPositionalSfx).not.toHaveBeenCalled();
 
-      // Damaged mob update
-      renderer.updateMobs([
-        {
-          ...initialMob,
-          health: 20,
-        },
-      ]);
+      renderer.updateMobs([makeMob({ health: 20 })]);
 
       expect(mockSoundManager.playPositionalSfx).toHaveBeenCalledTimes(1);
       const [soundUrl, pos, options] = mockSoundManager.playPositionalSfx.mock.calls[0];
-      expect(soundUrl).toContain('cmn_mole_person_damage.mp3');
+      expect(soundUrl).toBe('/assets/sounds/damage.mp3');
       expect(pos).toEqual({ x: 4.5, y: 7.5 });
       expect(options.spatial).toBeDefined();
+      expect(options.volumeScale).toBe(0.5);
     });
 
-    it('triggers positional digging sound when mob is mining', () => {
-      const miningMole: MiningActiveMob = {
-        id: 'mob-mole',
-        mobId: 'cmn_mole_person_001',
-        name: 'Mole Person',
-        position: { x: 5, y: 8 },
-        velocity: { x: 0, y: 0 },
-        health: 40,
-        maxHealth: 40,
-        attack: 6,
-        defense: 2,
-        isFacingLeft: false,
-        isMining: true,
-        animationState: 'mine',
-      };
-
-      renderer.updateMobs([miningMole]);
+    it('plays the death sound, not the hurt sound, on the killing blow', () => {
       renderer.tick(0.016, mockSoundManager);
-
-      expect(mockSoundManager.playPositionalSfx).toHaveBeenCalled();
-      const calls = mockSoundManager.playPositionalSfx.mock.calls;
-      const digCall = calls.find(([url]: [string]) => url.includes('cmn_mole_person_dig.mp3'));
-      expect(digCall).toBeDefined();
-      expect(digCall[1]).toEqual({ x: 5.5, y: 8.5 });
+      renderer.updateMobs([makeMob()]);
+      renderer.updateMobs([makeMob({ health: 0, animationState: 'death' })]);
+      expect(urlsPlayed()).toEqual(['/assets/sounds/death.mp3']);
     });
 
-    it('triggers positional ambient idle sound when mob idles past interval', () => {
-      const idleMole: MiningActiveMob = {
-        id: 'mob-mole',
-        mobId: 'cmn_mole_person_001',
-        name: 'Mole Person',
-        position: { x: 3, y: 5 },
-        velocity: { x: 0, y: 0 },
-        health: 40,
-        maxHealth: 40,
-        attack: 6,
-        defense: 2,
-        isFacingLeft: false,
-        isMining: false,
-        animationState: 'idle',
-      };
-
-      renderer.updateMobs([idleMole]);
-      const mob = renderer.getMob('mob-mole')!;
-      // Artificially elapse time past idle threshold (6500ms)
-      mob.lastIdleSoundTime = -10000;
-
+    it('plays the attack sound once when the mob starts a swing', () => {
       renderer.tick(0.016, mockSoundManager);
+      renderer.updateMobs([makeMob()]);
+      renderer.updateMobs([makeMob({ animationState: 'attack' })]);
+      renderer.updateMobs([makeMob({ animationState: 'attack' })]);
+      expect(urlsPlayed()).toEqual(['/assets/sounds/attack.mp3']);
 
-      const calls = mockSoundManager.playPositionalSfx.mock.calls;
-      const idleCall = calls.find(([url]: [string]) => url.includes('cmn_mole_person_idle.mp3'));
-      expect(idleCall).toBeDefined();
-      expect(idleCall[1]).toEqual({ x: 3.5, y: 5.5 });
+      renderer.updateMobs([makeMob({ animationState: 'idle' })]);
+      renderer.updateMobs([makeMob({ animationState: 'attack' })]);
+      expect(urlsPlayed()).toEqual(['/assets/sounds/attack.mp3', '/assets/sounds/attack.mp3']);
+    });
+
+    it('plays the dig sound while mining', () => {
+      renderer.updateMobs([makeMob({ isMining: true, animationState: 'mine' })]);
+      renderer.tick(0.016, mockSoundManager);
+      const call = mockSoundManager.playPositionalSfx.mock.calls.find(([url]: [string]) => url === '/assets/sounds/dig.mp3');
+      expect(call).toBeDefined();
+      expect(call[1]).toEqual({ x: 4.5, y: 7.5 });
+    });
+
+    it('plays the idle sound once the idle interval has passed', () => {
+      renderer.updateMobs([makeMob()]);
+      renderer.getMob('mob-mole')!.lastIdleSoundTime = -10000;
+      renderer.tick(0.016, mockSoundManager);
+      expect(urlsPlayed()).toContain('/assets/sounds/idle.mp3');
+    });
+
+    it('stays silent for a mob with no sounds, or a slot that is not set', () => {
+      renderer.tick(0.016, mockSoundManager);
+      renderer.updateMobs([makeMob({ sounds: undefined })]);
+      renderer.updateMobs([makeMob({ sounds: undefined, health: 10, animationState: 'attack' })]);
+      renderer.updateMobs([makeMob({ sounds: { attack: SOUNDS.attack }, health: 5, animationState: 'idle' })]);
+      expect(mockSoundManager.playPositionalSfx).not.toHaveBeenCalled();
+      expect(mockSoundManager.playSfx).not.toHaveBeenCalled();
+    });
+
+    it('uses sounds that arrive after the mob was first seen', () => {
+      renderer.tick(0.016, mockSoundManager);
+      renderer.updateMobs([makeMob({ sounds: undefined })]);
+      renderer.updateMobs([makeMob({ health: 30 })]);
+      expect(urlsPlayed()).toEqual(['/assets/sounds/damage.mp3']);
+    });
+
+    it('does not use the old hard-coded profile for the mole person', () => {
+      renderer.tick(0.016, mockSoundManager);
+      renderer.updateMobs([makeMob({ mobId: 'cmn_mole_person_001', sounds: undefined })]);
+      renderer.updateMobs([makeMob({ mobId: 'cmn_mole_person_001', sounds: undefined, health: 1 })]);
+      expect(mockSoundManager.playPositionalSfx).not.toHaveBeenCalled();
+    });
+
+    it('starts preloading a mob\'s sounds the first time it is seen', () => {
+      renderer.tick(0.016, mockSoundManager);
+      renderer.updateMobs([makeMob()]);
+      renderer.updateMobs([makeMob()]);
+      expect(mockSoundManager.preloadSfx).toHaveBeenCalledTimes(1);
+      expect(mockSoundManager.preloadSfx.mock.calls[0][0].sort()).toEqual(Object.values(SOUNDS).map((s) => s.url).sort());
+    });
+
+    it('falls back to playSfx when positional playback is unavailable', () => {
+      delete mockSoundManager.playPositionalSfx;
+      renderer.tick(0.016, mockSoundManager);
+      renderer.updateMobs([makeMob()]);
+      renderer.updateMobs([makeMob({ health: 20 })]);
+      expect(mockSoundManager.playSfx).toHaveBeenCalledWith(
+        '/assets/sounds/damage.mp3',
+        expect.objectContaining({ position: { x: 4.5, y: 7.5 }, volumeScale: 0.5 })
+      );
     });
   });
 
@@ -404,7 +430,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 40,
         maxHealth: 40,
-        attack: 6,
+        
         defense: 2,
         isFacingLeft: false,
         isMining: false,
@@ -438,7 +464,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 40,
         maxHealth: 40,
-        attack: 6,
+        
         defense: 2,
         isFacingLeft: false,
         isMining: false,
@@ -459,7 +485,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 40,
         maxHealth: 40,
-        attack: 6,
+        
         defense: 2,
         isFacingLeft: true,
         isMining: true,
@@ -513,7 +539,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 100,
         maxHealth: 100,
-        attack: 6,
+        
         defense: 2,
         isFacingLeft: false,
         isMining: false,
@@ -541,7 +567,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 1000000,
         maxHealth: 1000000,
-        attack: 0,
+        
         defense: 0,
         isFacingLeft: false,
         isMining: false,
@@ -571,7 +597,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 1000000,
         maxHealth: 1000000,
-        attack: 0,
+        
         defense: 0,
         isFacingLeft: false,
         isMining: false,
@@ -612,7 +638,7 @@ describe('MiningMobRenderer', () => {
         velocity: { x: 0, y: 0 },
         health: 1000000,
         maxHealth: 1000000,
-        attack: 0,
+        
         defense: 0,
         isFacingLeft: false,
         isMining: false,

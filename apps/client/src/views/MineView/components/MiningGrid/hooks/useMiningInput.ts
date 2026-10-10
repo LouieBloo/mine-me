@@ -1,18 +1,19 @@
 import { useEffect, useRef } from 'react';
 import type { MiningInputState, MiningPosition, Vector2D } from '@mine-me/shared';
-import type { ModularCharacterSprite } from '../../../../../components/game/sprites';
-import type { SpotLight } from '../../../../../components/game/lighting/SpotLight';
-import type { MiningMouseController } from '../input/MiningMouseController';
+import type { MiningClientWorld } from '../systems/MiningClientWorld';
 
 export interface UseMiningInputOptions {
+  world: Pick<
+    MiningClientWorld,
+    | 'playerSpriteRef'
+    | 'flashlightRef'
+    | 'showDebugRef'
+    | 'playerFacingDirRef'
+    | 'isFacingLeftRef'
+    | 'mouseControllerRef'
+  >;
   sendGameEvent: (event: any) => Promise<any> | void;
-  playerSpriteRef: React.RefObject<ModularCharacterSprite | null>;
-  flashlightRef: React.RefObject<SpotLight | null>;
-  showDebugRef: React.MutableRefObject<boolean>;
   onToggleDebug?: () => void;
-  playerFacingDirRef: React.MutableRefObject<Vector2D>;
-  isFacingLeftRef: React.MutableRefObject<boolean>;
-  mouseControllerRef?: React.MutableRefObject<MiningMouseController | null>;
   zoom: number;
   onZoomChange?: (zoom: number) => void;
   onVisionChange?: (newVision: number) => void;
@@ -20,19 +21,15 @@ export interface UseMiningInputOptions {
 }
 
 export function useMiningInput({
+  world,
   sendGameEvent,
-  playerSpriteRef,
-  flashlightRef,
-  showDebugRef,
   onToggleDebug,
-  playerFacingDirRef,
-  isFacingLeftRef,
-  mouseControllerRef,
   zoom,
   onZoomChange,
   onVisionChange,
   onReload,
 }: UseMiningInputOptions) {
+  const { playerSpriteRef, flashlightRef, showDebugRef, playerFacingDirRef, isFacingLeftRef, mouseControllerRef } = world;
   const onReloadRef = useRef(onReload);
   onReloadRef.current = onReload;
   const onToggleDebugRef = useRef(onToggleDebug);

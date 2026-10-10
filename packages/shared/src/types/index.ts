@@ -1,6 +1,6 @@
 import type { ParticleEffect } from './particles';
 import type { MouseActionTriggerMode } from './mining';
-import type { ItemSoundEffectsConfig } from './sound';
+import type { ItemSoundEffectsConfig, MobSoundEffectsConfig, MobSoundSlotRefs } from './sound';
 export * from './sound';
 
 export type CharacterClass = 'Warrior' | 'Mage' | 'Rogue';
@@ -163,6 +163,8 @@ export interface ItemProjectileConfig {
   reloadTime?: number;
   projectileSpeed?: number;
   projectileGravityScale?: number;
+  /** How many mobs a bullet passes through (0 or absent: it stops at the first). */
+  pierceCount?: number;
   projectileItemId?: string;
   maxLifetime?: number;
   muzzleFlashEffectId?: string;
@@ -284,7 +286,6 @@ export interface Mob {
   name: string;
   level: number;
   health: number;
-  attack: number;
   defense: number;
   attackPercentage?: number;
   defendPercentage?: number;
@@ -293,13 +294,21 @@ export interface Mob {
   abilities?: string[] | null;
   moveSpeed?: number;
   jumpForce?: number;
-  miningSpeed?: number;
+  /**
+   * Combat stats (Mining Speed, Damage, Tool Damage, Pick Power, Knockback) come from effects,
+   * exactly as for gear. See `deriveCombatStats`.
+   */
+  mobEffects?: ObjectEffects[];
   /** How long a hit takes control away from the mob in ms (0 = can't be stunned). */
   hitStunMs?: number;
   /** After a stun ends, how long until it can be stunned again, in ms. */
   stunImmunityMs?: number;
   dropTable?: DropTable;
   animations?: SkeletonManifest | MobAtlas | null;
+  /** Sound slots as stored: library sounds by id (see `resolveMobSounds`). */
+  soundEffects?: MobSoundSlotRefs | null;
+  /** The same slots resolved to playable urls. Filled in when definitions load; never stored. */
+  sounds?: MobSoundEffectsConfig | null;
 }
 
 
@@ -336,6 +345,7 @@ export interface Effect {
 export interface ObjectEffects {
   id: string;
   itemId?: string | null;
+  mobId?: string | null;
   effectId: string;
   effect?: Effect;
   value: number;

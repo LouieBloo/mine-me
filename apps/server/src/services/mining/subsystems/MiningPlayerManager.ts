@@ -1,6 +1,7 @@
 import { Socket } from 'socket.io';
 import {
   MINING_CONFIG,
+  advanceSwing,
   isTileSolid,
   knockbackImpulse,
   sanitizeMiningInput,
@@ -22,6 +23,8 @@ export interface MiningPlayerSession {
   socket: Socket;
   playerBody: MiningPlayerBody;
   inputs: MiningInputState;
+  /** Ticks the current input (by sequence) has been in effect, for the client's prediction ack. */
+  inputAge: number;
   miningSpeed: number | (() => number);
   /** Damage per swing to blocks (Tool Damage). */
   toolDamage: number;
@@ -48,8 +51,8 @@ export interface MiningPlayerSession {
   isDead: boolean;
   isMining: boolean;
   miningTarget: MiningPosition | null;
-  miningProgressMs: number;
-  miningTimeMs: number;
+  miningProgress: number;
+  miningTotal: number;
   targetMaxHealth?: number;
   isFacingLeft: boolean;
   aimDirection: Vector2D;
@@ -161,6 +164,7 @@ export class MiningPlayerManager {
         miningKey: false,
         sequence: 0,
       },
+      inputAge: 0,
       miningSpeed: options.miningSpeed ?? 0,
       toolDamage: options.toolDamage ?? 25,
       weaponDamage: options.weaponDamage ?? 25,
@@ -182,8 +186,8 @@ export class MiningPlayerManager {
       isDead: false,
       isMining: false,
       miningTarget: null,
-      miningProgressMs: 0,
-      miningTimeMs: 0,
+      miningProgress: 0,
+      miningTotal: 0,
       isFacingLeft: false,
       aimDirection: { x: 1, y: 0 },
       flashlightOn: false,
@@ -220,6 +224,7 @@ export class MiningPlayerManager {
     }
     input = clean;
 
+    if (input.sequence !== session.inputs.sequence) session.inputAge = 0;
     session.inputs = { ...input };
 
     if (input.aimDirection) {
@@ -243,6 +248,7 @@ export class MiningPlayerManager {
     const grid = this.world.grid;
     for (const session of this.players.values()) {
       session.invulnerableSeconds = Math.max(0, session.invulnerableSeconds - dt);
+      session.inputAge++;
       session.playerBody.processInputs(session.inputs, grid);
       session.playerBody.update(dt, grid);
 
@@ -339,17 +345,8 @@ export class MiningPlayerManager {
    */
   public advanceSwings(dt: number): void {
     for (const session of this.players.values()) {
-      session.swungThisTick = false;
       session.noticeCooldown = Math.max(0, session.noticeCooldown - dt);
-      // Allow at most one tick of carried-over time so the long-run rate is exact
-      session.swingCooldown = Math.max(-dt, session.swingCooldown - dt);
-
-      if (!session.inputs.miningKey || session.swingCooldown > 0) continue;
-
-      const speed = this.getMiningSpeed(session);
-      const swingsPerSec = 2.0 * ((speed > 0 ? speed : 25) / 25);
-      session.swungThisTick = true;
-      session.swingCooldown += 1 / swingsPerSec;
+      advanceSwing(session, dt, session.inputs.miningKey, this.getMiningSpeed(session));
     }
   }
 
@@ -411,7 +408,7 @@ export class MiningPlayerManager {
       if (currentSpeed === 0 && session.isMining) {
         session.isMining = false;
         session.miningTarget = null;
-        session.miningProgressMs = 0;
+        session.miningProgress = 0;
       }
     }
   }
