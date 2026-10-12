@@ -55,7 +55,7 @@ vi.mock('../src/components/game/PixiStageContext/PixiStageContext', () => ({
 }));
 
 let eventListeners: Record<string, (payload: any) => void> = {};
-let mockBlockSounds = new Map<number, string>();
+let mockBlockSounds = new Map<number, { url: string; volume: number }>();
 
 vi.mock('../src/contexts/SocketContext', () => ({
   useSocket: () => ({
@@ -218,11 +218,11 @@ describe('Mining Weapon Sound Effect Playback', () => {
     });
 
     expect(mockPlaySfx).toHaveBeenCalledTimes(1);
-    expect(mockPlaySfx).toHaveBeenCalledWith('/assets/sounds/items/item-pickaxe-iron_sfx.wav');
+    expect(mockPlaySfx).toHaveBeenCalledWith('/assets/sounds/items/item-pickaxe-iron_sfx.wav', { volumeScale: 1 });
   });
 
   it('does NOT play sounds on crack stage changes alone without blockHits', () => {
-    mockBlockSounds.set(MiningTileType.DIRT, '/assets/sounds/blocks/dirt_sfx.wav');
+    mockBlockSounds.set(MiningTileType.DIRT, { url: '/assets/sounds/blocks/dirt_sfx.wav', volume: 1 });
     const playerState = createPlayerState('/assets/sounds/items/item-pickaxe-iron_sfx.wav');
 
     render(
@@ -282,7 +282,7 @@ describe('Mining Weapon Sound Effect Playback', () => {
   });
 
   it('plays block damage sound effect when block hit occurs and has soundEffectUrl', () => {
-    mockBlockSounds.set(MiningTileType.DIRT, '/assets/sounds/blocks/dirt_sfx.wav');
+    mockBlockSounds.set(MiningTileType.DIRT, { url: '/assets/sounds/blocks/dirt_sfx.wav', volume: 1 });
     const playerState = createPlayerState(null); // No weapon sound
 
     render(
@@ -314,7 +314,7 @@ describe('Mining Weapon Sound Effect Playback', () => {
   });
 
   it('does NOT play block destroyed sound when revealing a previously unrevealed tile (falling into caverns)', () => {
-    mockBlockSounds.set(MiningTileType.DIRT, '/assets/sounds/blocks/dirt_sfx.wav');
+    mockBlockSounds.set(MiningTileType.DIRT, { url: '/assets/sounds/blocks/dirt_sfx.wav', volume: 1 });
     const playerState = createPlayerState(null);
 
     const sessionWithHiddenTile: MiningSessionClientState = {
@@ -356,7 +356,7 @@ describe('Mining Weapon Sound Effect Playback', () => {
   });
 
   it('does NOT play block sounds when tiles are destroyed by a dynamite explosion', () => {
-    mockBlockSounds.set(MiningTileType.DIRT, '/assets/sounds/blocks/dirt_sfx.wav');
+    mockBlockSounds.set(MiningTileType.DIRT, { url: '/assets/sounds/blocks/dirt_sfx.wav', volume: 1 });
     const playerState = createPlayerState(null);
 
     render(
@@ -384,7 +384,7 @@ describe('Mining Weapon Sound Effect Playback', () => {
     });
 
     // Verifies block destroy sound is suppressed, while the dynamite explosion sound plays
-    expect(mockPlaySfx).not.toHaveBeenCalledWith('/assets/sounds/blocks/dirt_sfx.wav');
+    expect(mockPlaySfx.mock.calls.map((c: any[]) => c[0])).not.toContain('/assets/sounds/blocks/dirt_sfx.wav');
     expect(mockPlaySfx).toHaveBeenCalledWith(
       '/assets/sounds/items/cmtz702uk0001nu7bn2tidnx0_explosion_sfx.mp3',
       expect.objectContaining({ throttleMs: 50 })
@@ -420,7 +420,7 @@ describe('Mining Weapon Sound Effect Playback', () => {
   });
 
   it('plays positional block sound when a mob mines a block', () => {
-    mockBlockSounds.set(MiningTileType.DIRT, '/assets/sounds/blocks/dirt_sfx.wav');
+    mockBlockSounds.set(MiningTileType.DIRT, { url: '/assets/sounds/blocks/dirt_sfx.wav', volume: 1 });
     const playerState = createPlayerState(null);
 
     render(

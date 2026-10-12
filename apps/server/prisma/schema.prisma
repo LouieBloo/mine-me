@@ -241,6 +241,8 @@ model MiningBlock {
   description          String?
   textureUrl           String?
   soundEffectUrl       String?
+  // How loud the mining sound is on this block, 0 to 1
+  soundEffectVolume    Float    @default(1)
   health               Int             @default(100)
   requiredPickPower    Int             @default(0)
   staminaCost          Int             @default(1)
@@ -280,6 +282,14 @@ model MiningMapConfig {
   dynamiteFuseSeconds Float    @default(4.0)
   rockGravityScale    Float    @default(1.2)
   rockRestitution     Float    @default(0.1)
+  // Fall damage (players): (impactSpeed - minSpeed) * perSpeed, capped at max (0 = no cap)
+  fallDamageMinSpeed  Float    @default(11)
+  fallDamagePerSpeed  Float    @default(6)
+  fallDamageMax       Float    @default(80)
+  // Falling rock damage (players): (rockSpeed - minSpeed) * perSpeed, capped at max (0 = no cap)
+  rockDamageMinSpeed  Float    @default(6)
+  rockDamagePerSpeed  Float    @default(5)
+  rockDamageMax       Float    @default(80)
   // Hostile NPC / Mob Spawning Settings
   mobSpawnCount       Int      @default(3)
   mobSpawnMinDepth    Int      @default(5)
@@ -344,6 +354,14 @@ enum SoundCategory {
   ITEM
   BLOCK
   MOB
+  CHARACTER
+}
+
+/// The player character's sounds (hurt, jump...). One row (id "default"); `soundEffects` maps a slot to a library sound id.
+model CharacterSoundConfig {
+  id           String   @id @default("default")
+  soundEffects Json?
+  updatedAt    DateTime @updatedAt
 }
 
 model Sound {

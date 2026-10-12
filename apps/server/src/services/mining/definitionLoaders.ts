@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import type { PrismaClient } from '@prisma/client';
-import { resolveMobSounds, type GameItem, type Mob, type MiningBlockConfig, type SoundTrack } from '@mine-me/shared';
+import { resolveCharacterSounds, resolveMobSounds, type CharacterSoundEffectsConfig, type GameItem, type Mob, type MiningBlockConfig, type SoundTrack } from '@mine-me/shared';
+import { CHARACTER_SOUND_CONFIG_ID } from '../characterSounds.service';
 import { MiningDataManager, type GameDefinitions } from './subsystems/MiningDataManager';
 
 type SoundLibraryEntry = Pick<SoundTrack, 'id' | 'url' | 'volume' | 'isActive'>;
@@ -17,15 +18,22 @@ export function attachMobSounds<M extends Mob>(mobs: M[], library: SoundLibraryE
   );
 }
 
+type LoaderPrisma = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'sound' | 'characterSoundConfig'>;
+
+/** The player character's playable sounds, resolved from the stored slot references. */
+export function buildCharacterSounds(refs: unknown, library: SoundLibraryEntry[]): CharacterSoundEffectsConfig {
+  return resolveCharacterSounds(refs, new Map(library.map((s) => [s.id, s])));
+}
+
 /**
  * Loads items, mobs and mining blocks from Postgres. Includes mirror what the admin tools export
  * to the seed JSON files, so consumers see the same shape either way.
  * Throws if the database cannot be read or has no items/blocks (i.e. it has not been seeded).
  */
 export async function loadDefinitionsFromDatabase(
-  prisma: Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'sound'>
+  prisma: LoaderPrisma
 ): Promise<GameDefinitions> {
-  const [items, mobs, blocks, sounds] = await Promise.all([
+  const [items, mobs, blocks, sounds, characterSoundConfig] = await Promise.all([
     prisma.item.findMany({
       include: { itemEffects: { include: { effect: true } }, particleEffect: true },
     }),
@@ -36,6 +44,7 @@ export async function loadDefinitionsFromDatabase(
       include: { dropTable: { include: { items: true } }, idleParticleEffect: true },
     }),
     prisma.sound.findMany({ select: { id: true, url: true, volume: true, isActive: true } }),
+    prisma.characterSoundConfig.findUnique({ where: { id: CHARACTER_SOUND_CONFIG_ID } }),
   ]);
 
   if (items.length === 0 || blocks.length === 0) {
@@ -49,6 +58,7 @@ export async function loadDefinitionsFromDatabase(
   // typed configs; the admin app writes them in the shared shape, so this is the one boundary cast.
   const definitions = { items, mobs, blocks } as unknown as GameDefinitions;
   definitions.mobs = attachMobSounds(definitions.mobs, sounds);
+  definitions.characterSounds = buildCharacterSounds(characterSoundConfig?.soundEffects, sounds);
   return definitions;
 }
 
@@ -65,6 +75,7 @@ export function loadDefinitionsFromFiles(dataDir: string): GameDefinitions {
   const soundsPath = path.join(dataDir, 'sounds.json');
   const library = fs.existsSync(soundsPath) ? read<SoundLibraryEntry>('sounds.json') : [];
   return {
+    characterSounds: {},
     items: read<GameItem>('items.json'),
     mobs: attachMobSounds(read<Mob>('mobs.json'), library),
     blocks: read<MiningBlockConfig>('blocks.json'),
@@ -73,7 +84,7 @@ export function loadDefinitionsFromFiles(dataDir: string): GameDefinitions {
 
 /** Loads definitions from the database and installs them for the mining engine. */
 export async function installDefinitionsFromDatabase(
-  prisma: Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'sound'>
+  prisma: LoaderPrisma
 ): Promise<void> {
   const definitions = await loadDefinitionsFromDatabase(prisma);
   MiningDataManager.initialize(definitions);

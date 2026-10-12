@@ -5,12 +5,13 @@ import path from 'path';
 import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds } from './definitionLoaders';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 
-const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; sounds?: any[] }) =>
+const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; sounds?: any[]; characterSounds?: any }) =>
   ({
     item: { findMany: vi.fn().mockResolvedValue(data.items ?? [{ id: 'i1', name: 'Thing' }]) },
     mob: { findMany: vi.fn().mockResolvedValue(data.mobs ?? [{ id: 'm1', name: 'Mole' }]) },
     miningBlock: { findMany: vi.fn().mockResolvedValue(data.blocks ?? [{ id: 'b1', typeKey: 'DIRT' }]) },
     sound: { findMany: vi.fn().mockResolvedValue(data.sounds ?? []) },
+    characterSoundConfig: { findUnique: vi.fn().mockResolvedValue(data.characterSounds ?? null) },
   }) as any;
 
 describe('loadDefinitionsFromDatabase', () => {
@@ -53,7 +54,19 @@ describe('mob sounds', () => {
 
   it('resolves stored sound references to playable urls', () => {
     const [mob] = attachMobSounds([{ id: 'm1', name: 'M', soundEffects: { attack: { soundId: 's1' }, death: { soundId: 's2' } } } as any], library);
-    expect(mob.sounds).toEqual({ attack: { soundId: 's1', url: '/assets/sounds/a.mp3', volume: 0.7, loop: false } });
+    expect(mob.sounds).toEqual({ attack: { soundId: 's1', url: '/assets/sounds/a.mp3', volume: 1, loop: false } });
+  });
+
+  it('plays a sound at the volume set on this mob, whatever the library volume is', () => {
+    const [a, b] = attachMobSounds(
+      [
+        { id: 'm1', name: 'A', soundEffects: { attack: { soundId: 's1', volume: 0.3 } } } as any,
+        { id: 'm2', name: 'B', soundEffects: { attack: { soundId: 's1' } } } as any,
+      ],
+      library
+    );
+    expect(a.sounds?.attack?.volume).toBe(0.3);
+    expect(b.sounds?.attack?.volume).toBe(1);
   });
 
   it('keeps plain-url sounds on mobs that have no references (seed JSON)', () => {
@@ -108,7 +121,7 @@ describe('loadDefinitionsFromFiles', () => {
     write('items.json', [{ id: 'a' }]);
     write('mobs.json', []);
     write('blocks.json', [{ typeKey: 'DIRT' }]);
-    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }] });
+    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], characterSounds: {} });
   });
 
   it('fails loudly on a missing file or non-array content', () => {
@@ -117,5 +130,42 @@ describe('loadDefinitionsFromFiles', () => {
     fs.rmSync(path.join(tmp, 'mobs.json'));
     write('items.json', []);
     expect(() => loadDefinitionsFromFiles(tmp)).toThrow();
+  });
+});
+
+describe('character sounds', () => {
+  const library = [
+    { id: 's1', url: '/assets/sounds/ouch.mp3', volume: 0.6, isActive: true },
+    { id: 's2', url: '/assets/sounds/off.mp3', volume: 1, isActive: false },
+  ];
+
+  it('resolves the stored slot references to playable urls in the database loader', async () => {
+    const defs = await loadDefinitionsFromDatabase(
+      fakePrisma({ sounds: library, characterSounds: { id: 'default', soundEffects: { hurt: { soundId: 's1' }, jump: { soundId: 's2' } } } })
+    );
+    expect(defs.characterSounds).toEqual({ hurt: { soundId: 's1', url: '/assets/sounds/ouch.mp3', volume: 1, loop: false } });
+  });
+
+  it('uses the volume set on the character slot', async () => {
+    const defs = await loadDefinitionsFromDatabase(
+      fakePrisma({ sounds: library, characterSounds: { id: 'default', soundEffects: { hurt: { soundId: 's1', volume: 0.4 } } } })
+    );
+    expect(defs.characterSounds?.hurt?.volume).toBe(0.4);
+  });
+
+  it('is empty when nothing is configured, or the sound was deleted', async () => {
+    expect((await loadDefinitionsFromDatabase(fakePrisma({}))).characterSounds).toEqual({});
+    const defs = await loadDefinitionsFromDatabase(
+      fakePrisma({ characterSounds: { id: 'default', soundEffects: { hurt: { soundId: 'gone' } } } })
+    );
+    expect(defs.characterSounds).toEqual({});
+  });
+
+  it('is available from the installed definitions', async () => {
+    await installDefinitionsFromDatabase(
+      fakePrisma({ sounds: library, characterSounds: { id: 'default', soundEffects: { death: { soundId: 's1' } } } })
+    );
+    expect(MiningDataManager.getInstance().getCharacterSounds().death?.url).toBe('/assets/sounds/ouch.mp3');
+    MiningDataManager.reset();
   });
 });

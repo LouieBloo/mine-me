@@ -160,4 +160,25 @@ describe('ItemSoundEffectUpload', () => {
     renderIt();
     expect(await screen.findByText('Failed to load the sound library')).toBeInTheDocument();
   });
+
+  it('shows each slot\'s own volume and saves a change for that slot only', async () => {
+    const { onUploadSuccess } = renderIt({
+      soundEffects: {
+        shoot: { url: '/assets/sounds/items/pistol.wav', loop: false, volume: 0.4 },
+        reload: { url: '/assets/sounds/items/pistol.wav', loop: false, volume: 0.9 },
+      },
+    });
+    await screen.findByTestId('item-sound-preview-shoot');
+    expect(screen.getByTestId('item-sound-volume-value-shoot')).toHaveTextContent('40%');
+    expect(screen.getByTestId('item-sound-volume-value-reload')).toHaveTextContent('90%');
+    mockFetchWithAuth.mockClear();
+    mockFetchWithAuth.mockImplementation(() => json({ id: 'item_1' }));
+
+    fireEvent.change(screen.getByLabelText('Reload Sound volume'), { target: { value: '55' } });
+
+    await waitFor(() => expect(onUploadSuccess).toHaveBeenCalled());
+    const [url, opts] = mockFetchWithAuth.mock.calls[0];
+    expect(url).toMatch(/\/sound-effects\/reload$/);
+    expect(JSON.parse(opts.body)).toEqual({ volume: 0.55 });
+  });
 });

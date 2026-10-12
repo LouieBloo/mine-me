@@ -1,7 +1,9 @@
 import type { PrismaClient } from '@prisma/client';
-import { normalizeMobSoundRefs, MOB_SOUND_SLOTS } from '@mine-me/shared';
+import { normalizeMobSoundRefs, MOB_SOUND_SLOTS, normalizeCharacterSoundRefs, CHARACTER_SOUND_SLOTS } from '@mine-me/shared';
 
-type UsageDb = Pick<PrismaClient, 'mob' | 'item' | 'miningBlock'>;
+import { CHARACTER_SOUND_CONFIG_ID } from './characterSounds.service';
+
+type UsageDb = Pick<PrismaClient, 'mob' | 'item' | 'miningBlock'> & Partial<Pick<PrismaClient, 'characterSoundConfig'>>;
 
 /** What plays a sound: a short label such as `Mob: Mole Person (death)`. */
 export type SoundUsage = string;
@@ -18,10 +20,11 @@ const addTo = (index: Map<string, SoundUsage[]>, key: string | null | undefined,
  * file url, so those are keyed by url. Returns two lookups so callers can ask by either.
  */
 export async function buildSoundUsageIndex(db: UsageDb): Promise<{ byId: Map<string, SoundUsage[]>; byUrl: Map<string, SoundUsage[]> }> {
-  const [mobs, items, blocks] = await Promise.all([
+  const [mobs, items, blocks, characterConfig] = await Promise.all([
     db.mob.findMany({ select: { name: true, soundEffects: true } }),
     db.item.findMany({ select: { name: true, soundEffectUrl: true, soundEffects: true } }),
     db.miningBlock.findMany({ select: { name: true, soundEffectUrl: true } }),
+    db.characterSoundConfig?.findUnique({ where: { id: CHARACTER_SOUND_CONFIG_ID } }) ?? null,
   ]);
 
   const byId = new Map<string, SoundUsage[]>();
@@ -31,6 +34,8 @@ export async function buildSoundUsageIndex(db: UsageDb): Promise<{ byId: Map<str
     const refs = normalizeMobSoundRefs(mob.soundEffects);
     for (const def of MOB_SOUND_SLOTS) addTo(byId, refs[def.slotKey]?.soundId, `Mob: ${mob.name} (${def.slotKey})`);
   }
+  const characterRefs = normalizeCharacterSoundRefs(characterConfig?.soundEffects);
+  for (const def of CHARACTER_SOUND_SLOTS) addTo(byId, characterRefs[def.slotKey]?.soundId, `Character (${def.slotKey})`);
   for (const item of items) {
     addTo(byUrl, item.soundEffectUrl, `Item: ${item.name}`);
     const slots = item.soundEffects && typeof item.soundEffects === 'object' ? (item.soundEffects as Record<string, any>) : {};

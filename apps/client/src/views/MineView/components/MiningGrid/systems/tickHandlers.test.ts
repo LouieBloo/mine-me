@@ -43,6 +43,7 @@ function makeWorld(overrides: Record<string, unknown> = {}): any {
     droppedItemsRef: ref([]),
     weaponAmmoStateRef: ref({ current: 0, max: 0, isReloading: false }),
     weaponSoundUrlRef: ref<string | null>(null),
+    weaponSoundVolumeRef: ref(1),
     lastWeaponSoundTimeRef: ref(0),
     tilesContainerRef: ref({}),
     droppedItemsContainerRef: ref({}),
@@ -51,7 +52,7 @@ function makeWorld(overrides: Record<string, unknown> = {}): any {
     tileGraphicsMap: ref(new Map()),
     tileSpritesMap: ref(new Map()),
     blockParticleConfigsRef: ref(new Map()),
-    blockSoundsRef: ref(new Map<number, string>()),
+    blockSoundsRef: ref(new Map<number, { url: string; volume: number }>()),
     torchEmittersRef: ref(new Map()),
     blockEmittersRef: ref(new Map()),
     remotePlayerRendererRef: ref({ updatePlayers: vi.fn() }),
@@ -224,13 +225,27 @@ describe('applyEffects', () => {
 
     it('plays the block sound and spawns chips, rate limited per tile', () => {
       const world = makeWorld();
-      world.blockSoundsRef.current.set(MiningTileType.DIRT, '/dirt.mp3');
+      world.blockSoundsRef.current.set(MiningTileType.DIRT, { url: '/dirt.mp3', volume: 1 });
       const ctx = makeCtx(world);
       applyEffects(payload({ blockHits: [hit()] }), ctx);
       applyEffects(payload({ blockHits: [hit()] }), ctx); // immediately again: too soon
       expect((ctx.soundManager as any).playPositionalSfx).toHaveBeenCalledTimes(1);
       expect(world.particleEngineRef.current.spawnBurst).toHaveBeenCalledTimes(1);
       expect(world.particleEngineRef.current.spawnBurst).toHaveBeenCalledWith(DEFAULT_PARTICLE_EFFECTS.block_dirt_chip, expect.anything());
+    });
+
+    it('plays the block sound at the volume set on that block, and the swing sound at the weapon\'s volume', () => {
+      const world = makeWorld({
+        weaponSoundUrlRef: ref('/swing.mp3'), weaponSoundVolumeRef: ref(0.25),
+        miningTargetRef: ref({ x: 2, y: 3 }), isMiningRef: ref(true),
+      });
+      world.blockSoundsRef.current.set(MiningTileType.DIRT, { url: '/dirt.mp3', volume: 0.6 });
+      const ctx = makeCtx(world);
+      applyEffects(payload({ blockHits: [hit()] }), ctx);
+      expect((ctx.soundManager as any).playSfx).toHaveBeenCalledWith('/swing.mp3', { volumeScale: 0.25 });
+      expect((ctx.soundManager as any).playPositionalSfx).toHaveBeenCalledWith(
+        '/dirt.mp3', { x: 2.5, y: 3.5 }, expect.objectContaining({ volumeScale: 0.6 })
+      );
     });
 
     it('uses mineral chips for minerals and the block\'s own particle config when it has one', () => {
@@ -251,7 +266,7 @@ describe('applyEffects', () => {
       applyEffects(payload({ isMining: true, blockHits: [hit({ x: 9, y: 9 })] }), ctx);
       expect((ctx.soundManager as any).playSfx).not.toHaveBeenCalled();
       applyEffects(payload({ isMining: true, blockHits: [hit()] }), ctx);
-      expect((ctx.soundManager as any).playSfx).toHaveBeenCalledWith('/swing.mp3');
+      expect((ctx.soundManager as any).playSfx).toHaveBeenCalledWith('/swing.mp3', { volumeScale: 1 });
     });
   });
 });

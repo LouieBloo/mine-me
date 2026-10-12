@@ -54,6 +54,8 @@ export class MiningMouseController {
     window.addEventListener('pointerdown', this.handlePointerDown);
     window.addEventListener('pointerup', this.handlePointerUp);
     window.addEventListener('blur', this.handleBlur);
+    window.addEventListener('pointercancel', this.handleBlur);
+    window.addEventListener('dragstart', this.handleBlur);
     this.canvas.addEventListener('pointerleave', this.handlePointerLeave);
   }
 
@@ -66,6 +68,8 @@ export class MiningMouseController {
     window.removeEventListener('pointerdown', this.handlePointerDown);
     window.removeEventListener('pointerup', this.handlePointerUp);
     window.removeEventListener('blur', this.handleBlur);
+    window.removeEventListener('pointercancel', this.handleBlur);
+    window.removeEventListener('dragstart', this.handleBlur);
     this.canvas.removeEventListener('pointerleave', this.handlePointerLeave);
     this.canvas = null;
     this.hoveredTile = null;
@@ -362,16 +366,11 @@ export class MiningMouseController {
     // Only handle primary button (left click)
     if (e.button !== 0) return;
 
-    // Check if the click target is an interactive UI element (button, input, modal)
+    // Only clicks that land on the game canvas itself count. Anything else (backpack, hotbar,
+    // buttons, modals) is UI. Events without an element target (e.g. dispatched on window) pass.
     const targetEl =
       e.target && typeof (e.target as any).closest === 'function' ? (e.target as HTMLElement) : null;
-    if (
-      targetEl &&
-      (targetEl.closest('button') ||
-        targetEl.closest('.pointer-events-auto') ||
-        targetEl.tagName === 'BUTTON' ||
-        targetEl.tagName === 'INPUT')
-    ) {
+    if (targetEl && targetEl !== this.canvas) {
       return;
     }
 
@@ -510,6 +509,7 @@ export class MiningMouseController {
     }
   };
 
+  /** Releases any held mouse state: window blur, pointer cancel, or a drag-and-drop starting. */
   private handleBlur = (): void => {
     if (this.activeAction instanceof ThrowableItemAction && this.activeAction.isCharging) {
       this.activeAction.cancelCharging();

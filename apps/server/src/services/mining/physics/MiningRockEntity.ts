@@ -8,6 +8,11 @@ export class MiningRockEntity extends MiningPhysicsBody {
   public hasSettled: boolean = false;
   public settledTile: { x: number; y: number } | null = null;
   public totalFallenDistance: number = 0;
+  /** Players this rock has already hit, so one fall hurts each player at most once. */
+  public readonly hitPlayerIds: Set<string> = new Set();
+  /** Where the rock was, and how fast it was falling, before the latest `update` (for swept hit tests). */
+  public previousPosition: Vector2D;
+  public previousVelocityY = 0;
   public angle: number = 0;
   public angularVelocity: number = 0;
   public rigidBody: planck.Body | null = null;
@@ -30,6 +35,7 @@ export class MiningRockEntity extends MiningPhysicsBody {
     });
     this.id = id;
     this.tileX = tileX;
+    this.previousPosition = { x: tileX + 0.5, y: tileY + 0.5 };
     this.rigidWorld = rigidWorld ?? null;
 
     if (rigidWorld) {
@@ -45,6 +51,8 @@ export class MiningRockEntity extends MiningPhysicsBody {
     if (this.hasSettled) return;
 
     const prevY = this.position.y;
+    this.previousPosition = { x: this.position.x, y: this.position.y };
+    this.previousVelocityY = this.velocity.y;
 
     if (this.rigidBody) {
       const pos = this.rigidBody.getPosition();

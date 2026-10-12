@@ -34,7 +34,12 @@ export default function ItemSoundEffectUpload({
 
   const buildRequest = (action: SoundSlotAction) => {
     const url = `/api/admin/items/${itemId}/sound-effects/${action.slotKey}`;
-    const body = action.kind === 'choose' ? { soundId: action.soundId } : { loop: action.loop };
+    const body =
+      action.kind === 'choose'
+        ? { soundId: action.soundId }
+        : action.kind === 'volume'
+          ? { volume: action.volume }
+          : { loop: action.loop };
     return fetchWithAuth(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   };
 

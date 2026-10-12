@@ -3,9 +3,8 @@ import React, { useState } from 'react';
 import { useQuickAccess } from '../../contexts/QuickAccessContext';
 import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 import { ItemTooltip } from '../ItemTooltip/ItemTooltip';
+import { QUICK_SLOT_COUNT, keyLabelForSlot } from '../../contexts/quickSlots';
 import './QuickAccessBar.css';
-
-const NUM_SLOTS = 4;
 
 export const QuickAccessBar: React.FC = () => {
   const {
@@ -79,18 +78,12 @@ export const QuickAccessBar: React.FC = () => {
   };
 
   return (
-    <div className="quick-access-bar flex flex-col gap-1.5 w-full">
-      <div className="flex justify-between items-center px-0.5">
-        <span className="text-[10px] font-black text-amber-500/90 uppercase tracking-widest flex items-center gap-1">
-          ⚡ Quick Access
-        </span>
-        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-          Keys 1-4
-        </span>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2 w-full">
-        {Array.from({ length: NUM_SLOTS }).map((_, slotIndex) => {
+    <div
+      data-testid="quick-access-bar"
+      className="quick-access-bar flex gap-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl p-2 shadow-2xl backdrop-blur-md w-fit"
+    >
+      <div className="flex gap-1.5">
+        {Array.from({ length: QUICK_SLOT_COUNT }).map((_, slotIndex) => {
           const { entry, totalQuantity } = getSlotEntry(slotIndex);
           const isSelected = selectedSlotIndex === slotIndex;
           const isDragOver = dragOverIndex === slotIndex;
@@ -128,7 +121,7 @@ export const QuickAccessBar: React.FC = () => {
                     : 'bg-slate-950/80 text-amber-400/80 border-slate-800 group-hover:text-amber-300'
                 }`}
               >
-                {slotIndex + 1}
+                {keyLabelForSlot(slotIndex)}
               </span>
 
               {/* Equipped Badge on Top Left */}

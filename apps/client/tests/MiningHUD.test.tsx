@@ -4,6 +4,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MiningHUD } from '../src/views/MineView/components/MiningHUD/MiningHUD';
 import type { MiningSessionClientState, PlayerState } from '@mine-me/shared';
 
+vi.mock('../src/components/QuickAccessBar/QuickAccessBar', () => ({
+  QuickAccessBar: () => <div data-testid="quick-access-bar" />,
+}));
+
 describe('MiningHUD', () => {
   const mockSessionState: MiningSessionClientState = {
     grid: [],
@@ -77,7 +81,7 @@ describe('MiningHUD', () => {
     expect((refreshButton as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('renders controls guide with 1-4 Quick Slots and Left Click Mine', () => {
+  it('renders controls guide with 1-0 Quick Slots and Left Click Mine', () => {
     render(
       <MiningHUD
         sessionState={mockSessionState}
@@ -88,7 +92,7 @@ describe('MiningHUD', () => {
       />
     );
 
-    expect(screen.getByText(/1-4/i)).toBeDefined();
+    expect(screen.getByText(/1-0/i)).toBeDefined();
     expect(screen.getByText(/Quick Slots/i)).toBeDefined();
     expect(screen.getByText(/Left Click/i)).toBeDefined();
     expect(screen.getAllByText(/Mine/i).length).toBeGreaterThan(0);
@@ -116,7 +120,7 @@ describe('MiningHUD', () => {
     expect(onToggleDebugMock).toHaveBeenCalledTimes(1);
   });
 
-  it('displays active state and position/reach overlay when showDebug is true', () => {
+  it('shows the Hitboxes ON state but no position/reach overlay when showDebug is true', () => {
     render(
       <MiningHUD
         sessionState={mockSessionState}
@@ -130,8 +134,8 @@ describe('MiningHUD', () => {
     );
 
     expect(screen.getByRole('button', { name: /Hitboxes ON/i })).toBeDefined();
-    expect(screen.getByText(/Pos: \(15, 0\)/i)).toBeDefined();
-    expect(screen.getByText(/Reach:/i)).toBeDefined();
+    expect(screen.queryByText(/Pos: \(15, 0\)/i)).toBeNull();
+    expect(screen.queryByText(/Reach:/i)).toBeNull();
   });
 
   it('renders Temporary Backpack with items in the HUD overlay', () => {

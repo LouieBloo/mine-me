@@ -98,6 +98,42 @@ describe('Admin Mining Config API Routes', () => {
     expect(res.body.rockRestitution).toBe(0.2);
   });
 
+  it('PUT /admin/mining-config saves fall damage settings', async () => {
+    const res = await request(app)
+      .put('/admin/mining-config')
+      .send({ fallDamageMinSpeed: 9, fallDamagePerSpeed: 7.5, fallDamageMax: 60 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.fallDamageMinSpeed).toBe(9);
+    expect(res.body.fallDamagePerSpeed).toBe(7.5);
+    expect(res.body.fallDamageMax).toBe(60);
+  });
+
+  it('PUT /admin/mining-config rejects negative or oversized fall damage settings', async () => {
+    for (const bad of [{ fallDamageMinSpeed: -1 }, { fallDamagePerSpeed: -0.5 }, { fallDamageMax: -5 }, { fallDamagePerSpeed: 1000 }]) {
+      const res = await request(app).put('/admin/mining-config').send(bad);
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it('PUT /admin/mining-config saves falling rock damage settings', async () => {
+    const res = await request(app)
+      .put('/admin/mining-config')
+      .send({ rockDamageMinSpeed: 4, rockDamagePerSpeed: 3.5, rockDamageMax: 90 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.rockDamageMinSpeed).toBe(4);
+    expect(res.body.rockDamagePerSpeed).toBe(3.5);
+    expect(res.body.rockDamageMax).toBe(90);
+  });
+
+  it('PUT /admin/mining-config rejects invalid falling rock damage settings', async () => {
+    for (const bad of [{ rockDamageMinSpeed: -1 }, { rockDamagePerSpeed: -0.5 }, { rockDamageMax: -5 }, { rockDamageMinSpeed: 500 }]) {
+      const res = await request(app).put('/admin/mining-config').send(bad);
+      expect(res.status).toBe(400);
+    }
+  });
+
   it('PUT /admin/mining-config updates and saves mob spawning parameters', async () => {
     const res = await request(app)
       .put('/admin/mining-config')

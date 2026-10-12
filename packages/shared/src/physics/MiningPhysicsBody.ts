@@ -163,10 +163,11 @@ export abstract class MiningPhysicsBody {
         if (this.velocity.y > 0) {
           // Hitting the floor -> ground the body and snap cleanly to the top surface of floor tile
           this.isGrounded = true;
+          const impactSpeed = this.velocity.y;
           const floorTileY = Math.floor(targetY + this.halfHeight);
           this.position.y = floorTileY - this.halfHeight;
           this.velocity.y = 0;
-          this.onGroundHit();
+          this.onGroundHit(impactSpeed);
         } else if (this.velocity.y < 0) {
           // Hitting the ceiling -> stop upward momentum and snap under ceiling
           const ceilingTileY = Math.floor(targetY - this.halfHeight);
@@ -236,6 +237,7 @@ export abstract class MiningPhysicsBody {
   }
 
   protected onCollideX(): void {}
-  protected onGroundHit(): void {}
+  /** Called when the body lands; `impactSpeed` is the downward speed (tiles/s) it hit the floor at. */
+  protected onGroundHit(_impactSpeed: number): void {}
   protected onCeilingHit(): void {}
 }

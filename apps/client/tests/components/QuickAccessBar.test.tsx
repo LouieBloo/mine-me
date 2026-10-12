@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { QuickAccessBar } from '../../src/components/QuickAccessBar/QuickAccessBar';
 import * as QuickAccessContextModule from '../../src/contexts/QuickAccessContext';
 
@@ -22,7 +22,7 @@ describe('QuickAccessBar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default mock implementation: all 4 slots empty
+    // Default mock implementation: slots 0-2 filled, rest empty
     mockGetSlotEntry.mockImplementation((index: number) => {
       if (index === 0) {
         return {
@@ -78,7 +78,7 @@ describe('QuickAccessBar', () => {
     });
 
     vi.spyOn(QuickAccessContextModule, 'useQuickAccess').mockReturnValue({
-      quickSlotItemIds: ['item-torch', 'item-pickaxe', 'item-potion', null],
+      quickSlotItemIds: ['item-torch', 'item-pickaxe', 'item-potion', ...Array(7).fill(null)],
       selectedSlotIndex: 0,
       selectSlot: mockSelectSlot,
       setSlotItem: mockSetSlotItem,
@@ -89,23 +89,21 @@ describe('QuickAccessBar', () => {
     });
   });
 
-  it('renders 4 slots with numbers 1-4 in the top right', () => {
+  it('renders 10 slots labelled 1-9 then 0 in the top right', () => {
     const { container } = render(<QuickAccessBar />);
 
     const slots = container.querySelectorAll('.quick-access-slot');
-    expect(slots.length).toBe(4);
+    expect(slots.length).toBe(10);
 
-    expect(slots[0].querySelector('span')?.textContent?.trim()).toBe('1');
-    expect(slots[1].querySelector('span')?.textContent?.trim()).toBe('2');
-    expect(slots[2].querySelector('span')?.textContent?.trim()).toBe('3');
-    expect(slots[3].querySelector('span')?.textContent?.trim()).toBe('4');
+    const labels = Array.from(slots).map(slot => slot.querySelector('span')?.textContent?.trim());
+    expect(labels).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']);
   });
 
   it('applies selected glow styling to the active slot (slot 1)', () => {
     const { container } = render(<QuickAccessBar />);
 
     const slots = container.querySelectorAll('.quick-access-slot');
-    expect(slots.length).toBe(4);
+    expect(slots.length).toBe(10);
 
     // Slot 0 is selected
     expect(slots[0].className).toContain('border-amber-400');
@@ -118,17 +116,24 @@ describe('QuickAccessBar', () => {
   it('displays item details, quantity, equipped badge, and empty placeholder', () => {
     const { container } = render(<QuickAccessBar />);
 
-    // Slot 0 has 5 torches
-    expect(screen.getByText('5')).toBeDefined();
+    const slots = container.querySelectorAll('.quick-access-slot');
+
+    // Slot 0 has 5 torches (quantity badge, not the key label)
+    expect(within(slots[0] as HTMLElement).getByText('5')).toBeDefined();
 
     // Slot 1 has Iron Pickaxe and is equipped ('E')
     expect(screen.getByText('E')).toBeDefined();
 
     // Slot 2 has depleted item with 0 quantity
-    expect(screen.getByText('0')).toBeDefined();
+    expect(within(slots[2] as HTMLElement).getByText('0')).toBeDefined();
 
-    // Slot 3 is empty and shows '+'
-    expect(screen.getByText('+')).toBeDefined();
+    // Empty slots show '+'
+    expect(screen.getAllByText('+')[0]).toBeDefined();
+  });
+
+  it('is a standalone HTML strip with a test id', () => {
+    render(<QuickAccessBar />);
+    expect(screen.getByTestId('quick-access-bar')).toBeDefined();
   });
 
   it('calls selectSlot when a slot is clicked', () => {

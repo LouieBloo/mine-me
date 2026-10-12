@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { useAutoHide } from '../../../../hooks/useAutoHide';
 import './ZoomControl.css';
 
 export interface ZoomControlProps {
@@ -7,6 +8,8 @@ export interface ZoomControlProps {
   minZoom?: number;
   maxZoom?: number;
   step?: number;
+  /** How long the panel stays visible after the last zoom activity. Default 5000ms. */
+  hideAfterMs?: number;
 }
 
 const PRESETS = [1.0, 1.25, 1.5, 1.75, 2.0];
@@ -17,7 +20,31 @@ export const ZoomControl: React.FC<ZoomControlProps> = ({
   minZoom = 1.0,
   maxZoom = 2.0,
   step = 0.05,
+  hideAfterMs,
 }) => {
+  const { visible, poke, hold, release } = useAutoHide(hideAfterMs);
+
+  // Show whenever the zoom value changes (wheel, buttons, slider), but not on first mount.
+  const previousZoomRef = useRef(zoom);
+  useEffect(() => {
+    if (previousZoomRef.current !== zoom) {
+      previousZoomRef.current = zoom;
+      poke();
+    }
+  }, [zoom, poke]);
+
+  // Dragging the slider holds the panel open until the pointer is released anywhere.
+  const handleSliderPointerDown = () => {
+    hold('drag');
+    const onUp = () => {
+      release('drag');
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
   const handleStep = (delta: number) => {
     const next = Math.min(maxZoom, Math.max(minZoom, Math.round((zoom + delta) * 100) / 100));
     onZoomChange(next);
@@ -33,7 +60,13 @@ export const ZoomControl: React.FC<ZoomControlProps> = ({
   return (
     <div
       data-testid="zoom-control"
-      className="zoom-control-container pointer-events-auto bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 shadow-2xl backdrop-blur-md flex flex-col gap-2.5 min-w-[230px]"
+      data-visible={visible}
+      aria-hidden={!visible}
+      onPointerEnter={() => hold('hover')}
+      onPointerLeave={() => release('hover')}
+      className={`zoom-control-container transition-opacity duration-500 ${
+        visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      } bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 shadow-2xl backdrop-blur-md flex flex-col gap-2.5 min-w-[230px]`}
     >
       {/* Header with Title and Current Readout */}
       <div className="flex items-center justify-between">
@@ -61,6 +94,7 @@ export const ZoomControl: React.FC<ZoomControlProps> = ({
         <input
           type="range"
           data-testid="zoom-slider-input"
+          onPointerDown={handleSliderPointerDown}
           min={minZoom}
           max={maxZoom}
           step={step}

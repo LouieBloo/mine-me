@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MiningSessionManager } from './MiningSessionManager';
+import { MiningDataManager } from './subsystems/MiningDataManager';
 
 vi.mock('../../index', () => ({ prisma: { character: { update: vi.fn() } } }));
 vi.mock('../characterBroadcast', () => ({ broadcastStatUpdate: vi.fn() }));
@@ -202,6 +203,15 @@ describe('MiningSessionManager.buildClientState', () => {
 
     manager.cancelSession('snap-a', { persistHealth: false });
     manager.cancelSession('snap-b', { persistHealth: false });
+  });
+
+  it('sends the character sounds from the installed definitions once, with the run', () => {
+    const manager = MiningSessionManager.getInstance();
+    const e = manager.createSession('snap-sounds', 'c', sock(), true);
+    const sounds = MiningDataManager.getInstance().getCharacterSounds();
+    const state = manager.buildClientState(e, 'snap-sounds');
+    expect(state.characterSounds).toBe(sounds);
+    manager.cancelSession('snap-sounds', { persistHealth: false });
   });
 
   it('throws a clear error for a player that is not in the room', () => {

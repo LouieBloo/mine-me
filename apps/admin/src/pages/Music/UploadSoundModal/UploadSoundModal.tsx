@@ -84,7 +84,8 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({ isOpen, onCl
       formData.append('description', description.trim());
       formData.append('type', type);
       formData.append('category', type === 'SFX' ? category : 'GENERAL');
-      formData.append('volume', volume.toString());
+      // Only music has a volume of its own; a sound effect's volume is set where it is used
+      if (type === 'BGM') formData.append('volume', volume.toString());
       formData.append('loop', loop.toString());
       formData.append('isActive', isActive.toString());
 
@@ -254,10 +255,12 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({ isOpen, onCl
                   <option value="MOB">Mob</option>
                   <option value="ITEM">Item</option>
                   <option value="BLOCK">Block</option>
+                  <option value="CHARACTER">Character</option>
                 </select>
               </div>
             )}
 
+            {type === 'BGM' && (
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
                 Preset Volume: {Math.round(volume * 100)}%
@@ -273,6 +276,14 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({ isOpen, onCl
                 disabled={uploading}
               />
             </div>
+            )}
+
+            {type === 'SFX' && (
+              <p className="col-span-2 text-xs text-slate-500">
+                Sound effects have no volume of their own: set it where the sound is used (a mob, item, block or the
+                character).
+              </p>
+            )}
           </div>
 
           {/* Toggles */}

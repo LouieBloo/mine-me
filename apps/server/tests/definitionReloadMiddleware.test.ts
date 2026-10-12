@@ -23,6 +23,7 @@ describe('affectsDefinitions', () => {
     expect(affectsDefinitions('POST', '/items')).toBe(true);
     expect(affectsDefinitions('PATCH', '/mobs/abc/sound-effects/death')).toBe(true);
     expect(affectsDefinitions('DELETE', '/particle-effects/1')).toBe(true);
+    expect(affectsDefinitions('PATCH', '/character-sounds/hurt')).toBe(true);
     expect(affectsDefinitions('GET', '/items')).toBe(false);
     expect(affectsDefinitions('POST', '/users')).toBe(false);
     expect(affectsDefinitions('POST', '/items-other')).toBe(false);

@@ -4,6 +4,7 @@ import { useSocket } from './SocketContext';
 import { notificationService } from '../services/notificationService';
 import type { InventoryEntry, GameItem } from '@mine-me/shared';
 import { isTorchItem, isLadderItem, isThrowableItem } from '@mine-me/shared';
+import { QUICK_SLOT_COUNT, slotIndexForKey } from './quickSlots';
 
 interface QuickAccessContextType {
   /** 4 quick slots storing item definition IDs (or null if empty) */
@@ -36,14 +37,13 @@ interface QuickAccessContextType {
 
 const QuickAccessContext = createContext<QuickAccessContextType | undefined>(undefined);
 
-const NUM_SLOTS = 4;
 
 export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { activeCharacter, playerState } = useGame();
   const { sendGameEvent } = useSocket();
 
   const [quickSlotItemIds, setQuickSlotItemIds] = useState<(string | null)[]>(() => {
-    return Array(NUM_SLOTS).fill(null);
+    return Array(QUICK_SLOT_COUNT).fill(null);
   });
 
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(null);
@@ -55,7 +55,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
   // Load persisted quick slots when activeCharacter changes
   useEffect(() => {
     if (!activeCharacter?.id) {
-      setQuickSlotItemIds(Array(NUM_SLOTS).fill(null));
+      setQuickSlotItemIds(Array(QUICK_SLOT_COUNT).fill(null));
       setSelectedSlotIndex(null);
       return;
     }
@@ -65,8 +65,8 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          const slots = Array(NUM_SLOTS).fill(null);
-          for (let i = 0; i < NUM_SLOTS; i++) {
+          const slots = Array(QUICK_SLOT_COUNT).fill(null);
+          for (let i = 0; i < QUICK_SLOT_COUNT; i++) {
             slots[i] = parsed[i] ?? null;
           }
           setQuickSlotItemIds(slots);
@@ -77,7 +77,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
       console.warn('Failed to load saved quick slots from localStorage:', err);
     }
 
-    setQuickSlotItemIds(Array(NUM_SLOTS).fill(null));
+    setQuickSlotItemIds(Array(QUICK_SLOT_COUNT).fill(null));
   }, [activeCharacter?.id]);
 
   // Persist quick slots when changed
@@ -91,12 +91,12 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [activeCharacter?.id]);
 
   const setSlotItem = useCallback((slotIndex: number, itemDefId: string | null) => {
-    if (slotIndex < 0 || slotIndex >= NUM_SLOTS) return;
+    if (slotIndex < 0 || slotIndex >= QUICK_SLOT_COUNT) return;
     setQuickSlotItemIds(prev => {
       const next = [...prev];
       // If this item was already assigned to another slot, clear that slot to avoid duplicates
       if (itemDefId) {
-        for (let i = 0; i < NUM_SLOTS; i++) {
+        for (let i = 0; i < QUICK_SLOT_COUNT; i++) {
           if (next[i] === itemDefId) {
             next[i] = null;
           }
@@ -109,7 +109,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [persistQuickSlots]);
 
   const swapSlots = useCallback((fromIndex: number, toIndex: number) => {
-    if (fromIndex < 0 || fromIndex >= NUM_SLOTS || toIndex < 0 || toIndex >= NUM_SLOTS) return;
+    if (fromIndex < 0 || fromIndex >= QUICK_SLOT_COUNT || toIndex < 0 || toIndex >= QUICK_SLOT_COUNT) return;
     setQuickSlotItemIds(prev => {
       const next = [...prev];
       const temp = next[fromIndex];
@@ -188,7 +188,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   // Select and perform the slot action
   const selectSlot = useCallback(async (slotIndex: number) => {
-    if (slotIndex < 0 || slotIndex >= NUM_SLOTS) return;
+    if (slotIndex < 0 || slotIndex >= QUICK_SLOT_COUNT) return;
 
     setSelectedSlotIndex(slotIndex);
 
@@ -260,9 +260,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
             type: 'equip_item',
             inventoryItemId: entry.id,
           });
-          if (res.success) {
-            notificationService.success('Equipped', `Equipped ${item.name}.`);
-          } else {
+          if (!res.success) {
             notificationService.error('Error', res.error || 'Failed to equip item.');
           }
         } catch (err: any) {
@@ -289,7 +287,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   }, [getSlotEntry, sendGameEvent]);
 
-  // Keyboard shortcut listener for keys 1, 2, 3, 4
+  // Keyboard shortcut listener for keys 1-9 and 0
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is in an input field or textarea
@@ -298,18 +296,10 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         return;
       }
 
-      if (e.key === '1') {
+      const slotIndex = slotIndexForKey(e.key);
+      if (slotIndex !== null) {
         e.preventDefault();
-        selectSlot(0);
-      } else if (e.key === '2') {
-        e.preventDefault();
-        selectSlot(1);
-      } else if (e.key === '3') {
-        e.preventDefault();
-        selectSlot(2);
-      } else if (e.key === '4') {
-        e.preventDefault();
-        selectSlot(3);
+        selectSlot(slotIndex);
       }
     };
 

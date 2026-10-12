@@ -8,6 +8,8 @@ export class MiningPlayerBody extends MiningPhysicsBody {
   public isOnLadder = false;
   /** Seconds left in which movement input is ignored after being knocked back. */
   public knockbackRemaining = 0;
+  /** Fastest downward speed (tiles/s) at which the body hit the floor during the last `update` (0 if it did not land). */
+  public lastImpactSpeed = 0;
 
   constructor(position: Vector2D) {
     super({
@@ -128,6 +130,7 @@ export class MiningPlayerBody extends MiningPhysicsBody {
   public override update(dt: number, grid: MiningCollisionGrid): void {
     this.collisionX = false;
     this.collisionY = false;
+    this.lastImpactSpeed = 0;
     if (this.knockbackRemaining > 0) {
       this.knockbackRemaining = Math.max(0, this.knockbackRemaining - dt);
     }
@@ -138,8 +141,9 @@ export class MiningPlayerBody extends MiningPhysicsBody {
     this.collisionX = true;
   }
 
-  protected override onGroundHit(): void {
+  protected override onGroundHit(impactSpeed: number): void {
     this.collisionY = true;
+    this.lastImpactSpeed = Math.max(this.lastImpactSpeed, impactSpeed);
   }
 
   protected override onCeilingHit(): void {

@@ -2,6 +2,7 @@ import { Socket } from 'socket.io';
 import {
   MINING_CONFIG,
   advanceSwing,
+  computeSpeedDamage,
   isTileSolid,
   knockbackImpulse,
   sanitizeMiningInput,
@@ -12,6 +13,7 @@ import {
   type MiningPosition,
   type Vector2D,
 } from '@mine-me/shared';
+import { fallDamageRule } from '../environmentalDamage';
 import { MiningPlayerBody } from '../physics/MiningPlayerBody';
 import { createKnownEntities, type KnownEntities } from '../MiningEntitySync';
 import type { MiningWorld } from '../MiningWorld';
@@ -251,6 +253,7 @@ export class MiningPlayerManager {
       session.inputAge++;
       session.playerBody.processInputs(session.inputs, grid);
       session.playerBody.update(dt, grid);
+      this.applyFallDamage(session);
 
       // Animation state determination
       if (session.isMining || session.inputs.miningKey) {
@@ -282,6 +285,25 @@ export class MiningPlayerManager {
       // Item pickups
       this.world.drops.checkItemPickupsForPlayer(session);
     }
+  }
+
+  /** Hurts a player who landed hard this tick, by the active map config's fall damage rule. */
+  private applyFallDamage(session: MiningPlayerSession): void {
+    const impactSpeed = session.playerBody.lastImpactSpeed;
+    if (impactSpeed <= 0 || session.isDead) return;
+
+    const amount = computeSpeedDamage(impactSpeed, fallDamageRule(this.world.mapConfig));
+    if (amount <= 0) return;
+
+    this.world.damage.applyDamage(
+      { kind: 'player', id: session.characterId },
+      {
+        amount,
+        type: 'environmental',
+        source: { kind: 'environment', name: 'Fall' },
+        ignoreInvulnerability: true,
+      }
+    );
   }
 
   /** Melee: players whose swing fired this tick hit every living mob in their weapon's hit box. */
@@ -367,20 +389,25 @@ export class MiningPlayerManager {
   }
 
   /**
-   * Applies damage to a player. Ignored while dead or invulnerable (the grace window after a hit).
-   * The caller handles knockback, notification and what happens on death.
+   * Applies damage to a player. Ignored while dead or invulnerable (the grace window after a hit),
+   * unless `ignoreInvulnerability` is set (environmental damage): that always lands and does not
+   * start a new grace window. The caller handles knockback, notification and what happens on death.
    */
   public damagePlayer(
     session: MiningPlayerSession | undefined,
-    amount: number
+    amount: number,
+    options: { ignoreInvulnerability?: boolean } = {}
   ): { applied: boolean; died: boolean } {
-    if (!session || session.isDead || session.invulnerableSeconds > 0) {
+    if (!session || session.isDead) return { applied: false, died: false };
+    if (!options.ignoreInvulnerability && session.invulnerableSeconds > 0) {
       return { applied: false, died: false };
     }
     if (!Number.isFinite(amount) || amount <= 0) return { applied: false, died: false };
 
     session.health = Math.max(0, session.health - amount);
-    session.invulnerableSeconds = MINING_CONFIG.PLAYER_HIT_INVULNERABILITY;
+    if (!options.ignoreInvulnerability) {
+      session.invulnerableSeconds = MINING_CONFIG.PLAYER_HIT_INVULNERABILITY;
+    }
     if (session.health <= 0) {
       session.isDead = true;
       return { applied: true, died: true };

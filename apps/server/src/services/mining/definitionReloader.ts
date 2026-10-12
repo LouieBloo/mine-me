@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import { installDefinitionsFromDatabase } from './definitionLoaders';
 
-type DefinitionDb = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'sound'>;
+type DefinitionDb = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'sound' | 'characterSoundConfig'>;
 
 export type ReloadResult = { ok: true } | { ok: false; error: string };
 

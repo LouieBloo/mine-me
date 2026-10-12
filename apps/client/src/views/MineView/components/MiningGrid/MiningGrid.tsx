@@ -27,6 +27,7 @@ import { useMiningActions } from './hooks/useMiningActions';
 import { useMiningAmbientEffects } from './hooks/useMiningAmbientEffects';
 import { useMiningStateSync } from './hooks/useMiningStateSync';
 import { ReloadSoundTrigger } from './systems/ReloadSoundTrigger';
+import { CharacterSoundPlayer } from './systems/CharacterSoundPlayer';
 import { usePlayerDamageEvents } from './hooks/usePlayerDamageEvents';
 import { useMiningTicker } from './hooks/useMiningTicker';
 import { TILE_SIZE } from './renderers/MiningTileRenderer';
@@ -87,6 +88,12 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const gridRef = useRef<MiningClientTile[][]>(
     initialSessionState.grid.map((row) => row.map((tile) => ({ ...tile })))
   );
+
+  // The player character's own sounds (hurt, jump, land, death), sent by the server with the run
+  const characterSoundsRef = useRef<CharacterSoundPlayer>(null as unknown as CharacterSoundPlayer);
+  if (!characterSoundsRef.current) {
+    characterSoundsRef.current = new CharacterSoundPlayer(soundManager, initialSessionState.characterSounds);
+  }
 
   // Client-Side Prediction Physics Body for local player
   const playerBodyRef = useRef<MiningPlayerBody>(
@@ -272,6 +279,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     particleEngineRef,
     blockParticleConfigsRef,
     blockSoundsRef,
+    floatingTextManagerRef,
   } = useMiningScene({
     app,
     initialSessionState,
@@ -335,7 +343,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   const reloadSoundRef = useRef<ReloadSoundTrigger | null>(null);
   if (!reloadSoundRef.current) reloadSoundRef.current = new ReloadSoundTrigger();
 
-  const { weaponSoundUrlRef, weaponAmmoStateRef, handleWeaponReload } = useMiningActions({
+  const { weaponSoundUrlRef, weaponSoundVolumeRef, weaponAmmoStateRef, handleWeaponReload } = useMiningActions({
     world: sceneWorld,
     playerState,
     equippedWeapon,
@@ -373,13 +381,14 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     tileTextureLoaded,
   });
 
-  // Hit knockback from the server is applied to the predicted player body
-  usePlayerDamageEvents({ onEvent, playerBodyRef, predictorRef: predictionRef });
+  // Hit knockback from the server is applied to the predicted player body; the damage shows as a floating number
+  usePlayerDamageEvents({ onEvent, playerBodyRef, predictorRef: predictionRef, floatingTextManagerRef, characterSoundsRef });
 
   // Real-time 30 Hz server ticks subscription (updates refs & graphics incrementally with ZERO React re-renders)
   // Everything the per-tick and per-frame systems share, in one object
   const world: MiningClientWorld = {
     ...sceneWorld,
+    characterSoundsRef,
     predictionRef,
     keysPressedRef,
     isMiningRef,
@@ -391,6 +400,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     droppedItemsRef,
     weaponAmmoStateRef,
     weaponSoundUrlRef,
+    weaponSoundVolumeRef,
     lastWeaponSoundTimeRef,
     cameraRef,
     fallingRocksContainerRef,

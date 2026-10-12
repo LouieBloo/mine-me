@@ -1,3 +1,4 @@
+import { withVolume } from '../../../../../services/sound/sfxVolume';
 import {
   type MiningStateTickPayload,
   MiningTileType,
@@ -182,20 +183,27 @@ export function applyEffects(payload: MiningStateTickPayload, ctx: TickHandlerCo
         const soundUrl = world.weaponSoundUrlRef.current;
         if (soundUrl && now - world.lastWeaponSoundTimeRef.current >= SOUND_REPEAT_MS) {
           world.lastWeaponSoundTimeRef.current = now;
-          soundManager.playSfx(soundUrl);
+          soundManager.playSfx(soundUrl, withVolume(world.weaponSoundVolumeRef.current));
         }
       }
 
-      const blockSoundUrl = world.blockSoundsRef.current.get(hit.tileType);
-      if (blockSoundUrl) {
+      const blockSound = world.blockSoundsRef.current.get(hit.tileType);
+      if (blockSound) {
         const lastBlockSound = ctx.effects.lastBlockSoundTime.get(tileKey) || 0;
         if (now - lastBlockSound >= SOUND_REPEAT_MS) {
           ctx.effects.lastBlockSoundTime.set(tileKey, now);
           const soundPos = { x: hit.x + 0.5, y: hit.y + 0.5 };
           if (typeof soundManager.playPositionalSfx === 'function') {
-            soundManager.playPositionalSfx(blockSoundUrl, soundPos, { spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING });
+            soundManager.playPositionalSfx(
+              blockSound.url,
+              soundPos,
+              withVolume(blockSound.volume, { spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING })
+            );
           } else {
-            soundManager.playSfx(blockSoundUrl, { position: soundPos, spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING });
+            soundManager.playSfx(
+              blockSound.url,
+              withVolume(blockSound.volume, { position: soundPos, spatial: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING })
+            );
           }
         }
       }

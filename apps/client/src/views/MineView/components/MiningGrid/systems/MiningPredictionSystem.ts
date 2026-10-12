@@ -4,6 +4,7 @@ import type { SoundManager } from '../../../../../services/sound';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 import { miningProfiler } from '../utils/MiningProfiler';
 import type { MiningPredictionState } from './MiningPredictionState';
+import type { CharacterSoundPlayer } from './CharacterSoundPlayer';
 
 export interface MiningPredictionContext {
   playerBody: MiningPlayerBody | null;
@@ -14,6 +15,8 @@ export interface MiningPredictionContext {
   currentPos: Vector2D;
   playerContainer: Container;
   soundManager?: SoundManager | null;
+  /** Hears the body's movement to play jump and land sounds. */
+  characterSounds?: CharacterSoundPlayer | null;
 }
 
 export class MiningPredictionSystem {
@@ -23,7 +26,7 @@ export class MiningPredictionSystem {
    * one (or before the grid arrives) the sprite just eases toward the last server position.
    */
   public static update(ctx: MiningPredictionContext, frameSeconds: number): void {
-    const { playerBody, prediction, grid, inputs, targetPos, currentPos, playerContainer, soundManager } = ctx;
+    const { playerBody, prediction, grid, inputs, targetPos, currentPos, playerContainer, soundManager, characterSounds } = ctx;
 
     if (playerBody && prediction && grid) {
       miningProfiler.startSection('Physics');
@@ -38,6 +41,13 @@ export class MiningPredictionSystem {
       const drawn = predictor.renderPosition();
 
       soundManager?.setListenerPosition(playerBody.position);
+      characterSounds?.observeMotion({
+        isGrounded: playerBody.isGrounded,
+        isOnLadder: playerBody.isOnLadder,
+        velocityY: playerBody.velocity.y,
+        knockbackRemaining: playerBody.knockbackRemaining,
+        jumpPressed: !!inputs.jump,
+      });
       currentPos.x = drawn.x;
       currentPos.y = drawn.y;
       playerContainer.x = drawn.x * TILE_SIZE;

@@ -190,6 +190,18 @@ describe('Sound Admin & Public API', () => {
       expect(fs.existsSync(getSoundsDir('Big_Boom_final.mp3'))).toBe(true);
     });
 
+    it('files an upload under the Character category (a label only; the file is stored flat)', async () => {
+      const res = await request(app)
+        .post('/admin/sounds')
+        .field('category', 'CHARACTER')
+        .field('type', 'SFX')
+        .attach('file', Buffer.from('ID3a'), 'hurt-grunt.mp3');
+
+      expect(res.status).toBe(201);
+      expect(res.body.category).toBe('CHARACTER');
+      expect(res.body.url).toBe('/assets/sounds/hurt-grunt.mp3');
+    });
+
     it('never overwrites an existing file: a second upload with the same name gets -2', async () => {
       const first = await request(app).post('/admin/sounds').attach('file', Buffer.from('FIRST'), 'click.mp3');
       const second = await request(app).post('/admin/sounds').attach('file', Buffer.from('SECOND'), 'click.mp3');

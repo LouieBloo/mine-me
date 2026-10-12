@@ -33,6 +33,21 @@ describe('dynamite blast rules', () => {
     return mob;
   };
 
+  describe('explosion sound', () => {
+    it('is sent at full volume unless the dynamite sets one, and at the dynamite\'s own volume otherwise', () => {
+      boom(3);
+      expect(engine.explosiveSubsystem.pendingExplosions[engine.explosiveSubsystem.pendingExplosions.length - 1]?.soundVolume).toBe(1);
+
+      engine.explodeDynamite({
+        id: 'dyn2', position: { x: CX, y: CY }, explosionRadius: 3, ownerId: cid,
+        soundEffects: { explosion: { url: '/assets/sounds/boom.mp3', volume: 0.4 } },
+      } as any);
+      const last = engine.explosiveSubsystem.pendingExplosions[engine.explosiveSubsystem.pendingExplosions.length - 1];
+      expect(last.soundUrl).toBe('/assets/sounds/boom.mp3');
+      expect(last.soundVolume).toBe(0.4);
+    });
+  });
+
   describe('tiles', () => {
     it('clears diggable blocks in the radius and leaves everything outside it', () => {
       boom(3);

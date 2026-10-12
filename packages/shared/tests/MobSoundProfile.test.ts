@@ -43,6 +43,13 @@ describe('normalizeMobSoundRefs', () => {
     ).toEqual({ dig: { soundId: 's_hit' } });
   });
 
+  it('keeps a valid volume, clamped, and drops one that is not a number', () => {
+    expect(normalizeMobSoundRefs({ dig: { soundId: 'a', volume: 0.4 } })).toEqual({ dig: { soundId: 'a', volume: 0.4 } });
+    expect(normalizeMobSoundRefs({ dig: { soundId: 'a', volume: 7 } }).dig?.volume).toBe(1);
+    expect(normalizeMobSoundRefs({ dig: { soundId: 'a', volume: 'loud' } })).toEqual({ dig: { soundId: 'a' } });
+    expect(normalizeMobSoundRefs({ dig: { soundId: 'a', volume: NaN } })).toEqual({ dig: { soundId: 'a' } });
+  });
+
   it('returns an empty object for junk input', () => {
     expect(normalizeMobSoundRefs(null)).toEqual({});
     expect(normalizeMobSoundRefs('x')).toEqual({});
@@ -50,9 +57,21 @@ describe('normalizeMobSoundRefs', () => {
 });
 
 describe('resolveMobSounds', () => {
-  it('resolves ids to urls and volumes from the library', () => {
+  it('resolves ids to urls from the library; the volume is the mob\'s own, not the library\'s', () => {
     const out = resolveMobSounds({ attack: { soundId: 's_hit' } }, library);
-    expect(out.attack).toEqual({ soundId: 's_hit', url: '/assets/sounds/hit.mp3', volume: 0.5, loop: false });
+    expect(out.attack).toEqual({ soundId: 's_hit', url: '/assets/sounds/hit.mp3', volume: 1, loop: false });
+  });
+
+  it('uses the volume set on this mob, so the same sound can be quieter on another mob', () => {
+    const quiet = resolveMobSounds({ attack: { soundId: 's_hit', volume: 0.25 } }, library);
+    const loud = resolveMobSounds({ attack: { soundId: 's_hit' } }, library);
+    expect(quiet.attack?.volume).toBe(0.25);
+    expect(loud.attack?.volume).toBe(1);
+  });
+
+  it('clamps a stored volume into 0 to 1', () => {
+    expect(resolveMobSounds({ attack: { soundId: 's_hit', volume: 3 } }, library).attack?.volume).toBe(1);
+    expect(resolveMobSounds({ attack: { soundId: 's_hit', volume: -2 } }, library).attack?.volume).toBe(0);
   });
 
   it('leaves out slots whose sound is missing or inactive', () => {

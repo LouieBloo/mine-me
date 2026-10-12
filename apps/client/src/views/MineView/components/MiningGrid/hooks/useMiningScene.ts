@@ -15,6 +15,7 @@ import {
   isLadderItem,
   isThrowableItem,
   DEFAULT_PARTICLE_EFFECTS,
+  clampSoundVolume,
   type ParticleEffectConfig,
   getAssetUrl,
   type MiningSessionClientState,
@@ -74,7 +75,7 @@ export function useMiningScene({
   const tileGraphicsMap = useRef<Map<string, Graphics>>(new Map());
   const tileSpritesMap = useRef<Map<string, Sprite>>(new Map());
   const blockTexturesRef = useRef<Map<number, Texture>>(new Map());
-  const blockSoundsRef = useRef<Map<number, string>>(new Map());
+  const blockSoundsRef = useRef<Map<number, { url: string; volume: number }>>(new Map());
   const blockParticleConfigsRef = useRef<Map<MiningTileType, ParticleEffectConfig>>(
     new Map([
       [MiningTileType.COPPERIUM, DEFAULT_PARTICLE_EFFECTS.fairy_sparkle],
@@ -315,7 +316,10 @@ export function useMiningScene({
               }
 
               if (blk.soundEffectUrl) {
-                blockSoundsRef.current.set(tileType, getAssetUrl(blk.soundEffectUrl));
+                blockSoundsRef.current.set(tileType, {
+                  url: getAssetUrl(blk.soundEffectUrl),
+                  volume: clampSoundVolume(blk.soundEffectVolume),
+                });
               } else {
                 blockSoundsRef.current.delete(tileType);
               }
@@ -510,7 +514,7 @@ export function useMiningScene({
       const preloadPromise = soundManager
         ? (async () => {
             const manifest = await manifestPromise;
-            const referenced = collectAssetUrls(dynamicItems, publicBlocks, initialSessionState.mobs);
+            const referenced = collectAssetUrls(dynamicItems, publicBlocks, initialSessionState.mobs, initialSessionState.characterSounds);
             const lists: AssetLists = {
               images: [...new Set([...manifest.images, ...referenced.images])],
               sounds: [...new Set([...manifest.sounds, ...referenced.sounds])],

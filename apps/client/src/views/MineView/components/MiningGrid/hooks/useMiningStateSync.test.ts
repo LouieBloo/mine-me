@@ -41,6 +41,7 @@ function setup(options: { equippedWeapon?: any; reloadSound?: ReloadSoundTrigger
     blockSoundsRef: ref(new Map()),
     blockParticleConfigsRef: ref(new Map()),
     weaponSoundUrlRef: ref(null),
+    weaponSoundVolumeRef: ref(1),
     lastWeaponSoundTimeRef: ref(0),
   };
   const off = vi.fn();
@@ -97,7 +98,7 @@ describe('useMiningStateSync', () => {
     expect(soundManager.playSfx).not.toHaveBeenCalled();
     getHandler()(tick({ current: 0, max: 6, isReloading: true }));
     expect(soundManager.playSfx).toHaveBeenCalledTimes(1);
-    expect(soundManager.playSfx).toHaveBeenCalledWith('/assets/sounds/items/reload.mp3');
+    expect(soundManager.playSfx).toHaveBeenCalledWith('/assets/sounds/items/reload.mp3', { volumeScale: 1 });
     getHandler()(tick({ current: 0, max: 6, isReloading: true }));
     expect(soundManager.playSfx).toHaveBeenCalledTimes(1);
   });

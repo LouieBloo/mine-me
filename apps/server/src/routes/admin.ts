@@ -5,6 +5,7 @@ import { reloadDefinitionsAfterWrite } from '../middleware/definitionReload';
 import * as CityController from '../controllers/admin/city.controller';
 import * as ItemController from '../controllers/admin/item.controller';
 import * as MobController from '../controllers/admin/mob.controller';
+import * as CharacterSoundController from '../controllers/admin/characterSound.controller';
 import * as MobSoundController from '../controllers/admin/mobSound.controller';
 import * as UserController from '../controllers/admin/user.controller';
 import * as InventoryController from '../controllers/admin/inventory.controller';
@@ -111,6 +112,8 @@ adminRouter.put('/particle-effects/:id', runValidation(AdminValidation.particleE
 adminRouter.delete('/particle-effects/:id', ParticleEffectController.deleteParticleEffect);
 
 // SOUNDS & MUSIC
+adminRouter.get('/character-sounds', CharacterSoundController.getCharacterSounds);
+adminRouter.patch('/character-sounds/:slot', CharacterSoundController.setCharacterSound);
 adminRouter.get('/sounds', SoundController.getSounds);
 adminRouter.get('/sounds/:id', SoundController.getSound);
 adminRouter.post('/sounds/sync', SoundController.syncSounds);

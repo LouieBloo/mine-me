@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { notificationService } from '../services/notificationService';
 import { QuickAccessProvider, useQuickAccess } from './QuickAccessContext';
 
 // Mocks
@@ -262,5 +263,103 @@ describe('QuickAccessContext', () => {
     mockPlayerState = { inventory: { items: [] } };
     rerender();
     expect(result.current.isThrowingDynamite).toBe(false);
+  });
+
+  describe('ten hotbar slots', () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QuickAccessProvider>{children}</QuickAccessProvider>
+    );
+    const press = (key: string, target: EventTarget = window) =>
+      act(() => {
+        target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      });
+
+    it('exposes ten empty slots by default', () => {
+      const { result } = renderHook(() => useQuickAccess(), { wrapper });
+      expect(result.current.quickSlotItemIds).toHaveLength(10);
+      expect(result.current.quickSlotItemIds.every(id => id === null)).toBe(true);
+    });
+
+    it('pads a saved 4-slot hotbar with six empty slots and keeps the first four', () => {
+      localStorage.setItem('nvg_quick_slots_char-1', JSON.stringify(['a', 'b', null, 'd']));
+      const { result } = renderHook(() => useQuickAccess(), { wrapper });
+      expect(result.current.quickSlotItemIds).toEqual(['a', 'b', null, 'd', null, null, null, null, null, null]);
+    });
+
+    it('sets and swaps slots 5-10 and ignores out-of-range indexes', () => {
+      const { result } = renderHook(() => useQuickAccess(), { wrapper });
+      act(() => {
+        result.current.setSlotItem(9, 'x');
+        result.current.setSlotItem(10, 'nope');
+      });
+      expect(result.current.quickSlotItemIds[9]).toBe('x');
+      expect(result.current.quickSlotItemIds).toHaveLength(10);
+      act(() => result.current.swapSlots(9, 4));
+      expect(result.current.quickSlotItemIds[4]).toBe('x');
+      expect(result.current.quickSlotItemIds[9]).toBeNull();
+    });
+
+    it.each([
+      ['1', 0], ['5', 4], ['9', 8], ['0', 9],
+    ])('key %s selects slot index %i', (key, index) => {
+      const { result } = renderHook(() => useQuickAccess(), { wrapper });
+      press(key);
+      expect(result.current.selectedSlotIndex).toBe(index);
+    });
+
+    it('ignores hotbar keys typed into an input', () => {
+      const { result } = renderHook(() => useQuickAccess(), { wrapper });
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      press('0', input);
+      expect(result.current.selectedSlotIndex).toBeNull();
+      input.remove();
+    });
+  });
+
+  it('equips a gear item from the hotbar without a success toast', async () => {
+    mockSendGameEvent.mockResolvedValue({ success: true });
+    mockPlayerState = {
+      inventory: {
+        items: [
+          {
+            id: 'inv-sword-1',
+            quantity: 1,
+            equipped: false,
+            item: { id: 'item-sword', name: 'Sword', type: 'GEAR' },
+          },
+        ],
+      },
+    };
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QuickAccessProvider>{children}</QuickAccessProvider>
+    );
+    const { result } = renderHook(() => useQuickAccess(), { wrapper });
+    act(() => result.current.setSlotItem(0, 'item-sword'));
+    await act(async () => {
+      await result.current.selectSlot(0);
+    });
+    expect(mockSendGameEvent).toHaveBeenCalledWith({ type: 'equip_item', inventoryItemId: 'inv-sword-1' });
+    expect(notificationService.success).not.toHaveBeenCalled();
+  });
+
+  it('still shows an error toast when equipping fails', async () => {
+    mockSendGameEvent.mockResolvedValue({ success: false, error: 'Too heavy' });
+    mockPlayerState = {
+      inventory: {
+        items: [
+          { id: 'inv-sword-1', quantity: 1, equipped: false, item: { id: 'item-sword', name: 'Sword', type: 'GEAR' } },
+        ],
+      },
+    };
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QuickAccessProvider>{children}</QuickAccessProvider>
+    );
+    const { result } = renderHook(() => useQuickAccess(), { wrapper });
+    act(() => result.current.setSlotItem(0, 'item-sword'));
+    await act(async () => {
+      await result.current.selectSlot(0);
+    });
+    expect(notificationService.error).toHaveBeenCalledWith('Error', 'Too heavy');
   });
 });

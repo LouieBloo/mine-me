@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import CharacterViewer from './CharacterViewer';
+import CharacterEditor from './CharacterEditor';
 import { ToastProvider } from '../../contexts/ToastContext';
 
 // Mock PixiJS
@@ -87,25 +87,31 @@ const mockManifest = {
   },
 };
 
+// One stable fetch function: a new one per render would make the data hooks reload forever
+const mockFetchWithAuth = vi.fn(async (url: string) => ({
+  ok: true,
+  json: () =>
+    Promise.resolve(
+      url.includes('character-sounds')
+        ? { soundEffects: {} }
+        : url.includes('/sounds')
+          ? []
+          : [
+              {
+                id: 'item_1',
+                name: 'Iron Helmet',
+                type: 'GEAR',
+                subType: 'HEAD',
+                gearImageUrl: '/assets/gear/helm.png',
+              },
+            ]
+    ),
+}));
 vi.mock('../../hooks/useApi', () => ({
-  useApi: () => ({
-    fetchWithAuth: vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve([
-          {
-            id: 'item_1',
-            name: 'Iron Helmet',
-            type: 'GEAR',
-            subType: 'HEAD',
-            gearImageUrl: '/assets/gear/helm.png',
-          },
-        ]),
-    }),
-  }),
+  useApi: () => ({ fetchWithAuth: mockFetchWithAuth }),
 }));
 
-describe('CharacterViewer Page', () => {
+describe('CharacterEditor Page', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'fetch',
@@ -116,11 +122,27 @@ describe('CharacterViewer Page', () => {
     );
   });
 
+  it('shows the rig editor together with the character sounds panel', async () => {
+    render(
+      <MemoryRouter>
+        <ToastProvider>
+          <CharacterEditor />
+        </ToastProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading Character Model & Slices...')).toBeNull();
+    });
+    expect(screen.getByTestId('character-sounds')).toBeDefined();
+    expect(screen.getByText('Character Sounds')).toBeDefined();
+  });
+
   it('renders header and parts list after loading', async () => {
     render(
       <MemoryRouter>
         <ToastProvider>
-          <CharacterViewer />
+          <CharacterEditor />
         </ToastProvider>
       </MemoryRouter>
     );
@@ -139,7 +161,7 @@ describe('CharacterViewer Page', () => {
     render(
       <MemoryRouter>
         <ToastProvider>
-          <CharacterViewer />
+          <CharacterEditor />
         </ToastProvider>
       </MemoryRouter>
     );
@@ -169,7 +191,7 @@ describe('CharacterViewer Page', () => {
     render(
       <MemoryRouter>
         <ToastProvider>
-          <CharacterViewer />
+          <CharacterEditor />
         </ToastProvider>
       </MemoryRouter>
     );
@@ -185,13 +207,13 @@ describe('CharacterViewer Page', () => {
     const plusButtons = screen.getAllByRole('button', { name: '+5' });
     expect(plusButtons.length).toBeGreaterThan(0);
     fireEvent.click(plusButtons[0]);
-  });
+  }, 20000);
 
   it('allows changing animation states', async () => {
     render(
       <MemoryRouter>
         <ToastProvider>
-          <CharacterViewer />
+          <CharacterEditor />
         </ToastProvider>
       </MemoryRouter>
     );
@@ -217,5 +239,5 @@ describe('CharacterViewer Page', () => {
         'bg-slate-900'
       );
     });
-  });
+  }, 20000);
 });

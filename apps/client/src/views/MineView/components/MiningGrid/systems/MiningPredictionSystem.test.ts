@@ -3,6 +3,7 @@ import { MiningPlayerBody, MiningTileType, MINING_CONFIG, type MiningClientTile,
 import { MiningPredictionSystem } from './MiningPredictionSystem';
 import { MiningPredictionState } from './MiningPredictionState';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
+import { CharacterSoundPlayer } from './CharacterSoundPlayer';
 
 const idle: MiningInputState = { up: false, down: false, left: false, right: false, jump: false, miningKey: false, sequence: 0 };
 
@@ -85,5 +86,41 @@ describe('MiningPredictionState', () => {
     const snap = state.takeSnapshot();
     expect(snap).toMatchObject({ tick: 2, ackAge: 2, isGrounded: true, knockbackRemaining: 0.2 });
     expect(state.takeSnapshot()).toBeNull();
+  });
+
+  describe('character sounds', () => {
+    const withSounds = (c: any, sounds: any) => ({ ...c, characterSounds: sounds });
+
+    it('tells the character sounds how the body moved each frame', () => {
+      const { ctx } = setup();
+      const sounds = { observeMotion: vi.fn() } as any;
+      MiningPredictionSystem.update(withSounds(ctx(idle), sounds), 1 / 30);
+      expect(sounds.observeMotion).toHaveBeenCalledTimes(1);
+      expect(sounds.observeMotion).toHaveBeenCalledWith({
+        isGrounded: expect.any(Boolean),
+        isOnLadder: false,
+        velocityY: expect.any(Number),
+        knockbackRemaining: 0,
+        jumpPressed: false,
+      });
+    });
+
+    it('plays the jump sound when a real jump leaves the ground, and the land sound on touching down hard', () => {
+      const { ctx } = setup();
+      const output = { playSfx: vi.fn(), preloadSfx: vi.fn() };
+      const sounds = new CharacterSoundPlayer(output, {
+        jump: { url: '/assets/sounds/jump.mp3' }, land: { url: '/assets/sounds/land.mp3' },
+      });
+      MiningPredictionSystem.update(withSounds(ctx(idle), sounds), 1 / 30);
+      const jumping = { ...idle, jump: true, sequence: 1 };
+      for (let i = 0; i < 40; i++) MiningPredictionSystem.update(withSounds(ctx(jumping), sounds), 1 / 30);
+      const played = output.playSfx.mock.calls.map((c) => c[0]);
+      expect(played).toContain('/assets/sounds/jump.mp3');
+    });
+
+    it('works without character sounds', () => {
+      const { ctx } = setup();
+      expect(() => MiningPredictionSystem.update(ctx(idle), 1 / 30)).not.toThrow();
+    });
   });
 });

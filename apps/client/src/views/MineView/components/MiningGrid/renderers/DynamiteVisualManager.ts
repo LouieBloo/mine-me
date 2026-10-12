@@ -1,3 +1,4 @@
+import { withVolume } from '../../../../../services/sound/sfxVolume';
 import type { MiningActiveDynamite, MiningExplosionEvent, ParticleEffectConfig, Vector2D, ItemSoundEffectsConfig } from '@mine-me/shared';
 import { DEFAULT_PARTICLE_EFFECTS, DEFAULT_DYNAMITE_SOUNDS } from '@mine-me/shared';
 import { TILE_SIZE } from './MiningTileRenderer';
@@ -154,9 +155,9 @@ export class DynamiteVisualManager {
       // Check for newly spawned dynamite that was NOT thrown locally (e.g. remote player throw)
       if (!this.lastKnownDynamites.has(dyn.id)) {
         if (now - this.lastLocalThrowTime > 800) {
-          const remoteThrowSound = dyn.soundEffects?.throw?.url ?? DEFAULT_DYNAMITE_SOUNDS.throw?.url;
-          if (remoteThrowSound && soundManager) {
-            soundManager.playSfx(remoteThrowSound);
+          const remoteThrow = dyn.soundEffects?.throw?.url ? dyn.soundEffects.throw : DEFAULT_DYNAMITE_SOUNDS.throw;
+          if (remoteThrow?.url && soundManager) {
+            soundManager.playSfx(remoteThrow.url, withVolume(remoteThrow.volume));
           }
         }
       }
@@ -228,10 +229,10 @@ export class DynamiteVisualManager {
         const fuseUrl = fuseConfig?.url;
         if (fuseUrl) {
           if (fuseConfig.loop !== false) {
-            soundManager.playLoopingSfx(fuseKey, fuseUrl);
+            soundManager.playLoopingSfx(fuseKey, fuseUrl, withVolume(fuseConfig.volume));
             this.activeFuseSoundKeys.add(fuseKey);
           } else if (!this.activeFuseSoundKeys.has(fuseKey)) {
-            soundManager.playSfx(fuseUrl);
+            soundManager.playSfx(fuseUrl, withVolume(fuseConfig.volume));
             this.activeFuseSoundKeys.add(fuseKey);
           }
         }
@@ -297,7 +298,8 @@ export class DynamiteVisualManager {
     tileSize: number = TILE_SIZE,
     explosionId?: string,
     soundUrl?: string | null,
-    soundManager?: SoundManager | null
+    soundManager?: SoundManager | null,
+    soundVolume?: number
   ): void {
     const centerPixel = {
       x: position.x * tileSize,
@@ -355,7 +357,7 @@ export class DynamiteVisualManager {
     if (soundManager) {
       const resolvedSoundUrl = soundUrl || DEFAULT_DYNAMITE_SOUNDS.explosion?.url;
       if (resolvedSoundUrl) {
-        soundManager.playSfx(resolvedSoundUrl, { throttleMs: 50 });
+        soundManager.playSfx(resolvedSoundUrl, withVolume(soundVolume, { throttleMs: 50 }));
       }
     }
   }
@@ -375,6 +377,8 @@ export class DynamiteVisualManager {
         exp.soundUrl ||
         this.lastKnownDynamites.get(exp.id)?.soundEffects?.explosion?.url ||
         DEFAULT_DYNAMITE_SOUNDS.explosion?.url;
+      // The server says how loud the detonated dynamite's explosion is; fall back to what we last saw of it
+      const soundVolume = exp.soundVolume ?? this.lastKnownDynamites.get(exp.id)?.soundEffects?.explosion?.volume;
 
       this.triggerExplosion(
         exp.position,
@@ -384,7 +388,8 @@ export class DynamiteVisualManager {
         tileSize,
         exp.id,
         soundUrl,
-        soundManager
+        soundManager,
+        soundVolume
       );
     }
   }

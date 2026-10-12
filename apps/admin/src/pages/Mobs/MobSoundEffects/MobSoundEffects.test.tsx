@@ -129,4 +129,27 @@ describe('MobSoundEffects', () => {
     renderIt();
     expect(await screen.findByText('Failed to load the sound library')).toBeInTheDocument();
   });
+
+  it('sets the volume of a slot on this mob only, as a 0-1 value, without resending the sound', async () => {
+    const { onChange } = renderIt({ soundEffects: { attack: { soundId: 's1', volume: 1 } } });
+    await screen.findByTestId('mob-sound-preview-attack');
+    mockFetchWithAuth.mockClear();
+    mockFetchWithAuth.mockImplementation(() => json({ id: 'mob1', soundEffects: { attack: { soundId: 's1', volume: 0.3 } } }));
+
+    fireEvent.change(screen.getByLabelText('Attack volume'), { target: { value: '30' } });
+
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    const [url, opts] = mockFetchWithAuth.mock.calls[0];
+    expect(url).toBe('/api/admin/mobs/mob1/sound-effects/attack');
+    expect(opts.method).toBe('PATCH');
+    expect(JSON.parse(opts.body)).toEqual({ volume: 0.3 });
+  });
+
+  it('shows the volume saved for each slot, so the same sound can differ between slots', async () => {
+    renderIt({ soundEffects: { attack: { soundId: 's1', volume: 0.2 }, death: { soundId: 's1', volume: 0.9 } } });
+    await screen.findByTestId('mob-sound-preview-attack');
+    expect(screen.getByTestId('mob-sound-volume-value-attack')).toHaveTextContent('20%');
+    expect(screen.getByTestId('mob-sound-volume-value-death')).toHaveTextContent('90%');
+    expect(screen.getByTestId('mob-sound-volume-value-dig')).toHaveTextContent('100%');
+  });
 });

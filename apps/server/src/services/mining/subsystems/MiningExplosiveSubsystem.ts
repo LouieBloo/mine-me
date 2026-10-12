@@ -1,4 +1,5 @@
 import {
+  clampSoundVolume,
   DEFAULT_DYNAMITE_SOUNDS,
   MINING_CONFIG,
   MiningTileType,
@@ -137,6 +138,7 @@ export class MiningExplosiveSubsystem {
       position: { x: dynamite.position.x, y: dynamite.position.y },
       radius,
       soundUrl: dynamite.soundEffects?.explosion?.url ?? DEFAULT_DYNAMITE_SOUNDS.explosion?.url,
+      soundVolume: clampSoundVolume(dynamite.soundEffects?.explosion?.volume),
     });
 
     const origin = { x: dynamite.position.x, y: dynamite.position.y };

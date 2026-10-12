@@ -304,6 +304,7 @@ export default function BlockDetail() {
           <BlockSoundEffectUpload
             blockId={block.id}
             soundEffectUrl={block.soundEffectUrl}
+            soundEffectVolume={block.soundEffectVolume}
             blockName={block.name}
             onUploadSuccess={(updated) => setBlock(updated)}
           />

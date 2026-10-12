@@ -25,11 +25,17 @@
   "dynamiteFuseSeconds": 4,
   "rockGravityScale": 1.2,
   "rockRestitution": 0.1,
+  "fallDamageMinSpeed": 16,
+  "fallDamagePerSpeed": 6,
+  "fallDamageMax": 80,
+  "rockDamageMinSpeed": 6,
+  "rockDamagePerSpeed": 5,
+  "rockDamageMax": 80,
   "mobSpawnCount": 3,
   "mobSpawnMinDepth": 5,
   "allowedMobIds": [
     "cmn_mole_person_001"
   ],
-  "isActive": true,
-  "surfaceDummyMobId": "mob_target_dummy"
+  "surfaceDummyMobId": "mob_target_dummy",
+  "isActive": true
 }

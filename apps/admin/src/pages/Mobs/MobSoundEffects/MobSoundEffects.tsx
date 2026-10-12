@@ -26,7 +26,12 @@ export default function MobSoundEffects({ mobId, soundEffects, onChange }: MobSo
   const buildRequest = (action: SoundSlotAction) => {
     const url = `/api/admin/mobs/${mobId}/sound-effects/${action.slotKey}`;
     const current = refs[action.slotKey as keyof MobSoundSlotRefs];
-    const body = action.kind === 'choose' ? { soundId: action.soundId } : { soundId: current?.soundId ?? null, loop: action.loop };
+    const body =
+      action.kind === 'choose'
+        ? { soundId: action.soundId }
+        : action.kind === 'volume'
+          ? { volume: action.volume }
+          : { soundId: current?.soundId ?? null, loop: action.loop };
     return fetchWithAuth(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   };
 

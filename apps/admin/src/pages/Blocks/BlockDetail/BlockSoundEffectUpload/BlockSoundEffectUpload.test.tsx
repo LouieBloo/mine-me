@@ -86,4 +86,19 @@ describe('BlockSoundEffectUpload', () => {
     const assign = mockFetchWithAuth.mock.calls.find((c) => c[0] === '/api/admin/blocks/block_dirt/sound-effect')!;
     expect(JSON.parse(assign[1].body)).toEqual({ soundId: 'new1' });
   });
+
+  it('shows the block\'s volume and saves a change as a volume-only request (the sound is kept)', async () => {
+    const { onUploadSuccess } = renderIt({ soundEffectUrl: '/assets/sounds/Crunch.mp3', soundEffectVolume: 0.6 });
+    await screen.findByTestId('block-sound-preview-damage');
+    expect(screen.getByTestId('block-sound-volume-value-damage')).toHaveTextContent('60%');
+    mockFetchWithAuth.mockClear();
+    mockFetchWithAuth.mockImplementation(() => json({ id: 'block_dirt', soundEffectUrl: '/assets/sounds/Crunch.mp3', soundEffectVolume: 0.25 }));
+
+    fireEvent.change(screen.getByLabelText('Damage Sound volume'), { target: { value: '25' } });
+
+    await waitFor(() => expect(onUploadSuccess).toHaveBeenCalled());
+    const [url, opts] = mockFetchWithAuth.mock.calls[0];
+    expect(url).toBe('/api/admin/blocks/block_dirt/sound-effect');
+    expect(JSON.parse(opts.body)).toEqual({ volume: 0.25 });
+  });
 });

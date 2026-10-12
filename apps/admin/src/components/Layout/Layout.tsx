@@ -46,7 +46,7 @@ export default function Layout() {
           <div className="pt-3 pb-1 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Characters & Users
           </div>
-          <NavLink to="/character-viewer" className={navLinkClass}>Character Viewer</NavLink>
+          <NavLink to="/character-editor" className={navLinkClass}>Character Editor</NavLink>
           <NavLink to="/mob-viewer" className={navLinkClass}>Mob Viewer</NavLink>
           <NavLink to="/character-levels" className={navLinkClass}>Levels Config</NavLink>
           <NavLink to="/mobs" className={navLinkClass}>Mobs Editor</NavLink>

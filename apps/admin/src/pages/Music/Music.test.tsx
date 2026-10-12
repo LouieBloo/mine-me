@@ -64,6 +64,19 @@ describe('Music page', () => {
     expect(screen.queryByText('Mole Growl')).not.toBeInTheDocument();
   });
 
+  it('shows a volume for music only; sound effects say it is set per use', async () => {
+    mockFetchWithAuth.mockImplementation(() => json([
+      sound({ id: 'bgm1', name: 'Cave Theme', type: 'BGM', volume: 0.7 }),
+      sound({ id: 'mob1', name: 'Mole Growl', category: 'MOB', volume: 0.4 }),
+    ]));
+    renderPage();
+    const musicRow = (await screen.findByText('Cave Theme')).closest('tr')!;
+    expect(within(musicRow).getByText('70%')).toBeInTheDocument();
+    const sfxRow = screen.getByText('Mole Growl').closest('tr')!;
+    expect(within(sfxRow).getByText('Per use')).toBeInTheDocument();
+    expect(within(sfxRow).queryByText('40%')).not.toBeInTheDocument();
+  });
+
   it('shows what uses each sound', async () => {
     renderPage();
     expect(await screen.findByText('Mob: Mole (attack)')).toBeInTheDocument();

@@ -74,6 +74,19 @@ describe('ItemSoundProfile Object-Oriented Domain Model', () => {
     expect(normalizedExplicit.explosion?.url).toBe('/assets/sounds/items/boom.mp3');
   });
 
+  it('keeps the volume set on each item slot, defaulting to 100% and clamping to 0-1', () => {
+    const profile = new DynamiteSoundProfile();
+    const out = profile.normalizeConfig({
+      throw: { url: '/a.mp3', volume: 0.4 },
+      inGameEffect: { url: '/b.mp3', volume: 5 },
+      explosion: { url: '/c.mp3', volume: 'loud' },
+    });
+    expect(out.throw?.volume).toBe(0.4);
+    expect(out.inGameEffect?.volume).toBe(1);
+    expect(out.explosion?.volume).toBe(1);
+    expect(profile.normalizeConfig({}, '/legacy.mp3').throw?.volume).toBe(1);
+  });
+
   it('allows registering custom sound profiles dynamically', () => {
     class BowSoundProfile extends ItemSoundProfile {
       public readonly subType = 'BOW';

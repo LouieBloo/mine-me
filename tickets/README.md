@@ -43,3 +43,12 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Set `
 | [037](037-weapon-sound-wiring.md) | Weapon sound wiring (reload, gunshots) | P2 (Done) |
 | [038](038-item-sound-picker.md) | Item sounds use the shared sound picker | P2 (Done) |
 | [039](039-one-sound-framework.md) | One way to add and assign sounds; sounds keep their own names | P1 (Done) |
+| [040](040-remove-mine-title-panel.md) | Remove the "Subterranean Mine" HUD panel | P3 (Done) |
+| [041](041-hotbar-on-game-screen.md) | Move the quick access hotbar onto the mining screen (top left) | P2 (Done) |
+| [042](042-ten-hotbar-slots.md) | Ten hotbar slots with keys 1-9 and 0 | P2 (Done) |
+| [043](043-zoom-panel-on-scroll.md) | Camera zoom panel shows only after scrolling, then fades | P3 (Done) |
+| [044](044-character-editor-and-sounds.md) | Character Editor (renamed viewer) with character sounds | P2 (Done) |
+| [045](045-player-damage-floating-numbers.md) | Floating damage numbers when the player is hurt | P2 (Done) |
+| [046](046-fall-damage.md) | Fall damage (players only), configurable in admin | P2 (Done) |
+| [047](047-falling-rock-damage.md) | Falling rocks damage the player by impact speed | P2 (Done) |
+| [048](048-per-use-sound-volume.md) | Per-use sound volume, relative to the global effects volume | P2 (Done) |

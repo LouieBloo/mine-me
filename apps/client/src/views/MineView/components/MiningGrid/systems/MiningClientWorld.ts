@@ -26,6 +26,7 @@ import type { DroppedItemVisualManager } from '../renderers/DroppedItemVisualMan
 import type { ProjectileVisualManager } from '../renderers/ProjectileVisualManager';
 import type { ProjectileTextureCache } from './ProjectileTextureCache';
 import type { MiningPredictionState } from './MiningPredictionState';
+import type { CharacterSoundPlayer } from './CharacterSoundPlayer';
 
 type Ref<T> = React.MutableRefObject<T>;
 type NullableRef<T> = React.RefObject<T | null>;
@@ -44,6 +45,8 @@ export interface MiningSimulationRefs {
   playerFacingDirRef: Ref<Vector2D>;
   showDebugRef: Ref<boolean>;
   mouseControllerRef: Ref<MiningMouseController>;
+  /** Plays the player character's hurt/jump/land/death sounds. */
+  characterSoundsRef: Ref<CharacterSoundPlayer>;
 }
 
 /** Entities and items as last reported by the server. */
@@ -55,6 +58,8 @@ export interface MiningEntityRefs {
   dynamicItemsRef: Ref<GameItem[]>;
   weaponAmmoStateRef: Ref<{ current: number; max: number; isReloading: boolean }>;
   weaponSoundUrlRef: Ref<string | null>;
+  /** Volume (0 to 1) set on the weapon for the sound in `weaponSoundUrlRef`. */
+  weaponSoundVolumeRef: Ref<number>;
   lastWeaponSoundTimeRef: Ref<number>;
 }
 
@@ -80,7 +85,8 @@ export interface MiningSceneRefs {
   dynamiteTextureRef: NullableRef<Texture>;
   projectileTexturesRef: NullableRef<ProjectileTextureCache>;
   blockParticleConfigsRef: Ref<Map<MiningTileType, ParticleEffectConfig>>;
-  blockSoundsRef: Ref<Map<number, string>>;
+  /** The mining sound of each block type, with the volume set on that block. */
+  blockSoundsRef: Ref<Map<number, { url: string; volume: number }>>;
   playerSpriteRef: NullableRef<ModularCharacterSprite>;
   remotePlayerRendererRef: NullableRef<MiningRemotePlayerRenderer>;
   mobRendererRef: NullableRef<MiningMobRenderer>;

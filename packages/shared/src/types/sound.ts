@@ -1,9 +1,9 @@
 export type SoundType = 'BGM' | 'SFX';
 
 /** Where a library sound is used. Music is `type: 'BGM'`; sound effects are grouped by what plays them. */
-export type SoundCategory = 'GENERAL' | 'ITEM' | 'BLOCK' | 'MOB';
+export type SoundCategory = 'GENERAL' | 'ITEM' | 'BLOCK' | 'MOB' | 'CHARACTER';
 
-export const SOUND_CATEGORIES: readonly SoundCategory[] = ['GENERAL', 'ITEM', 'BLOCK', 'MOB'];
+export const SOUND_CATEGORIES: readonly SoundCategory[] = ['GENERAL', 'ITEM', 'BLOCK', 'MOB', 'CHARACTER'];
 
 export interface SoundTrack {
   id: string;
@@ -44,6 +44,8 @@ export type ItemSoundSlot = 'throw' | 'inGameEffect' | 'explosion' | 'shoot' | '
 export interface SoundEffectSlotConfig {
   url?: string | null;
   loop?: boolean;
+  /** How loud this sound is where it is used, 0 to 1 (1 when absent). Scales the global effects volume. */
+  volume?: number;
 }
 
 export interface ItemSoundEffectsConfig {
@@ -61,6 +63,8 @@ export type MobSoundSlot = 'dig' | 'idle' | 'damage' | 'attack' | 'death';
 export interface MobSoundSlotRef {
   soundId?: string | null;
   loop?: boolean;
+  /** Volume of this sound on this mob, 0 to 1 (1 when absent). */
+  volume?: number;
 }
 
 export type MobSoundSlotRefs = Partial<Record<MobSoundSlot, MobSoundSlotRef>>;
@@ -72,6 +76,26 @@ export interface MobSoundSlotResolved extends SoundEffectSlotConfig {
 }
 
 export type MobSoundEffectsConfig = Partial<Record<MobSoundSlot, MobSoundSlotResolved>>;
+
+export type CharacterSoundSlot = 'hurt' | 'jump' | 'land' | 'death';
+
+/** What the admin stores for one character slot: a library sound by id (the url is resolved at load). */
+export interface CharacterSoundSlotRef {
+  soundId?: string | null;
+  loop?: boolean;
+  /** Volume of this sound on the character, 0 to 1 (1 when absent). */
+  volume?: number;
+}
+
+export type CharacterSoundSlotRefs = Partial<Record<CharacterSoundSlot, CharacterSoundSlotRef>>;
+
+/** A character slot after its library sound has been resolved to something the client can play. */
+export interface CharacterSoundSlotResolved extends SoundEffectSlotConfig {
+  soundId?: string | null;
+  volume?: number;
+}
+
+export type CharacterSoundEffectsConfig = Partial<Record<CharacterSoundSlot, CharacterSoundSlotResolved>>;
 
 export type AudioFalloffModel = 'linear' | 'quadratic' | 'smoothstep' | 'exponential';
 

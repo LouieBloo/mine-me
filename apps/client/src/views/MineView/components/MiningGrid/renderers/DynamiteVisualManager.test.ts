@@ -328,7 +328,7 @@ describe('DynamiteVisualManager', () => {
 
       manager.update([dyn], 0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager);
 
-      expect(mockSoundManager.playSfx).toHaveBeenCalledWith('/assets/sounds/items/custom_throw.mp3');
+      expect(mockSoundManager.playSfx).toHaveBeenCalledWith('/assets/sounds/items/custom_throw.mp3', { volumeScale: 1 });
     });
 
     it('suppresses throw sound when dynamite was just thrown locally', () => {
@@ -345,7 +345,57 @@ describe('DynamiteVisualManager', () => {
       manager.recordLocalThrow();
       manager.update([dyn], 0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager);
 
-      expect(mockSoundManager.playSfx).not.toHaveBeenCalledWith('/assets/sounds/items/custom_throw.mp3');
+      const played = (mockSoundManager.playSfx as any).mock.calls.map((c: any[]) => c[0]);
+      expect(played).not.toContain('/assets/sounds/items/custom_throw.mp3');
+    });
+
+    it('plays the remote throw sound at the volume set on that dynamite', () => {
+      manager.update(
+        [{
+          id: 'dyn-vol-1', position: { x: 5, y: 5 }, velocity: { x: 0, y: 0 }, fuseRemainingSeconds: 4,
+          soundEffects: { throw: { url: '/assets/sounds/items/custom_throw.mp3', loop: false, volume: 0.35 } },
+        } as MiningActiveDynamite],
+        0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager
+      );
+      expect(mockSoundManager.playSfx).toHaveBeenCalledWith('/assets/sounds/items/custom_throw.mp3', { volumeScale: 0.35 });
+    });
+
+    it('plays the fuse loop at the volume set on the fuse slot', () => {
+      manager.update(
+        [{
+          id: 'dyn-vol-2', position: { x: 5, y: 5 }, velocity: { x: 0, y: 0 }, fuseRemainingSeconds: 4,
+          soundEffects: { inGameEffect: { url: '/assets/sounds/items/fuse_loop.mp3', loop: true, volume: 0.2 } },
+        } as MiningActiveDynamite],
+        0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager
+      );
+      expect(mockSoundManager.playLoopingSfx).toHaveBeenCalledWith(
+        'dynamite_fuse_dyn-vol-2', '/assets/sounds/items/fuse_loop.mp3', { volumeScale: 0.2 }
+      );
+    });
+
+    it('plays the explosion at the volume the server sends with the event, else the dynamite\'s own', () => {
+      manager.handleExplosionEvents(
+        [{ id: 'e1', position: { x: 1, y: 1 }, radius: 3, soundUrl: '/assets/sounds/items/boom.mp3', soundVolume: 0.45 }],
+        mockParticleEngine, mockLightingEngine, 64, mockSoundManager
+      );
+      expect(mockSoundManager.playSfx).toHaveBeenCalledWith(
+        '/assets/sounds/items/boom.mp3', expect.objectContaining({ volumeScale: 0.45, throttleMs: 50 })
+      );
+
+      manager.update(
+        [{
+          id: 'e2', position: { x: 5, y: 5 }, velocity: { x: 0, y: 0 }, fuseRemainingSeconds: 4,
+          soundEffects: { explosion: { url: '/assets/sounds/items/boom2.mp3', loop: false, volume: 0.6 } },
+        } as MiningActiveDynamite],
+        0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager
+      );
+      manager.handleExplosionEvents(
+        [{ id: 'e2', position: { x: 5, y: 5 }, radius: 3 }],
+        mockParticleEngine, mockLightingEngine, 64, mockSoundManager
+      );
+      expect(mockSoundManager.playSfx).toHaveBeenCalledWith(
+        '/assets/sounds/items/boom2.mp3', expect.objectContaining({ volumeScale: 0.6 })
+      );
     });
 
     it('plays looping inGameEffect fuse sound while dynamite is active and stops it when exploded', () => {
@@ -363,7 +413,8 @@ describe('DynamiteVisualManager', () => {
       manager.update([dyn], 0.016, mockParticleEngine, mockLightingEngine, 64, mockSoundManager);
       expect(mockSoundManager.playLoopingSfx).toHaveBeenCalledWith(
         'dynamite_fuse_dyn-fuse-1',
-        '/assets/sounds/items/fuse_loop.mp3'
+        '/assets/sounds/items/fuse_loop.mp3',
+        { volumeScale: 1 }
       );
 
       // 2. Dynamite explodes/despawns -> stops looping fuse sound

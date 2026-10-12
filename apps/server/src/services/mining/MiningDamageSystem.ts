@@ -61,7 +61,9 @@ export class MiningDamageSystem {
   private damagePlayer(characterId: string, amount: number, event: DamageEvent): DamageResult {
     const session = this.world.players.get(characterId);
     const healthBefore = session?.health ?? 0;
-    const { applied, died } = this.world.playerManager.damagePlayer(session, amount);
+    const { applied, died } = this.world.playerManager.damagePlayer(session, amount, {
+      ignoreInvulnerability: event.ignoreInvulnerability,
+    });
     if (!applied || !session) return NO_DAMAGE;
 
     // The killing blow doesn't push; everything else knocks the player back if the hit carries a push

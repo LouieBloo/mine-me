@@ -66,4 +66,34 @@ describe('SoundChannel', () => {
     channel.setEnabled(false);
     expect(mockHowl.volume).toHaveBeenCalledWith(0);
   });
+
+  describe('per-use volume stays relative to the channel volume', () => {
+    const fakeHowl = () => ({ volume: vi.fn(), on: vi.fn(), loop: vi.fn() }) as any;
+
+    it('plays each sound at the channel volume times its own scale', () => {
+      const sfx = new SoundChannel('sfx', 0.8, true);
+      const quiet = fakeHowl();
+      const full = fakeHowl();
+      sfx.register(quiet, 0.5);
+      sfx.register(full, 1);
+      expect(quiet.volume).toHaveBeenLastCalledWith(0.4);
+      expect(full.volume).toHaveBeenLastCalledWith(0.8);
+    });
+
+    it('moving the slider rescales every playing sound, keeping their proportions', () => {
+      const sfx = new SoundChannel('sfx', 0.8, true);
+      const quiet = fakeHowl();
+      const full = fakeHowl();
+      sfx.register(quiet, 0.5);
+      sfx.register(full, 1);
+
+      sfx.setVolume(0.4);
+      expect(quiet.volume).toHaveBeenLastCalledWith(0.2);
+      expect(full.volume).toHaveBeenLastCalledWith(0.4);
+
+      sfx.setEnabled(false);
+      expect(quiet.volume).toHaveBeenLastCalledWith(0);
+      expect(full.volume).toHaveBeenLastCalledWith(0);
+    });
+  });
 });

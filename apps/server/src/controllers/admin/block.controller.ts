@@ -1,3 +1,4 @@
+import { readVolume } from '../../services/soundVolume';
 import { Request, Response } from 'express';
 import { prisma } from '../../index';
 import { syncJson, buildDropTableUpsert } from '../../services/admin.service';
@@ -166,11 +167,19 @@ export const uploadBlockTexture = async (req: Request, res: Response) => {
   }
 };
 
-/** Points the block's mining sound at a library sound (`soundId`), or clears it (`soundId: null`). */
+/**
+ * Points the block's mining sound at a library sound (`soundId`), clears it (`soundId: null`), and/or
+ * sets how loud it is on this block (`volume`, 0 to 1). Either can be sent alone.
+ */
 export const setBlockSoundEffect = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { soundId } = req.body ?? {};
+    const volumeInput = readVolume(req.body?.volume);
+    if (!volumeInput.ok) {
+      res.status(400).json({ error: volumeInput.error });
+      return;
+    }
 
     const block = await prisma.miningBlock.findFirst({
       where: { OR: [{ id }, { typeKey: id.toUpperCase() }] },
@@ -180,7 +189,8 @@ export const setBlockSoundEffect = async (req: Request, res: Response) => {
       return;
     }
 
-    let soundEffectUrl: string | null = null;
+    // Without a soundId in the request the block keeps its sound (a volume-only change)
+    let soundEffectUrl: string | null | undefined = soundId === undefined ? undefined : null;
     if (soundId !== null && soundId !== undefined) {
       if (typeof soundId !== 'string' || soundId.length === 0) {
         res.status(400).json({ error: 'soundId must be a sound id or null' });
@@ -196,7 +206,10 @@ export const setBlockSoundEffect = async (req: Request, res: Response) => {
 
     const updatedBlock = await prisma.miningBlock.update({
       where: { id: block.id },
-      data: { soundEffectUrl } as any,
+      data: {
+        ...(soundEffectUrl !== undefined && { soundEffectUrl }),
+        ...(volumeInput.volume !== undefined && { soundEffectVolume: volumeInput.volume }),
+      } as any,
       include: {
         idleParticleEffect: true,
         dropTable: { include: { items: { include: { item: true } } } },

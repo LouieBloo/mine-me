@@ -1021,6 +1021,7 @@ describe('useMiningTicker - Projectile Flight & Visibility', () => {
       setListenerPosition: setListenerPositionMock,
     };
     const weaponSoundUrlRef = { current: '/assets/sounds/axe_swing.mp3' };
+    const weaponSoundVolumeRef = { current: 0.4 };
     const setSwingSpeedMock = vi.fn();
     const setStateMock = vi.fn();
     const updateMock = vi.fn();
@@ -1062,6 +1063,7 @@ describe('useMiningTicker - Projectile Flight & Visibility', () => {
           isMiningRef,
           soundManager: mockSoundManager,
           weaponSoundUrlRef,
+          weaponSoundVolumeRef,
           miningSwingSpeed: 2.0, // 2 swings/sec = 500ms cycle
         })
       );
@@ -1071,7 +1073,7 @@ describe('useMiningTicker - Projectile Flight & Visibility', () => {
       expect(setSwingSpeedMock).toHaveBeenCalledWith(2.0);
       expect(setStateMock).toHaveBeenCalledWith('mine');
       expect(playSfxMock).toHaveBeenCalledTimes(1);
-      expect(playSfxMock).toHaveBeenCalledWith('/assets/sounds/axe_swing.mp3');
+      expect(playSfxMock).toHaveBeenCalledWith('/assets/sounds/axe_swing.mp3', { volumeScale: 0.4 });
 
       // Frame 2 at t=1300 (300ms later, which is < 500ms cycle): sound should NOT trigger again yet
       mockTime = 1300;

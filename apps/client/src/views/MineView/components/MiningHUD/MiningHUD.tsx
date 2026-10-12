@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { type MiningSessionClientState, type PlayerState, MINING_CONFIG } from '@mine-me/shared';
 import { ZoomControl } from '../ZoomControl/ZoomControl';
+import { QuickAccessBar } from '../../../../components/QuickAccessBar/QuickAccessBar';
 import { TemporaryBackpack } from '../TemporaryBackpack/TemporaryBackpack';
 import './MiningHUD.css';
 
@@ -76,45 +77,21 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
     <div className="mining-hud-overlay absolute inset-0 flex flex-col justify-between p-6 pointer-events-none select-none">
       {/* Top HUD Row */}
       <div className="flex justify-between items-start w-full">
-        {/* Top Left: Location/Title & Zoom Control */}
-        <div className="flex flex-col gap-2.5 pointer-events-auto">
-          <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 shadow-2xl backdrop-blur-md flex flex-col gap-1 w-64">
-            <h2 className="text-lg font-black text-amber-500 tracking-widest uppercase">Subterranean Mine</h2>
-            <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              <span>City: {playerState.cityId}</span>
-              <span>Vision: {sessionState.visionRange}</span>
-            </div>
-            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mt-0.5">
-              <span className={`px-2 py-0.5 rounded ${
-                sessionState.gameMode === 'multiplayer'
-                  ? 'bg-cyan-950/80 border border-cyan-500/40 text-cyan-300'
-                  : 'bg-slate-800 text-slate-300'
-              }`}>
-                {sessionState.gameMode === 'multiplayer'
-                  ? `👥 Multiplayer (${(sessionState.otherPlayers?.length ?? 0) + 1} Miners)`
-                  : '⛏️ Solo Mine'}
-              </span>
-            </div>
-            {sessionState.isMining && (
-              <div className="text-[10px] text-amber-400 font-black animate-pulse uppercase tracking-wider mt-1">
-                ⛏️ Excavating block...
-              </div>
-            )}
-            {showDebug && (
-              <div className="flex items-center justify-between text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950/60 border border-emerald-500/40 rounded px-2 py-0.5 mt-1">
-                <span>Pos: ({sessionState.position.x}, {sessionState.position.y})</span>
-                <span>Reach: {MINING_CONFIG.PLAYER_MINING_REACH}</span>
-              </div>
-            )}
+        {/* Top Left: Hotbar, Temporary Backpack & Zoom Control (on demand) */}
+        <div className="flex flex-col items-start gap-2.5 pointer-events-none">
+          <div className="pointer-events-auto">
+            <QuickAccessBar />
           </div>
 
-          {/* Camera Zoom Control Widget */}
+          {/* Temporary Backpack */}
+          <div className="pointer-events-auto">
+            <TemporaryBackpack items={sessionState.temporaryBackpack || []} />
+          </div>
+
+          {/* Camera Zoom Control (appears on zoom, fades after a few seconds) */}
           {onZoomChange && (
             <ZoomControl zoom={zoom} onZoomChange={onZoomChange} />
           )}
-
-          {/* Temporary Backpack */}
-          <TemporaryBackpack items={sessionState.temporaryBackpack || []} />
         </div>
 
         {/* Top Right: Debug Button, Refresh Button & Health/Stamina Panel */}
@@ -229,7 +206,7 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
             </span>
             <span className="text-slate-700">|</span>
             <span className="flex items-center gap-1.5">
-              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">1-4</kbd>
+              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">1-0</kbd>
               <span className="text-amber-400">Quick Slots</span>
             </span>
             <span className="text-slate-700">|</span>

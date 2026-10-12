@@ -8,6 +8,8 @@ import './BlockSoundEffectUpload.css';
 interface BlockSoundEffectUploadProps {
   blockId: string;
   soundEffectUrl?: string | null;
+  /** How loud the mining sound is on this block, 0 to 1. */
+  soundEffectVolume?: number;
   blockName?: string;
   onUploadSuccess: (updatedBlock: any) => void;
 }
@@ -21,14 +23,16 @@ const BLOCK_SOUND_SLOT: SoundSlotDefinition = {
 };
 
 /** Picks or uploads the block's mining sound with the same picker items and mobs use. */
-export default function BlockSoundEffectUpload({ blockId, soundEffectUrl, onUploadSuccess }: BlockSoundEffectUploadProps) {
+export default function BlockSoundEffectUpload({ blockId, soundEffectUrl, soundEffectVolume, onUploadSuccess }: BlockSoundEffectUploadProps) {
   const { fetchWithAuth } = useApi();
 
   const buildRequest = (action: SoundSlotAction) =>
     fetchWithAuth(`/api/admin/blocks/${blockId}/sound-effect`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ soundId: action.kind === 'choose' ? action.soundId : null }),
+      body: JSON.stringify(
+        action.kind === 'volume' ? { volume: action.volume } : { soundId: action.kind === 'choose' ? action.soundId : null }
+      ),
     });
 
   return (
@@ -45,7 +49,7 @@ export default function BlockSoundEffectUpload({ blockId, soundEffectUrl, onUplo
       <div className="p-8">
         <SoundSlotPicker
           slots={[BLOCK_SOUND_SLOT]}
-          selections={{ damage: { url: soundEffectUrl } }}
+          selections={{ damage: { url: soundEffectUrl, volume: soundEffectVolume } }}
           buildRequest={buildRequest}
           onChange={onUploadSuccess}
           entityLabel="block"

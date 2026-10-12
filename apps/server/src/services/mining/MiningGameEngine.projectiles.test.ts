@@ -40,6 +40,27 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
     expect(proj.velocity.x).toBeGreaterThan(0); // Firing to the right
   });
 
+  it('tells clients how loud the gunshot is on this weapon (100% unless set)', () => {
+    engine.shootProjectile('char-shooter-1', { x: 35, y: 0 });
+    const shot = engine.projectileSubsystem.pendingGunshots[0];
+    expect(shot.soundVolume).toBe(1);
+
+    const weapon: any = (engine as any).dataManager.getItemData(REVOLVER);
+    const original = weapon.soundEffects;
+    weapon.soundEffects = { ...(original ?? {}), shoot: { url: '/assets/sounds/shot.mp3', volume: 0.35 } };
+    try {
+      const ammo = mag();
+      if (ammo) ammo.lastShotAt = -Infinity;
+      engine.shootProjectile('char-shooter-1', { x: 35, y: 0 });
+      const gunshots = engine.projectileSubsystem.pendingGunshots;
+      const quiet = gunshots[gunshots.length - 1];
+      expect(quiet.soundUrl).toBe('/assets/sounds/shot.mp3');
+      expect(quiet.soundVolume).toBe(0.35);
+    } finally {
+      weapon.soundEffects = original;
+    }
+  });
+
   it('enforces 6 shots per cylinder before initiating automatic reload', () => {
     // Fire remaining shots by clearing fire rate restriction between shots
     for (let i = 0; i < 6; i++) {

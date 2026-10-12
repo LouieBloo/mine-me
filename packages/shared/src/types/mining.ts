@@ -1,4 +1,4 @@
-import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig } from './index';
+import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig, CharacterSoundEffectsConfig } from './index';
 import type { ParticleEffect } from './particles';
 import type { SkeletonManifest } from './modularRig';
 
@@ -170,6 +170,8 @@ export interface MiningBlockConfig {
   description?: string | null;
   textureUrl?: string | null;
   soundEffectUrl?: string | null;
+  /** Volume of the mining sound, 0 to 1 (1 when absent). */
+  soundEffectVolume?: number;
   health: number;
   mineTimeMs?: number;
   staminaCost: number;
@@ -537,6 +539,8 @@ export interface MiningSessionClientState {
   activeDynamites?: MiningActiveDynamite[];
   /** Active mobs/NPCs in the mining cavern. An empty array means "none". */
   mobs?: MiningActiveMob[];
+  /** The player character's sounds (hurt, jump...), resolved from the sound library. Sent once when the run starts. */
+  characterSounds?: CharacterSoundEffectsConfig;
 }
 
 /**
@@ -767,6 +771,8 @@ export interface MiningExplosionEvent {
   position: Vector2D;
   radius: number;
   soundUrl?: string | null;
+  /** Volume of the explosion sound on the dynamite that detonated, 0 to 1. */
+  soundVolume?: number;
 }
 
 /**
@@ -805,6 +811,8 @@ export interface MiningGunshotEvent {
   angle?: number;
   weaponItemId?: string;
   soundUrl?: string | null;
+  /** Volume of the gunshot sound on the weapon, 0 to 1. */
+  soundVolume?: number;
 }
 
 /**
@@ -839,6 +847,14 @@ export interface MiningMapConfigData {
   dynamiteFuseSeconds?: number;
   rockGravityScale?: number;
   rockRestitution?: number;
+  /** Fall damage (players): `(impactSpeed - minSpeed) * perSpeed`, capped at max (0 = no cap). Speeds are tiles/s. */
+  fallDamageMinSpeed?: number;
+  fallDamagePerSpeed?: number;
+  fallDamageMax?: number;
+  /** Falling rock damage (players): `(rock speed - minSpeed) * perSpeed`, capped at max (0 = no cap). Speeds are tiles/s. */
+  rockDamageMinSpeed?: number;
+  rockDamagePerSpeed?: number;
+  rockDamageMax?: number;
   /** Hostile NPC / Mob Spawning */
   mobSpawnCount?: number;
   mobSpawnMinDepth?: number;
@@ -873,6 +889,14 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   dynamiteFuseSeconds: 4.0,
   rockGravityScale: 1.2,
   rockRestitution: 0.1,
+  // A normal jump lands at ~8.5 tiles/s and a 2 tile drop at ~10.6, so neither hurts
+  fallDamageMinSpeed: 11,
+  fallDamagePerSpeed: 6,
+  fallDamageMax: 80,
+  // A rock that has fallen ~0.5 tile is moving ~6 tiles/s; 3 tiles of fall is ~40 damage
+  rockDamageMinSpeed: 6,
+  rockDamagePerSpeed: 5,
+  rockDamageMax: 80,
   mobSpawnCount: 3,
   mobSpawnMinDepth: 5,
   // No built-in mobs: the active map config (database) says which mobs live in the mine

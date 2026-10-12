@@ -121,4 +121,28 @@ describe('Mining Block Sound Effect Endpoints', () => {
     expect(remove.status).toBe(404);
     expect(mockBlocks[1].soundEffectUrl).toBe('/assets/sounds/blocks/copperium_sfx.wav');
   });
+
+  describe('per-block volume', () => {
+    it('sets the volume with the sound, and alone without losing the sound', async () => {
+      const first = await request(app).patch('/api/admin/blocks/block_dirt/sound-effect').send({ soundId: 'lib_1', volume: 0.5 });
+      expect(first.status).toBe(200);
+      expect(mockBlocks[0]).toMatchObject({ soundEffectUrl: '/assets/sounds/Crunch.mp3', soundEffectVolume: 0.5 });
+
+      const only = await request(app).patch('/api/admin/blocks/block_dirt/sound-effect').send({ volume: 0.2 });
+      expect(only.status).toBe(200);
+      expect(mockBlocks[0]).toMatchObject({ soundEffectUrl: '/assets/sounds/Crunch.mp3', soundEffectVolume: 0.2 });
+    });
+
+    it('changing the sound alone keeps the volume', async () => {
+      await request(app).patch('/api/admin/blocks/block_dirt/sound-effect').send({ soundId: 'lib_1', volume: 0.4 });
+      await request(app).patch('/api/admin/blocks/block_dirt/sound-effect').send({ soundId: 'lib_1' });
+      expect(mockBlocks[0].soundEffectVolume).toBe(0.4);
+    });
+
+    it.each([[-0.5], [1.01], ['loud'], [null]])('rejects volume %s without saving', async (volume) => {
+      const res = await request(app).patch('/api/admin/blocks/block_dirt/sound-effect').send({ soundId: 'lib_1', volume });
+      expect(res.status).toBe(400);
+      expect(mockBlocks[0].soundEffectUrl).toBeNull();
+    });
+  });
 });

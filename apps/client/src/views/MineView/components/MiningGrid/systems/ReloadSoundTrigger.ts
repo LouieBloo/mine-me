@@ -1,4 +1,4 @@
-import type { GameItem } from '@mine-me/shared';
+import { clampSoundVolume, type GameItem } from '@mine-me/shared';
 
 /** A reload can't restart before the previous one finished, so one sound covers this long at minimum. */
 const MIN_DEDUPE_MS = 600;
@@ -22,7 +22,7 @@ export class ReloadSoundTrigger {
   }
 
   /** Plays the weapon's `reload` slot unless this reload already sounded. Returns whether it played. */
-  public trigger(weapon: GameItem | null | undefined, play: (url: string) => void): boolean {
+  public trigger(weapon: GameItem | null | undefined, play: (url: string, volume: number) => void): boolean {
     const url = weapon?.soundEffects?.reload?.url;
     if (!url) return false;
 
@@ -32,7 +32,7 @@ export class ReloadSoundTrigger {
     if (t - this.lastPlayedAt < windowMs) return false;
 
     this.lastPlayedAt = t;
-    play(url);
+    play(url, clampSoundVolume(weapon?.soundEffects?.reload?.volume));
     return true;
   }
 
@@ -40,7 +40,7 @@ export class ReloadSoundTrigger {
    * Feed every server ammo update. Plays on the not-reloading -> reloading edge. The first update
    * only records the state, so joining a run mid-reload doesn't sound a reload that began earlier.
    */
-  public observeAmmo(isReloading: boolean, weapon: GameItem | null | undefined, play: (url: string) => void): boolean {
+  public observeAmmo(isReloading: boolean, weapon: GameItem | null | undefined, play: (url: string, volume: number) => void): boolean {
     const started = this.seenAmmo && isReloading && !this.wasReloading;
     this.seenAmmo = true;
     this.wasReloading = isReloading;

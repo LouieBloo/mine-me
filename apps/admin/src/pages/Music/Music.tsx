@@ -263,7 +263,7 @@ export default function Music() {
 
                     {/* Volume */}
                     <td className="py-4 px-6 text-slate-600 font-bold text-xs">
-                      {Math.round(track.volume * 100)}%
+                      {track.type === 'BGM' ? `${Math.round(track.volume * 100)}%` : <span className="text-slate-400" title="Set where the sound is used">Per use</span>}
                     </td>
 
                     {/* Active Toggle Switch */}

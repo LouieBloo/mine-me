@@ -161,4 +161,25 @@ describe('SoundManager', () => {
 
     manager.stopLoopingSfx(key);
   });
+
+  describe('volume set where a sound is used, relative to the effects volume slider', () => {
+    it('plays at the effects volume times the use volume', () => {
+      const manager = SoundManager.getInstance();
+      manager.setSfxVolume(0.8);
+      const quiet = manager.playSfx('/assets/sounds/use_volume_quiet.mp3', { volumeScale: 0.5, throttleMs: 0 });
+      const full = manager.playSfx('/assets/sounds/use_volume_full.mp3', { throttleMs: 0 });
+      expect(quiet).not.toBeNull();
+      expect(full).not.toBeNull();
+      const master = manager.sfxChannel.getEffectiveVolume();
+      expect(full!.volume()).toBeCloseTo(master, 5);
+      expect(quiet!.volume()).toBeCloseTo(master * 0.5, 5);
+
+      manager.setSfxVolume(0.9);
+    });
+
+    it('a sound with a use volume of 0 is silent', () => {
+      const manager = SoundManager.getInstance();
+      expect(manager.playSfx('/assets/sounds/use_volume_zero.mp3', { volumeScale: 0, throttleMs: 0 })).toBeNull();
+    });
+  });
 });

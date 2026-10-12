@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameItem, PlayerState, } from '@mine-me/shared';
 import {
-  DEFAULT_DYNAMITE_SOUNDS,
   getAssetUrl,
   MiningTileType,
 } from '@mine-me/shared';
@@ -14,8 +13,10 @@ import {
   ShootWeaponAction,
 } from '../input/MouseAction';
 import type { SoundManager } from '../../../../../services/sound';
+import { withVolume } from '../../../../../services/sound/sfxVolume';
 import type { MiningClientWorld } from '../systems/MiningClientWorld';
 import { ReloadSoundTrigger } from '../systems/ReloadSoundTrigger';
+import { throwSoundOf, weaponSoundOf, type ItemSound } from '../systems/weaponSound';
 
 export interface UseMiningActionsOptions {
   world: Pick<
@@ -88,32 +89,37 @@ export function useMiningActions({
     lightingEngineRef,
     dynamicItemsRef,
   } = world;
-  const [resolvedSoundUrl, setResolvedSoundUrl] = useState<string | null>(
-    equippedWeapon?.soundEffects?.shoot?.url || equippedWeapon?.soundEffectUrl || null
-  );
+  const [resolvedSound, setResolvedSound] = useState<ItemSound | null>(weaponSoundOf(equippedWeapon));
 
   useEffect(() => {
-    const soundUrl = equippedWeapon?.soundEffects?.shoot?.url || equippedWeapon?.soundEffectUrl;
-    if (soundUrl) {
-      setResolvedSoundUrl(soundUrl);
+    const sound = weaponSoundOf(equippedWeapon);
+    if (sound) {
+      setResolvedSound(sound);
       return;
     }
     if (equippedWeapon?.id) {
       fetch(getAssetUrl('/api/public/items?type=GEAR'))
         .then((res) => (res.ok ? res.json() : []))
         .then((items: any[]) => {
-          const found = items.find((i: any) => i.id === equippedWeapon.id);
-          const foundSound = found?.soundEffects?.shoot?.url || found?.soundEffectUrl;
-          if (foundSound) {
-            setResolvedSoundUrl(foundSound);
+          const found = weaponSoundOf(items.find((i: any) => i.id === equippedWeapon.id));
+          if (found) {
+            setResolvedSound(found);
           }
         })
         .catch(() => {});
     }
-  }, [equippedWeapon?.id, equippedWeapon?.soundEffectUrl, equippedWeapon?.soundEffects?.shoot?.url]);
+  }, [
+    equippedWeapon?.id,
+    equippedWeapon?.soundEffectUrl,
+    equippedWeapon?.soundEffects?.shoot?.url,
+    equippedWeapon?.soundEffects?.shoot?.volume,
+    equippedWeapon?.soundEffects?.throw?.volume,
+  ]);
 
-  const weaponSoundUrlRef = useRef<string | null>(resolvedSoundUrl);
-  weaponSoundUrlRef.current = resolvedSoundUrl;
+  const weaponSoundUrlRef = useRef<string | null>(resolvedSound?.url ?? null);
+  weaponSoundUrlRef.current = resolvedSound?.url ?? null;
+  const weaponSoundVolumeRef = useRef<number>(resolvedSound?.volume ?? 1);
+  weaponSoundVolumeRef.current = resolvedSound?.volume ?? 1;
 
   const fallbackReloadSoundRef = useRef<ReloadSoundTrigger | null>(null);
   if (!fallbackReloadSoundRef.current) fallbackReloadSoundRef.current = new ReloadSoundTrigger();
@@ -134,7 +140,7 @@ export function useMiningActions({
     }
     try {
       // Instant feedback; the server's own reloads (empty magazine) sound via the ammo ticks
-      reloadSound.trigger(weapon, (url) => soundManager.playSfx?.(url));
+      reloadSound.trigger(weapon, (url, volume) => soundManager.playSfx?.(url, withVolume(volume)));
 
       weaponAmmoStateRef.current.isReloading = true;
 
@@ -270,12 +276,9 @@ export function useMiningActions({
                 itemId: targetItem?.id,
               } as any);
               if (res.success) {
-                const throwSoundUrl =
-                  targetItem?.soundEffects?.throw?.url ||
-                  targetItem?.soundEffectUrl ||
-                  DEFAULT_DYNAMITE_SOUNDS.throw?.url;
-                if (throwSoundUrl) {
-                  soundManager.playSfx(throwSoundUrl);
+                const throwSound = throwSoundOf(targetItem);
+                if (throwSound) {
+                  soundManager.playSfx(throwSound.url, withVolume(throwSound.volume));
                 }
                 dynamiteVisualManagerRef.current?.recordLocalThrow();
                 onDynamiteThrown?.();
@@ -353,11 +356,9 @@ export function useMiningActions({
             const dirY = dy / dist;
             const angle = Math.atan2(dy, dx);
 
-            const gunshotSound =
-              weapon.soundEffects?.shoot?.url ||
-              weapon.soundEffectUrl ||
-              weaponSoundUrlRef.current ||
-              null;
+            const gunshot = weaponSoundOf(weapon);
+            const gunshotSound = gunshot?.url ?? weaponSoundUrlRef.current ?? null;
+            const gunshotVolume = gunshot ? gunshot.volume : weaponSoundVolumeRef.current;
 
             projectileVisualManagerRef.current?.triggerLocalShot(
               muzzlePos,
@@ -366,7 +367,8 @@ export function useMiningActions({
               particleEngineRef.current,
               lightingEngineRef.current,
               soundManager,
-              TILE_SIZE
+              TILE_SIZE,
+              gunshotVolume
             );
 
             // Trigger visual kickback recoil impulse on the aiming arm
@@ -450,6 +452,7 @@ export function useMiningActions({
 
   return {
     weaponSoundUrlRef,
+    weaponSoundVolumeRef,
     weaponAmmoStateRef,
     handleWeaponReload,
   };

@@ -6,6 +6,7 @@ export type Filter = 'ALL' | 'BGM' | SoundCategory;
 export const FILTERS: { key: Filter; label: string }[] = [
   { key: 'ALL', label: 'All Sounds' },
   { key: 'BGM', label: 'Music (BGM)' },
+  { key: 'CHARACTER', label: 'Character SFX' },
   { key: 'MOB', label: 'Mob SFX' },
   { key: 'ITEM', label: 'Item SFX' },
   { key: 'BLOCK', label: 'Block SFX' },

@@ -1,3 +1,4 @@
+import { withVolume } from '../../../../../services/sound/sfxVolume';
 import type { MiningGunshotEvent, Vector2D } from '@mine-me/shared';
 import { DEFAULT_PARTICLE_EFFECTS } from '@mine-me/shared';
 import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
@@ -35,14 +36,15 @@ export class ProjectileVisualManager {
     particleEngine?: ParticleEngine | null,
     lightingEngine?: LightingEngine | null,
     soundManager?: SoundManager | null,
-    tileSize: number = 48
+    tileSize: number = 48,
+    soundVolume?: number
   ): void {
-    // 1. Immediate local audio
+    // 1. Immediate local audio, at the volume set on the weapon
     if (soundManager && soundUrl) {
       if (typeof soundManager.playPositionalSfx === 'function') {
-        soundManager.playPositionalSfx(soundUrl, muzzlePos);
+        soundManager.playPositionalSfx(soundUrl, muzzlePos, withVolume(soundVolume));
       } else {
-        soundManager.playSfx(soundUrl);
+        soundManager.playSfx(soundUrl, withVolume(soundVolume));
       }
     }
 
@@ -115,9 +117,9 @@ export class ProjectileVisualManager {
       // Remote player gunshot: play positional audio if weapon has sound configured
       if (!isLocalShooter && soundManager && shot.soundUrl) {
         if (typeof soundManager.playPositionalSfx === 'function') {
-          soundManager.playPositionalSfx(shot.soundUrl, shotPos);
+          soundManager.playPositionalSfx(shot.soundUrl, shotPos, withVolume(shot.soundVolume));
         } else {
-          soundManager.playSfx(shot.soundUrl);
+          soundManager.playSfx(shot.soundUrl, withVolume(shot.soundVolume));
         }
       }
 

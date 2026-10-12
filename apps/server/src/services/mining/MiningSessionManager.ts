@@ -12,6 +12,7 @@ import {
   type MiningBackpackItem,
   MINING_CONFIG,
 } from '@mine-me/shared';
+import { MiningDataManager } from './subsystems/MiningDataManager';
 import { toClientGrid } from '../miningMap.service';
 import { dynamiteDefinition, toRemotePlayer } from './MiningEntitySync';
 
@@ -159,6 +160,7 @@ export class MiningSessionManager {
       otherPlayers,
       activeDynamites: engine.activeDynamites.length > 0 ? engine.activeDynamites.map(dynamiteDefinition) : undefined,
       mobs: activeMobs,
+      characterSounds: MiningDataManager.getInstance().getCharacterSounds(),
     };
   }
 

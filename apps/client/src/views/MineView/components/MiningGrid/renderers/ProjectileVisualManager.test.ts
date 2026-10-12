@@ -22,6 +22,29 @@ describe('ProjectileVisualManager', () => {
     };
   });
 
+  it('plays the local gunshot at the volume set on the weapon', () => {
+    manager.triggerLocalShot(
+      { x: 12, y: 8 }, 0.5, '/assets/sounds/items/revolver_shot.wav',
+      mockParticleEngine, mockLightingEngine, mockSoundManager, 64, 0.3
+    );
+    expect(mockSoundManager.playPositionalSfx).toHaveBeenCalledWith(
+      '/assets/sounds/items/revolver_shot.wav', { x: 12, y: 8 }, { volumeScale: 0.3 }
+    );
+  });
+
+  it('plays another player\'s gunshot at the volume the server sends with the event', () => {
+    manager.handleGunshotEvents(
+      [{
+        id: 'shot-vol', characterId: 'other', position: { x: 3, y: 4 }, angle: 0,
+        soundUrl: '/assets/sounds/items/revolver_shot.wav', soundVolume: 0.55,
+      } as any],
+      'me', mockParticleEngine, mockLightingEngine, mockSoundManager, 64
+    );
+    expect(mockSoundManager.playPositionalSfx).toHaveBeenCalledWith(
+      '/assets/sounds/items/revolver_shot.wav', { x: 3, y: 4 }, { volumeScale: 0.55 }
+    );
+  });
+
   it('triggers immediate local shot audiovisual feedback', () => {
     manager.triggerLocalShot(
       { x: 12, y: 8 },
@@ -35,7 +58,8 @@ describe('ProjectileVisualManager', () => {
     // Audio check
     expect(mockSoundManager.playPositionalSfx).toHaveBeenCalledWith(
       '/assets/sounds/items/revolver_shot.wav',
-      { x: 12, y: 8 }
+      { x: 12, y: 8 },
+      { volumeScale: 1 }
     );
 
     // Particle check (muzzle flash & smoke)

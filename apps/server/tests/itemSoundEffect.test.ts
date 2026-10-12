@@ -78,6 +78,41 @@ describe('Item Sound Effect Endpoints', () => {
     expect(mockItems[0].soundEffectUrl).toBe('/assets/sounds/items/pistol.wav');
   });
 
+  describe('per-item volume', () => {
+    it('sets the volume of a slot, alone or with its sound', async () => {
+      const withSound = await request(app)
+        .patch('/api/admin/items/item_pickaxe_1/sound-effects/shoot')
+        .send({ soundId: 'lib_1', volume: 0.6 });
+      expect(withSound.status).toBe(200);
+      expect(mockItems[0].soundEffects.shoot).toMatchObject({ url: '/assets/sounds/items/pistol.wav', volume: 0.6 });
+
+      const only = await request(app).patch('/api/admin/items/item_pickaxe_1/sound-effects/shoot').send({ volume: 0.3 });
+      expect(only.status).toBe(200);
+      expect(mockItems[0].soundEffects.shoot).toMatchObject({ url: '/assets/sounds/items/pistol.wav', volume: 0.3 });
+    });
+
+    it('keeps the slot volume when the sound is swapped, and each slot has its own', async () => {
+      await request(app).patch('/api/admin/items/item_pickaxe_1/sound-effects/shoot').send({ soundId: 'lib_1', volume: 0.5 });
+      await request(app).patch('/api/admin/items/item_pickaxe_1/sound-effects/reload').send({ soundId: 'lib_1', volume: 0.9 });
+      await request(app).patch('/api/admin/items/item_pickaxe_1/sound-effects/shoot').send({ soundId: 'lib_1' });
+      expect(mockItems[0].soundEffects.shoot.volume).toBe(0.5);
+      expect(mockItems[0].soundEffects.reload.volume).toBe(0.9);
+    });
+
+    it('stores the volume of the legacy throw sound in the throw slot', async () => {
+      mockItems[0].soundEffectUrl = '/assets/sounds/items/legacy.mp3';
+      const res = await request(app).patch('/api/admin/items/item_pickaxe_1/sound-effects/throw').send({ volume: 0.7 });
+      expect(res.status).toBe(200);
+      expect(mockItems[0].soundEffects.throw).toMatchObject({ url: '/assets/sounds/items/legacy.mp3', volume: 0.7 });
+    });
+
+    it.each([[-1], [2], ['x'], [null]])('rejects volume %s', async (volume) => {
+      const res = await request(app).patch('/api/admin/items/item_pickaxe_1/sound-effects/shoot').send({ soundId: 'lib_1', volume });
+      expect(res.status).toBe(400);
+      expect(mockItems[0].soundEffects).toBeUndefined();
+    });
+  });
+
   it('returns 404 when the item does not exist', async () => {
     const res = await request(app)
       .patch('/api/admin/items/non_existent_item/sound-effects/throw')

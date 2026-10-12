@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import type { PlayerInventory, InventoryEntry } from '@mine-me/shared';
 import { ItemListIcon } from '../ItemListIcon/ItemListIcon';
-import { QuickAccessBar } from '../QuickAccessBar/QuickAccessBar';
 import './InventoryPanel.css';
 
 interface Props {
@@ -114,9 +113,6 @@ export const InventoryPanel = ({ inventory }: Props) => {
             {totalItems} / {inventory.slots}
           </span>
         </div>
-
-        {/* 4 Quick Access Slots */}
-        <QuickAccessBar />
 
         {/* Sort Controls */}
         <div className="flex gap-1.5 items-center">

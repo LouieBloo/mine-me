@@ -1,3 +1,4 @@
+import { withVolume } from '../../../../../services/sound/sfxVolume';
 import { useEffect, useRef } from 'react';
 import {
   type MiningSessionClientState,
@@ -85,7 +86,7 @@ export function useMiningStateSync({
       entityDefs: entityDefsRef.current!,
       effects: effectsRef.current,
       onWeaponAmmo: (ammo) =>
-        reloadSound?.observeAmmo(ammo.isReloading, equippedWeaponRef.current, (url) => soundManager.playSfx?.(url)),
+        reloadSound?.observeAmmo(ammo.isReloading, equippedWeaponRef.current, (url, volume) => soundManager.playSfx?.(url, withVolume(volume))),
       onVisionChange: (vision) => onVisionChangeRef.current?.(vision),
       onBackpackChange: (backpack) => onBackpackChangeRef.current?.(backpack),
     };

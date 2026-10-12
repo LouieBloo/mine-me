@@ -1,4 +1,4 @@
-import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Cities from './pages/Cities/Cities';
@@ -14,7 +14,7 @@ import MobDetail from './pages/Mobs/MobDetail';
 import ItemDetail from './pages/Items/ItemDetail/ItemDetail';
 import MapEditor from './pages/MapEditor/MapEditor';
 import CharacterLevel from './pages/CharacterLevel/CharacterLevel';
-import CharacterViewer from './pages/CharacterViewer/CharacterViewer';
+import CharacterEditor from './pages/CharacterEditor/CharacterEditor';
 import MobViewer from './pages/MobViewer/MobViewer';
 import Effects from './pages/Effects/Effects';
 import EffectDetail from './pages/Effects/EffectDetail';
@@ -99,8 +99,13 @@ const router = createBrowserRouter([
         element: <MobViewer />
       },
       {
+        path: "character-editor",
+        element: <CharacterEditor />
+      },
+      {
+        // The page used to be called the Character Viewer
         path: "character-viewer",
-        element: <CharacterViewer />
+        element: <Navigate to="/character-editor" replace />
       },
       {
         path: "rates",

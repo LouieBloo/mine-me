@@ -214,6 +214,60 @@ describe('MiningMouseController and MouseAction', () => {
       controller.detach();
     });
 
+    describe('clicks outside the game canvas', () => {
+      const setup = () => {
+        const canvas = document.createElement('canvas');
+        canvas.getBoundingClientRect = () => ({
+          left: 0, top: 0, width: 320, height: 320, right: 320, bottom: 320, x: 0, y: 0, toJSON: () => {},
+        });
+        document.body.appendChild(canvas);
+        controller.attach(canvas);
+        controller.setCamera({ screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }) } as any);
+        const miningSpy = vi.fn();
+        controller.onMiningStateChange(miningSpy);
+        return { canvas, miningSpy };
+      };
+      const down = (el: Element) =>
+        el.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 138, clientY: 138, bubbles: true }));
+
+      it('ignores a pointerdown on the side panel (not the canvas)', () => {
+        const { canvas, miningSpy } = setup();
+        const panel = document.createElement('div');
+        document.body.appendChild(panel);
+        down(panel);
+        expect(controller.getIsMouseDown()).toBe(false);
+        expect(miningSpy).not.toHaveBeenCalled();
+        panel.remove();
+        canvas.remove();
+      });
+
+      it('still mines on a pointerdown that lands on the canvas', () => {
+        const { canvas, miningSpy } = setup();
+        down(canvas);
+        expect(controller.getIsMouseDown()).toBe(true);
+        expect(miningSpy).toHaveBeenCalledWith(true, { x: 2, y: 2 });
+        canvas.remove();
+      });
+
+      it('stops mining when the pointer is cancelled (e.g. a drag-and-drop takes over)', () => {
+        const { canvas, miningSpy } = setup();
+        down(canvas);
+        window.dispatchEvent(new Event('pointercancel'));
+        expect(controller.getIsMouseDown()).toBe(false);
+        expect(miningSpy).toHaveBeenLastCalledWith(false, null);
+        canvas.remove();
+      });
+
+      it('stops mining when a drag starts', () => {
+        const { canvas, miningSpy } = setup();
+        down(canvas);
+        window.dispatchEvent(new Event('dragstart'));
+        expect(controller.getIsMouseDown()).toBe(false);
+        expect(miningSpy).toHaveBeenLastCalledWith(false, null);
+        canvas.remove();
+      });
+    });
+
     it('returns appropriate reticle style for minable, out of reach, and rock tiles in mining mode', () => {
       // (6, 5) is DIRT and adjacent to player at (5.5, 5.5) -> valid in reach
       mockGrid[5][6] = { type: MiningTileType.DIRT, revealed: true };

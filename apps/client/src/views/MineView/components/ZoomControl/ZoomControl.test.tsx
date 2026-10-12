@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ZoomControl } from './ZoomControl';
 
 describe('ZoomControl', () => {
@@ -45,5 +45,78 @@ describe('ZoomControl', () => {
     fireEvent.change(slider, { target: { value: '1.75' } });
 
     expect(handleZoomChange).toHaveBeenCalledWith(1.75);
+  });
+
+  describe('show on zoom, fade after a few seconds', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    const panel = () => screen.getByTestId('zoom-control');
+    const isShown = () => panel().getAttribute('data-visible') === 'true';
+
+    it('is hidden and not clickable on mount', () => {
+      render(<ZoomControl zoom={1.5} onZoomChange={vi.fn()} />);
+      expect(isShown()).toBe(false);
+      expect(panel().className).toContain('opacity-0');
+      expect(panel().className).toContain('pointer-events-none');
+      expect(panel().getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('appears when the zoom changes and hides after 5 seconds', () => {
+      const { rerender } = render(<ZoomControl zoom={1.5} onZoomChange={vi.fn()} />);
+      rerender(<ZoomControl zoom={1.55} onZoomChange={vi.fn()} />);
+      expect(isShown()).toBe(true);
+      expect(panel().className).toContain('pointer-events-auto');
+
+      act(() => vi.advanceTimersByTime(4999));
+      expect(isShown()).toBe(true);
+      act(() => vi.advanceTimersByTime(1));
+      expect(isShown()).toBe(false);
+    });
+
+    it('restarts the 5 second timer on each zoom change', () => {
+      const { rerender } = render(<ZoomControl zoom={1.5} onZoomChange={vi.fn()} />);
+      rerender(<ZoomControl zoom={1.55} onZoomChange={vi.fn()} />);
+      act(() => vi.advanceTimersByTime(4000));
+      rerender(<ZoomControl zoom={1.6} onZoomChange={vi.fn()} />);
+      act(() => vi.advanceTimersByTime(4000));
+      expect(isShown()).toBe(true);
+      act(() => vi.advanceTimersByTime(1000));
+      expect(isShown()).toBe(false);
+    });
+
+    it('stays open while hovered and hides 5 seconds after the pointer leaves', () => {
+      const { rerender } = render(<ZoomControl zoom={1.5} onZoomChange={vi.fn()} />);
+      rerender(<ZoomControl zoom={1.55} onZoomChange={vi.fn()} />);
+      fireEvent.pointerEnter(panel());
+      act(() => vi.advanceTimersByTime(30000));
+      expect(isShown()).toBe(true);
+      fireEvent.pointerLeave(panel());
+      act(() => vi.advanceTimersByTime(4999));
+      expect(isShown()).toBe(true);
+      act(() => vi.advanceTimersByTime(1));
+      expect(isShown()).toBe(false);
+    });
+
+    it('stays open while the slider is dragged, even if the pointer leaves the panel', () => {
+      const { rerender } = render(<ZoomControl zoom={1.5} onZoomChange={vi.fn()} />);
+      rerender(<ZoomControl zoom={1.55} onZoomChange={vi.fn()} />);
+      fireEvent.pointerDown(screen.getByTestId('zoom-slider-input'));
+      fireEvent.pointerLeave(panel());
+      act(() => vi.advanceTimersByTime(30000));
+      expect(isShown()).toBe(true);
+      act(() => {
+        window.dispatchEvent(new Event('pointerup'));
+      });
+      act(() => vi.advanceTimersByTime(5000));
+      expect(isShown()).toBe(false);
+    });
+
+    it('honours a custom hideAfterMs', () => {
+      const { rerender } = render(<ZoomControl zoom={1.5} onZoomChange={vi.fn()} hideAfterMs={1000} />);
+      rerender(<ZoomControl zoom={1.55} onZoomChange={vi.fn()} hideAfterMs={1000} />);
+      act(() => vi.advanceTimersByTime(1000));
+      expect(isShown()).toBe(false);
+    });
   });
 });

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ReloadSoundTrigger } from './ReloadSoundTrigger';
 
-const weapon = (reloadTime = 1.5, url: string | null = '/assets/sounds/items/reload.mp3'): any => ({
+const weapon = (reloadTime = 1.5, url: string | null = '/assets/sounds/items/reload.mp3', volume?: number): any => ({
   id: 'gun',
   projectileConfig: { reloadTime },
-  soundEffects: url ? { reload: { url } } : {},
+  soundEffects: url ? { reload: { url, ...(volume !== undefined && { volume }) } } : {},
 });
 
 const make = () => {
@@ -18,7 +18,14 @@ describe('ReloadSoundTrigger', () => {
     const { trigger } = make();
     const play = vi.fn();
     expect(trigger.trigger(weapon(), play)).toBe(true);
-    expect(play).toHaveBeenCalledWith('/assets/sounds/items/reload.mp3');
+    expect(play).toHaveBeenCalledWith('/assets/sounds/items/reload.mp3', 1);
+  });
+
+  it('plays the reload sound at the volume set on the weapon\'s reload slot', () => {
+    const { trigger } = make();
+    const play = vi.fn();
+    trigger.trigger(weapon(1.5, '/assets/sounds/items/reload.mp3', 0.4), play);
+    expect(play).toHaveBeenCalledWith('/assets/sounds/items/reload.mp3', 0.4);
   });
 
   it('is silent for a weapon with no reload sound or no weapon', () => {

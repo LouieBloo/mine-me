@@ -1,3 +1,4 @@
+import { withVolume } from '../../../../../services/sound/sfxVolume';
 import { useEffect, useRef } from 'react';
 import type { Application } from 'pixi.js';
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
@@ -68,6 +69,7 @@ export function useMiningTicker({
     cameraRef,
     particleEngineRef,
     playerBodyRef,
+    characterSoundsRef,
     predictionRef,
     gridRef,
     keysPressedRef,
@@ -75,6 +77,7 @@ export function useMiningTicker({
     miningTargetRef,
     blockTexturesRef,
     weaponSoundUrlRef,
+    weaponSoundVolumeRef,
     lastWeaponSoundTimeRef,
   } = world;
   const animTimeRef = useRef<number>(0);
@@ -137,6 +140,7 @@ export function useMiningTicker({
           currentPos,
           playerContainer,
           soundManager,
+          characterSounds: characterSoundsRef?.current ?? null,
         },
         app.ticker.deltaMS / 1000
       );
@@ -222,7 +226,7 @@ export function useMiningTicker({
       if (isSwinging && soundManager && weaponSoundUrlRef?.current) {
         if (nowMs - soundTimeRef.current >= swingCycleDurationMs) {
           soundTimeRef.current = nowMs;
-          soundManager.playSfx(weaponSoundUrlRef.current);
+          soundManager.playSfx(weaponSoundUrlRef.current, withVolume(weaponSoundVolumeRef?.current));
         }
       }
 

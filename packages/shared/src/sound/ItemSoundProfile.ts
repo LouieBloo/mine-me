@@ -1,4 +1,5 @@
 import type { ItemSoundEffectsConfig, ItemSoundSlot } from '../types/sound';
+import { clampSoundVolume } from './soundSlots';
 
 /**
  * Definition for a specific sound effect slot on an item (e.g. throw, fuse loop, explosion).
@@ -68,6 +69,7 @@ export abstract class ItemSoundProfile {
       normalized[slot.slotKey] = {
         url: url || null,
         loop: rawSlot?.loop !== undefined ? Boolean(rawSlot.loop) : slot.defaultLoop,
+        volume: clampSoundVolume(rawSlot?.volume),
       };
     }
 

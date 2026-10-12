@@ -4,6 +4,7 @@ import {
   SOL_CURRENCY_SUBTYPE,
   findCurrencyItem,
   isThrowableItem,
+  type CharacterSoundEffectsConfig,
   type GameItem,
   type Mob,
   type MiningBlockConfig,
@@ -16,6 +17,8 @@ export interface GameDefinitions {
   items: GameItem[];
   mobs: Mob[];
   blocks: MiningBlockConfig[];
+  /** The player character's resolved sounds (hurt, jump...). Missing means none are set. */
+  characterSounds?: CharacterSoundEffectsConfig;
 }
 
 const TILE_TYPE_KEYS: Record<number, string> = {
@@ -49,9 +52,11 @@ export class MiningDataManager {
   private readonly itemsByNameLower = new Map<string, GameItem>();
 
   private readonly mobsById = new Map<string, Mob>();
+  private readonly characterSounds: CharacterSoundEffectsConfig;
   private readonly mobsByNameLower = new Map<string, Mob>();
 
   constructor(definitions: GameDefinitions) {
+    this.characterSounds = definitions.characterSounds ?? {};
     this.items = definitions.items;
     this.mobs = definitions.mobs;
 
@@ -99,6 +104,11 @@ export class MiningDataManager {
   /** Test helper: forget the installed definitions. */
   public static reset(): void {
     MiningDataManager.instance = null;
+  }
+
+  /** The player character's sounds, resolved to playable urls (empty if none are set). */
+  public getCharacterSounds(): CharacterSoundEffectsConfig {
+    return this.characterSounds;
   }
 
   /**

@@ -1,4 +1,5 @@
 import {
+  clampSoundVolume,
   type DamageEvent,
   type MiningGunshotEvent,
   type Vector2D,
@@ -161,6 +162,7 @@ export class MiningProjectileSubsystem {
       target,
       direction: { x: dirX, y: dirY },
       soundUrl,
+      soundVolume: clampSoundVolume(weaponItem?.soundEffects?.shoot?.volume),
     });
 
     return {

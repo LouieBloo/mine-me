@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getAssetUrl, type SoundCategory } from '@mine-me/shared';
 import { useApi } from '../../hooks/useApi';
 import { useToast } from '../../contexts/ToastContext';
@@ -21,11 +21,15 @@ export interface SoundSlotSelection {
   soundId?: string | null;
   url?: string | null;
   loop?: boolean;
+  /** How loud the sound is in this place, 0 to 1 (full volume when absent). */
+  volume?: number;
 }
 
 export type SoundSlotAction =
   | { kind: 'choose'; slotKey: string; soundId: string | null }
-  | { kind: 'loop'; slotKey: string; loop: boolean };
+  | { kind: 'loop'; slotKey: string; loop: boolean }
+  /** How loud the slot's sound is on this entity, 0 to 1. Independent of every other use of the same sound. */
+  | { kind: 'volume'; slotKey: string; volume: number };
 
 interface SoundSlotPickerProps {
   slots: readonly SoundSlotDefinition[];
@@ -45,10 +49,14 @@ interface SoundSlotPickerProps {
   testIdPrefix: string;
 }
 
-const CATEGORY_LABEL: Record<string, string> = { MOB: 'Mob sounds', ITEM: 'Item sounds', BLOCK: 'Block sounds', GENERAL: 'General' };
+const CATEGORY_LABEL: Record<string, string> = { CHARACTER: 'Character sounds', MOB: 'Mob sounds', ITEM: 'Item sounds', BLOCK: 'Block sounds', GENERAL: 'General' };
 const UNLISTED = '__unlisted__';
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.webm', '.m4a', '.aac', '.flac'];
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+/** The volume slider saves this long after the last move, so dragging does not send a request per step. */
+export const VOLUME_SAVE_DELAY_MS = 400;
+
+const toPercent = (volume: number | undefined): number => Math.round((volume ?? 1) * 100);
 
 /**
  * One row per sound slot: pick a sound already in the library, upload a new one (it joins the
@@ -69,6 +77,28 @@ export default function SoundSlotPicker({
   const { library, loading: loadingLibrary, reload: reloadLibrary } = useSoundLibrary(true);
   const [busySlot, setBusySlot] = useState<string | null>(null);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
+  // Volume (percent) while the slider is being moved, until the saved value comes back
+  const [draftVolumes, setDraftVolumes] = useState<Record<string, number>>({});
+  const volumeTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => {
+    const timers = volumeTimers.current;
+    return () => Object.values(timers).forEach(clearTimeout);
+  }, []);
+
+  const changeVolume = (slotKey: string, percent: number) => {
+    setDraftVolumes((prev) => ({ ...prev, [slotKey]: percent }));
+    clearTimeout(volumeTimers.current[slotKey]);
+    volumeTimers.current[slotKey] = setTimeout(async () => {
+      await send(slotKey, { kind: 'volume', slotKey, volume: percent / 100 }, 'Volume saved');
+      // Saved: the entity now carries the value. Failed: fall back to what is stored.
+      setDraftVolumes((prev) => {
+        const rest = { ...prev };
+        delete rest[slotKey];
+        return rest;
+      });
+    }, VOLUME_SAVE_DELAY_MS);
+  };
 
   const send = async (slotKey: string, action: SoundSlotAction, success: string) => {
     setBusySlot(slotKey);
@@ -155,6 +185,8 @@ export default function SoundSlotPicker({
         const previewUrl = selected?.url ?? (unlisted ? selection?.url ?? null : null);
         const isBusy = busySlot === def.slotKey;
         const isLooping = selection?.loop ?? def.defaultLoop ?? false;
+        const hasSound = Boolean(selectedId || unlisted);
+        const volumePercent = draftVolumes[def.slotKey] ?? toPercent(selection?.volume);
 
         return (
           <div
@@ -239,6 +271,28 @@ export default function SoundSlotPicker({
               )}
             </div>
 
+            <div className="flex items-center gap-3">
+              <label htmlFor={`${testIdPrefix}-volume-${def.slotKey}`} className="text-xs font-bold text-slate-700 select-none">
+                Volume
+              </label>
+              <input
+                id={`${testIdPrefix}-volume-${def.slotKey}`}
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={volumePercent}
+                disabled={!hasSound || isBusy}
+                aria-label={`${def.label} volume`}
+                onChange={(e) => changeVolume(def.slotKey, Number(e.target.value))}
+                className="w-48 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <span className="w-12 text-xs font-mono font-bold text-slate-700" data-testid={`${testIdPrefix}-volume-value-${def.slotKey}`}>
+                {volumePercent}%
+              </span>
+              <span className="text-[10px] text-slate-400">of the game's effects volume</span>
+            </div>
+
             {missing && (
               <p className="text-xs font-bold text-red-600">
                 This slot points at a sound that no longer exists. The {entityLabel} plays nothing for it.
@@ -250,7 +304,16 @@ export default function SoundSlotPicker({
               </p>
             )}
             {previewUrl && (
-              <audio controls preload="none" src={getAssetUrl(previewUrl)} data-testid={`${testIdPrefix}-preview-${def.slotKey}`}>
+              <audio
+                controls
+                preload="none"
+                src={getAssetUrl(previewUrl)}
+                ref={(el) => {
+                  // The preview plays at this place's volume, so the admin hears what the game will play
+                  if (el) el.volume = volumePercent / 100;
+                }}
+                data-testid={`${testIdPrefix}-preview-${def.slotKey}`}
+              >
                 Your browser does not support the audio element.
               </audio>
             )}

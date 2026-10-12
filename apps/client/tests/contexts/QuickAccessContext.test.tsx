@@ -74,10 +74,10 @@ describe('QuickAccessContext', () => {
     <QuickAccessProvider>{children}</QuickAccessProvider>
   );
 
-  it('initializes with 4 empty slots and loads from localStorage', () => {
+  it('initializes with 10 empty slots and loads from localStorage', () => {
     const { result } = renderHook(() => useQuickAccess(), { wrapper });
 
-    expect(result.current.quickSlotItemIds).toEqual([null, null, null, null]);
+    expect(result.current.quickSlotItemIds).toEqual(Array(10).fill(null));
     expect(result.current.selectedSlotIndex).toBe(null);
   });
 
@@ -90,7 +90,7 @@ describe('QuickAccessContext', () => {
 
     expect(result.current.quickSlotItemIds[0]).toBe('item-torch-id');
     expect(localStorage.getItem('nvg_quick_slots_char-1')).toBe(
-      JSON.stringify(['item-torch-id', null, null, null])
+      JSON.stringify(['item-torch-id', ...Array(9).fill(null)])
     );
   });
 
@@ -152,7 +152,7 @@ describe('QuickAccessContext', () => {
     expect(result.current.isPlacingTorch).toBe(false);
   });
 
-  it('responds to keyboard events 1-4', () => {
+  it('responds to keyboard events 1-9 and 0', () => {
     const { result } = renderHook(() => useQuickAccess(), { wrapper });
 
     act(() => {

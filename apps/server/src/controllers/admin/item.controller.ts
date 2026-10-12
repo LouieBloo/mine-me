@@ -1,3 +1,4 @@
+import { readVolume } from '../../services/soundVolume';
 import { Request, Response } from 'express';
 import { prisma } from '../../index';
 import { syncJson, getPagination } from '../../services/admin.service';
@@ -321,9 +322,15 @@ export const updateItemSoundEffectSlot = async (req: Request, res: Response) => 
       rawEffects && typeof rawEffects === 'object' ? { ...rawEffects } : {};
 
     const { loop, soundId } = req.body ?? {};
+    const volumeInput = readVolume(req.body?.volume);
+    if (!volumeInput.ok) {
+      res.status(400).json({ error: volumeInput.error });
+      return;
+    }
     const updateData: any = {};
 
     // Point the slot at a library sound (or clear it). The file stays in the library either way.
+    // The slot keeps the volume already set on it when the sound changes.
     if (soundId !== undefined) {
       if (soundId === null) {
         currentSoundEffects[slot] = {
@@ -356,6 +363,15 @@ export const updateItemSoundEffectSlot = async (req: Request, res: Response) => 
         ...(currentSoundEffects[slot] || {}),
         url: currentSoundEffects[slot]?.url || (slot === 'throw' ? (item as any).soundEffectUrl : null),
         loop: Boolean(loop),
+      };
+    }
+
+    // How loud the slot's sound is on this item (the legacy throw sound keeps its volume in the same place)
+    if (volumeInput.volume !== undefined) {
+      currentSoundEffects[slot] = {
+        ...(currentSoundEffects[slot] || {}),
+        url: currentSoundEffects[slot]?.url || (slot === 'throw' ? (item as any).soundEffectUrl : null),
+        volume: volumeInput.volume,
       };
     }
     updateData.soundEffects = currentSoundEffects;
