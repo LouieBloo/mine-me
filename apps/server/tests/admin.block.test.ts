@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
+import { Prisma } from '@prisma/client';
 import { adminRouter } from '../src/routes/admin';
 import { publicRouter } from '../src/routes/public';
 
@@ -159,5 +160,39 @@ describe('Mining Block Controller & Routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Hardened Dirt');
     expect(res.body.health).toBe(250);
+  });
+});
+
+describe('Mining Block flammability', () => {
+  const BURNS = { ignitionChance: 0.5, spreadChance: 0.3, burnDuration: 6, heat: 2, burnsInto: 'DIRT', flameEffectId: 'pe1' };
+
+  beforeEach(() => {
+    mockBlocks = [{ id: 'block_dirt', typeKey: 'DIRT', name: 'Dirt', staminaCost: 1, idleParticleEffectId: null, idleParticleEffect: null }];
+  });
+
+  it('PUT /admin/blocks/:id saves how a block burns', async () => {
+    const res = await request(app).put('/admin/blocks/block_dirt').send({ flammability: BURNS });
+    expect(res.status).toBe(200);
+    expect(mockBlocks[0].flammability).toEqual(BURNS);
+  });
+
+  it('turning it off clears the column with a database null, not a bare null', async () => {
+    mockBlocks[0].flammability = BURNS;
+    const res = await request(app).put('/admin/blocks/block_dirt').send({ flammability: null });
+    expect(res.status).toBe(200);
+    expect(mockBlocks[0].flammability).toBe(Prisma.JsonNull);
+  });
+
+  it('leaves it alone when the request does not mention it', async () => {
+    mockBlocks[0].flammability = BURNS;
+    await request(app).put('/admin/blocks/block_dirt').send({ name: 'Soil' });
+    expect(mockBlocks[0].flammability).toEqual(BURNS);
+  });
+
+  it('rejects settings that do not make sense, listing the problems, and changes nothing', async () => {
+    const res = await request(app).put('/admin/blocks/block_dirt').send({ flammability: { ignitionChance: 2, spreadChance: 0.3, burnDuration: 0, heat: 1 } });
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toHaveLength(2);
+    expect(mockBlocks[0].flammability).toBeUndefined();
   });
 });

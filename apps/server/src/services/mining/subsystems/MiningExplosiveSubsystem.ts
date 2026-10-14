@@ -142,6 +142,8 @@ export class MiningExplosiveSubsystem {
     });
 
     const origin = { x: dynamite.position.x, y: dynamite.position.y };
+    // An explosive with the Ignites effect sets flammable things in the blast alight
+    this.world.ignition.fromExplosion(dynamite.itemId, origin.x, origin.y, radius);
     const source: DamageEvent['source'] = {
       kind: 'explosion',
       id: dynamite.id,

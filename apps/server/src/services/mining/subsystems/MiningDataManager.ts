@@ -5,9 +5,11 @@ import {
   findCurrencyItem,
   isThrowableItem,
   type CharacterSoundEffectsConfig,
+  type FluidDefinition,
   type GameItem,
   type Mob,
   type MiningBlockConfig,
+  type ParticleEffect,
   type ItemPhysicsConfig,
   type ItemSoundEffectsConfig,
 } from '@mine-me/shared';
@@ -17,6 +19,10 @@ export interface GameDefinitions {
   items: GameItem[];
   mobs: Mob[];
   blocks: MiningBlockConfig[];
+  /** Fluids (oil...). Absent means none are defined. */
+  fluids?: FluidDefinition[];
+  /** The particle effect library, so fluids and fire can name an effect by id. Absent means none. */
+  particleEffects?: ParticleEffect[];
   /** The player character's resolved sounds (hurt, jump...). Missing means none are set. */
   characterSounds?: CharacterSoundEffectsConfig;
 }
@@ -44,6 +50,10 @@ export class MiningDataManager {
   private readonly items: GameItem[];
   private readonly mobs: Mob[];
   private readonly blocksByTypeKey = new Map<string, MiningBlockConfig>();
+  private readonly fluids: FluidDefinition[] = [];
+  private readonly fluidsByTypeKey = new Map<string, FluidDefinition>();
+  private readonly fluidsById = new Map<string, FluidDefinition>();
+  private readonly particleEffectsById = new Map<string, ParticleEffect>();
 
   private readonly itemsById = new Map<string, GameItem>();
   private readonly itemsByKey = new Map<string, GameItem>();
@@ -64,6 +74,15 @@ export class MiningDataManager {
       if (block?.typeKey && !this.blocksByTypeKey.has(block.typeKey)) {
         this.blocksByTypeKey.set(block.typeKey, block);
       }
+    }
+    for (const effect of definitions.particleEffects ?? []) {
+      if (effect?.id && !this.particleEffectsById.has(effect.id)) this.particleEffectsById.set(effect.id, effect);
+    }
+    for (const fluid of definitions.fluids ?? []) {
+      if (!fluid?.typeKey || this.fluidsByTypeKey.has(fluid.typeKey)) continue;
+      this.fluids.push(fluid);
+      this.fluidsByTypeKey.set(fluid.typeKey, fluid);
+      MiningDataManager.putFirst(this.fluidsById, fluid.id, fluid);
     }
     for (const item of this.items) {
       MiningDataManager.putFirst(this.itemsById, item.id, item);
@@ -136,6 +155,22 @@ export class MiningDataManager {
   public getBlockRequiredPickPower(tileType: MiningTileType): number {
     const required = this.getBlockConfig(tileType)?.requiredPickPower;
     return typeof required === 'number' && required > 0 ? required : 0;
+  }
+
+  /** A particle effect from the library by id (undefined if there is none with that id). */
+  public getParticleEffect(id: string | null | undefined): ParticleEffect | undefined {
+    return typeof id === 'string' ? this.particleEffectsById.get(id) : undefined;
+  }
+
+  /** All fluid definitions, in load order (the first of any duplicated typeKey wins). */
+  public getFluids(): FluidDefinition[] {
+    return this.fluids;
+  }
+
+  /** Fluid definition by typeKey (e.g. 'OIL') or by database id. */
+  public getFluid(keyOrId: string): FluidDefinition | undefined {
+    if (typeof keyOrId !== 'string') return undefined;
+    return this.fluidsByTypeKey.get(keyOrId) ?? this.fluidsById.get(keyOrId);
   }
 
   /**

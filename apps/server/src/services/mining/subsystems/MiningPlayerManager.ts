@@ -21,6 +21,8 @@ import { isInBounds, type ServerMiningGrid } from '../../miningMap.service';
 
 export interface MiningPlayerSession {
   characterId: string;
+  /** On fire (set by the burning system each tick). */
+  burning?: boolean;
   characterName: string;
   socket: Socket;
   playerBody: MiningPlayerBody;
@@ -251,6 +253,7 @@ export class MiningPlayerManager {
     for (const session of this.players.values()) {
       session.invulnerableSeconds = Math.max(0, session.invulnerableSeconds - dt);
       session.inputAge++;
+      session.playerBody.fluidEnvironment = this.world.fluids.environment;
       session.playerBody.processInputs(session.inputs, grid);
       session.playerBody.update(dt, grid);
       this.applyFallDamage(session);
@@ -352,7 +355,7 @@ export class MiningPlayerManager {
         this.world.damage.applyDamage({ kind: 'mob', id: mob.id }, {
           amount: session.weaponDamage,
           type: 'melee',
-          source: { kind: 'player', id: session.characterId, name: session.characterName, position: { x: px, y: py } },
+          source: { kind: 'player', id: session.characterId, name: session.characterName, itemId: session.equippedWeaponId ?? undefined, position: { x: px, y: py } },
           knockback: knockbackImpulse(session.knockback, kbDirX > 0 ? 1 : -1),
         });
       }

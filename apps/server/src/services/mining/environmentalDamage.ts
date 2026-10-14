@@ -1,4 +1,4 @@
-import { DEFAULT_MINING_MAP_CONFIG, type MiningMapConfigData, type SpeedDamageRule } from '@mine-me/shared';
+import { DEFAULT_MINING_MAP_CONFIG, type FireDamageRule, type MiningMapConfigData, type SpeedDamageRule } from '@mine-me/shared';
 
 /** The map config's fall damage rule (falls back to the game defaults for missing fields). */
 export function fallDamageRule(config?: Partial<MiningMapConfigData>): SpeedDamageRule {
@@ -15,5 +15,15 @@ export function rockDamageRule(config?: Partial<MiningMapConfigData>): SpeedDama
     minSpeed: config?.rockDamageMinSpeed ?? DEFAULT_MINING_MAP_CONFIG.rockDamageMinSpeed ?? 0,
     perSpeed: config?.rockDamagePerSpeed ?? DEFAULT_MINING_MAP_CONFIG.rockDamagePerSpeed ?? 0,
     max: config?.rockDamageMax ?? DEFAULT_MINING_MAP_CONFIG.rockDamageMax ?? 0,
+  };
+}
+
+/** The map config's fire rule: burning and heat damage (falls back to the game defaults for missing fields). */
+export function fireDamageRule(config?: Partial<MiningMapConfigData>): FireDamageRule {
+  return {
+    burnDamagePerSecond: config?.burnDamagePerSecond ?? DEFAULT_MINING_MAP_CONFIG.burnDamagePerSecond ?? 0,
+    burnSeconds: config?.burnSeconds ?? DEFAULT_MINING_MAP_CONFIG.burnSeconds ?? 0,
+    heatRadius: config?.heatRadius ?? DEFAULT_MINING_MAP_CONFIG.heatRadius ?? 0,
+    heatDamagePerSecond: config?.heatDamagePerSecond ?? DEFAULT_MINING_MAP_CONFIG.heatDamagePerSecond ?? 0,
   };
 }

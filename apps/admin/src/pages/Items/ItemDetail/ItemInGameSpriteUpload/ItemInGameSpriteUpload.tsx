@@ -39,8 +39,8 @@ export default function ItemInGameSpriteUpload({
 
     const img = new Image();
     img.onload = () => {
-      if (img.width > 256 || img.height > 256) {
-        toast.error(`In-game sprite must be at most 256x256 pixels. This image is ${img.width}x${img.height}.`);
+      if (img.width !== img.height) {
+        toast.error(`In-game sprite must be square (same width and height). This image is ${img.width}x${img.height}.`);
         setPendingFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
       } else {
@@ -87,7 +87,7 @@ export default function ItemInGameSpriteUpload({
         <div>
           <h3 className="text-xl font-black text-white tracking-tight uppercase">In-Game Sprite</h3>
           <p className="text-slate-400 text-xs font-bold mt-1 uppercase tracking-widest">
-            Rendered in the game world when dropped (Max 256x256 PNG)
+            Rendered in the game world when dropped (Square PNG)
           </p>
         </div>
         {!showUpload && (
@@ -124,7 +124,7 @@ export default function ItemInGameSpriteUpload({
                 />
               </svg>
               <span className="text-sm font-black uppercase text-slate-500">
-                {pendingFile ? pendingFile.name : 'Select PNG (Max 256x256)'}
+                {pendingFile ? pendingFile.name : 'Select PNG (square)'}
               </span>
               <input
                 type="file"

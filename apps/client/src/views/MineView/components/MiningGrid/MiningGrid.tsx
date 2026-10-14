@@ -32,6 +32,7 @@ import { usePlayerDamageEvents } from './hooks/usePlayerDamageEvents';
 import { useMiningTicker } from './hooks/useMiningTicker';
 import { TILE_SIZE } from './renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from './renderers/DynamiteVisualManager';
+import { FluidSounds } from './renderers/FluidSounds';
 import { DroppedItemVisualManager } from './renderers/DroppedItemVisualManager';
 import { ProjectileVisualManager } from './renderers/ProjectileVisualManager';
 import { MiningPredictionState } from './systems/MiningPredictionState';
@@ -186,6 +187,10 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
           holdRotation: item.holdRotation,
           muzzleOffsetX: item.muzzleOffsetX,
           muzzleOffsetY: item.muzzleOffsetY,
+          heldParticleEffectId: item.heldParticleEffectId,
+          heldParticleOffsetX: item.heldParticleOffsetX,
+          heldParticleOffsetY: item.heldParticleOffsetY,
+          heldLightConfig: item.heldLightConfig,
         };
       });
 
@@ -254,6 +259,10 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     cameraRef,
     gridContainerRef,
     tilesContainerRef,
+    fluidRendererRef,
+    fireFieldRef,
+    fireRendererRef,
+    burningBodiesRef,
     fallingRocksContainerRef,
     droppedItemsContainerRef,
     dynamitesContainerRef,
@@ -292,6 +301,35 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     soundManager,
     onDynamicItemsLoaded: setDynamicItems,
   });
+
+  // The player's predicted body feels the same fluid the server's does, so wading does not rubber-band
+  useEffect(() => {
+    const body = playerBodyRef.current;
+    body.fluidEnvironment = fluidRendererRef.current?.environment ?? null;
+    return () => {
+      body.fluidEnvironment = null;
+    };
+  }, [containersReady, fluidRendererRef]);
+
+  // What fluids and fire sound like (needs the scene's fluid and fire state, so it is made once they exist)
+  const fluidSoundsRef = useRef<FluidSounds | null>(null);
+  useEffect(() => {
+    const fluids = fluidRendererRef.current;
+    const fire = fireFieldRef.current;
+    if (!containersReady || !fluids || !fire) return;
+    const sounds = new FluidSounds(soundManager, fluids, fire);
+    fluidSoundsRef.current = sounds;
+    return () => {
+      sounds.destroy();
+      fluidSoundsRef.current = null;
+    };
+  }, [containersReady, fluidRendererRef, fireFieldRef, soundManager]);
+
+  // Burning blocks are drawn by looking up the type of the tile that is on fire
+  useEffect(() => {
+    fireRendererRef.current?.setTileTypeSource((x, y) => gridRef.current[y]?.[x]?.type);
+    return () => fireRendererRef.current?.setTileTypeSource(null);
+  }, [containersReady, fireRendererRef]);
 
   const torchEmittersRef = useRef<Map<string, EmitterHandle>>(new Map());
   const blockEmittersRef = useRef<Map<string, EmitterHandle>>(new Map());
@@ -403,6 +441,11 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     weaponSoundVolumeRef,
     lastWeaponSoundTimeRef,
     cameraRef,
+    fluidRendererRef,
+    fireFieldRef,
+    fireRendererRef,
+    burningBodiesRef,
+    fluidSoundsRef,
     fallingRocksContainerRef,
     droppedItemsContainerRef,
     dynamitesContainerRef,

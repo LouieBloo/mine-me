@@ -97,7 +97,12 @@ model Item {
   throwable       Boolean         @default(false)
   triggerMode     MouseActionTriggerMode @default(SINGLE)
   particleEffectId String?
-  particleEffect   ParticleEffect? @relation(fields: [particleEffectId], references: [id], onDelete: SetNull)
+  particleEffect   ParticleEffect? @relation("ItemGroundParticle", fields: [particleEffectId], references: [id], onDelete: SetNull)
+  heldParticleEffectId String?
+  heldParticleEffect   ParticleEffect? @relation("ItemHeldParticle", fields: [heldParticleEffectId], references: [id], onDelete: SetNull)
+  heldParticleOffsetX Float           @default(0)
+  heldParticleOffsetY Float           @default(0)
+  heldLightConfig Json?
   physicsConfig   Json?
   lightConfig     Json?
   shootsProjectiles Boolean       @default(false)
@@ -213,6 +218,8 @@ model Effect {
   pickPowerModifier   Boolean         @default(false)
   knockbackModifier   Boolean         @default(false)
   explodes            Boolean         @default(false)
+  // Sets flammable things alight (value = ignition strength in percent, 100 = the material's own chance)
+  ignites             Boolean         @default(false)
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   objectEffects       ObjectEffects[]
@@ -248,9 +255,40 @@ model MiningBlock {
   staminaCost          Int             @default(1)
   idleParticleEffectId String?
   idleParticleEffect   ParticleEffect? @relation(fields: [idleParticleEffectId], references: [id], onDelete: SetNull)
+  // Shared Flammability shape (null = the block does not burn)
+  flammability         Json?
   dropTable            DropTable?      @relation("MiningBlockDrops")
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
+}
+
+model Fluid {
+  id              String   @id @default(cuid())
+  // Open key, e.g. OIL. Fluids are rows, not code: a new fluid needs no new enum value.
+  typeKey         String   @unique
+  name            String
+  description     String?
+  // CSS hex colour the client draws the fluid with
+  color           String   @default("#000000")
+  opacity         Float    @default(0.9)
+  // Heavier fluids sink under lighter ones, and decide how things float
+  density         Float    @default(1)
+  // Fraction of movement speed removed at full submersion, 0 to 1
+  viscosity       Float    @default(0.5)
+  // Share of the level difference moved per simulation step, 0 to 1
+  flowRate        Float    @default(0.5)
+  // A cell below this level evaporates
+  minLevel        Float    @default(0.05)
+  // A cell only spreads sideways when the level difference exceeds this
+  flowThreshold   Float    @default(0.02)
+  // Shared Flammability shape (null = not flammable)
+  flammability    Json?
+  // Where it appears in generated mines (shared FluidGeneration shape; null = never generated)
+  generation      Json?
+  // Sound slots (enter, exit, ignite, burn): library sounds by id, each with its own volume
+  soundEffects    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model MiningMapConfig {
@@ -290,6 +328,14 @@ model MiningMapConfig {
   rockDamageMinSpeed  Float    @default(6)
   rockDamagePerSpeed  Float    @default(5)
   rockDamageMax       Float    @default(80)
+  // Fire (players and mobs): burning does burnDamagePerSecond for burnSeconds after the last touch of fire;
+  // standing within heatRadius tiles of a fire hurts by heatDamagePerSecond x the fire's heat, fading with distance
+  burnDamagePerSecond Float    @default(6)
+  burnSeconds         Float    @default(5)
+  heatRadius          Float    @default(2.5)
+  heatDamagePerSecond Float    @default(1.5)
+  // ParticleEffect drawn on a burning player or mob (null = none)
+  burningEffectId     String?
   // Hostile NPC / Mob Spawning Settings
   mobSpawnCount       Int      @default(3)
   mobSpawnMinDepth    Int      @default(5)
@@ -309,7 +355,8 @@ model ParticleEffect {
   config       Json
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  items        Item[]
+  items        Item[]          @relation("ItemGroundParticle")
+  heldByItems  Item[]          @relation("ItemHeldParticle")
   miningBlocks MiningBlock[]
 }
 
@@ -355,6 +402,7 @@ enum SoundCategory {
   BLOCK
   MOB
   CHARACTER
+  FLUID
 }
 
 /// The player character's sounds (hurt, jump...). One row (id "default"); `soundEffects` maps a slot to a library sound id.

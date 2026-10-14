@@ -81,6 +81,11 @@ export class MiningPlayerBody extends MiningPhysicsBody {
       this.facing = { x: Math.sign(dx), y: Math.sign(dy) };
     }
 
+    // Wading through fluid slows walking, climbing and jumping (a jump loses less speed than a walk,
+    // so a pool can be climbed out of: height goes with the square of speed)
+    const fluid = this.updateFluidContact();
+    const jumpFactor = Math.sqrt(fluid);
+
     // While knocked back the player is carried by the impulse, not by input or ladders
     if (this.knockbackRemaining > 0) {
       this.hasGravity = true;
@@ -88,7 +93,7 @@ export class MiningPlayerBody extends MiningPhysicsBody {
     }
 
     // Set horizontal velocity directly based on move speed
-    this.velocity.x = dx * MINING_CONFIG.MOVE_SPEED;
+    this.velocity.x = dx * MINING_CONFIG.MOVE_SPEED * fluid;
 
     // Ladder Climbing & Physics Handling
     if (grid) {
@@ -98,17 +103,17 @@ export class MiningPlayerBody extends MiningPhysicsBody {
     if (this.isOnLadder) {
       // If pressing jump while on a ladder, player leaps off the ladder
       if (inputs.jump) {
-        this.velocity.y = -MINING_CONFIG.JUMP_FORCE;
+        this.velocity.y = -MINING_CONFIG.JUMP_FORCE * jumpFactor;
         this.isGrounded = false;
         this.hasGravity = true;
       } else if (inputs.up) {
         // Climb Up
-        this.velocity.y = -MINING_CONFIG.CLIMB_SPEED;
+        this.velocity.y = -MINING_CONFIG.CLIMB_SPEED * fluid;
         this.isGrounded = false;
         this.hasGravity = false;
       } else if (inputs.down) {
         // Climb Down
-        this.velocity.y = MINING_CONFIG.CLIMB_SPEED;
+        this.velocity.y = MINING_CONFIG.CLIMB_SPEED * fluid;
         this.hasGravity = false;
       } else {
         // Stationary on ladder (hold grip without slipping)
@@ -121,7 +126,7 @@ export class MiningPlayerBody extends MiningPhysicsBody {
 
       // Handle Jump if grounded and spacebar/jump key is pressed
       if (inputs.jump && this.isGrounded) {
-        this.velocity.y = -MINING_CONFIG.JUMP_FORCE;
+        this.velocity.y = -MINING_CONFIG.JUMP_FORCE * jumpFactor;
         this.isGrounded = false;
       }
     }

@@ -31,6 +31,11 @@
   "rockDamageMinSpeed": 6,
   "rockDamagePerSpeed": 5,
   "rockDamageMax": 80,
+  "burnDamagePerSecond": 6,
+  "burnSeconds": 5,
+  "heatRadius": 2.5,
+  "heatDamagePerSecond": 1.5,
+  "burningEffectId": null,
   "mobSpawnCount": 3,
   "mobSpawnMinDepth": 5,
   "allowedMobIds": [

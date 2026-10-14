@@ -11,6 +11,7 @@ import { ParticleEngine } from '../../../../../components/game/particles/Particl
 import {
   MiningTileType,
   MINING_CONFIG,
+  FireField,
   isTorchItem,
   isLadderItem,
   isThrowableItem,
@@ -23,6 +24,10 @@ import {
 } from '@mine-me/shared';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
+import { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
+import { FluidRenderer } from '../renderers/FluidRenderer';
+import { FireRenderer } from '../renderers/FireRenderer';
+import { BurningBodies } from '../renderers/BurningBodies';
 import { ProjectileTextureCache } from '../systems/ProjectileTextureCache';
 import {
   collectAssetUrls,
@@ -66,6 +71,10 @@ export function useMiningScene({
   const gridContainerRef = useRef<Container | null>(null);
   const backgroundContainerRef = useRef<Container | null>(null);
   const tilesContainerRef = useRef<Container | null>(null);
+  const fluidRendererRef = useRef<FluidRenderer | null>(null);
+  const fireFieldRef = useRef<FireField | null>(null);
+  const fireRendererRef = useRef<FireRenderer | null>(null);
+  const burningBodiesRef = useRef<BurningBodies | null>(null);
   const fallingRocksContainerRef = useRef<Container | null>(null);
   const droppedItemsContainerRef = useRef<Container | null>(null);
   const playerContainerRef = useRef<Container | null>(null);
@@ -126,6 +135,7 @@ export function useMiningScene({
     const gridContainer = new Container();
     const backgroundContainer = new Container();
     const tilesContainer = new Container();
+    const fluidsContainer = new Container();
     const fallingRocksContainer = new Container();
     const droppedItemsContainer = new Container();
     const dynamitesContainer = new Container();
@@ -165,6 +175,8 @@ export function useMiningScene({
 
     gridContainer.addChild(backgroundContainer);
     gridContainer.addChild(tilesContainer);
+    // Fluid sits on the tiles and behind every entity, so characters and items stay visible in it
+    gridContainer.addChild(fluidsContainer);
     gridContainer.addChild(fallingRocksContainer);
     gridContainer.addChild(droppedItemsContainer);
     gridContainer.addChild(dynamitesContainer);
@@ -190,10 +202,26 @@ export function useMiningScene({
     playerContainerRef.current = playerContainer;
     particlesContainerRef.current = particlesContainer;
 
+    const gridRows = initialSessionState.grid.length;
+    const fluidRenderer = new FluidRenderer(
+      fluidsContainer,
+      initialSessionState.grid[0]?.length ?? MINING_CONFIG.GRID_WIDTH,
+      gridRows || MINING_CONFIG.GRID_HEIGHT,
+      initialSessionState.fluids ?? []
+    );
+    fluidRenderer.apply(initialSessionState.fluidCells ?? []);
+    fluidRenderer.render();
+    fluidRendererRef.current = fluidRenderer;
+
+    const fireField = new FireField(fluidRenderer.field.width, fluidRenderer.field.height);
+    fireField.apply(initialSessionState.fireCells ?? []);
+    fireFieldRef.current = fireField;
+
     const particleEngine = new ParticleEngine(particlesContainer, app.renderer, 3000);
     particleEngineRef.current = particleEngine;
 
     const remotePlayerRenderer = new MiningRemotePlayerRenderer(otherPlayersContainer);
+    remotePlayerRenderer.setParticleEngine(particleEngine, (id) => DroppedItemVisualManager.getEffectConfig(id));
     remotePlayerRendererRef.current = remotePlayerRenderer;
     if (initialSessionState.otherPlayers) {
       remotePlayerRenderer.updatePlayers(initialSessionState.otherPlayers);
@@ -261,6 +289,15 @@ export function useMiningScene({
     // Initial sunlight calculation
     lightingEngine.updateGrid(initialSessionState.grid);
     lightingEngineRef.current = lightingEngine;
+
+    // Fire: flames and lights on burning cells, and the effect on burning players and mobs (all data driven)
+    const fireRenderer = new FireRenderer(fireField, fluidRenderer);
+    fireRenderer.setEngines(particleEngine, lightingEngine);
+    fireRenderer.setBlockFlames(initialSessionState.blockFlames ?? []);
+    fireRendererRef.current = fireRenderer;
+    const burningBodies = new BurningBodies();
+    burningBodies.setup(particleEngine, initialSessionState.burningEffect);
+    burningBodiesRef.current = burningBodies;
 
     // Load assets in parallel: cave tiling background, dirt block texture + modular character sprite with gear
     const loadAllAssets = async () => {
@@ -408,6 +445,7 @@ export function useMiningScene({
           const effects = await peRes.json();
           if (Array.isArray(effects)) {
             DynamiteVisualManager.setCustomParticleEffects(effects);
+            DroppedItemVisualManager.setCustomParticleEffects(effects);
           }
         }
       } catch (err) {
@@ -566,6 +604,13 @@ export function useMiningScene({
         particleEngineRef.current.destroy();
         particleEngineRef.current = null;
       }
+      fireRenderer.destroy();
+      fireRendererRef.current = null;
+      burningBodies.destroy();
+      burningBodiesRef.current = null;
+      fluidRenderer.destroy();
+      fluidRendererRef.current = null;
+      fireFieldRef.current = null;
       lightingEngine.destroy();
       lightingEngineRef.current = null;
       flashlightRef.current = null;
@@ -590,6 +635,10 @@ export function useMiningScene({
     gridContainerRef,
     backgroundContainerRef,
     tilesContainerRef,
+    fluidRendererRef,
+    fireFieldRef,
+    fireRendererRef,
+    burningBodiesRef,
     particlesContainerRef,
     fallingRocksContainerRef,
     droppedItemsContainerRef,

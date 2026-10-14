@@ -4,6 +4,9 @@ import type { MiningDamageSystem } from './MiningDamageSystem';
 import type { MiningBlockSubsystem } from './subsystems/MiningBlockSubsystem';
 import type { MiningDataManager } from './subsystems/MiningDataManager';
 import type { MiningDropSubsystem } from './subsystems/MiningDropSubsystem';
+import type { MiningFluidSubsystem } from './subsystems/MiningFluidSubsystem';
+import type { MiningIgnitionSubsystem } from './subsystems/MiningIgnitionSubsystem';
+import type { MiningFireSubsystem } from './subsystems/MiningFireSubsystem';
 import type { MiningExplosiveSubsystem } from './subsystems/MiningExplosiveSubsystem';
 import type { MiningMobSubsystem } from './subsystems/MiningMobSubsystem';
 import type { MiningPlayerManager, MiningPlayerSession } from './subsystems/MiningPlayerManager';
@@ -46,6 +49,11 @@ export interface MiningWorld {
   readonly explosives: MiningExplosiveSubsystem;
   readonly projectiles: MiningProjectileSubsystem;
   readonly mobs: MiningMobSubsystem;
+  readonly fluids: MiningFluidSubsystem;
+  /** Where fire starts: sparks from items, blasts and (later) fire itself. */
+  readonly ignition: MiningIgnitionSubsystem;
+  /** Fire burning through the mine's fuel. */
+  readonly fire: MiningFireSubsystem;
   /** The one place hits are applied (see MiningDamageSystem). */
   readonly damage: MiningDamageSystem;
 

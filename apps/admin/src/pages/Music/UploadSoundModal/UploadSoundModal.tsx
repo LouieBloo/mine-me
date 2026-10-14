@@ -256,6 +256,7 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({ isOpen, onCl
                   <option value="ITEM">Item</option>
                   <option value="BLOCK">Block</option>
                   <option value="CHARACTER">Character</option>
+                  <option value="FLUID">Fluid & fire</option>
                 </select>
               </div>
             )}

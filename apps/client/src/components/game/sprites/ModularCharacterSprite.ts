@@ -8,7 +8,7 @@ import type {
   SkeletonToolSocketDef,
   ModularAnimationState,
 } from '@mine-me/shared';
-import { MODULAR_GEAR_SLOTS } from '@mine-me/shared';
+import { MODULAR_GEAR_SLOTS, type HeldLightConfig } from '@mine-me/shared';
 
 export type CharacterAnimationState = ModularAnimationState;
 
@@ -32,6 +32,18 @@ export interface GearLayerDescriptor {
   holdRotation?: number; // in degrees
   muzzleOffsetX?: number;
   muzzleOffsetY?: number;
+  /** Particle effect (by id) emitted from the layer while it is held, and its origin in weapon-sprite space. */
+  heldParticleEffectId?: string | null;
+  heldParticleOffsetX?: number;
+  heldParticleOffsetY?: number;
+  /** Light the layer gives off while held (offset in weapon-sprite space). */
+  heldLightConfig?: HeldLightConfig | null;
+}
+
+/** What the held weapon emits: the effect id and where, in the weapon sprite's local space. */
+export interface HeldParticleSpec {
+  effectId: string;
+  offset: { x: number; y: number };
 }
 
 /**
@@ -43,6 +55,8 @@ export class ModularCharacterSprite extends ModularEntitySprite {
   private gearSprites: Map<string, Sprite[]> = new Map();
   private weaponSprite: Sprite | null = null;
   private currentMuzzleOffset: { x: number; y: number } = { x: 0, y: 0 };
+  private heldParticle: HeldParticleSpec | null = null;
+  private heldLight: HeldLightConfig | null = null;
 
   constructor(
     parentContainer: Container,
@@ -78,6 +92,15 @@ export class ModularCharacterSprite extends ModularEntitySprite {
             x: layer.muzzleOffsetX ?? 0,
             y: layer.muzzleOffsetY ?? 0,
           };
+
+          this.heldParticle = layer.heldParticleEffectId
+            ? {
+                effectId: layer.heldParticleEffectId,
+                offset: { x: layer.heldParticleOffsetX ?? 0, y: layer.heldParticleOffsetY ?? 0 },
+              }
+            : null;
+
+          this.heldLight = layer.heldLightConfig?.enabled ? layer.heldLightConfig : null;
 
           const targetToolDimension = 280;
           const maxDim = Math.max(texture.width, texture.height);
@@ -164,16 +187,52 @@ export class ModularCharacterSprite extends ModularEntitySprite {
     if (!this.weaponSprite || this.weaponSprite.destroyed || !this.weaponSprite.parent) {
       return null;
     }
-    const offset = customOffset ?? this.currentMuzzleOffset;
-    if (typeof this.weaponSprite.toGlobal !== 'function') {
+    return this.weaponPointToContainer(relativeToContainer, customOffset ?? this.currentMuzzleOffset);
+  }
+
+  /** The effect the equipped weapon emits while held, or null when it has none. */
+  getHeldParticle(): HeldParticleSpec | null {
+    if (!this.weaponSprite || this.weaponSprite.destroyed || !this.weaponSprite.parent) return null;
+    return this.heldParticle;
+  }
+
+  /**
+   * World position (in `relativeToContainer` space) of the held weapon's particle origin.
+   * Follows the swing, aim and flip like the muzzle does.
+   */
+  getHeldParticleWorldPosition(relativeToContainer: Container): { x: number; y: number } | null {
+    const spec = this.getHeldParticle();
+    if (!spec) return null;
+    return this.weaponPointToContainer(relativeToContainer, spec.offset);
+  }
+
+  /** The light the equipped weapon gives off while held, or null when it has none. */
+  getHeldLight(): HeldLightConfig | null {
+    if (!this.weaponSprite || this.weaponSprite.destroyed || !this.weaponSprite.parent) return null;
+    return this.heldLight;
+  }
+
+  /** World position (in `relativeToContainer` space) of the held weapon's light. */
+  getHeldLightWorldPosition(relativeToContainer: Container): { x: number; y: number } | null {
+    const light = this.getHeldLight();
+    if (!light) return null;
+    return this.weaponPointToContainer(relativeToContainer, { x: light.offsetX ?? 0, y: light.offsetY ?? 0 });
+  }
+
+  /** Converts a point in the weapon sprite's local space into another container's space. */
+  private weaponPointToContainer(
+    relativeToContainer: Container,
+    offset: { x: number; y: number }
+  ): { x: number; y: number } {
+    const weapon = this.weaponSprite!;
+    if (typeof weapon.toGlobal !== 'function') {
       return { x: offset.x, y: offset.y };
     }
-    const globalPos = this.weaponSprite.toGlobal(offset);
+    const globalPos = weapon.toGlobal(offset);
     if (typeof relativeToContainer.toLocal !== 'function') {
       return globalPos;
     }
-    const localPos = relativeToContainer.toLocal(globalPos);
-    return localPos;
+    return relativeToContainer.toLocal(globalPos);
   }
 
   /**
@@ -191,6 +250,8 @@ export class ModularCharacterSprite extends ModularEntitySprite {
     this.gearSprites.clear();
     this.weaponSprite = null;
     this.currentMuzzleOffset = { x: 0, y: 0 };
+    this.heldParticle = null;
+    this.heldLight = null;
   }
 
   /**

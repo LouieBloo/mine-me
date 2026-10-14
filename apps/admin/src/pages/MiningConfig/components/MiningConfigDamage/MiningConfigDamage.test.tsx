@@ -75,4 +75,39 @@ describe('MiningConfigDamage', () => {
       expect(preview.getByText('30 tiles/s: 30 dmg')).toBeInTheDocument();
     });
   });
+
+  describe('fire damage', () => {
+    it('shows the fire settings with the saved values', () => {
+      renderCard({ burnDamagePerSecond: 8, burnSeconds: 6, heatRadius: 3, heatDamagePerSecond: 2 });
+      expect((screen.getByLabelText('Burn Damage per Second') as HTMLInputElement).value).toBe('8');
+      expect((screen.getByLabelText('Burn Time (s)') as HTMLInputElement).value).toBe('6');
+      expect((screen.getByLabelText('Heat Radius (tiles)') as HTMLInputElement).value).toBe('3');
+      expect((screen.getByLabelText('Heat Damage per Second') as HTMLInputElement).value).toBe('2');
+    });
+
+    it('reports edits as numbers on the right config field', () => {
+      const onChange = renderCard();
+      fireEvent.change(screen.getByLabelText('Burn Damage per Second'), { target: { value: '9.5' } });
+      expect(onChange).toHaveBeenCalledWith('burnDamagePerSecond', 9.5);
+      fireEvent.change(screen.getByLabelText('Burn Time (s)'), { target: { value: '3' } });
+      expect(onChange).toHaveBeenCalledWith('burnSeconds', 3);
+      fireEvent.change(screen.getByLabelText('Heat Radius (tiles)'), { target: { value: '0' } });
+      expect(onChange).toHaveBeenCalledWith('heatRadius', 0);
+      fireEvent.change(screen.getByLabelText('Heat Damage per Second'), { target: { value: '4' } });
+      expect(onChange).toHaveBeenCalledWith('heatDamagePerSecond', 4);
+    });
+
+    it('previews what one burn costs and how hot oil is near and far', () => {
+      renderCard({ burnDamagePerSecond: 6, burnSeconds: 5, heatRadius: 2.5, heatDamagePerSecond: 1.5 });
+      const preview = within(screen.getByTestId('fire-damage-preview'));
+      expect(preview.getByText('One burn: 30 dmg over 5s')).toBeInTheDocument();
+      expect(preview.getByText(/at the fire:\s*4\.5 dmg\/s/)).toBeInTheDocument();
+      expect(preview.getByText(/at 1\.3 tiles:\s*2\.3 dmg\/s/)).toBeInTheDocument();
+    });
+
+    it('starts from the game defaults', () => {
+      renderCard();
+      expect((screen.getByLabelText('Burn Damage per Second') as HTMLInputElement).value).toBe(String(DEFAULT_MINING_MAP_CONFIG.burnDamagePerSecond));
+    });
+  });
 });

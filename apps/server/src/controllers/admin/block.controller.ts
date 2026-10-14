@@ -6,6 +6,8 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import { getSoundsDir, resolveAssetUrl } from '../../config/assetPaths';
+import { Prisma } from '@prisma/client';
+import { validateFlammability } from '@mine-me/shared';
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -94,6 +96,16 @@ export const updateBlock = async (req: Request, res: Response) => {
 
     if (dropTable !== undefined) {
       dataToUpdate.dropTable = buildDropTableUpsert(dropTable);
+    }
+
+    // How the block burns (null: it does not). A Json column is cleared with JsonNull, never a bare null.
+    if (req.body.flammability !== undefined) {
+      const errors = validateFlammability(req.body.flammability);
+      if (errors.length > 0) {
+        res.status(400).json({ error: errors.join('; '), errors });
+        return;
+      }
+      dataToUpdate.flammability = req.body.flammability === null ? Prisma.JsonNull : req.body.flammability;
     }
 
     const block = await prisma.miningBlock.update({

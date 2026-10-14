@@ -247,4 +247,49 @@ describe('BlockDetail Page', () => {
       expect((screen.getByLabelText(/required pick power/i) as HTMLInputElement).value).toBe('2');
     });
   });
+
+  describe('flammability', () => {
+    const renderPage = () =>
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/blocks/block_copperium']}>
+            <Routes>
+              <Route path="/blocks/:id" element={<BlockDetail />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      );
+    const BURNS = { ignitionChance: 0.6, spreadChance: 0.4, burnDuration: 5, heat: 2, burnsInto: 'DIRT' };
+    const putBody = () => JSON.parse(mockFetchWithAuth.mock.calls.find((c) => c[1]?.method === 'PUT')![1].body);
+
+    it('does not burn by default, and saves null', async () => {
+      setupMockData();
+      renderPage();
+      await screen.findByText('Copperium Ore');
+      expect(screen.getByLabelText('Can burn')).not.toBeChecked();
+      fireEvent.click(screen.getByRole('button', { name: /save block properties/i }));
+      await waitFor(() => expect(putBody().flammability).toBeNull());
+    });
+
+    it('shows how an existing block burns, and the flame effect picker with the particle library', async () => {
+      setupMockData({ flammability: BURNS });
+      renderPage();
+      await screen.findByText('Copperium Ore');
+      expect(screen.getByLabelText('Can burn')).toBeChecked();
+      expect(screen.getByLabelText('Burn Duration (s)')).toHaveValue(5);
+      expect(screen.getByLabelText('Burns Into (block key)')).toHaveValue('DIRT');
+      expect(screen.getByRole('option', { name: 'fairy_sparkle' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Flame Effect')).toBeInTheDocument();
+    });
+
+    it('lets a block be made to burn and saves its settings with the rest', async () => {
+      setupMockData();
+      renderPage();
+      await screen.findByText('Copperium Ore');
+      fireEvent.click(screen.getByLabelText('Can burn'));
+      fireEvent.change(screen.getByLabelText('Burn Duration (s)'), { target: { value: '9' } });
+      fireEvent.click(screen.getByRole('button', { name: /save block properties/i }));
+      await waitFor(() => expect(putBody().flammability).toMatchObject({ burnDuration: 9, ignitionChance: 0.5 }));
+    });
+  });
 });

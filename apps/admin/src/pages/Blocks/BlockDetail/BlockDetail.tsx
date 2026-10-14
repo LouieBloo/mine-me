@@ -6,7 +6,8 @@ import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
 import BlockTextureUpload from './BlockTextureUpload';
 import BlockSoundEffectUpload from './BlockSoundEffectUpload/BlockSoundEffectUpload';
 import { DropTableEditor } from '../../../components/DropTableEditor/DropTableEditor';
-import type { MiningBlockConfig, DropTable } from '@mine-me/shared';
+import FlammabilityPanel from '../../../components/FlammabilityPanel/FlammabilityPanel';
+import type { MiningBlockConfig, DropTable, Flammability } from '@mine-me/shared';
 import './BlockDetail.css';
 
 export default function BlockDetail() {
@@ -20,6 +21,7 @@ export default function BlockDetail() {
   const [block, setBlock] = useState<MiningBlockConfig | null>(null);
   const [particleEffectsList, setParticleEffectsList] = useState<any[]>([]);
   const [dropTable, setDropTable] = useState<Omit<DropTable, 'id'> | null>(null);
+  const [flammability, setFlammability] = useState<Flammability | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -46,6 +48,7 @@ export default function BlockDetail() {
         setBlock(data);
         setParticleEffectsList(Array.isArray(particleEffectsJson) ? particleEffectsJson : []);
         setDropTable(data.dropTable || null);
+        setFlammability(data.flammability ?? null);
         setFormData({
           name: data.name || '',
           description: data.description || '',
@@ -79,6 +82,7 @@ export default function BlockDetail() {
         ...formData,
         idleParticleEffectId: formData.idleParticleEffectId || null,
         dropTable,
+        flammability,
       };
       const res = await fetchWithAuth(`/api/admin/blocks/${block.id}`, {
         method: 'PUT',
@@ -265,6 +269,16 @@ export default function BlockDetail() {
                 <span className="text-[11px] text-slate-400 font-medium">
                   Continuous ambient sparkles/effects emitted from this block in-game (no light)
                 </span>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <FlammabilityPanel
+                  value={flammability}
+                  onChange={setFlammability}
+                  title="Block Flammability"
+                  description="Whether fire can burn this block, how fast it spreads through it, and what is left when it is gone"
+                  particleEffects={particleEffectsList}
+                />
               </div>
 
               <div className="pt-4 border-t border-slate-100">

@@ -63,6 +63,7 @@ export function mobDynamic(mob: MiningActiveMobSession): MiningMobDynamic {
     isMining: mob.isMining,
     miningTarget: mob.miningTarget ?? undefined,
     animationState: mob.animationState,
+    ...(mob.burning ? { burning: true } : {}),
   };
 }
 
@@ -144,6 +145,7 @@ export function playerDynamic(p: MiningPlayerSession): MiningRemotePlayerDynamic
     aimDirection: p.aimDirection,
     flashlightOn: p.flashlightOn,
     animationState: p.animationState,
+    ...(p.burning ? { burning: true } : {}),
   };
 }
 

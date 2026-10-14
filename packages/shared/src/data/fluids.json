@@ -1,0 +1,43 @@
+[
+  {
+    "id": "fluid_oil",
+    "typeKey": "OIL",
+    "name": "Oil",
+    "description": "Thick black crude. Flows slowly, slows anything wading through it, and burns.",
+    "color": "#0b0b0d",
+    "opacity": 0.9,
+    "density": 0.8,
+    "viscosity": 0.6,
+    "flowRate": 0.35,
+    "minLevel": 0.05,
+    "flowThreshold": 0.02,
+    "flammability": {
+      "heat": 3,
+      "burnsInto": null,
+      "flameLight": {
+        "type": "POINT",
+        "color": "#ff7a1c",
+        "effect": "FLICKER",
+        "radius": 3.2,
+        "enabled": true,
+        "intensity": 0.75,
+        "flickerSpeed": 11,
+        "flickerAmount": 0.22
+      },
+      "burnDuration": 8,
+      "spreadChance": 0.5,
+      "flameEffectId": "cmv7d4tg700008ziyh95ovrka",
+      "ignitionChance": 0.8
+    },
+    "generation": {
+      "maxSize": 4,
+      "minSize": 2,
+      "maxDepth": null,
+      "minDepth": 2,
+      "percentage": 1.5
+    },
+    "soundEffects": null,
+    "createdAt": "2026-10-13T22:58:35.715Z",
+    "updatedAt": "2026-10-14T00:23:07.705Z"
+  }
+]

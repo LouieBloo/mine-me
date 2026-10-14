@@ -25,6 +25,7 @@ const EFFECT_FLAGS = [
   'pickPowerModifier',
   'knockbackModifier',
   'explodes',
+  'ignites',
 ] as const;
 
 const parseEffectFlags = (body: Record<string, unknown>) =>

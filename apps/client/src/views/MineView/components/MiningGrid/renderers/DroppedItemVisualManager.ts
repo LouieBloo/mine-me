@@ -4,8 +4,7 @@ import { TILE_SIZE } from './MiningTileRenderer';
 import type { ParticleEngine, EmitterHandle } from '../../../../../components/game/particles/ParticleEngine';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import type { LightSource } from '../../../../../components/game/lighting/LightSource';
-import { PointLight } from '../../../../../components/game/lighting/PointLight';
-import { SpotLight } from '../../../../../components/game/lighting/SpotLight';
+import { createItemLight, parseLightColor } from '../../../../../components/game/lighting/itemLight';
 
 /**
  * Visual effects and lighting coordinator for items dropped on the mine ground.
@@ -75,13 +74,7 @@ export class DroppedItemVisualManager {
    * Parses color input (hex string like "#fbbf24" or number) into a numeric hex value.
    */
   public static parseColor(color?: string | number): number {
-    if (typeof color === 'number') return color;
-    if (typeof color === 'string') {
-      const clean = color.replace('#', '');
-      const parsed = parseInt(clean, 16);
-      if (!isNaN(parsed)) return parsed;
-    }
-    return 0xfbbf24; // Default warm gold
+    return parseLightColor(color);
   }
 
   /**
@@ -160,60 +153,7 @@ export class DroppedItemVisualManager {
 
     if (!lightingEngine) return;
 
-    const hexColor = DroppedItemVisualManager.parseColor(lightConfig.color);
-    const radius = Math.max(0.5, lightConfig.radius ?? 1.8);
-    const intensity = Math.max(0.05, lightConfig.intensity ?? 0.5);
-
-    let createdLight: LightSource;
-
-    if (lightConfig.type === 'SPOT') {
-      const angleDeg = lightConfig.spotAngle ?? 90;
-      const rad = (angleDeg * Math.PI) / 180;
-      const direction = { x: Math.cos(rad), y: Math.sin(rad) };
-      const coneAngle = lightConfig.spotConeAngle ?? 45;
-
-      createdLight = new SpotLight(
-        lightId,
-        { x: lightX, y: lightY },
-        direction,
-        hexColor,
-        intensity,
-        radius,
-        coneAngle
-      );
-    } else {
-      // Default to POINT
-      let options: {
-        flicker?: { speed: number; amount: number };
-        pulse?: { speed: number; minIntensity: number; maxIntensity: number };
-      } | undefined;
-
-      if (lightConfig.effect === 'PULSE') {
-        options = {
-          pulse: {
-            speed: lightConfig.pulseSpeed ?? 2.5,
-            minIntensity: lightConfig.minIntensity ?? Math.max(0.05, intensity * 0.6),
-            maxIntensity: lightConfig.maxIntensity ?? (intensity * 1.3),
-          },
-        };
-      } else if (lightConfig.effect === 'FLICKER') {
-        options = {
-          flicker: {
-            speed: lightConfig.flickerSpeed ?? 12,
-            amount: lightConfig.flickerAmount ?? 0.2,
-          },
-        };
-      }
-
-      createdLight = new PointLight(
-        lightId,
-        { x: lightX, y: lightY },
-        hexColor,
-        intensity,
-        radius,
-        options
-      );
-    }
+    const createdLight: LightSource = createItemLight(lightId, lightConfig, lightX, lightY);
 
     lightingEngine.addLight(createdLight);
     this.activeLights.set(key, createdLight);

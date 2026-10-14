@@ -183,4 +183,34 @@ describe('InventoryService', () => {
       });
     });
   });
+  describe('mapCharacterInventory held particle fields', () => {
+    const inv = (item: Record<string, unknown>) => ({
+      id: 'inv1',
+      quantity: 1,
+      equipped: true,
+      slotIndex: 0,
+      item: { id: 'i1', name: 'Pick', description: '', type: 'GEAR', subType: 'WEAPON', itemEffects: [], ...item },
+    });
+
+    it('passes the held effect and origin to the client', () => {
+      const mapped = InventoryService.mapCharacterInventory({
+        maxInventorySlots: 10,
+        inventory: [inv({ heldParticleEffectId: 'pe_flame', heldParticleOffsetX: 7, heldParticleOffsetY: -9 })],
+      } as any);
+      expect(mapped.items[0].item).toMatchObject({ heldParticleEffectId: 'pe_flame', heldParticleOffsetX: 7, heldParticleOffsetY: -9 });
+    });
+
+    it('passes the held light config to the client', () => {
+      const lamp = { enabled: true, type: 'POINT', effect: 'STATIC', color: '#fff', radius: 2, intensity: 0.5 };
+      const mapped = InventoryService.mapCharacterInventory({ maxInventorySlots: 10, inventory: [inv({ heldLightConfig: lamp })] } as any);
+      expect(mapped.items[0].item.heldLightConfig).toEqual(lamp);
+      const none = InventoryService.mapCharacterInventory({ maxInventorySlots: 10, inventory: [inv({})] } as any);
+      expect(none.items[0].item.heldLightConfig).toBeNull();
+    });
+
+    it('defaults to no effect and a zero origin', () => {
+      const mapped = InventoryService.mapCharacterInventory({ maxInventorySlots: 10, inventory: [inv({})] } as any);
+      expect(mapped.items[0].item).toMatchObject({ heldParticleEffectId: null, heldParticleOffsetX: 0, heldParticleOffsetY: 0 });
+    });
+  });
 });

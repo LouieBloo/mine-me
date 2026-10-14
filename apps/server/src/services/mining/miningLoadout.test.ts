@@ -30,6 +30,31 @@ describe('buildMiningLoadout', () => {
     expect(l.gearLayers[0]).toMatchObject({ shootsProjectiles: true, muzzleOffsetX: 5 });
   });
 
+  it('sends the held particle effect and its origin with the gear layer, so other players see it too', () => {
+    const l = build({
+      inventory: [
+        gear('flame', 'WEAPON', {
+          gearImageUrl: '/flame.png',
+          heldParticleEffectId: 'pe_flame',
+          heldParticleOffsetX: 12,
+          heldParticleOffsetY: -30,
+        }),
+      ],
+    });
+    expect(l.gearLayers[0]).toMatchObject({ heldParticleEffectId: 'pe_flame', heldParticleOffsetX: 12, heldParticleOffsetY: -30 });
+  });
+
+  it('sends the held light with the gear layer, so other players light up too', () => {
+    const lamp = { enabled: true, type: 'POINT', effect: 'STATIC', color: '#ff8a2a', radius: 3, intensity: 0.6, offsetX: 4, offsetY: 5 };
+    const l = build({ inventory: [gear('flame', 'WEAPON', { gearImageUrl: '/flame.png', heldLightConfig: lamp })] });
+    expect(l.gearLayers[0].heldLightConfig).toEqual(lamp);
+  });
+
+  it('defaults to no held effect and a zero origin', () => {
+    const l = build({ inventory: [gear('pick', 'WEAPON', { gearImageUrl: '/pick.png' })] });
+    expect(l.gearLayers[0]).toMatchObject({ heldParticleEffectId: null, heldParticleOffsetX: 0, heldParticleOffsetY: 0, heldLightConfig: null });
+  });
+
   it('returns null weapon and no layers when nothing is equipped', () => {
     const l = build({ inventory: [{ ...gear('gun', 'WEAPON'), equipped: false }] });
     expect(l.equippedWeaponId).toBeNull();

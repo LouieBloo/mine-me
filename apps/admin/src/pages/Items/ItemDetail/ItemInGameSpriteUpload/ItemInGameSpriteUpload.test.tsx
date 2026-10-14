@@ -29,7 +29,7 @@ describe('ItemInGameSpriteUpload Component', () => {
 
     expect(screen.getByRole('heading', { name: /In-Game Sprite/i })).toBeInTheDocument();
     expect(screen.getByText(/Upload In-Game Sprite/i)).toBeInTheDocument();
-    expect(screen.getByText(/Select PNG \(Max 256x256\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Select PNG \(square\)/i)).toBeInTheDocument();
   });
 
   it('renders sprite preview and update button when inGameSpriteUrl is present', () => {

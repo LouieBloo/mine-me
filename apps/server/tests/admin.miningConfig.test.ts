@@ -134,6 +134,22 @@ describe('Admin Mining Config API Routes', () => {
     }
   });
 
+  it('PUT /admin/mining-config saves the fire settings', async () => {
+    const res = await request(app)
+      .put('/admin/mining-config')
+      .send({ burnDamagePerSecond: 9, burnSeconds: 3.5, heatRadius: 4, heatDamagePerSecond: 2.5 });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ burnDamagePerSecond: 9, burnSeconds: 3.5, heatRadius: 4, heatDamagePerSecond: 2.5 });
+  });
+
+  it('PUT /admin/mining-config rejects invalid fire settings', async () => {
+    for (const bad of [{ burnDamagePerSecond: -1 }, { burnSeconds: 500 }, { heatRadius: -2 }, { heatRadius: 99 }, { heatDamagePerSecond: -0.1 }]) {
+      const res = await request(app).put('/admin/mining-config').send(bad);
+      expect(res.status).toBe(400);
+    }
+  });
+
   it('PUT /admin/mining-config updates and saves mob spawning parameters', async () => {
     const res = await request(app)
       .put('/admin/mining-config')

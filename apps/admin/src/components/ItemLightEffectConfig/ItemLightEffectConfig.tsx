@@ -5,6 +5,9 @@ import './ItemLightEffectConfig.css';
 interface ItemLightEffectConfigProps {
   lightConfig?: ItemLightConfig | null;
   onChange: (config: ItemLightConfig | null) => void;
+  /** Heading and blurb; default to the dropped-item wording. */
+  title?: string;
+  description?: string;
 }
 
 const DEFAULT_CONFIG: ItemLightConfig = {
@@ -36,6 +39,8 @@ const COLOR_PRESETS = [
 export const ItemLightEffectConfig: React.FC<ItemLightEffectConfigProps> = ({
   lightConfig,
   onChange,
+  title = 'In-Game Light Effect',
+  description = 'Dynamically illuminates cavern darkness when dropped on the mine floor',
 }) => {
   const isEnabled = Boolean(lightConfig?.enabled);
   const current: ItemLightConfig = { ...DEFAULT_CONFIG, ...(lightConfig || {}) };
@@ -63,10 +68,8 @@ export const ItemLightEffectConfig: React.FC<ItemLightEffectConfigProps> = ({
             💡
           </div>
           <div>
-            <h4 className="font-black text-base tracking-wide text-amber-400">In-Game Light Effect</h4>
-            <p className="text-xs text-slate-400">
-              Dynamically illuminates cavern darkness when dropped on the mine floor
-            </p>
+            <h4 className="font-black text-base tracking-wide text-amber-400">{title}</h4>
+            <p className="text-xs text-slate-400">{description}</p>
           </div>
         </div>
 

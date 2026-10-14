@@ -1,9 +1,9 @@
 import type { PrismaClient } from '@prisma/client';
-import { normalizeMobSoundRefs, MOB_SOUND_SLOTS, normalizeCharacterSoundRefs, CHARACTER_SOUND_SLOTS } from '@mine-me/shared';
+import { normalizeMobSoundRefs, MOB_SOUND_SLOTS, normalizeCharacterSoundRefs, CHARACTER_SOUND_SLOTS, normalizeFluidSoundRefs, FLUID_SOUND_SLOTS } from '@mine-me/shared';
 
 import { CHARACTER_SOUND_CONFIG_ID } from './characterSounds.service';
 
-type UsageDb = Pick<PrismaClient, 'mob' | 'item' | 'miningBlock'> & Partial<Pick<PrismaClient, 'characterSoundConfig'>>;
+type UsageDb = Pick<PrismaClient, 'mob' | 'item' | 'miningBlock'> & Partial<Pick<PrismaClient, 'characterSoundConfig' | 'fluid'>>;
 
 /** What plays a sound: a short label such as `Mob: Mole Person (death)`. */
 export type SoundUsage = string;
@@ -20,11 +20,12 @@ const addTo = (index: Map<string, SoundUsage[]>, key: string | null | undefined,
  * file url, so those are keyed by url. Returns two lookups so callers can ask by either.
  */
 export async function buildSoundUsageIndex(db: UsageDb): Promise<{ byId: Map<string, SoundUsage[]>; byUrl: Map<string, SoundUsage[]> }> {
-  const [mobs, items, blocks, characterConfig] = await Promise.all([
+  const [mobs, items, blocks, characterConfig, fluids] = await Promise.all([
     db.mob.findMany({ select: { name: true, soundEffects: true } }),
     db.item.findMany({ select: { name: true, soundEffectUrl: true, soundEffects: true } }),
     db.miningBlock.findMany({ select: { name: true, soundEffectUrl: true } }),
     db.characterSoundConfig?.findUnique({ where: { id: CHARACTER_SOUND_CONFIG_ID } }) ?? null,
+    db.fluid?.findMany({ select: { name: true, soundEffects: true } }) ?? [],
   ]);
 
   const byId = new Map<string, SoundUsage[]>();
@@ -33,6 +34,10 @@ export async function buildSoundUsageIndex(db: UsageDb): Promise<{ byId: Map<str
   for (const mob of mobs) {
     const refs = normalizeMobSoundRefs(mob.soundEffects);
     for (const def of MOB_SOUND_SLOTS) addTo(byId, refs[def.slotKey]?.soundId, `Mob: ${mob.name} (${def.slotKey})`);
+  }
+  for (const fluid of fluids) {
+    const refs = normalizeFluidSoundRefs(fluid.soundEffects);
+    for (const def of FLUID_SOUND_SLOTS) addTo(byId, refs[def.slotKey]?.soundId, `Fluid: ${fluid.name} (${def.slotKey})`);
   }
   const characterRefs = normalizeCharacterSoundRefs(characterConfig?.soundEffects);
   for (const def of CHARACTER_SOUND_SLOTS) addTo(byId, characterRefs[def.slotKey]?.soundId, `Character (${def.slotKey})`);

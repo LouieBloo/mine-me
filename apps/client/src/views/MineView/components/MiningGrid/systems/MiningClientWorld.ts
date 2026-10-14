@@ -20,6 +20,11 @@ import type { EmitterHandle, ParticleEngine } from '../../../../../components/ga
 import type { MiningMouseController } from '../input/MiningMouseController';
 import type { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
 import type { MiningMobRenderer } from '../renderers/MiningMobRenderer';
+import type { FireField } from '@mine-me/shared';
+import type { FluidRenderer } from '../renderers/FluidRenderer';
+import type { FireRenderer } from '../renderers/FireRenderer';
+import type { BurningBodies } from '../renderers/BurningBodies';
+import type { FluidSounds } from '../renderers/FluidSounds';
 import type { ActiveFallingRock } from '../renderers/MiningEntityRenderer';
 import type { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
 import type { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
@@ -68,6 +73,16 @@ export interface MiningSceneRefs {
   cameraRef: NullableRef<Camera2D>;
   gridContainerRef: NullableRef<Container>;
   tilesContainerRef: NullableRef<Container>;
+  /** Draws the fluid the server has revealed (and holds the client's copy of the fluid grid). */
+  fluidRendererRef: NullableRef<FluidRenderer>;
+  /** Which visible cells are on fire, as the server last said (ticket 061 draws it). */
+  fireFieldRef: NullableRef<FireField>;
+  /** Flames and lights on the burning cells. */
+  fireRendererRef: NullableRef<FireRenderer>;
+  /** The effect on burning players and mobs. */
+  burningBodiesRef: NullableRef<BurningBodies>;
+  /** Splashes, fire catching and the crackle loops. */
+  fluidSoundsRef: NullableRef<FluidSounds>;
   fallingRocksContainerRef: NullableRef<Container>;
   droppedItemsContainerRef: NullableRef<Container>;
   dynamitesContainerRef: NullableRef<Container>;

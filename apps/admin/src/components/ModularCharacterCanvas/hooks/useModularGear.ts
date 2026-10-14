@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Assets, Sprite, Texture, Graphics, type Container } from 'pixi.js';
-import { MODULAR_GEAR_SLOTS, type GearSubType } from '@mine-me/shared';
+import { MODULAR_GEAR_SLOTS, type GearSubType, type ParticleEffectConfig } from '@mine-me/shared';
 import type { CharacterJointNodes } from '../animation/ModularAnimationEngine';
 
 export interface ModularGearItem {
@@ -12,6 +12,60 @@ export interface ModularGearItem {
   muzzleOffsetX?: number;
   muzzleOffsetY?: number;
   shootsProjectiles?: boolean;
+  /** Effect the held item emits and where (weapon-sprite local space); drawn as a marker and emitted live in the preview. */
+  heldParticle?: HeldParticlePreview | null;
+  /** Origin of the light the held item gives off; drawn as a marker (the admin has no lighting). */
+  heldLight?: HeldLightPreview | null;
+}
+
+export interface HeldParticlePreview {
+  config: ParticleEffectConfig;
+  offsetX: number;
+  offsetY: number;
+}
+
+export const PARTICLE_MARKER_LABEL = 'particle_marker';
+export const LIGHT_MARKER_LABEL = 'light_marker';
+
+export interface HeldLightPreview {
+  offsetX: number;
+  offsetY: number;
+}
+
+/** Shows (or hides) a crosshair marker on the weapon sprite at the given origin. */
+function syncOriginMarker(sprite: Sprite, label: string, color: number, origin: { offsetX: number; offsetY: number } | null | undefined): void {
+  let marker = sprite.getChildByLabel(label) as Graphics | null;
+  if (!origin) {
+    if (marker) marker.visible = false;
+    return;
+  }
+  if (!marker) {
+    marker = new Graphics();
+    marker.label = label;
+    marker.circle(0, 0, 9);
+    marker.stroke({ color, width: 2, alpha: 0.95 });
+    marker.circle(0, 0, 3);
+    marker.fill({ color: 0xffffff });
+    marker.moveTo(-16, 0);
+    marker.lineTo(16, 0);
+    marker.moveTo(0, -16);
+    marker.lineTo(0, 16);
+    marker.stroke({ color, width: 1.5, alpha: 0.9 });
+    sprite.addChild(marker);
+  }
+  marker.visible = true;
+  marker.x = origin.offsetX;
+  marker.y = origin.offsetY;
+}
+
+/** Amber marker for the held particle origin. */
+export function syncParticleMarker(sprite: Sprite, heldParticle: HeldParticlePreview | null | undefined): void {
+  syncOriginMarker(sprite, PARTICLE_MARKER_LABEL, 0xf59e0b, heldParticle);
+}
+
+/** Blue marker for the held light origin. */
+export function syncLightMarker(sprite: Sprite, heldLight: HeldLightPreview | null | undefined): void {
+  syncOriginMarker(sprite, LIGHT_MARKER_LABEL, 0x38bdf8, heldLight);
 }
 
 export interface UseModularGearOptions {
@@ -79,6 +133,8 @@ export function useModularGear({ nodesRef, selectedGear, isSceneReady }: UseModu
       } else if (marker) {
         marker.visible = false;
       }
+      syncParticleMarker(s, weaponGear.heldParticle);
+      syncLightMarker(s, weaponGear.heldLight);
       return;
     }
 
@@ -133,6 +189,8 @@ export function useModularGear({ nodesRef, selectedGear, isSceneReady }: UseModu
               muzzleGfx.y = gear.muzzleOffsetY ?? 0;
               sprite.addChild(muzzleGfx);
             }
+            syncParticleMarker(sprite, gear.heldParticle);
+            syncLightMarker(sprite, gear.heldLight);
           }
 
           const slotNodeName = MODULAR_GEAR_SLOTS[gear.subType] || 'torso';

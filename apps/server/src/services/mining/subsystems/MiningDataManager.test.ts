@@ -83,3 +83,31 @@ describe('MiningDataManager (in-memory definitions)', () => {
     });
   });
 });
+
+describe('MiningDataManager fluids', () => {
+  const oil = { id: 'fluid-1', typeKey: 'OIL', name: 'Oil' };
+  const water = { id: 'fluid-2', typeKey: 'WATER', name: 'Water' };
+  const make = (fluids?: object[]) => new MiningDataManager({ ...partialDefinitions({}), fluids } as unknown as GameDefinitions);
+
+  it('finds a fluid by typeKey or by id', () => {
+    const dm = make([oil, water]);
+    expect(dm.getFluid('OIL')?.name).toBe('Oil');
+    expect(dm.getFluid('fluid-2')?.name).toBe('Water');
+    expect(dm.getFluid('LAVA')).toBeUndefined();
+    expect(dm.getFluid(5 as unknown as string)).toBeUndefined();
+  });
+
+  it('lists fluids in load order', () => {
+    expect(make([oil, water]).getFluids().map((f) => f.typeKey)).toEqual(['OIL', 'WATER']);
+  });
+
+  it('keeps the first of a duplicated typeKey and skips rows without one', () => {
+    const dm = make([oil, { ...water, typeKey: 'OIL' }, { id: 'x', name: 'Nameless' }]);
+    expect(dm.getFluids()).toHaveLength(1);
+    expect(dm.getFluid('OIL')?.id).toBe('fluid-1');
+  });
+
+  it('has no fluids when the definitions do not say', () => {
+    expect(make(undefined).getFluids()).toEqual([]);
+  });
+});

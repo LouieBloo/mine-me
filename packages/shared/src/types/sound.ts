@@ -1,9 +1,9 @@
 export type SoundType = 'BGM' | 'SFX';
 
 /** Where a library sound is used. Music is `type: 'BGM'`; sound effects are grouped by what plays them. */
-export type SoundCategory = 'GENERAL' | 'ITEM' | 'BLOCK' | 'MOB' | 'CHARACTER';
+export type SoundCategory = 'GENERAL' | 'ITEM' | 'BLOCK' | 'MOB' | 'CHARACTER' | 'FLUID';
 
-export const SOUND_CATEGORIES: readonly SoundCategory[] = ['GENERAL', 'ITEM', 'BLOCK', 'MOB', 'CHARACTER'];
+export const SOUND_CATEGORIES: readonly SoundCategory[] = ['GENERAL', 'ITEM', 'BLOCK', 'MOB', 'CHARACTER', 'FLUID'];
 
 export interface SoundTrack {
   id: string;
@@ -97,6 +97,26 @@ export interface CharacterSoundSlotResolved extends SoundEffectSlotConfig {
 
 export type CharacterSoundEffectsConfig = Partial<Record<CharacterSoundSlot, CharacterSoundSlotResolved>>;
 
+export type FluidSoundSlot = 'enter' | 'exit' | 'ignite' | 'burn';
+
+/** What the admin stores for one fluid slot: a library sound by id (the url is resolved at load). */
+export interface FluidSoundSlotRef {
+  soundId?: string | null;
+  loop?: boolean;
+  /** Volume of this sound on this fluid, 0 to 1 (1 when absent). */
+  volume?: number;
+}
+
+export type FluidSoundSlotRefs = Partial<Record<FluidSoundSlot, FluidSoundSlotRef>>;
+
+/** A fluid slot after its library sound has been resolved to something the client can play. */
+export interface FluidSoundSlotResolved extends SoundEffectSlotConfig {
+  soundId?: string | null;
+  volume?: number;
+}
+
+export type FluidSoundEffectsConfig = Partial<Record<FluidSoundSlot, FluidSoundSlotResolved>>;
+
 export type AudioFalloffModel = 'linear' | 'quadratic' | 'smoothstep' | 'exponential';
 
 export interface SpatialAudioConfig {
@@ -132,6 +152,27 @@ export const DEFAULT_SPATIAL_AUDIO_CONFIG: Required<SpatialAudioConfig> = {
 };
 
 export const MINING_SPATIAL_AUDIO_PRESETS = {
+  FLUID_SPLASH: {
+    maxDistance: 18,
+    minDistance: 2,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 12,
+    enablePanning: true,
+  },
+  FIRE_IGNITE: {
+    maxDistance: 16,
+    minDistance: 2,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 12,
+    enablePanning: true,
+  },
+  FIRE_CRACKLE: {
+    maxDistance: 12,
+    minDistance: 1.5,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 10,
+    enablePanning: true,
+  },
   BLOCK_MINING: {
     maxDistance: 16,
     minDistance: 2,

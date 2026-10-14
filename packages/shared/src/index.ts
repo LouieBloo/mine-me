@@ -34,3 +34,12 @@ export * from './utils/pixiParticlesConverter';
 export * from './sound';
 
 export * from './utils/miningInputValidation';
+export * from './gameLogic/fluid/FluidRegistry';
+export * from './gameLogic/fluid/FluidGrid';
+export * from './gameLogic/fluid/fluidWire';
+export * from './gameLogic/fluid/fluidLayout';
+export * from './gameLogic/fluid/fluidSubmersion';
+export * from './physics/fluidForces';
+export * from './gameLogic/fire/FireGrid';
+export * from './gameLogic/fire/fireWire';
+export * from './gameLogic/fire/heat';

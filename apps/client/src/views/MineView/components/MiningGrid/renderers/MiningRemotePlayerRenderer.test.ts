@@ -16,6 +16,12 @@ vi.mock('../../../../../components/game/sprites', () => {
     setAimAngle = vi.fn();
     update = vi.fn();
     destroy = vi.fn();
+    heldParticle: { effectId: string; offset: { x: number; y: number } } | null = null;
+    getHeldParticle = vi.fn(() => this.heldParticle);
+    getHeldParticleWorldPosition = vi.fn(() => (this.heldParticle ? { x: 7, y: 9 } : null));
+    heldLight: any = null;
+    getHeldLight = vi.fn(() => this.heldLight);
+    getHeldLightWorldPosition = vi.fn(() => (this.heldLight ? { x: 64, y: 32 } : null));
     static REFERENCE_HEIGHT = 500;
   }
   return {
@@ -253,5 +259,108 @@ describe('MiningRemotePlayerRenderer', () => {
     renderer.destroy();
     expect(renderer.getPlayerCount()).toBe(0);
     expect(mockLightingEngine.removeLight).toHaveBeenCalledWith('remote_flashlight_char-1');
+  });
+
+  describe('held item particles', () => {
+    const alice = {
+      characterId: 'char-1',
+      characterName: 'Miner Alice',
+      position: { x: 10, y: 5 },
+      velocity: { x: 0, y: 0 },
+      isMining: false,
+      isFacingLeft: false,
+      animationState: 'idle',
+    } as MiningRemotePlayer;
+
+    const makeEngine = () => {
+      const emitter = { setPosition: vi.fn(), destroy: vi.fn() };
+      return { engine: { addEmitter: vi.fn(() => emitter) } as any, emitter };
+    };
+    const config = { emitterType: 'continuous', rate: 20 } as any;
+
+    it('emits the effect of the item another player holds, at the item position', () => {
+      const { engine } = makeEngine();
+      renderer.setParticleEngine(engine, (id) => (id === 'pe_flame' ? config : null));
+      renderer.updatePlayers([alice]);
+      const instance = renderer.getPlayer('char-1')!;
+      instance.isLoaded = true;
+      (instance.sprite as any).heldParticle = { effectId: 'pe_flame', offset: { x: 1, y: 2 } };
+
+      renderer.tick(0.016);
+
+      expect(engine.addEmitter).toHaveBeenCalledWith(config, { x: 7, y: 9 });
+    });
+
+    it('emits nothing when the held item has no effect', () => {
+      const { engine } = makeEngine();
+      renderer.setParticleEngine(engine, () => config);
+      renderer.updatePlayers([alice]);
+      renderer.getPlayer('char-1')!.isLoaded = true;
+
+      renderer.tick(0.016);
+
+      expect(engine.addEmitter).not.toHaveBeenCalled();
+    });
+
+    it('stops the effect when the player leaves and on destroy', () => {
+      const { engine, emitter } = makeEngine();
+      renderer.setParticleEngine(engine, () => config);
+      renderer.updatePlayers([alice]);
+      const instance = renderer.getPlayer('char-1')!;
+      instance.isLoaded = true;
+      (instance.sprite as any).heldParticle = { effectId: 'pe_flame', offset: { x: 0, y: 0 } };
+      renderer.tick(0.016);
+
+      renderer.updatePlayers([{ ...alice, characterId: 'char-2' }]);
+      expect(emitter.destroy).toHaveBeenCalledTimes(1);
+
+      const second = renderer.getPlayer('char-2')!;
+      second.isLoaded = true;
+      (second.sprite as any).heldParticle = { effectId: 'pe_flame', offset: { x: 0, y: 0 } };
+      renderer.tick(0.016);
+      renderer.destroy();
+      expect(emitter.destroy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('held item light', () => {
+    const alice = {
+      characterId: 'char-1',
+      characterName: 'Miner Alice',
+      position: { x: 10, y: 5 },
+      velocity: { x: 0, y: 0 },
+      isMining: false,
+      isFacingLeft: false,
+      animationState: 'idle',
+    } as MiningRemotePlayer;
+    const lightCfg = { enabled: true, type: 'POINT', effect: 'STATIC', color: '#ff8a2a', radius: 3, intensity: 0.6 };
+    const makeLighting = () => ({ addLight: vi.fn(), removeLight: vi.fn() }) as any;
+
+    it('lights up around another player holding a lit item, and removes it when they leave', () => {
+      const lighting = makeLighting();
+      renderer.setLightingEngine(lighting);
+      renderer.updatePlayers([alice]);
+      const instance = renderer.getPlayer('char-1')!;
+      instance.isLoaded = true;
+      (instance.sprite as any).heldLight = lightCfg;
+      lighting.addLight.mockClear();
+
+      renderer.tick(0.016);
+      const held = lighting.addLight.mock.calls.map((c: any) => c[0]).find((l: any) => l.id === 'held_item_light_char-1');
+      expect(held).toBeDefined();
+
+      renderer.updatePlayers([{ ...alice, characterId: 'char-2' }]);
+      expect(lighting.removeLight).toHaveBeenCalledWith('held_item_light_char-1');
+    });
+
+    it('adds no light for an item without one', () => {
+      const lighting = makeLighting();
+      renderer.setLightingEngine(lighting);
+      renderer.updatePlayers([alice]);
+      renderer.getPlayer('char-1')!.isLoaded = true;
+      lighting.addLight.mockClear();
+      renderer.tick(0.016);
+      expect(lighting.addLight.mock.calls.some((c: any) => String(c[0].id).startsWith('held_item_light'))).toBe(false);
+    });
   });
 });

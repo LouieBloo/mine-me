@@ -84,6 +84,10 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
         getScale: vi.fn(() => 0.5),
         getShoulderOffset: vi.fn(() => ({ x: -131, y: -68 })),
         update: vi.fn(),
+        getHeldParticle: vi.fn(() => null),
+        getHeldParticleWorldPosition: vi.fn(() => null),
+        getHeldLight: vi.fn(() => null),
+        getHeldLightWorldPosition: vi.fn(() => null),
       },
     };
     activeFallingRocksRef = { current: [] };
@@ -365,6 +369,10 @@ describe('useMiningTicker - Torch Preview Lighting', () => {
         getScale: vi.fn(() => 0.5),
         getShoulderOffset: vi.fn(() => ({ x: -131, y: -68 })),
         update: vi.fn(),
+        getHeldParticle: vi.fn(() => null),
+        getHeldParticleWorldPosition: vi.fn(() => null),
+        getHeldLight: vi.fn(() => null),
+        getHeldLightWorldPosition: vi.fn(() => null),
       },
     };
     activeFallingRocksRef = { current: [] };
@@ -440,6 +448,19 @@ describe('useMiningTicker - Torch Preview Lighting', () => {
       })
     );
   };
+
+  it('lights the cavern from the item the player holds, and removes the light on unmount', () => {
+    playerSpriteRef.current.getHeldLight = vi.fn(() => ({ enabled: true, type: 'POINT', effect: 'STATIC', color: '#ff8a2a', radius: 3, intensity: 0.6 }));
+    playerSpriteRef.current.getHeldLightWorldPosition = vi.fn(() => ({ x: 64, y: 96 }));
+    const { unmount } = renderTickerHook() as any;
+
+    tickerCallbacks[0]();
+
+    const ids = mockLightingEngine.addLight.mock.calls.map((c: any) => c[0].id);
+    expect(ids).toContain('held_item_light_local');
+    unmount?.();
+    expect(mockLightingEngine.removeLight).toHaveBeenCalledWith('held_item_light_local');
+  });
 
   it('adds normal torch point light to LightingEngine when in torch preview mode', () => {
     renderTickerHook();

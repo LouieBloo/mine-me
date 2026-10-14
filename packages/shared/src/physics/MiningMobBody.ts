@@ -89,8 +89,12 @@ export class MiningMobBody extends MiningPhysicsBody {
       this.isFacingLeft = false;
     }
 
+    // Wading through fluid slows the mob like the player (jumps lose less: height goes with speed squared)
+    const fluid = this.updateFluidContact();
+    const jumpFactor = Math.sqrt(fluid);
+
     // Set horizontal velocity
-    this.velocity.x = Math.sign(moveX) * this.moveSpeed;
+    this.velocity.x = Math.sign(moveX) * this.moveSpeed * fluid;
 
     // Check ladders
     if (grid) {
@@ -100,15 +104,15 @@ export class MiningMobBody extends MiningPhysicsBody {
     if (this.isOnLadder) {
       if (jump) {
         // Leap off ladder
-        this.velocity.y = -this.jumpForce;
+        this.velocity.y = -this.jumpForce * jumpFactor;
         this.isGrounded = false;
         this.hasGravity = true;
       } else if (climbUp) {
-        this.velocity.y = -this.climbSpeed;
+        this.velocity.y = -this.climbSpeed * fluid;
         this.isGrounded = false;
         this.hasGravity = false;
       } else if (climbDown) {
-        this.velocity.y = this.climbSpeed;
+        this.velocity.y = this.climbSpeed * fluid;
         this.hasGravity = false;
       } else {
         // Hold grip
@@ -120,7 +124,7 @@ export class MiningMobBody extends MiningPhysicsBody {
 
       // Jump if grounded
       if (jump && this.isGrounded) {
-        this.velocity.y = -this.jumpForce;
+        this.velocity.y = -this.jumpForce * jumpFactor;
         this.isGrounded = false;
       }
     }

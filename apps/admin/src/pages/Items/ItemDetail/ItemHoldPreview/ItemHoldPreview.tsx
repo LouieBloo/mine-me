@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { getAssetUrl } from '@mine-me/shared';
+import { getAssetUrl, type ParticleEffectConfig, type HeldLightConfig } from '@mine-me/shared';
+import OriginOffsetCard from './OriginOffsetCard/OriginOffsetCard';
 import ModularCharacterCanvas from '../../../../components/ModularCharacterCanvas/ModularCharacterCanvas';
 import type { CharacterAnimationState } from '../../../../components/ModularCharacterCanvas/ModularCharacterCanvas';
 import './ItemHoldPreview.css';
@@ -20,18 +21,31 @@ export interface ItemHoldPreviewProps {
     holdRotation?: number;
     muzzleOffsetX?: number;
     muzzleOffsetY?: number;
+    heldParticleEffectId?: string | null;
+    heldParticleOffsetX?: number;
+    heldParticleOffsetY?: number;
+    heldLightConfig?: HeldLightConfig | null;
   };
+  /** Config of the item's held particle effect (looked up by the page); played live from the origin marker. */
+  heldParticleConfig?: ParticleEffectConfig | null;
+  /** Display name of the held particle effect. */
+  heldParticleName?: string;
   onChange: (fields: {
     holdOffsetX?: number;
     holdOffsetY?: number;
     holdRotation?: number;
     muzzleOffsetX?: number;
     muzzleOffsetY?: number;
+    heldParticleOffsetX?: number;
+    heldParticleOffsetY?: number;
+    heldLightConfig?: HeldLightConfig;
   }) => void;
 }
 
 export const ItemHoldPreview: React.FC<ItemHoldPreviewProps> = ({
   item,
+  heldParticleConfig = null,
+  heldParticleName,
   onChange,
 }) => {
   const [aimAngleDeg, setAimAngleDeg] = useState<number>(0);
@@ -46,6 +60,12 @@ export const ItemHoldPreview: React.FC<ItemHoldPreviewProps> = ({
   const muzzleOffsetX = typeof item.muzzleOffsetX === 'number' ? item.muzzleOffsetX : 0;
   const muzzleOffsetY = typeof item.muzzleOffsetY === 'number' ? item.muzzleOffsetY : 0;
   const shootsProjectiles = Boolean(item.shootsProjectiles);
+  const hasHeldParticle = Boolean(item.heldParticleEffectId);
+  const particleOffsetX = typeof item.heldParticleOffsetX === 'number' ? item.heldParticleOffsetX : 0;
+  const particleOffsetY = typeof item.heldParticleOffsetY === 'number' ? item.heldParticleOffsetY : 0;
+  const hasHeldLight = Boolean(item.heldLightConfig?.enabled);
+  const lightOffsetX = item.heldLightConfig?.offsetX ?? 0;
+  const lightOffsetY = item.heldLightConfig?.offsetY ?? 0;
 
   const previewSpriteUrl = item.gearImageUrl || item.inGameSpriteUrl || item.iconUrl;
   const fullSpriteUrl = previewSpriteUrl ? getAssetUrl(previewSpriteUrl) : null;
@@ -63,9 +83,29 @@ export const ItemHoldPreview: React.FC<ItemHoldPreviewProps> = ({
         muzzleOffsetX,
         muzzleOffsetY,
         shootsProjectiles,
+        heldParticle:
+          hasHeldParticle && heldParticleConfig
+            ? { config: heldParticleConfig, offsetX: particleOffsetX, offsetY: particleOffsetY }
+            : null,
+        heldLight: hasHeldLight ? { offsetX: lightOffsetX, offsetY: lightOffsetY } : null,
       },
     ];
-  }, [fullSpriteUrl, holdOffsetX, holdOffsetY, holdRotation, muzzleOffsetX, muzzleOffsetY, shootsProjectiles]);
+  }, [
+    fullSpriteUrl,
+    holdOffsetX,
+    holdOffsetY,
+    holdRotation,
+    muzzleOffsetX,
+    muzzleOffsetY,
+    shootsProjectiles,
+    hasHeldParticle,
+    heldParticleConfig,
+    particleOffsetX,
+    particleOffsetY,
+    hasHeldLight,
+    lightOffsetX,
+    lightOffsetY,
+  ]);
 
   // Convert aim angle from degrees to radians for Pixi character arm rotation
   const aimAngleRad = (aimAngleDeg * Math.PI) / 180;
@@ -85,6 +125,17 @@ export const ItemHoldPreview: React.FC<ItemHoldPreviewProps> = ({
     });
   };
 
+  const handleResetParticleOffsets = () => {
+    onChange({
+      heldParticleOffsetX: 0,
+      heldParticleOffsetY: 0,
+    });
+  };
+
+  const handleResetLightOffsets = () => {
+    if (item.heldLightConfig) onChange({ heldLightConfig: { ...item.heldLightConfig, offsetX: 0, offsetY: 0 } });
+  };
+
   const handleResetAll = () => {
     onChange({
       holdOffsetX: 0,
@@ -92,6 +143,8 @@ export const ItemHoldPreview: React.FC<ItemHoldPreviewProps> = ({
       holdRotation: 0,
       muzzleOffsetX: 0,
       muzzleOffsetY: 0,
+      ...(hasHeldParticle ? { heldParticleOffsetX: 0, heldParticleOffsetY: 0 } : {}),
+      ...(item.heldLightConfig ? { heldLightConfig: { ...item.heldLightConfig, offsetX: 0, offsetY: 0 } } : {}),
     });
     setAimAngleDeg(0);
   };
@@ -413,6 +466,49 @@ export const ItemHoldPreview: React.FC<ItemHoldPreviewProps> = ({
                 </div>
               </div>
             </div>
+
+
+            {/* Held effect origins (only shown when the item has that effect) */}
+            {hasHeldParticle && (
+              <OriginOffsetCard
+                testId="held-particle-card"
+                name="Particle"
+                theme="amber"
+                title="Held Particle Effect Origin"
+                description={`Where ${heldParticleName ? `"${heldParticleName}"` : 'the effect'} is emitted on the sprite (amber marker). It follows the swing and aim.`}
+                x={particleOffsetX}
+                y={particleOffsetY}
+                onChange={({ x, y }) =>
+                  onChange({
+                    ...(x !== undefined ? { heldParticleOffsetX: x } : {}),
+                    ...(y !== undefined ? { heldParticleOffsetY: y } : {}),
+                  })
+                }
+                onReset={handleResetParticleOffsets}
+              />
+            )}
+
+            {hasHeldLight && (
+              <OriginOffsetCard
+                testId="held-light-card"
+                name="Light"
+                theme="sky"
+                title="Held Light Origin"
+                description="Where the light sits on the sprite (blue marker). It follows the swing and aim and lights up the cavern around the holder."
+                x={lightOffsetX}
+                y={lightOffsetY}
+                onChange={({ x, y }) =>
+                  onChange({
+                    heldLightConfig: {
+                      ...(item.heldLightConfig as HeldLightConfig),
+                      ...(x !== undefined ? { offsetX: x } : {}),
+                      ...(y !== undefined ? { offsetY: y } : {}),
+                    },
+                  })
+                }
+                onReset={handleResetLightOffsets}
+              />
+            )}
 
             {/* Projectile Launch Muzzle Config (Only shown when shootsProjectiles is true) */}
             {shootsProjectiles && (

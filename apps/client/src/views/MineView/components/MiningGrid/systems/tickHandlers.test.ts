@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MiningTileType, DEFAULT_PARTICLE_EFFECTS, type MiningStateTickPayload } from '@mine-me/shared';
+import { MiningTileType, DEFAULT_PARTICLE_EFFECTS, FireField, type MiningStateTickPayload } from '@mine-me/shared';
 import {
   applyEffects,
   applyEntities,
+  applyBurning,
+  applyFluidSounds,
+  applyFireUpdates,
+  applyFluidUpdates,
   applySelfState,
   applySessionData,
   applyTileUpdates,
@@ -46,6 +50,10 @@ function makeWorld(overrides: Record<string, unknown> = {}): any {
     weaponSoundVolumeRef: ref(1),
     lastWeaponSoundTimeRef: ref(0),
     tilesContainerRef: ref({}),
+    fluidRendererRef: ref(null),
+    fireFieldRef: ref(null),
+    burningBodiesRef: ref(null),
+    fluidSoundsRef: ref(null),
     droppedItemsContainerRef: ref({}),
     droppedSpritesMap: ref(new Map()),
     blockTexturesRef: ref(new Map()),
@@ -386,5 +394,170 @@ describe('handleStateTick', () => {
     expect(order).toEqual(['explosion', 'tiles']);
     // the blast also kept the broken block from getting its own crumble
     expect(world.particleEngineRef.current.spawnBurst).not.toHaveBeenCalled();
+  });
+});
+
+describe('applyFluidUpdates', () => {
+  const makeRenderer = () => ({ apply: vi.fn(), render: vi.fn() });
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+
+  it('does nothing before the fluid renderer exists', () => {
+    expect(() => applyFluidUpdates(tick({ fluidCells: [[1, 1, 1, 64]] }), makeCtx(makeWorld()))).not.toThrow();
+  });
+
+  it('applies the tick\'s changed cells and redraws', () => {
+    const renderer = makeRenderer();
+    applyFluidUpdates(tick({ fluidCells: [[1, 2, 1, 64], [3, 4, 0, 0]] }), makeCtx(makeWorld({ fluidRendererRef: ref(renderer) })));
+    expect(renderer.apply).toHaveBeenCalledWith([[1, 2, 1, 64], [3, 4, 0, 0]]);
+    expect(renderer.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes the fluid in newly revealed tiles first, then the tick\'s changes (so a later change wins)', () => {
+    const renderer = makeRenderer();
+    applyFluidUpdates(
+      tick({
+        revealedTiles: [
+          { x: 5, y: 5, type: MiningTileType.EMPTY, fluid: [1, 128] },
+          { x: 6, y: 5, type: MiningTileType.EMPTY },
+        ],
+        fluidCells: [[5, 5, 1, 100]],
+      }),
+      makeCtx(makeWorld({ fluidRendererRef: ref(renderer) }))
+    );
+    expect(renderer.apply).toHaveBeenCalledWith([[5, 5, 1, 128], [5, 5, 1, 100]]);
+  });
+
+  it('still redraws (cheaply) on a tick with no fluid news, and does not call apply', () => {
+    const renderer = makeRenderer();
+    applyFluidUpdates(tick({}), makeCtx(makeWorld({ fluidRendererRef: ref(renderer) })));
+    expect(renderer.apply).not.toHaveBeenCalled();
+    expect(renderer.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs as part of a full state tick', () => {
+    const renderer = makeRenderer();
+    const world = makeWorld({ fluidRendererRef: ref(renderer) });
+    handleStateTick(payload({ fluidCells: [[1, 1, 1, 10]] }), makeCtx(world));
+    expect(renderer.apply).toHaveBeenCalledWith([[1, 1, 1, 10]]);
+  });
+});
+
+describe('applyFireUpdates', () => {
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+  const makeField = () => new FireField(10, 10);
+
+  it('does nothing before the fire field exists', () => {
+    expect(() => applyFireUpdates(tick({ fireCells: [[1, 1, 1]] }), makeCtx(makeWorld()))).not.toThrow();
+  });
+
+  it('applies fires starting and stopping', () => {
+    const field = makeField();
+    const ctx = makeCtx(makeWorld({ fireFieldRef: ref(field) }));
+    applyFireUpdates(tick({ fireCells: [[1, 2, 1], [3, 4, 1]] }), ctx);
+    expect(field.isBurning(1, 2)).toBe(true);
+    expect(field.burningCount).toBe(2);
+    applyFireUpdates(tick({ fireCells: [[1, 2, 0]] }), ctx);
+    expect(field.isBurning(1, 2)).toBe(false);
+  });
+
+  it('takes fire in newly revealed tiles, and lets a later change in the same tick win', () => {
+    const field = makeField();
+    applyFireUpdates(
+      tick({
+        revealedTiles: [
+          { x: 5, y: 5, type: MiningTileType.EMPTY, fire: 1 },
+          { x: 6, y: 5, type: MiningTileType.EMPTY },
+        ],
+        fireCells: [[5, 5, 0]],
+      }),
+      makeCtx(makeWorld({ fireFieldRef: ref(field) }))
+    );
+    expect(field.isBurning(5, 5)).toBe(false);
+    expect(field.isBurning(6, 5)).toBe(false);
+    const field2 = makeField();
+    applyFireUpdates(tick({ revealedTiles: [{ x: 5, y: 5, type: MiningTileType.EMPTY, fire: 1 }] }), makeCtx(makeWorld({ fireFieldRef: ref(field2) })));
+    expect(field2.isBurning(5, 5)).toBe(true);
+  });
+
+  it('runs as part of a full state tick', () => {
+    const field = makeField();
+    handleStateTick(payload({ fireCells: [[2, 2, 1]] }), makeCtx(makeWorld({ fireFieldRef: ref(field) })));
+    expect(field.isBurning(2, 2)).toBe(true);
+  });
+});
+
+describe('applyBurning', () => {
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, position: { x: 3, y: 4 }, ...extra }) as MiningStateTickPayload;
+  const mobAt = (id: string, burning?: boolean) => ({ id, position: { x: 10, y: 11 }, burning }) as any;
+
+  it('does nothing before the burning effect exists', () => {
+    expect(() => applyBurning(tick({ burning: true }), makeCtx(makeWorld()))).not.toThrow();
+  });
+
+  it('puts the effect on the local player when they are burning', () => {
+    const burning = { sync: vi.fn() };
+    applyBurning(tick({ burning: true }), makeCtx(makeWorld({ burningBodiesRef: ref(burning) })));
+    expect(burning.sync).toHaveBeenCalledWith([{ id: 'self', x: 3, y: 4 }]);
+  });
+
+  it('puts it on burning mobs and other players too, and only on those burning', () => {
+    const burning = { sync: vi.fn() };
+    applyBurning(
+      tick({
+        mobs: [mobAt('m1', true), mobAt('m2')],
+        otherPlayers: [{ characterId: 'p1', position: { x: 7, y: 8 }, burning: true } as any, { characterId: 'p2', position: { x: 1, y: 1 } } as any],
+      }),
+      makeCtx(makeWorld({ burningBodiesRef: ref(burning) }))
+    );
+    expect(burning.sync).toHaveBeenCalledWith([
+      { id: 'mob:m1', x: 10, y: 11 },
+      { id: 'player:p1', x: 7, y: 8 },
+    ]);
+  });
+
+  it('tells it nobody is burning when that is so (so the effect can stop)', () => {
+    const burning = { sync: vi.fn() };
+    applyBurning(tick({}), makeCtx(makeWorld({ burningBodiesRef: ref(burning) })));
+    expect(burning.sync).toHaveBeenCalledWith([]);
+  });
+
+  it('runs as part of a full state tick', () => {
+    const burning = { sync: vi.fn() };
+    handleStateTick(payload({ burning: true }), makeCtx(makeWorld({ burningBodiesRef: ref(burning) })));
+    expect(burning.sync).toHaveBeenCalled();
+  });
+});
+
+describe('applyFluidSounds', () => {
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+  const makeSounds = () => ({ onSplashes: vi.fn(), onFireChanges: vi.fn() });
+
+  it('does nothing before the fluid sounds exist', () => {
+    expect(() => applyFluidSounds(tick({ fluidSplashes: [{ kind: 'enter', fluidId: 1, x: 1, y: 1 }] }), makeCtx(makeWorld()))).not.toThrow();
+  });
+
+  it('hands splashes and cells that caught fire to the sounds', () => {
+    const sounds = makeSounds();
+    const splashes = [{ kind: 'enter' as const, fluidId: 1, x: 1, y: 2 }];
+    const fire: [number, number, 0 | 1][] = [[3, 4, 1]];
+    applyFluidSounds(tick({ fluidSplashes: splashes, fireCells: fire }), makeCtx(makeWorld({ fluidSoundsRef: ref(sounds) })));
+    expect(sounds.onSplashes).toHaveBeenCalledWith(splashes);
+    expect(sounds.onFireChanges).toHaveBeenCalledWith(fire, expect.any(Number));
+  });
+
+  it('does not call them when there is nothing to play', () => {
+    const sounds = makeSounds();
+    applyFluidSounds(tick({}), makeCtx(makeWorld({ fluidSoundsRef: ref(sounds) })));
+    applyFluidSounds(tick({ fluidSplashes: [], fireCells: [] }), makeCtx(makeWorld({ fluidSoundsRef: ref(sounds) })));
+    expect(sounds.onSplashes).not.toHaveBeenCalled();
+    expect(sounds.onFireChanges).not.toHaveBeenCalled();
+  });
+
+  it('runs as part of a full state tick, after the fire field is updated', () => {
+    const sounds = makeSounds();
+    const field = new FireField(10, 10);
+    sounds.onFireChanges.mockImplementation(() => expect(field.isBurning(2, 2)).toBe(true));
+    handleStateTick(payload({ fireCells: [[2, 2, 1]] }), makeCtx(makeWorld({ fluidSoundsRef: ref(sounds), fireFieldRef: ref(field) })));
+    expect(sounds.onFireChanges).toHaveBeenCalled();
   });
 });

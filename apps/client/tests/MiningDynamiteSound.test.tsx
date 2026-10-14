@@ -67,6 +67,11 @@ vi.mock('../src/components/game/PixiStageContext/PixiStageContext', () => ({
 vi.mock('../src/views/MineView/components/MiningGrid/hooks/useMiningScene', () => ({
   useMiningScene: () => ({
     containersReady: true,
+    fluidRendererRef: { current: null },
+    fireFieldRef: { current: null },
+    fireRendererRef: { current: null },
+    burningBodiesRef: { current: null },
+    fluidSoundsRef: { current: null },
     tileTextureLoaded: 1,
     cameraRef: { current: null },
     gridContainerRef: { current: null },

@@ -1,0 +1,136 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { MiningTileType, quantizeFluidLevel, type MiningStateTickPayload } from '@mine-me/shared';
+import { MiningGameEngine } from './MiningGameEngine';
+import { MiningSessionManager } from './MiningSessionManager';
+
+describe('fluids on the wire', () => {
+  afterEach(() => vi.restoreAllMocks());
+  const cid = 'wire-char';
+  let engine: MiningGameEngine;
+  let socket: { connected: boolean; emit: ReturnType<typeof vi.fn> };
+  const tick = (n = 1) => { for (let i = 0; i < n; i++) (engine as any).tick(1 / 30); };
+  const ticks = (): MiningStateTickPayload[] => socket.emit.mock.calls.filter((c) => c[0] === 'mining_state_tick').map((c) => c[1]);
+  const lastTick = () => ticks()[ticks().length - 1];
+  const setTile = (x: number, y: number, type: number, revealed = true) => {
+    engine.grid[y][x] = { type: type as MiningTileType, revealed };
+  };
+
+  /** A pocket x 30..34, y 30..32, solid around it, with the player far away (nothing revealed there). */
+  beforeEach(() => {
+    socket = { connected: true, emit: vi.fn() };
+    engine = new MiningGameEngine({
+      characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0 }, socket: socket as any,
+    });
+    for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
+    // Forget the generated oil so only this test's oil exists
+    for (let y = 0; y < engine.fluidSubsystem.grid.height; y++) {
+      for (let x = 0; x < engine.fluidSubsystem.grid.width; x++) engine.fluidSubsystem.grid.setCell(x, y, 0, 0);
+    }
+    engine.fluidSubsystem.drainChanges();
+    for (let y = 28; y <= 34; y++) {
+      for (let x = 28; x <= 36; x++) {
+        const open = x >= 30 && x <= 34 && y >= 30 && y <= 32;
+        setTile(x, y, open ? MiningTileType.EMPTY : MiningTileType.DIRT, false);
+      }
+    }
+    engine.players.get(cid)!.playerBody.position = { x: 5.5, y: 5.5 };
+  });
+
+  it('never sends fluid in cells the fog of war has not revealed', () => {
+    engine.fluidSubsystem.placeFluid(32, 30, 'OIL');
+    tick(20);
+    expect(ticks().every((t) => !t.fluidCells || t.fluidCells.length === 0)).toBe(true);
+  });
+
+  it('sends changed cells once they are revealed, as [x, y, fluidId, level]', () => {
+    for (let x = 30; x <= 34; x++) engine.grid[30][x].revealed = true;
+    engine.fluidSubsystem.placeFluid(32, 30, 'OIL');
+    tick(1);
+    const t = lastTick();
+    expect(t.fluidCells).toEqual([[32, 30, 1, quantizeFluidLevel(1)]]);
+  });
+
+  it('sends nothing on ticks where the fluid did not change', () => {
+    for (let y = 30; y <= 32; y++) for (let x = 30; x <= 34; x++) engine.grid[y][x].revealed = true;
+    engine.fluidSubsystem.placeFluid(32, 32, 'OIL', 0.5);
+    tick(60);
+    const before = ticks().length;
+    tick(10);
+    expect(ticks().slice(before).every((t) => t.fluidCells === undefined)).toBe(true);
+  });
+
+  it('describes a newly revealed tile together with the fluid in it', () => {
+    engine.fluidSubsystem.placeFluid(32, 30, 'OIL', 0.5);
+    engine.players.get(cid)!.playerBody.position = { x: 32.5, y: 30.5 };
+    (engine as any).revealAndTrackTiles({ x: 32.5, y: 30.5 }, 2);
+    tick(1);
+    const entry = lastTick().revealedTiles!.find((r) => r.x === 32 && r.y === 30)!;
+    expect(entry.fluid).toEqual([1, quantizeFluidLevel(0.5)]);
+    expect(lastTick().revealedTiles!.find((r) => r.x === 31 && r.y === 30)!.fluid).toBeUndefined();
+  });
+
+  it('gives a joining client the fluid definitions and a snapshot of only the revealed cells', () => {
+    engine.fluidSubsystem.placeFluid(31, 31, 'OIL', 0.75);
+    engine.fluidSubsystem.placeFluid(33, 31, 'OIL', 0.25);
+    engine.grid[31][31].revealed = true;
+    const state = MiningSessionManager.getInstance().buildClientState(engine, cid);
+    expect(state.fluids).toEqual([
+      { id: 1, typeKey: 'OIL', name: 'Oil', color: '#0b0b0d', opacity: 0.9, viscosity: 0.6, density: 0.8 },
+    ]);
+    expect(state.fluidCells).toEqual([[31, 31, 1, quantizeFluidLevel(0.75)]]);
+  });
+
+  it('reports oil that drained away as an empty cell', () => {
+    for (let y = 30; y <= 32; y++) for (let x = 30; x <= 34; x++) engine.grid[y][x].revealed = true;
+    engine.fluidSubsystem.placeFluid(32, 30, 'OIL', 0.04); // thinner than the oil minimum: evaporates
+    tick(6);
+    const last = new Map<string, number[]>();
+    for (const c of ticks().flatMap((t) => t.fluidCells ?? [])) last.set(`${c[0]},${c[1]}`, c);
+    expect(last.size).toBeGreaterThan(0);
+    for (const c of last.values()) expect(c).toEqual([c[0], c[1], 0, 0]);
+  });
+
+  describe('how a burning fluid looks', () => {
+    const FLAME = { emitterType: 'continuous', rate: 30 } as any;
+    const LIGHT = { enabled: true, type: 'POINT', effect: 'FLICKER', color: '#ff8a2a', radius: 3, intensity: 0.8 } as any;
+    const burns = (extra: object) => ({ ignitionChance: 1, spreadChance: 1, burnDuration: 4, heat: 3, burnsInto: null, ...extra });
+
+    it('carries the flame effect and light the fluid names, resolved from the particle library', () => {
+      engine.dataManager.getFluid('OIL')!.flammability = burns({ flameEffectId: 'pe_flame', flameLight: LIGHT });
+      vi.spyOn(engine.dataManager, 'getParticleEffect').mockImplementation((id) => (id === 'pe_flame' ? ({ id, config: FLAME } as any) : undefined));
+      const [oil] = engine.fluidSubsystem.clientDefinitions();
+      expect(oil.flame).toEqual({ effect: FLAME, light: LIGHT });
+    });
+
+    it('sends no flame when the fluid names none, or the effect is not in the library', () => {
+      engine.dataManager.getFluid('OIL')!.flammability = burns({});
+      expect(engine.fluidSubsystem.clientDefinitions()[0].flame).toBeUndefined();
+      engine.dataManager.getFluid('OIL')!.flammability = burns({ flameEffectId: 'missing' });
+      expect(engine.fluidSubsystem.clientDefinitions()[0].flame).toBeUndefined();
+    });
+
+    it('sends the light alone when only a light is set, and leaves out a disabled one', () => {
+      engine.dataManager.getFluid('OIL')!.flammability = burns({ flameLight: LIGHT });
+      expect(engine.fluidSubsystem.clientDefinitions()[0].flame).toEqual({ effect: null, light: LIGHT });
+      engine.dataManager.getFluid('OIL')!.flammability = burns({ flameLight: { ...LIGHT, enabled: false } });
+      expect(engine.fluidSubsystem.clientDefinitions()[0].flame).toBeUndefined();
+    });
+
+    it('carries the fluid\'s playable sounds, and none when it has none', () => {
+      expect(engine.fluidSubsystem.clientDefinitions()[0].sounds).toBeUndefined();
+      const sounds = { enter: { soundId: 's1', url: '/assets/sounds/splash.mp3', volume: 0.5, loop: false } };
+      engine.dataManager.getFluid('OIL')!.sounds = sounds;
+      expect(engine.fluidSubsystem.clientDefinitions()[0].sounds).toEqual(sounds);
+      engine.dataManager.getFluid('OIL')!.sounds = {};
+      expect(engine.fluidSubsystem.clientDefinitions()[0].sounds).toBeUndefined();
+    });
+
+    it('a joining client also gets the effect drawn on burning bodies, from the map config', () => {
+      engine.mapConfig = { ...engine.mapConfig, burningEffectId: 'pe_burning' };
+      vi.spyOn(engine.dataManager, 'getParticleEffect').mockImplementation((id) => (id === 'pe_burning' ? ({ id, config: FLAME } as any) : undefined));
+      expect(MiningSessionManager.getInstance().buildClientState(engine, cid).burningEffect).toEqual(FLAME);
+      engine.mapConfig = { ...engine.mapConfig, burningEffectId: null };
+      expect(MiningSessionManager.getInstance().buildClientState(engine, cid).burningEffect).toBeNull();
+    });
+  });
+});

@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import { installDefinitionsFromDatabase } from './definitionLoaders';
 
-type DefinitionDb = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'sound' | 'characterSoundConfig'>;
+type DefinitionDb = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'fluid' | 'particleEffect' | 'sound' | 'characterSoundConfig'>;
 
 export type ReloadResult = { ok: true } | { ok: false; error: string };
 
@@ -30,7 +30,7 @@ async function runReload(): Promise<ReloadResult> {
 }
 
 /**
- * Re-reads items, mobs, blocks and sounds from the database into the running server, so admin edits
+ * Re-reads items, mobs, blocks, fluids and sounds from the database into the running server, so admin edits
  * apply without a restart. Reloads never overlap: callers that arrive while one is running share a
  * single follow-up reload, which starts after their writes have committed. Runs already in progress
  * keep the definitions they started with; new runs and newly seen mobs get the fresh ones.

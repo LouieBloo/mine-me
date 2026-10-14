@@ -2,6 +2,9 @@ import { Container, Text } from 'pixi.js';
 import { ModularCharacterSprite, type GearLayerDescriptor } from '../../../../../components/game/sprites';
 import { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
+import type { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
+import { HeldItemLight } from '../../../../../components/game/lighting/HeldItemLight';
+import { HeldItemParticles, type ParticleConfigResolver } from '../../../../../components/game/particles/HeldItemParticles';
 import { MINING_CONFIG, type MiningRemotePlayer, type Vector2D } from '@mine-me/shared';
 import { TILE_SIZE } from './MiningTileRenderer';
 
@@ -21,6 +24,10 @@ export interface RemotePlayerInstance {
   targetAim: Vector2D;
   currentAim: Vector2D;
   flashlightOn: boolean;
+  /** Emitter for the effect of the item this player is holding. */
+  heldParticles: HeldItemParticles;
+  /** Light of the item this player is holding. */
+  heldLight: HeldItemLight;
 }
 
 /**
@@ -31,6 +38,8 @@ export class MiningRemotePlayerRenderer {
   private parentContainer: Container;
   private lightingEngine: LightingEngine | null = null;
   private players: Map<string, RemotePlayerInstance> = new Map();
+  private particleEngine: ParticleEngine | null = null;
+  private resolveParticleConfig: ParticleConfigResolver = () => null;
 
   constructor(parentContainer: Container, lightingEngine?: LightingEngine | null) {
     this.parentContainer = parentContainer;
@@ -44,6 +53,12 @@ export class MiningRemotePlayerRenderer {
         this.lightingEngine.addLight(instance.flashlight);
       }
     }
+  }
+
+  /** Particle engine and effect lookup used for the effects on the items other players hold. */
+  public setParticleEngine(engine: ParticleEngine | null, resolveConfig: ParticleConfigResolver): void {
+    this.particleEngine = engine;
+    this.resolveParticleConfig = resolveConfig;
   }
 
   public getLightingEngine(): LightingEngine | null {
@@ -143,6 +158,8 @@ export class MiningRemotePlayerRenderer {
           targetAim: { ...initialAim },
           currentAim: { ...initialAim },
           flashlightOn: isLightOn,
+          heldParticles: new HeldItemParticles((id) => this.resolveParticleConfig(id)),
+          heldLight: new HeldItemLight(`held_item_light_${playerData.characterId}`, TILE_SIZE),
         };
 
         this.players.set(playerData.characterId, instance);
@@ -234,12 +251,16 @@ export class MiningRemotePlayerRenderer {
         const remoteAimAngle = Math.atan2(instance.currentAim.y, localDx);
         instance.sprite.setAimAngle(remoteAimAngle);
         instance.sprite.update(dt);
+        instance.heldParticles.sync(this.particleEngine, instance.sprite, this.parentContainer);
+        instance.heldLight.sync(this.lightingEngine, instance.sprite, this.parentContainer);
       }
     }
   }
 
   private removePlayer(id: string, instance: RemotePlayerInstance): void {
     this.players.delete(id);
+    instance.heldParticles.destroy();
+    instance.heldLight.destroy();
     if (this.lightingEngine) {
       this.lightingEngine.removeLight(instance.flashlight.id);
     }

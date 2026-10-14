@@ -79,6 +79,7 @@ async function main() {
           pickPowerModifier: effRoot.pickPowerModifier ?? false,
           knockbackModifier: effRoot.knockbackModifier ?? false,
           explodes: effRoot.explodes ?? false,
+          ignites: effRoot.ignites ?? false,
         },
         create: {
           id: effRoot.id,
@@ -92,6 +93,7 @@ async function main() {
           pickPowerModifier: effRoot.pickPowerModifier ?? false,
           knockbackModifier: effRoot.knockbackModifier ?? false,
           explodes: effRoot.explodes ?? false,
+          ignites: effRoot.ignites ?? false,
         },
       });
     }

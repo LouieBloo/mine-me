@@ -88,7 +88,49 @@ export const ROCK_DAMAGE_RULE: DamageRuleDefinition = {
   ],
 };
 
-const DAMAGE_RULES: DamageRuleDefinition[] = [FALL_DAMAGE_RULE, ROCK_DAMAGE_RULE];
+export const FIRE_DAMAGE_RULE: DamageRuleDefinition = {
+  id: 'fire',
+  title: 'Fire: Burning and Heat',
+  icon: '🔥',
+  description:
+    'Touching fire sets a player or mob alight: they take burn damage every second until it burns out. Standing near a fire hurts too, by the fire material\'s heat, fading to nothing at the heat radius. Hits land twice a second and ignore the short invulnerability after a mob hit.',
+  fields: [
+    {
+      field: 'burnDamagePerSecond',
+      label: 'Burn Damage per Second',
+      help: 'Health lost each second while on fire.',
+      min: 0,
+      max: 1000,
+      step: 0.5,
+    },
+    {
+      field: 'burnSeconds',
+      label: 'Burn Time (s)',
+      help: 'How long burning lasts after the last touch of fire. Touching fire again starts it over.',
+      min: 0,
+      max: 120,
+      step: 0.5,
+    },
+    {
+      field: 'heatRadius',
+      label: 'Heat Radius (tiles)',
+      help: 'How far a fire\'s heat reaches. 0 turns heat off.',
+      min: 0,
+      max: 20,
+      step: 0.5,
+    },
+    {
+      field: 'heatDamagePerSecond',
+      label: 'Heat Damage per Second',
+      help: 'Damage per second right at a fire whose material has heat 1 (oil has 3).',
+      min: 0,
+      max: 1000,
+      step: 0.5,
+    },
+  ],
+};
+
+const DAMAGE_RULES: DamageRuleDefinition[] = [FALL_DAMAGE_RULE, ROCK_DAMAGE_RULE, FIRE_DAMAGE_RULE];
 
 /** Sample drops (in tiles) used for the "what would this do" preview. */
 export const SAMPLE_DROP_TILES = [2, 4, 6, 10];
@@ -114,7 +156,7 @@ export default function MiningConfigDamage({ config, onFieldChange }: MiningConf
         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
           <span>💥</span> Environmental Damage
         </h3>
-        <p className="text-xs text-slate-500">Damage players take from the mine itself. Environmental hits ignore the short invulnerability after a mob hit.</p>
+        <p className="text-xs text-slate-500">Damage players take from the mine itself (fire hurts mobs too). Environmental hits ignore the short invulnerability after a mob hit.</p>
       </div>
 
       {DAMAGE_RULES.map(rule => (
@@ -126,7 +168,7 @@ export default function MiningConfigDamage({ config, onFieldChange }: MiningConf
             <p className="text-xs text-slate-500">{rule.description}</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className={`grid grid-cols-1 gap-4 ${rule.fields.length > 3 ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
             {rule.fields.map(def => (
               <div key={def.field} className="space-y-1">
                 <label htmlFor={def.field} className="text-sm font-semibold text-slate-700">
@@ -164,6 +206,20 @@ export default function MiningConfigDamage({ config, onFieldChange }: MiningConf
                   </span>
                 );
               })}
+            </div>
+          )}
+
+          {rule.id === 'fire' && (
+            <div className="flex flex-wrap gap-2 text-xs" data-testid="fire-damage-preview">
+              <span className="px-2 py-1 rounded-md bg-slate-100 border border-slate-200 text-slate-600 font-semibold">
+                One burn: {Math.round((config.burnDamagePerSecond ?? 0) * (config.burnSeconds ?? 0))} dmg over {config.burnSeconds ?? 0}s
+              </span>
+              {[0, 0.5].map(share => (
+                <span key={share} className="px-2 py-1 rounded-md bg-slate-100 border border-slate-200 text-slate-600 font-semibold">
+                  Heat of 3 at {share === 0 ? 'the fire' : `${(share * (config.heatRadius ?? 0)).toFixed(1)} tiles`}:{' '}
+                  {(3 * (config.heatDamagePerSecond ?? 0) * (1 - share)).toFixed(1)} dmg/s
+                </span>
+              ))}
             </div>
           )}
 

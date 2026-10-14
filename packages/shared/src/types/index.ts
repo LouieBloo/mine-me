@@ -156,6 +156,13 @@ export interface ItemLightConfig {
   spotConeAngle?: number;
 }
 
+/** A light an item gives off while held: the usual light config plus where it sits on the sprite. */
+export interface HeldLightConfig extends ItemLightConfig {
+  /** Offset in weapon-sprite local space (same convention as the muzzle and held particle origin). */
+  offsetX?: number;
+  offsetY?: number;
+}
+
 export interface ItemProjectileConfig {
   shootsProjectiles?: boolean;
   magazineSize: number;
@@ -197,6 +204,13 @@ export interface GameItem {
   projectileConfig?: ItemProjectileConfig | null;
   particleEffectId?: string | null;
   particleEffect?: ParticleEffect | null;
+  /** Particle effect played from the item while it is held (equipped); the ground effect is `particleEffectId`. */
+  heldParticleEffectId?: string | null;
+  /** Where the held effect is emitted, in weapon-sprite local space (same convention as the muzzle). */
+  heldParticleOffsetX?: number;
+  heldParticleOffsetY?: number;
+  /** Light that lights up the cavern around whoever holds the item. */
+  heldLightConfig?: HeldLightConfig | null;
   itemEffects?: ObjectEffects[];
   physicsConfig?: ItemPhysicsConfig | null;
   lightConfig?: ItemLightConfig | null;
@@ -338,6 +352,8 @@ export interface Effect {
   /** Melee knockback, in tenths of tiles/s (45 = 4.5 tiles/s). */
   knockbackModifier?: boolean;
   explodes?: boolean;
+  /** Sets flammable things alight; the effect's value is the ignition strength in percent (100 = normal). */
+  ignites?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -359,4 +375,5 @@ export * from './gameEvents';
 export * from './mining';
 export * from './modularRig';
 export * from './particles';
+export * from './fluid';
 export * from './sound';

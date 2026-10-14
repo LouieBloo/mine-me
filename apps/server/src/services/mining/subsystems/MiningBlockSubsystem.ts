@@ -4,6 +4,7 @@ import {
   canBreakBlock,
   canPlaceBuildable,
   isTileMineable,
+  isTileSolid,
   type MiningPosition,
   type MiningBlockHitEvent,
   type DamageEvent,
@@ -257,6 +258,7 @@ export class MiningBlockSubsystem {
             kind: 'player',
             id: miners[0].characterId,
             name: miners[0].characterName,
+            itemId: miners[0].equippedWeaponId ?? undefined,
             position: { x: miners[0].playerBody.position.x, y: miners[0].playerBody.position.y },
           },
         };
@@ -277,6 +279,24 @@ export class MiningBlockSubsystem {
         }
       }
     }
+  }
+
+  /**
+   * A block has burned out. It becomes the block it burns into (`burnsInto`, a block type key) when that names
+   * one, otherwise it simply goes: no loot, rocks resting on it start to fall, clients are told.
+   */
+  public burnBlock(x: number, y: number, burnsInto?: string | null): void {
+    const { grid, rigidWorld } = this.world;
+    if (grid[y]?.[x]?.type === undefined || grid[y][x].type === MiningTileType.EMPTY) return;
+    const into = burnsInto ? MiningTileType[burnsInto as keyof typeof MiningTileType] : undefined;
+    if (into !== undefined && into !== MiningTileType.EMPTY) {
+      grid[y][x] = { type: into, revealed: true };
+      rigidWorld.removeTileCollider(x, y);
+      if (isTileSolid(into)) rigidWorld.addTileCollider(x, y);
+      this.world.pushTileUpdate({ x, y, type: into, damageStage: 0 });
+      return;
+    }
+    this.completeMiningBlock({ x, y }, undefined, { dropItems: false });
   }
 
   /**

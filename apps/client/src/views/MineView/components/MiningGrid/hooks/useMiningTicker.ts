@@ -8,6 +8,10 @@ import {
   DEFAULT_MINING_SWING_SPEED,
   type MiningSessionClientState,
 } from '@mine-me/shared';
+import { HeldItemLight } from '../../../../../components/game/lighting/HeldItemLight';
+import { TILE_SIZE } from '../renderers/MiningTileRenderer';
+import { HeldItemParticles } from '../../../../../components/game/particles/HeldItemParticles';
+import { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
 import { miningProfiler } from '../utils/MiningProfiler';
 import { installRenderInstrumentation } from '../utils/renderInstrumentation';
 
@@ -101,6 +105,9 @@ export function useMiningTicker({
     };
     syncRenderInstrumentation();
     const unsubscribeProfiler = miningProfiler.subscribe(syncRenderInstrumentation);
+
+    const heldItemLight = new HeldItemLight('held_item_light_local', TILE_SIZE);
+    const heldItemParticles = new HeldItemParticles((id) => DroppedItemVisualManager.getEffectConfig(id));
 
     const tickerCallback = () => {
       miningProfiler.beginFrame();
@@ -241,7 +248,15 @@ export function useMiningTicker({
           playerSpriteRef.current.setMoveVelocity(moveVx, moveVy);
         }
         playerSpriteRef.current.update(dt);
+        heldItemParticles.sync(particleEngineRef?.current, playerSpriteRef.current, gridContainer);
+        heldItemLight.sync(lightingEngineRef.current, playerSpriteRef.current, gridContainer);
       }
+
+      // 4.5 Fire: flames and lights follow the fire, and the burning effect follows the local player
+      miningProfiler.startSection('Fire');
+      world.fireRendererRef?.current?.sync(nowMs, currentPos);
+      world.burningBodiesRef?.current?.move('self', currentPos.x, currentPos.y);
+      world.fluidSoundsRef?.current?.syncLoops(nowMs, currentPos);
 
       // 5. Remote Players & Active Mobs
       miningProfiler.startSection('Remote Players');
@@ -380,6 +395,8 @@ export function useMiningTicker({
       restoreRender?.();
       restoreRender = null;
       lightingEngineRef.current?.removeLight('torch_preview');
+      heldItemParticles.destroy();
+      heldItemLight.destroy();
       dynamiteVisualManagerRef?.current?.destroy(
         particleEngineRef?.current,
         lightingEngineRef?.current

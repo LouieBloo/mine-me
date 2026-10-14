@@ -30,6 +30,11 @@ export interface DamageEvent {
    * new one (so environmental damage cannot shield a player from a mob hit).
    */
   ignoreInvulnerability?: boolean;
+  /**
+   * The hit does not interrupt or stun the target (a mob keeps doing what it was doing). For damage that
+   * ticks over time, such as burning, which would otherwise stun-lock.
+   */
+  noStun?: boolean;
 }
 
 export type DamageTarget = { kind: 'mob'; id: string } | { kind: 'player'; id: string };

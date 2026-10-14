@@ -5,7 +5,11 @@ import ItemHoldPreview from './ItemHoldPreview';
 // Mock ModularCharacterCanvas to isolate ItemHoldPreview controls and logic
 vi.mock('../../../../components/ModularCharacterCanvas/ModularCharacterCanvas', () => ({
   default: (props: any) => (
-    <div data-testid="mock-modular-character-canvas">
+    <div
+      data-testid="mock-modular-character-canvas"
+      data-held-particle={JSON.stringify(props.selectedGear?.[0]?.heldParticle ?? null)}
+      data-held-light={JSON.stringify(props.selectedGear?.[0]?.heldLight ?? null)}
+    >
       Canvas Mock (aim: {props.aimAngle}, gearCount: {props.selectedGear?.length})
     </div>
   ),
@@ -144,6 +148,114 @@ describe('ItemHoldPreview Component', () => {
       holdRotation: 0,
       muzzleOffsetX: 0,
       muzzleOffsetY: 0,
+    });
+  });
+  describe('held particle effect origin', () => {
+    const flame = { emitterType: 'continuous', rate: 30 } as any;
+    const flameItem = { ...baseItem, shootsProjectiles: false, heldParticleEffectId: 'pe_flame', heldParticleOffsetX: 20, heldParticleOffsetY: -40 };
+
+    it('is hidden when the item has no held particle effect', () => {
+      render(<ItemHoldPreview item={baseItem} onChange={vi.fn()} />);
+      expect(screen.queryByTestId('held-particle-card')).toBeNull();
+      expect(screen.getByTestId('mock-modular-character-canvas').getAttribute('data-held-particle')).toBe('null');
+    });
+
+    it('shows the X/Y controls with the saved offsets and names the effect', () => {
+      render(<ItemHoldPreview item={flameItem} heldParticleConfig={flame} heldParticleName="Flame" onChange={vi.fn()} />);
+      expect(screen.getByTestId('held-particle-card')).toBeDefined();
+      expect(screen.getByText(/"Flame" is emitted/)).toBeDefined();
+      expect((screen.getByLabelText('Particle Horizontal Offset (X)') as HTMLInputElement).value).toBe('20');
+      expect((screen.getByLabelText('Particle Vertical Offset (Y)') as HTMLInputElement).value).toBe('-40');
+    });
+
+    it('hands the canvas the effect config and origin so it can draw the marker and emit', () => {
+      render(<ItemHoldPreview item={flameItem} heldParticleConfig={flame} onChange={vi.fn()} />);
+      const held = JSON.parse(screen.getByTestId('mock-modular-character-canvas').getAttribute('data-held-particle')!);
+      expect(held).toEqual({ config: flame, offsetX: 20, offsetY: -40 });
+    });
+
+    it('does not ask the canvas to emit while the effect config is not loaded', () => {
+      render(<ItemHoldPreview item={flameItem} heldParticleConfig={null} onChange={vi.fn()} />);
+      expect(screen.getByTestId('held-particle-card')).toBeDefined();
+      expect(screen.getByTestId('mock-modular-character-canvas').getAttribute('data-held-particle')).toBe('null');
+    });
+
+    it('reports offset edits from the number box, the slider and the +/- buttons', () => {
+      const onChange = vi.fn();
+      render(<ItemHoldPreview item={flameItem} heldParticleConfig={flame} onChange={onChange} />);
+
+      fireEvent.change(screen.getByLabelText('Particle Horizontal Offset (X)'), { target: { value: '55' } });
+      expect(onChange).toHaveBeenLastCalledWith({ heldParticleOffsetX: 55 });
+
+      fireEvent.change(screen.getByLabelText('Particle Vertical Offset (Y) slider'), { target: { value: '-90' } });
+      expect(onChange).toHaveBeenLastCalledWith({ heldParticleOffsetY: -90 });
+
+      fireEvent.click(screen.getByLabelText('Increase Particle Horizontal Offset (X)'));
+      expect(onChange).toHaveBeenLastCalledWith({ heldParticleOffsetX: 21 });
+
+      fireEvent.click(screen.getByLabelText('Decrease Particle Vertical Offset (Y)'));
+      expect(onChange).toHaveBeenLastCalledWith({ heldParticleOffsetY: -41 });
+    });
+
+    it('resets only the particle origin, and Reset All includes it', () => {
+      const onChange = vi.fn();
+      render(<ItemHoldPreview item={flameItem} heldParticleConfig={flame} onChange={onChange} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reset Origin' }));
+      expect(onChange).toHaveBeenLastCalledWith({ heldParticleOffsetX: 0, heldParticleOffsetY: 0 });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reset All Offsets' }));
+      expect(onChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ holdOffsetX: 0, muzzleOffsetX: 0, heldParticleOffsetX: 0, heldParticleOffsetY: 0 })
+      );
+    });
+  });
+  describe('held light origin', () => {
+    const lamp = { enabled: true, type: 'POINT', effect: 'FLICKER', color: '#ff8a2a', radius: 3, intensity: 0.6, offsetX: 15, offsetY: -25 } as any;
+    const lampItem = { ...baseItem, shootsProjectiles: false, heldLightConfig: lamp };
+
+    it('is hidden without a light, or when the light is disabled', () => {
+      const { rerender } = render(<ItemHoldPreview item={baseItem} onChange={vi.fn()} />);
+      expect(screen.queryByTestId('held-light-card')).toBeNull();
+      expect(screen.getByTestId('mock-modular-character-canvas').getAttribute('data-held-light')).toBe('null');
+
+      rerender(<ItemHoldPreview item={{ ...baseItem, heldLightConfig: { ...lamp, enabled: false } }} onChange={vi.fn()} />);
+      expect(screen.queryByTestId('held-light-card')).toBeNull();
+    });
+
+    it('shows the saved offsets and hands the canvas the origin for its marker', () => {
+      render(<ItemHoldPreview item={lampItem} onChange={vi.fn()} />);
+      expect((screen.getByLabelText('Light Horizontal Offset (X)') as HTMLInputElement).value).toBe('15');
+      expect((screen.getByLabelText('Light Vertical Offset (Y)') as HTMLInputElement).value).toBe('-25');
+      expect(JSON.parse(screen.getByTestId('mock-modular-character-canvas').getAttribute('data-held-light')!)).toEqual({ offsetX: 15, offsetY: -25 });
+    });
+
+    it('writes offset edits back into the light config, keeping the rest of it', () => {
+      const onChange = vi.fn();
+      render(<ItemHoldPreview item={lampItem} onChange={onChange} />);
+
+      fireEvent.change(screen.getByLabelText('Light Horizontal Offset (X)'), { target: { value: '40' } });
+      expect(onChange).toHaveBeenLastCalledWith({ heldLightConfig: { ...lamp, offsetX: 40 } });
+
+      fireEvent.click(screen.getByLabelText('Decrease Light Vertical Offset (Y)'));
+      expect(onChange).toHaveBeenLastCalledWith({ heldLightConfig: { ...lamp, offsetY: -26 } });
+    });
+
+    it('resets only the light origin, and Reset All includes it', () => {
+      const onChange = vi.fn();
+      render(<ItemHoldPreview item={lampItem} onChange={onChange} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reset Origin' }));
+      expect(onChange).toHaveBeenLastCalledWith({ heldLightConfig: { ...lamp, offsetX: 0, offsetY: 0 } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reset All Offsets' }));
+      expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ heldLightConfig: { ...lamp, offsetX: 0, offsetY: 0 } }));
+    });
+
+    it('can show both origins side by side', () => {
+      render(<ItemHoldPreview item={{ ...lampItem, heldParticleEffectId: 'pe_flame' }} onChange={vi.fn()} />);
+      expect(screen.getByTestId('held-light-card')).toBeDefined();
+      expect(screen.getByTestId('held-particle-card')).toBeDefined();
     });
   });
 });

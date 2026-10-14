@@ -36,9 +36,20 @@ export class MiningDamageSystem {
     const amount = this.modifyDamage(target, event);
     if (!isValidDamageAmount(amount)) return NO_DAMAGE;
 
-    return target.kind === 'mob'
-      ? this.damageMob(target.id, amount, event)
-      : this.damagePlayer(target.id, amount, event);
+    const result =
+      target.kind === 'mob'
+        ? this.damageMob(target.id, amount, event)
+        : this.damagePlayer(target.id, amount, event);
+
+    // A hit by an item that ignites sets flammable things alight where it lands
+    if (result.applied && event.source.itemId) {
+      const body =
+        target.kind === 'mob'
+          ? this.world.mobs.activeMobs.get(target.id)?.mobBody
+          : this.world.players.get(target.id)?.playerBody;
+      if (body) this.world.ignition.fromHit(event, body.position.x, body.position.y);
+    }
+    return result;
   }
 
   private damageMob(mobId: string, amount: number, event: DamageEvent): DamageResult {
@@ -46,7 +57,7 @@ export class MiningDamageSystem {
     if (!mob || mob.health <= 0) return NO_DAMAGE;
 
     const healthBefore = mob.health;
-    this.world.mobs.damageMob(mobId, amount);
+    this.world.mobs.damageMob(mobId, amount, { stun: !event.noStun });
 
     // Knockback only moves mobs that can move at all (not target dummies / stationary mobs)
     if (event.knockback && mob.mobBody.moveSpeed > 0) {
@@ -112,6 +123,8 @@ export class MiningDamageSystem {
 
     const amount = event.amount; // tiles have no modifiers yet (pickaxe power etc. come with ticket 012)
     const prevStage = getDamageStage(tile);
+    // Sparks fly from the block that was struck, whether or not it breaks
+    this.world.ignition.fromHit(event, x + 0.5, y + 0.5);
     tile.damage = (tile.damage || 0) + amount;
 
     const maxHealth = this.world.data.getBlockMaxHealth(tile.type);

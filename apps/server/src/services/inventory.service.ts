@@ -161,6 +161,10 @@ export class InventoryService {
       throwable: item.throwable,
       particleEffectId: item.particleEffectId,
       particleEffect: item.particleEffect,
+      heldParticleEffectId: item.heldParticleEffectId ?? null,
+      heldParticleOffsetX: typeof item.heldParticleOffsetX === 'number' ? item.heldParticleOffsetX : 0,
+      heldParticleOffsetY: typeof item.heldParticleOffsetY === 'number' ? item.heldParticleOffsetY : 0,
+      heldLightConfig: item.heldLightConfig ?? null,
       physicsConfig: item.physicsConfig,
       lightConfig: item.lightConfig,
       shootsProjectiles: item.shootsProjectiles,
@@ -189,6 +193,7 @@ export class InventoryService {
           pickPowerModifier: ie.effect.pickPowerModifier,
           knockbackModifier: ie.effect.knockbackModifier,
           explodes: ie.effect.explodes,
+          ignites: ie.effect.ignites,
         } : undefined
       })),
     };

@@ -1,6 +1,7 @@
 import { readVolume } from '../../services/soundVolume';
 import { Request, Response } from 'express';
 import { prisma } from '../../index';
+import { Prisma } from '@prisma/client';
 import { syncJson, getPagination } from '../../services/admin.service';
 import { ITEM_TYPES, ITEM_SUBTYPES, ITEM_RARITIES } from '@mine-me/shared';
 import multer from 'multer';
@@ -111,8 +112,16 @@ export const getItem = async (req: Request, res: Response) => {
   res.json(item);
 };
 
+/** Prisma needs an explicit marker (not a bare null) to clear a Json column. */
+const normalizeJsonFields = (itemData: Record<string, unknown>): void => {
+  if ('heldLightConfig' in itemData && itemData.heldLightConfig == null) {
+    itemData.heldLightConfig = Prisma.JsonNull;
+  }
+};
+
 export const createItem = async (req: Request, res: Response) => {
-  const { itemEffects, particleEffect, ...itemData } = req.body;
+  const { itemEffects, particleEffect, heldParticleEffect, ...itemData } = req.body;
+  normalizeJsonFields(itemData);
   if ('itemKey' in itemData) {
     itemData.itemKey = itemData.itemKey && typeof itemData.itemKey === 'string' && itemData.itemKey.trim().length > 0
       ? itemData.itemKey.trim().toLowerCase()
@@ -152,7 +161,8 @@ export const createItem = async (req: Request, res: Response) => {
 };
 
 export const updateItem = async (req: Request, res: Response) => {
-  const { itemEffects, particleEffect, ...itemData } = req.body;
+  const { itemEffects, particleEffect, heldParticleEffect, ...itemData } = req.body;
+  normalizeJsonFields(itemData);
   if ('itemKey' in itemData) {
     itemData.itemKey = itemData.itemKey && typeof itemData.itemKey === 'string' && itemData.itemKey.trim().length > 0
       ? itemData.itemKey.trim().toLowerCase()

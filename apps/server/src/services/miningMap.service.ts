@@ -6,6 +6,7 @@ import {
   getTileMaxHealth,
   isTileSolid,
   DEFAULT_MINING_MAP_CONFIG,
+  type FluidDefinition,
   type MiningMapConfigData,
 } from '@mine-me/shared';
 import { MiningDataManager } from './mining/subsystems/MiningDataManager';
@@ -84,7 +85,20 @@ export interface MapGeneratorOptions {
   rockCount?: number;
   /** Number of treasure chests. Overrides config count if provided. */
   chestCount?: number;
+  /** Fluids to place in the mine as sealed pockets (those with generation settings). None by default. */
+  fluids?: readonly FluidDefinition[];
 }
+
+/** One cell of fluid the generator placed: a full cell of `typeKey` at (x, y). */
+export interface GeneratedFluidCell {
+  x: number;
+  y: number;
+  typeKey: string;
+  level: number;
+}
+
+/** Salt for the fluids' own random stream, so pocket placement never depends on how much the other steps drew. */
+const FLUID_SEED_SALT = 0x0f1d51ed;
 
 export class MiningMapGenerator {
   private rng: () => number;
@@ -92,9 +106,16 @@ export class MiningMapGenerator {
   private width: number;
   private height: number;
   private grid: ServerMiningGrid = [];
+  private readonly fluids: readonly FluidDefinition[];
+  private readonly fluidRng: () => number;
+  /** Fluid cells placed by the last `generate()`. */
+  public fluidCells: GeneratedFluidCell[] = [];
+  private fluidCellKeys = new Set<number>();
 
   constructor(options: MapGeneratorOptions) {
     this.rng = createSeededRng(options.seed);
+    this.fluidRng = createSeededRng(options.seed ^ FLUID_SEED_SALT);
+    this.fluids = options.fluids ?? [];
     this.config = {
       ...DEFAULT_MINING_MAP_CONFIG,
       ...options.config,
@@ -111,10 +132,70 @@ export class MiningMapGenerator {
     this.carveCaverns();
     this.carveTunnels();
     this.protectSurfaceAndSpawn();
+    this.placeFluidPockets();
     this.placeOreVeins();
     this.placeRocks();
     this.placeChests();
     return this.grid;
+  }
+
+  /**
+   * Carves sealed square pockets inside plain dirt and fills them with each fluid that has generation
+   * settings. Runs before ores, rocks and chests so there is room to fit them: a pocket's walls (a one tile
+   * margin) are solid dirt, and the later steps leave pocket cells alone (a rock cannot sit on an open
+   * cell, ores only replace dirt, chests skip `fluidCells`). Uses its own random stream.
+   */
+  private placeFluidPockets(): void {
+    this.fluidCells = [];
+    this.fluidCellKeys = new Set();
+    const ordered = [...this.fluids].sort((a, b) => (a.typeKey < b.typeKey ? -1 : a.typeKey > b.typeKey ? 1 : 0));
+    for (const fluid of ordered) {
+      const gen = fluid.generation;
+      if (!gen || gen.percentage <= 0) continue;
+      const first = Math.max(1, gen.minDepth);
+      const last = Math.min(this.height - 2, gen.maxDepth ?? this.height - 2);
+      if (last < first) continue;
+
+      let diggable = 0;
+      for (let y = first; y <= last; y++) {
+        for (let x = 1; x < this.width - 1; x++) if (this.grid[y][x].type === MiningTileType.DIRT) diggable++;
+      }
+      const averageSide = (gen.minSize + gen.maxSize) / 2;
+      const target = Math.round((diggable * gen.percentage) / 100 / (averageSide * averageSide));
+      let placed = 0;
+      for (let attempt = 0; attempt < target * 30 && placed < target; attempt++) {
+        const size = gen.minSize + Math.floor(this.fluidRng() * (gen.maxSize - gen.minSize + 1));
+        const x = 1 + Math.floor(this.fluidRng() * Math.max(1, this.width - 2 - size));
+        const y = first + Math.floor(this.fluidRng() * Math.max(1, last - first + 2 - size));
+        if (y + size - 1 > last) continue;
+        if (!this.canHoldPocket(x, y, size)) continue;
+        for (let py = y; py < y + size; py++) {
+          for (let px = x; px < x + size; px++) {
+            this.grid[py][px] = { type: MiningTileType.EMPTY, revealed: false };
+            this.fluidCells.push({ x: px, y: py, typeKey: fluid.typeKey, level: 1 });
+            this.fluidCellKeys.add(py * this.width + px);
+          }
+        }
+        placed++;
+      }
+    }
+  }
+
+  /** A pocket fits when its square is all plain dirt and the ring around it is solid, so it is sealed. */
+  private canHoldPocket(x: number, y: number, size: number): boolean {
+    if (x < 1 || y < 1 || x + size > this.width - 1 || y + size > this.height - 1) return false;
+    for (let py = y - 1; py <= y + size; py++) {
+      for (let px = x - 1; px <= x + size; px++) {
+        const type = this.grid[py][px].type;
+        const inside = px >= x && px < x + size && py >= y && py < y + size;
+        if (inside) {
+          if (type !== MiningTileType.DIRT) return false;
+        } else if (!isTileSolid(type)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private initializeSolidGrid(): void {
@@ -432,6 +513,7 @@ export class MiningMapGenerator {
 
     for (let y = midY; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
+        if (this.fluidCellKeys.has(y * this.width + x)) continue;
         if (this.grid[y][x].type === MiningTileType.EMPTY) {
           const belowSolid = y + 1 >= this.height || isTileSolid(this.grid[y + 1][x].type);
           const aboveAir = y - 1 >= 0 && !isTileSolid(this.grid[y - 1][x].type);
@@ -480,6 +562,13 @@ export class MiningMapGenerator {
 export function generateMiningMap(options: MapGeneratorOptions): ServerMiningGrid {
   const generator = new MiningMapGenerator(options);
   return generator.generate();
+}
+
+/** Like `generateMiningMap`, but also says which cells hold fluid (see `options.fluids`). */
+export function generateMiningMapWithFluids(options: MapGeneratorOptions): { grid: ServerMiningGrid; fluidCells: GeneratedFluidCell[] } {
+  const generator = new MiningMapGenerator(options);
+  const grid = generator.generate();
+  return { grid, fluidCells: generator.fluidCells };
 }
 
 // ---------------------------------------------------------------------------

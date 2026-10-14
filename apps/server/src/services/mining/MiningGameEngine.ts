@@ -24,7 +24,7 @@ import {
 } from '@mine-me/shared';
 import * as planck from 'planck';
 import {
-  generateMiningMap,
+  generateMiningMapWithFluids,
   getDamageStage,
   isInBounds,
   type ServerMiningGrid,
@@ -56,6 +56,10 @@ import { MiningDropSubsystem } from './subsystems/MiningDropSubsystem';
 import { MiningRockSubsystem } from './subsystems/MiningRockSubsystem';
 import { MiningExplosiveSubsystem, type ThrowRequest } from './subsystems/MiningExplosiveSubsystem';
 import { MiningProjectileSubsystem, type ShootResult } from './subsystems/MiningProjectileSubsystem';
+import { MiningFluidSubsystem } from './subsystems/MiningFluidSubsystem';
+import { MiningIgnitionSubsystem } from './subsystems/MiningIgnitionSubsystem';
+import { MiningFireSubsystem } from './subsystems/MiningFireSubsystem';
+import { MiningBurningSubsystem } from './subsystems/MiningBurningSubsystem';
 import { MiningMobSubsystem, type MiningActiveMobSession } from './subsystems/MiningMobSubsystem';
 
 export type { MiningPlayerSession, MiningActiveMobSession };
@@ -120,7 +124,7 @@ export class MiningGameEngine {
   public droppedTicks = 0;
   private intervalId: NodeJS.Timeout | null = null;
   private isStopped = false;
-  private pendingRevealedTiles: { x: number; y: number; type: MiningTileType; damageStage?: number }[] = [];
+  private pendingRevealedTiles: NonNullable<MiningStateTickPayload['revealedTiles']> = [];
 
   // Dedicated Subsystems
   public readonly dataManager: MiningDataManager;
@@ -131,6 +135,10 @@ export class MiningGameEngine {
   public readonly explosiveSubsystem: MiningExplosiveSubsystem;
   public readonly projectileSubsystem: MiningProjectileSubsystem;
   public readonly mobSubsystem: MiningMobSubsystem;
+  public readonly fluidSubsystem: MiningFluidSubsystem;
+  public readonly ignitionSubsystem: MiningIgnitionSubsystem;
+  public readonly fireSubsystem: MiningFireSubsystem;
+  public readonly burningSubsystem: MiningBurningSubsystem;
   /** The single place hits are applied (see MiningDamageSystem). */
   public readonly damageSystem: MiningDamageSystem;
 
@@ -150,7 +158,12 @@ export class MiningGameEngine {
     this.mapConfig = options.mapConfig;
 
     // Generate authoritative grid
-    this.grid = generateMiningMap({ seed: this.seed, config: options.mapConfig });
+    const generated = generateMiningMapWithFluids({
+      seed: this.seed,
+      config: options.mapConfig,
+      fluids: MiningDataManager.getInstance().getFluids(),
+    });
+    this.grid = generated.grid;
 
     // Initialize Planck.js rigid body physics world
     this.rigidWorld = new MiningRigidWorld({
@@ -177,6 +190,11 @@ export class MiningGameEngine {
     this.explosiveSubsystem = new MiningExplosiveSubsystem(world);
     this.projectileSubsystem = new MiningProjectileSubsystem(world);
     this.mobSubsystem = new MiningMobSubsystem(world);
+    this.fluidSubsystem = new MiningFluidSubsystem(world);
+    this.ignitionSubsystem = new MiningIgnitionSubsystem(world);
+    this.fireSubsystem = new MiningFireSubsystem(world);
+    this.burningSubsystem = new MiningBurningSubsystem(world);
+    for (const cell of generated.fluidCells) this.fluidSubsystem.placeFluid(cell.x, cell.y, cell.typeKey, cell.level);
     this.damageSystem = new MiningDamageSystem(world);
     this.blockSubsystem.onToolTooWeak = (session, blockName) =>
       this.playerManager.sendNotice(session, 'tool_too_weak', `Your tool isn't strong enough to break ${blockName}.`);
@@ -427,6 +445,9 @@ export class MiningGameEngine {
     // 1. Process physics, animations, FoW, and item pickups for all players
     this.runStep('players', () => this.playerManager.updatePlayerPhysicsAndFoW(dt));
 
+    // 1.5 Fluids push and brake loose bodies, then the rigid world steps
+    this.runStep('fluidForces', () => this.fluidSubsystem.applyBodyForces());
+
     // 2. Step Planck rigid world
     this.runStep('rigidWorld', () => this.rigidWorld.step(dt));
 
@@ -435,6 +456,15 @@ export class MiningGameEngine {
 
     // 4. Falling rocks simulation
     this.runStep('rocks', () => this.rockSubsystem.updateFallingRocks(dt));
+
+    // 4.5 Fluids flow (every Nth tick)
+    this.runStep('fluids', () => this.fluidSubsystem.update());
+
+    // 4.6 Fire takes new sparks, spreads and burns (same beat as fluids, right after them)
+    this.runStep('fire', () => this.fireSubsystem.update());
+
+    // 4.7 Fire hurts: burning and heat on everyone in the room
+    this.runStep('burning', () => this.burningSubsystem.update(dt));
 
     // 5. Dynamite continuous physics & fuse countdown simulation
     this.runStep('explosives', () => this.explosiveSubsystem.updateActiveDynamites(dt));
@@ -453,6 +483,9 @@ export class MiningGameEngine {
 
     // 9. Update Active Mobs (AI, Physics, Mining, Combat)
     this.runStep('mobs', () => this.mobSubsystem.updateActiveMobs(dt));
+
+    // 9.5 Who just waded into or out of a fluid (for splash sounds)
+    this.runStep('fluidSplashes', () => this.fluidSubsystem.trackSplashes());
 
     // 10. Broadcast 30 Hz State Tick
     this.runStep('broadcast', () => this.broadcastStateTick());
@@ -638,11 +671,21 @@ export class MiningGameEngine {
       get mobs() {
         return engine.mobSubsystem;
       },
+      get fluids() {
+        return engine.fluidSubsystem;
+      },
+      get fire() {
+        return engine.fireSubsystem;
+      },
+      get ignition() {
+        return engine.ignitionSubsystem;
+      },
       get damage() {
         return engine.damageSystem;
       },
       pushTileUpdate: (update) => {
         engine.pendingRevealedTiles.push(update);
+        engine.fluidSubsystem.onTileChanged(update.x, update.y);
       },
       revealAround: (position, visionRange) => engine.revealAndTrackTiles(position, visionRange),
       notifyPlayerHealth: (characterId, health, maxHealth) =>
@@ -683,11 +726,14 @@ export class MiningGameEngine {
         const ny = cy + dy;
         if (isInBounds(nx, ny) && !this.grid[ny][nx].revealed) {
           this.grid[ny][nx].revealed = true;
+          const fluid = this.fluidSubsystem.contentsAt(nx, ny);
           this.pendingRevealedTiles.push({
             x: nx,
             y: ny,
             type: this.grid[ny][nx].type,
             damageStage: getDamageStage(this.grid[ny][nx]),
+            ...(fluid ? { fluid } : {}),
+            ...(this.fireSubsystem.isBurning(nx, ny) ? { fire: 1 as const } : {}),
           });
         }
       }
@@ -703,6 +749,10 @@ export class MiningGameEngine {
     const gunshotsToSend = this.projectileSubsystem.consumePendingGunshots();
     const allBlockHits = this.blockSubsystem.consumePendingBlockHits();
     const dropsDirty = this.dropSubsystem.droppedItemsDirty;
+    // Taken every tick even with nobody connected, so changes never pile up
+    const fluidChanges = this.fluidSubsystem.takeVisibleChanges();
+    const fireChanges = this.fireSubsystem.takeVisibleChanges();
+    const splashesToSend = this.fluidSubsystem.takeSplashes();
 
     for (const session of this.players.values()) {
       if (!session.socket || !session.socket.connected) continue;
@@ -733,6 +783,7 @@ export class MiningGameEngine {
       const otherPlayers = others.map(playerDynamic);
       const explosionsNear = explosionsToSend.filter((e) => isInInterest(center, e.position));
       const gunshotsNear = gunshotsToSend.filter((g) => isInInterest(center, g.position));
+      const splashesNear = splashesToSend.filter((s) => isInInterest(center, { x: s.x, y: s.y }));
 
       const spawned = collectSpawned(known, {
         mobs: mobsNear,
@@ -767,8 +818,12 @@ export class MiningGameEngine {
           knockbackRemaining: session.playerBody.knockbackRemaining,
         },
         isMining: session.isMining,
+        ...(session.burning ? { burning: true } : {}),
         miningTarget: session.miningTarget ?? undefined,
         revealedTiles: this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined,
+        fluidCells: fluidChanges.length > 0 ? fluidChanges : undefined,
+        fireCells: fireChanges.length > 0 ? fireChanges : undefined,
+        fluidSplashes: splashesNear.length > 0 ? splashesNear : undefined,
         fallingRocks: fallingRockPayloads.length > 0 ? fallingRockPayloads : undefined,
         activeDynamites: dynamitePayloads.length > 0 ? dynamitePayloads : undefined,
         activeProjectiles: projectilePayloads.length > 0 ? projectilePayloads : undefined,

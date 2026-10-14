@@ -38,6 +38,7 @@ export const itemValidation = [
   body('combatScore').optional().isInt({ min: 0 }).withMessage('Combat Score must be >= 0'),
   body('particleEffectId').optional({ nullable: true }).isString().withMessage('particleEffectId must be a string'),
   body('physicsConfig').optional({ nullable: true }).isObject().withMessage('physicsConfig must be an object'),
+  body('heldLightConfig').optional({ nullable: true }).isObject().withMessage('heldLightConfig must be an object'),
   body('lightConfig').optional({ nullable: true }).isObject().withMessage('lightConfig must be an object'),
   body('itemKey').optional({ nullable: true }).isString().withMessage('itemKey must be a string'),
   body('shootsProjectiles').optional().isBoolean().withMessage('shootsProjectiles must be a boolean'),
@@ -47,7 +48,10 @@ export const itemValidation = [
   body('holdOffsetY').optional().isFloat().withMessage('holdOffsetY must be a number'),
   body('holdRotation').optional().isFloat().withMessage('holdRotation must be a number'),
   body('muzzleOffsetX').optional().isFloat().withMessage('muzzleOffsetX must be a number'),
-  body('muzzleOffsetY').optional().isFloat().withMessage('muzzleOffsetY must be a number')
+  body('muzzleOffsetY').optional().isFloat().withMessage('muzzleOffsetY must be a number'),
+  body('heldParticleEffectId').optional({ nullable: true }).isString().withMessage('heldParticleEffectId must be a string'),
+  body('heldParticleOffsetX').optional().isFloat().withMessage('heldParticleOffsetX must be a number'),
+  body('heldParticleOffsetY').optional().isFloat().withMessage('heldParticleOffsetY must be a number')
 ];
 
 export const mobValidation = [
@@ -100,7 +104,8 @@ export const effectValidation = [
   body('toolDamageModifier').optional().isBoolean().withMessage('toolDamageModifier must be a boolean'),
   body('pickPowerModifier').optional().isBoolean().withMessage('pickPowerModifier must be a boolean'),
   body('knockbackModifier').optional().isBoolean().withMessage('knockbackModifier must be a boolean'),
-  body('explodes').optional().isBoolean().withMessage('explodes must be a boolean')
+  body('explodes').optional().isBoolean().withMessage('explodes must be a boolean'),
+  body('ignites').optional().isBoolean().withMessage('ignites must be a boolean')
 ];
 
 export const particleEffectValidation = [
@@ -139,6 +144,11 @@ export const miningConfigValidation = [
   body('rockDamageMinSpeed').optional().isFloat({ min: 0, max: 100 }).withMessage('Rock Damage Min Speed must be between 0 and 100'),
   body('rockDamagePerSpeed').optional().isFloat({ min: 0, max: 100 }).withMessage('Rock Damage Per Speed must be between 0 and 100'),
   body('rockDamageMax').optional().isFloat({ min: 0, max: 10000 }).withMessage('Rock Damage Max must be between 0 and 10000'),
+  body('burnDamagePerSecond').optional().isFloat({ min: 0, max: 1000 }).withMessage('Burn Damage Per Second must be between 0 and 1000'),
+  body('burnSeconds').optional().isFloat({ min: 0, max: 120 }).withMessage('Burn Seconds must be between 0 and 120'),
+  body('heatRadius').optional().isFloat({ min: 0, max: 20 }).withMessage('Heat Radius must be between 0 and 20'),
+  body('heatDamagePerSecond').optional().isFloat({ min: 0, max: 1000 }).withMessage('Heat Damage Per Second must be between 0 and 1000'),
+  body('burningEffectId').optional({ nullable: true }).isString().withMessage('Burning Effect ID must be a string or null'),
   body('mobSpawnCount').optional().isInt({ min: 0, max: 20 }).withMessage('Mob Spawn Count must be between 0 and 20'),
   body('mobSpawnMinDepth').optional().isInt({ min: 1, max: 40 }).withMessage('Mob Spawn Min Depth must be between 1 and 40'),
   body('allowedMobIds').optional().isArray().withMessage('Allowed Mob IDs must be an array of strings'),

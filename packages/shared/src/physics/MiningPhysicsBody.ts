@@ -1,4 +1,5 @@
 import { MINING_CONFIG, isTileSolid, type Vector2D, type MiningTileType } from '../types/mining';
+import { movementFactorAt, type FluidEnvironment } from '../gameLogic/fluid/fluidSubmersion';
 
 export interface MiningCollisionGrid {
   [y: number]: { [x: number]: { type: MiningTileType } };
@@ -50,6 +51,10 @@ export abstract class MiningPhysicsBody {
   public gravityScale: number;
   public isGrounded: boolean = false;
   public mass: number;
+  /** The fluid around the body, if the room has any. Set by whoever steps the body (server or client prediction). */
+  public fluidEnvironment: FluidEnvironment | null = null;
+  /** Speed multiplier from wading through fluid, 1 when dry (see `updateFluidContact`). */
+  public movementFactor = 1;
 
   constructor(options: PhysicsBodyOptions) {
     this._position = { ...options.position };
@@ -72,6 +77,12 @@ export abstract class MiningPhysicsBody {
   /**
    * Applies an acceleration or velocity change to the body.
    */
+  /** Works out how much the fluid around the body slows it right now. Call before reading `movementFactor`. */
+  public updateFluidContact(): number {
+    this.movementFactor = movementFactorAt(this.fluidEnvironment, this.position.x, this.position.y, this.halfWidth, this.halfHeight);
+    return this.movementFactor;
+  }
+
   public applyImpulse(impulse: Vector2D): void {
     this.velocity.x += impulse.x / this.mass;
     this.velocity.y += impulse.y / this.mass;
@@ -119,6 +130,8 @@ export abstract class MiningPhysicsBody {
    * through a thin wall. Slow bodies run a single step, exactly as before.
    */
   public update(dt: number, grid: MiningCollisionGrid): void {
+    // Fresh every step, so a body that moves out of (or into) fluid is never held to the last reading
+    this.updateFluidContact();
     const cap = MINING_CONFIG.MAX_ENTITY_SPEED;
     this.velocity.x = Math.max(-cap, Math.min(cap, this.velocity.x));
     this.velocity.y = Math.max(-cap, Math.min(cap, this.velocity.y));
@@ -146,8 +159,10 @@ export abstract class MiningPhysicsBody {
     // 2. Apply gravity if not grounded
     if (this.hasGravity && !this.isGrounded) {
       this.velocity.y += MINING_CONFIG.GRAVITY * this.gravityScale * dt;
-      if (this.velocity.y > MINING_CONFIG.TERMINAL_FALL_SPEED) {
-        this.velocity.y = MINING_CONFIG.TERMINAL_FALL_SPEED;
+      // Thick fluid slows a fall, but never stops it: a body always sinks, just slowly
+      const terminal = MINING_CONFIG.TERMINAL_FALL_SPEED * Math.max(MINING_CONFIG.FLUID_MIN_FALL_FACTOR, this.movementFactor);
+      if (this.velocity.y > terminal) {
+        this.velocity.y = terminal;
       }
     }
 

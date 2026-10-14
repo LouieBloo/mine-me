@@ -488,6 +488,7 @@ export function useModularCanvasScene({
 
   return {
     containerRef,
+    appRef,
     nodesRef,
     loading,
     error,

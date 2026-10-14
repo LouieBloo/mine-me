@@ -286,4 +286,84 @@ describe('ModularCharacterSprite', () => {
 
     sprite.destroy();
   });
+  describe('held particle effect', () => {
+    it('exposes the effect and offset of the equipped weapon, and a world position for it', async () => {
+      const sprite = new ModularCharacterSprite(parentContainer);
+      await sprite.load();
+
+      await sprite.setGearLayers([
+        {
+          url: '/assets/gear/flame_pickaxe.png',
+          subType: 'WEAPON',
+          heldParticleEffectId: 'pe_flame',
+          heldParticleOffsetX: 30,
+          heldParticleOffsetY: -45,
+        },
+      ]);
+
+      expect(sprite.getHeldParticle()).toEqual({ effectId: 'pe_flame', offset: { x: 30, y: -45 } });
+      const pos = sprite.getHeldParticleWorldPosition(parentContainer);
+      expect(typeof pos?.x).toBe('number');
+      expect(typeof pos?.y).toBe('number');
+      sprite.destroy();
+    });
+
+    it('has none for a weapon without an effect, for non-weapon gear, and once gear is cleared', async () => {
+      const sprite = new ModularCharacterSprite(parentContainer);
+      await sprite.load();
+
+      await sprite.setGearLayers([{ url: '/assets/gear/pick.png', subType: 'WEAPON' }]);
+      expect(sprite.getHeldParticle()).toBeNull();
+      expect(sprite.getHeldParticleWorldPosition(parentContainer)).toBeNull();
+
+      await sprite.setGearLayers([
+        { url: '/assets/gear/pick.png', subType: 'WEAPON', heldParticleEffectId: 'pe_flame' },
+      ]);
+      expect(sprite.getHeldParticle()).not.toBeNull();
+
+      await sprite.setGearLayers([]);
+      expect(sprite.getHeldParticle()).toBeNull();
+      sprite.destroy();
+    });
+
+    it('defaults the origin to the weapon centre', async () => {
+      const sprite = new ModularCharacterSprite(parentContainer);
+      await sprite.load();
+      await sprite.setGearLayers([
+        { url: '/assets/gear/pick.png', subType: 'WEAPON', heldParticleEffectId: 'pe_flame' },
+      ]);
+      expect(sprite.getHeldParticle()?.offset).toEqual({ x: 0, y: 0 });
+      sprite.destroy();
+    });
+  });
+  describe('held light', () => {
+    const lamp = { enabled: true, type: 'POINT', effect: 'STATIC', color: '#ff8a2a', radius: 3, intensity: 0.6, offsetX: 10, offsetY: -20 } as const;
+
+    it('exposes the equipped weapon light and a world position for it', async () => {
+      const sprite = new ModularCharacterSprite(parentContainer);
+      await sprite.load();
+      await sprite.setGearLayers([{ url: '/assets/gear/pick.png', subType: 'WEAPON', heldLightConfig: lamp }]);
+
+      expect(sprite.getHeldLight()).toEqual(lamp);
+      const pos = sprite.getHeldLightWorldPosition(parentContainer);
+      expect(typeof pos?.x).toBe('number');
+      sprite.destroy();
+    });
+
+    it('has none when the weapon has no light, the light is disabled, or gear is cleared', async () => {
+      const sprite = new ModularCharacterSprite(parentContainer);
+      await sprite.load();
+      await sprite.setGearLayers([{ url: '/assets/gear/pick.png', subType: 'WEAPON' }]);
+      expect(sprite.getHeldLight()).toBeNull();
+
+      await sprite.setGearLayers([{ url: '/assets/gear/pick.png', subType: 'WEAPON', heldLightConfig: { ...lamp, enabled: false } }]);
+      expect(sprite.getHeldLight()).toBeNull();
+
+      await sprite.setGearLayers([{ url: '/assets/gear/pick.png', subType: 'WEAPON', heldLightConfig: lamp }]);
+      await sprite.setGearLayers([]);
+      expect(sprite.getHeldLight()).toBeNull();
+      expect(sprite.getHeldLightWorldPosition(parentContainer)).toBeNull();
+      sprite.destroy();
+    });
+  });
 });

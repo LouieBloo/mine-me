@@ -145,6 +145,11 @@ export class MiningSessionManager {
 
     return {
       grid: toClientGrid(engine.grid),
+      fluids: engine.fluidSubsystem.clientDefinitions(),
+      fluidCells: engine.fluidSubsystem.visibleSnapshot(),
+      fireCells: engine.fireSubsystem.visibleSnapshot(),
+      blockFlames: engine.fluidSubsystem.blockFlameDefinitions(),
+      burningEffect: MiningDataManager.getInstance().getParticleEffect(engine.mapConfig?.burningEffectId)?.config ?? null,
       position: {
         x: Math.round(pos.x),
         y: Math.round(pos.y),

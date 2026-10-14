@@ -39,6 +39,10 @@ export function buildMiningLoadout(character: { maxInventorySlots?: number; inve
       holdRotation: inv.item.holdRotation ?? 0,
       muzzleOffsetX: inv.item.muzzleOffsetX ?? 0,
       muzzleOffsetY: inv.item.muzzleOffsetY ?? 0,
+      heldParticleEffectId: inv.item.heldParticleEffectId ?? null,
+      heldParticleOffsetX: inv.item.heldParticleOffsetX ?? 0,
+      heldParticleOffsetY: inv.item.heldParticleOffsetY ?? 0,
+      heldLightConfig: (inv.item.heldLightConfig as MiningGearLayer['heldLightConfig']) ?? null,
     }));
 
   const weapon = equippedGear.find((inv) => inv.item.subType === 'WEAPON');

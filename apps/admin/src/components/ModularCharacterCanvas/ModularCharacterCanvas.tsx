@@ -10,6 +10,7 @@ import {
   type ToolSocketOverride,
 } from './hooks/useModularCanvasScene';
 import { useModularGear, type ModularGearItem } from './hooks/useModularGear';
+import { useHeldParticlePreview } from './hooks/useHeldParticlePreview';
 import './ModularCharacterCanvas.css';
 
 export type {
@@ -83,7 +84,7 @@ export default function ModularCharacterCanvas({
   className = '',
   aimAngle,
 }: ModularCharacterCanvasProps) {
-  const { containerRef, nodesRef, loading, error } = useModularCanvasScene({
+  const { containerRef, appRef, nodesRef, loading, error } = useModularCanvasScene({
     manifestUrl,
     manifestData,
     baseAssetPath,
@@ -106,8 +107,15 @@ export default function ModularCharacterCanvas({
     height,
   });
 
-  useModularGear({
+  const { gearSpritesRef } = useModularGear({
     nodesRef,
+    selectedGear,
+    isSceneReady: !loading,
+  });
+
+  useHeldParticlePreview({
+    appRef,
+    gearSpritesRef,
     selectedGear,
     isSceneReady: !loading,
   });

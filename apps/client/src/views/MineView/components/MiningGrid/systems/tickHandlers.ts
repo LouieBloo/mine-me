@@ -1,5 +1,7 @@
 import { withVolume } from '../../../../../services/sound/sfxVolume';
 import {
+  type FireWireCell,
+  type FluidWireCell,
   type MiningStateTickPayload,
   MiningTileType,
   MINING_CONFIG,
@@ -294,6 +296,57 @@ export function applyTileUpdates(payload: MiningStateTickPayload, ctx: TickHandl
   world.mouseControllerRef.current?.setGrid(grid);
 }
 
+/**
+ * Fluid the server revealed or changed: the fluid in newly revealed tiles, then this tick's changed cells.
+ * Works on the client's copy of the fluid grid, and redraws only what changed.
+ */
+export function applyFluidUpdates(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  const renderer = ctx.world.fluidRendererRef?.current;
+  if (!renderer) return;
+  const cells: FluidWireCell[] = [];
+  for (const tile of payload.revealedTiles ?? []) {
+    if (tile.fluid) cells.push([tile.x, tile.y, tile.fluid[0], tile.fluid[1]]);
+  }
+  if (payload.fluidCells) cells.push(...payload.fluidCells);
+  if (cells.length > 0) renderer.apply(cells);
+  renderer.render();
+}
+
+/** Fires that started or stopped: in newly revealed tiles, then this tick's changes. Updates the client's copy of the fire grid. */
+export function applyFireUpdates(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  const field = ctx.world.fireFieldRef?.current;
+  if (!field) return;
+  const cells: FireWireCell[] = [];
+  for (const tile of payload.revealedTiles ?? []) {
+    if (tile.fire) cells.push([tile.x, tile.y, 1]);
+  }
+  if (payload.fireCells) cells.push(...payload.fireCells);
+  if (cells.length > 0) field.apply(cells);
+}
+
+/** Splashes of bodies crossing a fluid's surface, and the sound of cells catching fire. */
+export function applyFluidSounds(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  const sounds = ctx.world.fluidSoundsRef?.current;
+  if (!sounds) return;
+  if (payload.fluidSplashes && payload.fluidSplashes.length > 0) sounds.onSplashes(payload.fluidSplashes);
+  if (payload.fireCells && payload.fireCells.length > 0) sounds.onFireChanges(payload.fireCells, performance.now());
+}
+
+/** Who is on fire: the local player, mobs and other players. The burning effect follows each of them. */
+export function applyBurning(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  const burning = ctx.world.burningBodiesRef?.current;
+  if (!burning) return;
+  const bodies: Array<{ id: string; x: number; y: number }> = [];
+  if (payload.burning) bodies.push({ id: 'self', x: payload.position.x, y: payload.position.y });
+  for (const mob of payload.mobs ?? []) {
+    if (mob.burning) bodies.push({ id: `mob:${mob.id}`, x: mob.position.x, y: mob.position.y });
+  }
+  for (const other of payload.otherPlayers ?? []) {
+    if (other.burning) bodies.push({ id: `player:${other.characterId}`, x: other.position.x, y: other.position.y });
+  }
+  burning.sync(bodies);
+}
+
 /** Chest glow, torch light + flame, and ambient block particles for the tiles that changed. */
 export function syncTileLights(revealed: NonNullable<MiningStateTickPayload['revealedTiles']>, ctx: TickHandlerContext): void {
   const { world } = ctx;
@@ -366,5 +419,9 @@ export function handleStateTick(payload: MiningStateTickPayload, ctx: TickHandle
   applySessionData(payload, ctx);
   applyEffects(payload, ctx); // explosions are remembered here for applyTileUpdates
   applyTileUpdates(payload, ctx);
+  applyFluidUpdates(payload, ctx);
+  applyFireUpdates(payload, ctx);
+  applyFluidSounds(payload, ctx); // after the fluid and fire fields are up to date
+  applyBurning(payload, ctx);
   miningProfiler.recordExternal('Socket Tick Handler', performance.now() - start);
 }

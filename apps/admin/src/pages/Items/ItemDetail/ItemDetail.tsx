@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { EffectsEditor } from '../../../components/EffectsEditor/EffectsEditor';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../contexts/ToastContext';
@@ -11,7 +11,7 @@ import ItemGearUpload from './ItemGearUpload';
 import ItemInGameSpriteUpload from './ItemInGameSpriteUpload/ItemInGameSpriteUpload';
 import ItemSoundEffectUpload from './ItemSoundEffectUpload/ItemSoundEffectUpload';
 import ItemColliderEditor from '../../../components/ItemColliderEditor/ItemColliderEditor';
-import ItemLightEffectConfig from './ItemLightEffectConfig/ItemLightEffectConfig';
+import ItemLightEffectConfig from '../../../components/ItemLightEffectConfig/ItemLightEffectConfig';
 import ItemProjectileConfig from './ItemProjectileConfig/ItemProjectileConfig';
 import ItemInGameScale from './ItemInGameScale/ItemInGameScale';
 import ItemHoldPreview from './ItemHoldPreview/ItemHoldPreview';
@@ -32,9 +32,10 @@ export default function ItemDetail() {
   const [data, setData] = useState<any>(isNew ? {
     itemKey: '', name: '', description: '', type: 'GEAR', subType: 'HEAD',
     vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', triggerMode: 'SINGLE', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, throwable: false, experience: 0,
-    combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null, physicsConfig: null, lightConfig: null,
+    combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null, heldParticleEffectId: null, heldLightConfig: null, physicsConfig: null, lightConfig: null,
     shootsProjectiles: false, projectileConfig: null, inGameScale: 1.0,
-    holdOffsetX: 0, holdOffsetY: 0, holdRotation: 0, muzzleOffsetX: 0, muzzleOffsetY: 0
+    holdOffsetX: 0, holdOffsetY: 0, holdRotation: 0, muzzleOffsetX: 0, muzzleOffsetY: 0,
+    heldParticleOffsetX: 0, heldParticleOffsetY: 0
   } : null);
   const [enums, setEnums] = useState<ItemEnums | null>(null);
   const [effectsList, setEffectsList] = useState<any[]>([]);
@@ -83,11 +84,20 @@ export default function ItemDetail() {
           holdRotation: typeof json.holdRotation === 'number' ? json.holdRotation : 0,
           muzzleOffsetX: typeof json.muzzleOffsetX === 'number' ? json.muzzleOffsetX : 0,
           muzzleOffsetY: typeof json.muzzleOffsetY === 'number' ? json.muzzleOffsetY : 0,
+          heldParticleEffectId: json.heldParticleEffectId ?? null,
+          heldLightConfig: json.heldLightConfig ?? null,
+          heldParticleOffsetX: typeof json.heldParticleOffsetX === 'number' ? json.heldParticleOffsetX : 0,
+          heldParticleOffsetY: typeof json.heldParticleOffsetY === 'number' ? json.heldParticleOffsetY : 0,
         });
         setLoading(false);
       })
       .catch(err => { toast.error(err.message); setLoading(false); });
   }, [id, isNew]);
+
+  const heldParticle = useMemo(
+    () => particleEffectsList.find((pe) => pe.id === data?.heldParticleEffectId) ?? null,
+    [particleEffectsList, data?.heldParticleEffectId]
+  );
 
   const handleTypeChange = (newType: string) => {
     const firstSubType = enums?.subTypes[newType]?.[0] || '';
@@ -253,7 +263,7 @@ export default function ItemDetail() {
             {/* Particle Effect */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Particle Effect</label>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Ground Particle Effect</label>
                 {data.particleEffectId && (
                   <button
                     type="button"
@@ -276,6 +286,38 @@ export default function ItemDetail() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Held Particle Effect */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label htmlFor="held-particle-effect" className="text-xs font-black text-slate-400 uppercase tracking-widest">Held Particle Effect</label>
+                {data.heldParticleEffectId && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/particle-effects/${data.heldParticleEffectId}`)}
+                    className="cursor-pointer text-[10px] font-bold text-sky-600 hover:text-sky-800 underline"
+                  >
+                    View FX ↗
+                  </button>
+                )}
+              </div>
+              <select
+                id="held-particle-effect"
+                value={data.heldParticleEffectId || ''}
+                onChange={(e) => setData({ ...data, heldParticleEffectId: e.target.value || null })}
+                className="item-detail-select"
+              >
+                <option value="">None (No Held Effect)</option>
+                {particleEffectsList.map(pe => (
+                  <option key={pe.id} value={pe.id}>
+                    {pe.name} ({pe.config?.emitterType || pe.type})
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-400 font-medium">
+                Plays from the item while it is held. Position it in the hold preview below.
+              </p>
             </div>
 
             {/* Experience */}
@@ -439,6 +481,16 @@ export default function ItemDetail() {
               />
             </div>
 
+            {/* Held Light: the same light config, given off while the item is held */}
+            <div className="md:col-span-2 pt-4 border-t border-slate-100">
+              <ItemLightEffectConfig
+                title="Held Light"
+                description="Lights up the cavern around whoever holds this item. Position it in the hold preview below."
+                lightConfig={data.heldLightConfig}
+                onChange={(cfg) => setData({ ...data, heldLightConfig: cfg })}
+              />
+            </div>
+
             {/* Shoots Projectiles Config Panel */}
             <div className="md:col-span-2 pt-4 border-t border-slate-100">
               <ItemProjectileConfig
@@ -454,6 +506,8 @@ export default function ItemDetail() {
             <div className="md:col-span-2 pt-4 border-t border-slate-100">
               <ItemHoldPreview
                 item={data}
+                heldParticleConfig={heldParticle?.config ?? null}
+                heldParticleName={heldParticle?.name}
                 onChange={(updatedFields) => setData((prev: any) => ({ ...prev, ...updatedFields }))}
               />
             </div>

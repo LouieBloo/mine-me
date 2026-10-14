@@ -37,6 +37,8 @@ import { separateBodies, type SeparationParticipant } from './mobSeparation';
 
 export interface MiningActiveMobSession extends SwingState {
   id: string;
+  /** On fire (set by the burning system each tick). */
+  burning?: boolean;
   mobId: string;
   name: string;
   mobBody: MiningMobBody;
@@ -220,7 +222,13 @@ export class MiningMobSubsystem {
         if (Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= 3 && y <= 5) continue;
         const tile = grid[y]?.[x];
         const floor = grid[y + 1]?.[x];
-        if (tile && tile.type === MiningTileType.EMPTY && floor && isTileSolid(floor.type)) {
+        if (
+          tile &&
+          tile.type === MiningTileType.EMPTY &&
+          floor &&
+          isTileSolid(floor.type) &&
+          this.world.fluids.grid.getLevel(x, y) <= 0 // not inside a sealed oil pocket
+        ) {
           candidates.push({ x: x + 0.5, y: y + 1.0 });
         }
       }
@@ -317,6 +325,7 @@ export class MiningMobSubsystem {
 
       const intent = mob.ai.update(dt, aiContext);
 
+      mob.mobBody.fluidEnvironment = this.world.fluids.environment;
       mob.mobBody.processMovement(
         intent.moveX,
         intent.jump,
@@ -557,7 +566,7 @@ export class MiningMobSubsystem {
    * Removes health from a mob. Not for gameplay code: hits go through `world.damage.applyDamage`,
    * which calls this after its own checks.
    */
-  public damageMob(instanceId: string, damage: number): void {
+  public damageMob(instanceId: string, damage: number, options: { stun?: boolean } = {}): void {
     const mob = this.activeMobs.get(instanceId);
     if (!mob || mob.health <= 0) return;
 
@@ -565,7 +574,7 @@ export class MiningMobSubsystem {
 
     // A hit only costs the mob control if it isn't already stunned or still immune from a recent
     // stun, so sustained fire can't stun-lock it. Damage and knockback apply regardless.
-    if (mob.health > 0 && this.canBeStunned(mob)) {
+    if (mob.health > 0 && options.stun !== false && this.canBeStunned(mob)) {
       mob.hitStunDurationMs = mob.hitStunMs;
       mob.animationState = 'damage';
       // Being hit interrupts whatever the mob was doing

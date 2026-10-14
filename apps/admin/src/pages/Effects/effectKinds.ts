@@ -21,6 +21,7 @@ export const EFFECT_KINDS: readonly EffectKind[] = [
   { flag: 'healthGain', label: 'Grants Health Gain', short: 'Health Gain', badge: 'text-emerald-800 bg-emerald-100 border border-emerald-200' },
   { flag: 'staminaGain', label: 'Grants Stamina Gain', short: 'Stamina Gain', badge: 'text-blue-800 bg-blue-100 border border-blue-200' },
   { flag: 'explodes', label: 'Explodes', short: 'Explodes', badge: 'text-slate-700 bg-slate-100 border border-slate-200' },
+  { flag: 'ignites', label: 'Ignites (sets flammable things alight; value = strength in %, 100 = normal)', short: 'Ignites', badge: 'text-red-800 bg-red-100 border border-red-200' },
 ];
 
 export const DEFAULT_EFFECT_FLAGS: Record<string, boolean> = Object.fromEntries(

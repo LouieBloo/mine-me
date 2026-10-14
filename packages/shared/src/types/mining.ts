@@ -1,5 +1,6 @@
-import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig, CharacterSoundEffectsConfig } from './index';
-import type { ParticleEffect } from './particles';
+import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig, HeldLightConfig, CharacterSoundEffectsConfig, FluidSoundEffectsConfig } from './index';
+import type { ParticleEffect, ParticleEffectConfig } from './particles';
+import type { Flammability } from './fluid';
 import type { SkeletonManifest } from './modularRig';
 
 // ============================================================================
@@ -91,6 +92,12 @@ export const MINING_CONFIG = {
   ROCK_CRUSH_DAMAGE: 50,
   // Player hit reaction: grace period after taking damage, and the knockback impulse (tiles/s, away from the source)
   SERVER_TICK_RATE: 30, // simulation steps per second (fixed timestep)
+  FLUID_BODY_DRAG: 6, // per second: how hard a fluid brakes a thrown or dropped body, scaled by viscosity and depth
+  FLUID_SPLASH_ENTER_DEPTH: 0.3, // a body counts as in a fluid once this much of its height is under
+  FLUID_SPLASH_EXIT_DEPTH: 0.1, // ...and as out once less than this is (the gap stops splash spam at the surface)
+  FLUID_SPLASH_COOLDOWN_SECONDS: 0.4, // fewest seconds between splashes of the same body
+  FLUID_MIN_FALL_FACTOR: 0.2, // fluid never slows a fall below this share of the normal top speed
+  FLUID_STEP_TICKS: 3, // the fluid simulation steps every Nth tick (10 Hz at 30 Hz ticks)
   MAX_CATCHUP_TICKS: 5, // most steps run in one loop wake-up; any more lag is dropped instead of spiralling
   DEFAULT_PLAYER_MAX_HEALTH: 100,
   PLAYER_HIT_INVULNERABILITY: 0.5,
@@ -179,6 +186,8 @@ export interface MiningBlockConfig {
   requiredPickPower?: number;
   idleParticleEffectId?: string | null;
   idleParticleEffect?: ParticleEffect | null;
+  /** How the block burns; null/absent means it does not. */
+  flammability?: Flammability | null;
   dropTable?: DropTable | null;
   createdAt?: string | Date;
   updatedAt?: string | Date;
@@ -487,6 +496,19 @@ export interface MiningActiveDynamite {
 export interface MiningGearLayer {
   url: string;
   subType: GearSubType;
+  shootsProjectiles?: boolean;
+  throwable?: boolean;
+  holdOffsetX?: number;
+  holdOffsetY?: number;
+  holdRotation?: number;
+  muzzleOffsetX?: number;
+  muzzleOffsetY?: number;
+  /** Particle effect (by id) emitted from the layer while it is held, and where. */
+  heldParticleEffectId?: string | null;
+  heldParticleOffsetX?: number;
+  heldParticleOffsetY?: number;
+  /** Light given off while the layer is held. */
+  heldLightConfig?: HeldLightConfig | null;
 }
 
 /**
@@ -504,6 +526,8 @@ export interface MiningRemotePlayer {
   flashlightOn?: boolean;
   animationState: 'idle' | 'walk' | 'mine' | 'jump' | 'climb';
   gearLayers?: MiningGearLayer[];
+  /** On fire. Absent when not (it is only sent while true). */
+  burning?: boolean;
 }
 
 /**
@@ -513,6 +537,16 @@ export interface MiningRemotePlayer {
 export interface MiningSessionClientState {
   /** The visible grid (fog of war applied). */
   grid: MiningClientTile[][];
+  /** How to draw each fluid in the mine, sent once. Missing means the mine has no fluids. */
+  fluids?: { id: number; typeKey: string; name: string; color: string; opacity: number; viscosity: number; density: number; flame?: { effect: ParticleEffectConfig | null; light: ItemLightConfig | null }; sounds?: FluidSoundEffectsConfig }[];
+  /** Fluid in the cells already revealed, as [x, y, fluidId, level]; later changes arrive in each tick's `fluidCells`. */
+  fluidCells?: [x: number, y: number, fluidId: number, level: number][];
+  /** Cells already on fire in the revealed part of the mine, as [x, y, 1]; later changes arrive in each tick's `fireCells`. */
+  fireCells?: [x: number, y: number, burning: 0 | 1][];
+  /** The particle effect drawn on anything that is on fire (a player or a mob). Absent: none. */
+  burningEffect?: ParticleEffectConfig | null;
+  /** How burning blocks look, by tile type, for the block types that can burn. */
+  blockFlames?: { tileType: number; flame: { effect: ParticleEffectConfig | null; light: ItemLightConfig | null } }[];
   /** Current player position on the grid. */
   position: MiningPosition;
   /** Items on the ground that can be picked up. */
@@ -626,7 +660,7 @@ export interface MiningBlockHitEvent {
  */
 export type MiningMobDynamic = Pick<
   MiningActiveMob,
-  'id' | 'position' | 'velocity' | 'health' | 'isFacingLeft' | 'isMining' | 'miningTarget' | 'animationState'
+  'id' | 'position' | 'velocity' | 'health' | 'isFacingLeft' | 'isMining' | 'miningTarget' | 'animationState' | 'burning'
 >;
 
 export type MiningRemotePlayerDynamic = Pick<
@@ -640,6 +674,7 @@ export type MiningRemotePlayerDynamic = Pick<
   | 'aimDirection'
   | 'flashlightOn'
   | 'animationState'
+  | 'burning'
 >;
 
 /** A dropped item as ticks carry it: where it is. Its description arrives once in `spawned`. */
@@ -661,6 +696,14 @@ export interface MiningSpawnedEntities {
   droppedItems?: MiningDroppedItem[];
 }
 
+/** A body crossing the surface of a fluid: `fluidId` is the fluid's cell id (see `FluidClientDefinition`). */
+export interface MiningFluidSplashEvent {
+  kind: 'enter' | 'exit';
+  fluidId: number;
+  x: number;
+  y: number;
+}
+
 /** 30 Hz real-time simulation snapshot emitted by server to client. */
 export interface MiningStateTickPayload {
   tick: number;
@@ -676,6 +719,8 @@ export interface MiningStateTickPayload {
   /** Body flags the client cannot derive from position/velocity alone (see PlayerPredictor). */
   bodyState: { isGrounded: boolean; isOnLadder: boolean; knockbackRemaining: number };
   isMining: boolean;
+  /** The receiving player is on fire (only present while true). */
+  burning?: boolean;
   miningTarget?: MiningPosition;
   miningProgress?: number;
   temporaryBackpack?: MiningBackpackItem[];
@@ -697,7 +742,16 @@ export interface MiningStateTickPayload {
   explosions?: MiningExplosionEvent[];
   /** Block damage hit events (e.g. tool swing hits dealing damage) triggered during this tick. */
   blockHits?: MiningBlockHitEvent[];
-  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number }[];
+  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; fluid?: [fluidId: number, level: number]; fire?: 1 }[];
+  /**
+   * Fluid cells that changed this tick, as [x, y, fluidId, level]. Only cells the fog of war has revealed
+   * are ever sent (a newly revealed tile carries its fluid in `revealedTiles`).
+   */
+  fluidCells?: [x: number, y: number, fluidId: number, level: number][];
+  /** Players and mobs that waded into or climbed out of a fluid this tick, near the receiving player (for splash sounds). */
+  fluidSplashes?: MiningFluidSplashEvent[];
+  /** Cells where fire started (1) or stopped (0) this tick, as [x, y, burning]. Only revealed cells are ever sent. */
+  fireCells?: [x: number, y: number, burning: 0 | 1][];
   /** Other players in the shared room (dynamic fields only). An empty array means "none". */
   otherPlayers?: MiningRemotePlayerDynamic[];
   /** Active mobs and NPCs (dynamic fields only). An empty array means "none". */
@@ -742,6 +796,8 @@ export interface MiningPathWaypoint {
 
 /** State of an active mob within a mining cavern session. */
 export interface MiningActiveMob {
+  /** On fire. Absent when not (it is only sent while true). */
+  burning?: boolean;
   id: string; // Instance ID e.g. "mob_123_1"
   mobId: string; // Database Mob ID
   name: string;
@@ -855,6 +911,14 @@ export interface MiningMapConfigData {
   rockDamageMinSpeed?: number;
   rockDamagePerSpeed?: number;
   rockDamageMax?: number;
+  /** Fire (players and mobs): damage per second while burning, and how long burning lasts after the last touch of fire. */
+  burnDamagePerSecond?: number;
+  burnSeconds?: number;
+  /** Heat: how far (tiles) a fire's heat reaches, and the damage per second at the fire itself for a material of heat 1. */
+  heatRadius?: number;
+  heatDamagePerSecond?: number;
+  /** The ParticleEffect (by id) drawn on a burning player or mob. None: nothing drawn. */
+  burningEffectId?: string | null;
   /** Hostile NPC / Mob Spawning */
   mobSpawnCount?: number;
   mobSpawnMinDepth?: number;
@@ -897,6 +961,12 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   rockDamageMinSpeed: 6,
   rockDamagePerSpeed: 5,
   rockDamageMax: 80,
+  // Burning for the default 5 s costs 30 health; oil (heat 3) hurts about 4.5 per second at its edge
+  burnDamagePerSecond: 6,
+  burnSeconds: 5,
+  heatRadius: 2.5,
+  heatDamagePerSecond: 1.5,
+  burningEffectId: null,
   mobSpawnCount: 3,
   mobSpawnMinDepth: 5,
   // No built-in mobs: the active map config (database) says which mobs live in the mine

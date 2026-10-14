@@ -13,6 +13,8 @@ import * as CharacterController from '../controllers/admin/character.controller'
 import * as CharacterLevelController from '../controllers/admin/character-level.controller';
 import * as EffectController from '../controllers/admin/effect.controller';
 import * as BlockController from '../controllers/admin/block.controller';
+import * as FluidController from '../controllers/admin/fluid.controller';
+import * as FluidSoundController from '../controllers/admin/fluidSound.controller';
 import * as MiningConfigController from '../controllers/admin/miningConfig.controller';
 import * as ParticleEffectController from '../controllers/admin/particleEffect.controller';
 import * as SoundController from '../controllers/admin/sound.controller';
@@ -90,6 +92,14 @@ adminRouter.get('/effects/:id', EffectController.getEffect);
 adminRouter.post('/effects', runValidation(AdminValidation.effectValidation), EffectController.createEffect);
 adminRouter.put('/effects/:id', runValidation(AdminValidation.effectValidation), EffectController.updateEffect);
 adminRouter.delete('/effects/:id', EffectController.deleteEffect);
+
+// FLUIDS
+adminRouter.get('/fluids', FluidController.getFluids);
+adminRouter.get('/fluids/:id', FluidController.getFluid);
+adminRouter.post('/fluids', FluidController.createFluid);
+adminRouter.put('/fluids/:id', FluidController.updateFluid);
+adminRouter.delete('/fluids/:id', FluidController.deleteFluid);
+adminRouter.patch('/fluids/:id/sound-effects/:slot', FluidSoundController.requireFluidSoundSlot, FluidSoundController.setFluidSoundSlot);
 
 // MINING BLOCKS
 adminRouter.get('/blocks', BlockController.getBlocks);

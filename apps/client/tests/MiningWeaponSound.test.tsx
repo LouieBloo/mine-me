@@ -73,6 +73,11 @@ vi.mock('../src/contexts/SocketContext', () => ({
 vi.mock('../src/views/MineView/components/MiningGrid/hooks/useMiningScene', () => ({
   useMiningScene: () => ({
     containersReady: true,
+    fluidRendererRef: { current: null },
+    fireFieldRef: { current: null },
+    fireRendererRef: { current: null },
+    burningBodiesRef: { current: null },
+    fluidSoundsRef: { current: null },
     tileTextureLoaded: true,
     cameraRef: { current: null },
     gridContainerRef: { current: null },
