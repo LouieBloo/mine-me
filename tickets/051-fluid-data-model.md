@@ -1,6 +1,6 @@
 # 051 - Fluid data model (Fluid table, shared type, loader)
 
-**Priority:** P1 - **Status:** Done, pending the Oil row (`--apply` not run) - **Part of:** fluids + fire epic (051-061)
+**Priority:** P1 - **Status:** Done; Oil script applied (owner confirmed 2026-10-14) - **Part of:** fluids + fire epic (051-061)
 
 ## Problem
 The game has no fluids. Per the project rules, fluid definitions are game data: Postgres, loaded at server start via `definitionLoaders`, reloaded after every admin save (ticket 036), mirrored to `packages/shared/src/data` as dev seed only.
@@ -33,6 +33,6 @@ Schema (additive `db push`), shared `FluidDefinition`/`Flammability` + `validate
 - **Schema:** new `Fluid` table (additive `db push`, applied to the dev DB).
 - **Shared:** `types/fluid.ts` (`Flammability`, `FluidDefinition`, `validateFluid`, `validateFlammability`), `data/fluids.json` dev mirror with Oil. `validateFluid` is what the 060 admin API will enforce.
 - **Server:** `fluid` added to the loader and reloader Prisma picks; `loadDefinitionsFromDatabase` reads the table (empty is fine), `loadDefinitionsFromFiles` reads `fluids.json` if present; `MiningDataManager.getFluids()/getFluid(keyOrId)` (first duplicate typeKey wins; rows without a key are skipped). Reloads after admin saves already go through the same path.
-- **Data:** `prisma/add-oil-fluid.ts` (dry run by default, idempotent, never overwrites an existing Oil). Dry run checked against the dev DB: "will be created". **Not applied: run `npx tsx prisma/add-oil-fluid.ts --apply` when ready, then restart the server.**
+- **Data:** `prisma/add-oil-fluid.ts` (dry run by default, idempotent, never overwrites an existing Oil). Dry run checked against the dev DB: "will be created". **Applied** (owner confirmed 2026-10-14; not re-checked against the DB).
 - **Tests:** shared validator (27), loader/data-manager/script tests. Mutation-checked: dropping the flowRate rule and dropping the duplicate-key guard each fail a test.
 - **Not done here (by design):** admin CRUD/page (060), client delivery of fluid definitions (054), numeric grid ids (052).

@@ -54,17 +54,17 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Set `
 | [048](048-per-use-sound-volume.md) | Per-use sound volume, relative to the global effects volume | P2 (Done) |
 | [049](049-flame-pickaxe-held-particles.md) | Flame Pickaxe and held-item particle effects | P2 (Done) |
 | [050](050-held-item-light-and-ember-flame.md) | Held item light (pattern for any item) and a subtler flame | P2 (Done) |
-| [051](051-fluid-data-model.md) | Fluid data model (table, shared type, loader) | P1 (Done, Oil not yet applied) |
+| [051](051-fluid-data-model.md) | Fluid data model (table, shared type, loader) | P1 (Done) |
 | [052](052-fluid-simulation.md) | Fluid cell simulation | P1 (Done) |
-| [053](053-oil-in-map-generation.md) | Oil pockets in map generation | P2 (Done, needs `--apply` on Oil) |
+| [053](053-oil-in-map-generation.md) | Oil pockets in map generation | P2 (Done) |
 | [054](054-fluid-network-and-rendering.md) | Fluid wire format and client rendering | P1 (Done) |
 | [055](055-fluid-entity-interaction.md) | Fluids affect players, mobs, drops and rocks | P2 (Done) |
-| [056](056-flammability-and-ignition-sources.md) | Flammability fields and ignition sources | P1 (Done, needs `--apply` on the Ignites effect) |
+| [056](056-flammability-and-ignition-sources.md) | Flammability fields and ignition sources | P1 (Done) |
 | [057](057-fire-simulation.md) | Fire simulation (spreads through tiles) | P1 (Done; drawn in 061) |
 | [058](058-burning-status-and-heat.md) | Burning status and heat damage | P1 (Done; drawn in 061) |
 | [059](059-flammable-blocks.md) | Flammable blocks (grass, dead wood) | P3 (Done; no block flammable until set in the admin) |
 | [060](060-admin-fluids-page.md) | Admin: Fluids page | P1 (Done) |
-| [061](061-fire-and-fluid-effects.md) | Fire visuals and light (sounds in 062) | P2 (Done, needs `--apply` for the fire visuals) |
+| [061](061-fire-and-fluid-effects.md) | Fire visuals and light (sounds in 062) | P2 (Done) |
 | [062](062-fire-and-fluid-sounds.md) | Fire and fluid sounds through the sound library | P2 (Done; needs audio files) |
 | [063](063-fluid-look.md) | Fluid look: smooth surface, waves, depth shading, streams | P2 (Done; judge the look in the game) |
 | [064](064-torches-ignite-oil.md) | Torches light oil | P2 (Done; data applied, restart server) |

@@ -25,6 +25,6 @@ Seeded generation places pockets only within depth range, respects frequency bou
 ## Implementation notes
 - Schema `Fluid.generation Json?` (additive `db push`, applied); shared `FluidGeneration` + `validateFluidGeneration`; `fluids.json` Oil gets generation.
 - `MiningMapGenerator.placeFluidPockets`, `generateMiningMapWithFluids` (grid + `fluidCells`); `MiningGameEngine` passes the loaded fluids and places the cells into the fluid grid (still sealed, so nothing flows at the start).
-- `prisma/add-oil-fluid.ts` now also gives an existing Oil its generation settings when it has none (dry run says "will get its generation settings"). **Not applied: needs `--apply`** (done together with other pending data changes at the end of the epic; the server must restart afterwards).
+- `prisma/add-oil-fluid.ts` now also gives an existing Oil its generation settings when it has none (dry run says "will get its generation settings"). **Applied** (owner confirmed 2026-10-14; not re-checked against the DB).
 - **Tests:** generator (10: pockets are full open cells, depth range, square sizes, sealed, nothing inside/over, reproducible, nothing without settings, more with a higher percentage, edges) and engine (pockets start still, no mob spawns inside); shared validator tests. Mutation-checked: the chest guard, the mob guard and the solid-ring rule each fail a test.
 - Pre-existing flaky test noticed: `MiningGameEngine.drops.test.ts` "sends the list when items spawn..." fails about 1 run in 12 on the tree without any fluid changes too. Not touched here.

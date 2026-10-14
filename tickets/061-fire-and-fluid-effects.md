@@ -1,6 +1,6 @@
 # 061 - Fire visuals and light (sounds moved to 062)
 
-**Priority:** P2 - **Status:** Done (2026-10-13), needs the data script `--apply` - **Depends on:** 054, 057
+**Priority:** P2 - **Status:** Done (2026-10-13); data script applied (owner confirmed 2026-10-14) - **Depends on:** 054, 057
 
 ## Scope
 Flames on burning cells (Pixi particles from `ParticleEffect` rows, never hard-coded), flickering light from the definition, heat shimmer optional, burn-out/ash, ignition and crackle sounds through the sound library (slots defined once, each with its own volume), entity burning visuals (flame on a burning character/mob), admin controls in the Fluids page and block page.
@@ -21,6 +21,6 @@ Flames on burning cells (Pixi particles from `ParticleEffect` rows, never hard-c
 - **Server:** the definitions load now includes the particle effect library (`MiningDataManager.getParticleEffect`); `MiningFluidSubsystem.clientDefinitions` resolves each fluid's flame; the join state carries the burning effect; `MiningMapConfig.burningEffectId` (additive `db push`, applied) through service, validation and the JSON mirror.
 - **Client:** `FireRenderer` (flames and lights on burning cells), `BurningBodies` (the effect on burning players and mobs), created with the scene, fed by `applyBurning` (each tick) and synced in the frame ticker; `FluidRenderer.flameOf`.
 - **Admin:** flame picker and light panel in the flammability panel (`ItemLightEffectConfig` moved to `components/` because two screens now use it); "Burning Look" card on the Mine Generator page.
-- **Data:** `prisma/add-fire-visuals.ts` creates the "Oil Fire" and "Burning" particle effects and points Oil and the active mine config at them, each only if unset (dry run by default, idempotent). **Not applied: needs `--apply`; the server must restart afterwards.**
+- **Data:** `prisma/add-fire-visuals.ts` creates the "Oil Fire" and "Burning" particle effects and points Oil and the active mine config at them, each only if unset (dry run by default, idempotent). **Applied** (owner confirmed 2026-10-14; not re-checked against the DB).
 - **Tests:** flame/light rendering and caps (14), burning bodies (7), tick handler (5), server definitions/wire (7), admin panels (8 + 5), data script (7). Mutation-checked: "nearest first" ordering and the burning filter each fail a test.
 - Not covered automatically: the Pixi scene wiring and the ticker line (both are only constructed in a real browser). Judged in the game.
