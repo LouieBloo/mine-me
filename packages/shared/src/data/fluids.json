@@ -11,6 +11,13 @@
     "flowRate": 0.35,
     "minLevel": 0.05,
     "flowThreshold": 0.02,
+    "appearance": {
+      "highlight": 0.5,
+      "waveSpeed": 0.6,
+      "depthOpacity": 0.25,
+      "waveAmplitude": 0.06,
+      "depthDarkening": 0.35
+    },
     "flammability": {
       "heat": 3,
       "burnsInto": null,
@@ -34,10 +41,10 @@
       "minSize": 2,
       "maxDepth": null,
       "minDepth": 2,
-      "percentage": 1.5
+      "percentage": 10
     },
     "soundEffects": null,
     "createdAt": "2026-10-13T22:58:35.715Z",
-    "updatedAt": "2026-10-14T00:23:07.705Z"
+    "updatedAt": "2026-10-14T02:43:16.389Z"
   }
 ]

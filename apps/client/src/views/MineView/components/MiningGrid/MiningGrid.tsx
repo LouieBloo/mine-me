@@ -16,6 +16,7 @@ import {
   type GameItem,
   CharacterModEngine,
   calculateEffectiveSwingSpeed,
+  isTileSolid,
 } from '@mine-me/shared';
 import type { EmitterHandle } from '../../../../components/game/particles/ParticleEngine';
 import { useSocket } from '../../../../contexts/SocketContext';
@@ -324,6 +325,15 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       fluidSoundsRef.current = null;
     };
   }, [containersReady, fluidRendererRef, fireFieldRef, soundManager]);
+
+  // Falling fluid is drawn as a stream, which needs to know which neighbouring cells are solid terrain
+  useEffect(() => {
+    fluidRendererRef.current?.setSolidSampler((x, y) => {
+      const tile = gridRef.current[y]?.[x];
+      return !tile || isTileSolid(tile.type);
+    });
+    return () => fluidRendererRef.current?.setSolidSampler(undefined);
+  }, [containersReady, fluidRendererRef]);
 
   // Burning blocks are drawn by looking up the type of the tile that is on fire
   useEffect(() => {

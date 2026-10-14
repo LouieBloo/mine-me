@@ -7,7 +7,7 @@ import { syncJson } from '../../services/admin.service';
 /** The columns an admin may set. `typeKey` is only set when a fluid is created. */
 const EDITABLE_FIELDS = [
   'name', 'description', 'color', 'opacity', 'density', 'viscosity', 'flowRate', 'minLevel', 'flowThreshold',
-  'flammability', 'generation',
+  'appearance', 'flammability', 'generation',
 ] as const;
 
 const NUMERIC_FIELDS = ['opacity', 'density', 'viscosity', 'flowRate', 'minLevel', 'flowThreshold'] as const;
@@ -81,6 +81,7 @@ export const createFluid = async (req: Request, res: Response) => {
         flowRate: input.flowRate!,
         minLevel: input.minLevel!,
         flowThreshold: input.flowThreshold!,
+        appearance: jsonOrNull(input.appearance),
         flammability: jsonOrNull(input.flammability),
         generation: jsonOrNull(input.generation),
       },
@@ -117,6 +118,7 @@ export const updateFluid = async (req: Request, res: Response) => {
     for (const field of ['color', ...NUMERIC_FIELDS] as const) {
       if (input[field] !== undefined) (data as Record<string, unknown>)[field] = input[field];
     }
+    if (input.appearance !== undefined) data.appearance = jsonOrNull(input.appearance);
     if (input.flammability !== undefined) data.flammability = jsonOrNull(input.flammability);
     if (input.generation !== undefined) data.generation = jsonOrNull(input.generation);
 

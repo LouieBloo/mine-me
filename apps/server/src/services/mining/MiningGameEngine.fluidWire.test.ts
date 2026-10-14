@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MiningTileType, quantizeFluidLevel, type MiningStateTickPayload } from '@mine-me/shared';
+import { DEFAULT_FLUID_APPEARANCE, MiningTileType, quantizeFluidLevel, type MiningStateTickPayload } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MiningSessionManager } from './MiningSessionManager';
 
@@ -74,10 +74,16 @@ describe('fluids on the wire', () => {
     engine.fluidSubsystem.placeFluid(33, 31, 'OIL', 0.25);
     engine.grid[31][31].revealed = true;
     const state = MiningSessionManager.getInstance().buildClientState(engine, cid);
-    expect(state.fluids).toEqual([
-      { id: 1, typeKey: 'OIL', name: 'Oil', color: '#0b0b0d', opacity: 0.9, viscosity: 0.6, density: 0.8 },
+    expect(state.fluids).toMatchObject([
+      { id: 1, typeKey: 'OIL', name: 'Oil', color: '#0b0b0d', opacity: 0.9, viscosity: 0.6, density: 0.8, appearance: DEFAULT_FLUID_APPEARANCE },
     ]);
     expect(state.fluidCells).toEqual([[31, 31, 1, quantizeFluidLevel(0.75)]]);
+  });
+
+  it('sends how the fluid looks, with whatever the admin left out filled in', () => {
+    engine.dataManager.getFluid('OIL')!.appearance = { waveAmplitude: 0.02, highlight: 9 };
+    const state = MiningSessionManager.getInstance().buildClientState(engine, cid);
+    expect(state.fluids![0].appearance).toEqual({ ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0.02, highlight: 1 });
   });
 
   it('reports oil that drained away as an empty cell', () => {

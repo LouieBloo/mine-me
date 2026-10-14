@@ -110,6 +110,27 @@ describe('admin fluids', () => {
     expect(syncJson).toHaveBeenCalled();
   });
 
+  it('saves how the fluid looks, and clears it back to the defaults with null', async () => {
+    const res = await request(app).put('/admin/fluids/fluid_oil').send({ appearance: { waveAmplitude: 0.02, waveSpeed: 0.3 } });
+    expect(res.status).toBe(200);
+    expect(rows[0].appearance).toEqual({ waveAmplitude: 0.02, waveSpeed: 0.3 });
+    await request(app).put('/admin/fluids/fluid_oil').send({ appearance: null });
+    expect(rows[0].appearance).toBe(Prisma.JsonNull);
+  });
+
+  it('refuses a look setting out of range', async () => {
+    const res = await request(app).put('/admin/fluids/fluid_oil').send({ appearance: { waveAmplitude: 5 } });
+    expect(res.status).toBe(400);
+    expect(res.body.errors.some((e: string) => e.includes('appearance.waveAmplitude'))).toBe(true);
+    expect(rows[0].appearance).toBeUndefined();
+  });
+
+  it('creates a fluid with a look', async () => {
+    const res = await request(app).post('/admin/fluids').send({ ...NEW_WATER, appearance: { highlight: 0.8 } });
+    expect(res.status).toBe(201);
+    expect(rows.find((r) => r.typeKey === 'WATER')!.appearance).toEqual({ highlight: 0.8 });
+  });
+
   it('keeps what a partial update does not mention', async () => {
     await request(app).put('/admin/fluids/fluid_oil').send({ name: 'Crude Oil' });
     expect(rows[0]).toMatchObject({ name: 'Crude Oil', color: '#0b0b0d', density: 0.8 });

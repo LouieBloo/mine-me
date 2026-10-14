@@ -119,11 +119,12 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
 
   let predictionRef: any;
 
-  const mount = () => {
+  const mount = (renderProps?: { speed?: number }) => {
     predictionRef = { current: new MiningPredictionState(playerBodyRef.current, keysPressedRef.current) };
-    renderHook(() =>
+    const hook = renderHook(({ speed }: { speed?: number }) =>
       useMiningTicker({
         app: mockApp,
+        miningSwingSpeed: speed,
         playerContainerRef: { current: playerContainer },
         gridContainerRef: { current: gridContainer },
         fallingRocksContainerRef: { current: null },
@@ -145,9 +146,11 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
         keysPressedRef,
         isMiningRef,
         miningTargetRef,
-      })
+      }),
+      { initialProps: renderProps ?? {} }
     );
     expect(tickerCallbacks.length).toBe(1);
+    return hook;
   };
   /** Changing the keys always bumps the input sequence, exactly as the real input handlers do. */
   const press = (change: Record<string, boolean>) => {
@@ -167,6 +170,14 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
     expect(playerBodyRef.current.position.x).toBeGreaterThan(2.05);
     // The sprite is drawn through the partial step after the body's last one, so it is at or just ahead of the body
     expect(playerContainer.x).toBeGreaterThanOrEqual(playerBodyRef.current.position.x * 64 - 1e-6);
+  });
+
+  it('paces the swing animation with the latest swing speed, not the one from the first render', () => {
+    const hook = mount({ speed: 5 });
+    hook.rerender({ speed: 2 });
+    press({ right: true });
+    frames(1);
+    expect(playerSpriteRef.current.setSwingSpeed).toHaveBeenLastCalledWith(2);
   });
 
   it('moves the sprite on the very first frame after a key press, before any whole step has run', () => {

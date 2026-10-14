@@ -69,6 +69,38 @@ describe('FluidDetail editing', () => {
     expect(JSON.parse(opts.body)).toMatchObject({ name: 'Crude Oil', flowRate: 0.2, typeKey: 'OIL', flammability: OIL.flammability, generation: OIL.generation });
   });
 
+  it('shows the look settings (the defaults when none are stored), saves them, and feeds the preview', async () => {
+    renderAt('/fluids/fluid_oil');
+    await screen.findByDisplayValue('Oil');
+    expect(screen.getByLabelText('Wave Height')).toHaveValue(0.06);
+    expect(screen.getByLabelText('Depth Darkening')).toHaveValue(0.35);
+    fireEvent.change(screen.getByLabelText('Wave Height'), { target: { value: '0.02' } });
+    fireEvent.change(screen.getByLabelText('Wave Speed'), { target: { value: '0.3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Fluid' }));
+    expect(await screen.findByText('Fluid saved!')).toBeInTheDocument();
+    expect(JSON.parse(lastCall('PUT')![1].body).appearance).toEqual({
+      waveAmplitude: 0.02, waveSpeed: 0.3, highlight: 0.5, depthDarkening: 0.35, depthOpacity: 0.25,
+    });
+  });
+
+  it('loads the look a fluid already has, keeping defaults for what it leaves out', async () => {
+    mockFetchWithAuth.mockImplementation(() => ok({ ...OIL, appearance: { waveAmplitude: 0.01, highlight: 0.9 } }));
+    renderAt('/fluids/fluid_oil');
+    await screen.findByDisplayValue('Oil');
+    expect(screen.getByLabelText('Wave Height')).toHaveValue(0.01);
+    expect(screen.getByLabelText('Surface Highlight')).toHaveValue(0.9);
+    expect(screen.getByLabelText('Wave Speed')).toHaveValue(0.6);
+  });
+
+  it('refuses a look setting out of range, naming it', async () => {
+    renderAt('/fluids/fluid_oil');
+    await screen.findByDisplayValue('Oil');
+    fireEvent.change(screen.getByLabelText('Wave Height'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Fluid' }));
+    expect(await screen.findByText(/appearance.waveAmplitude/)).toBeInTheDocument();
+    expect(lastCall('PUT')).toBeUndefined();
+  });
+
   it('lets the flames be picked from the particle library and saves the choice', async () => {
     mockFetchWithAuth.mockImplementation((url: string, opts?: any) => {
       if (url === '/api/admin/particle-effects') return ok([{ id: 'pe_flame', name: 'Oil Fire' }, { id: 'pe_ember', name: 'Ember' }]);

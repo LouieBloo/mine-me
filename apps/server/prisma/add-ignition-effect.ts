@@ -1,6 +1,7 @@
 /**
  * One-off, idempotent data script (ticket 056): adds the "Ignites" effect and gives it to the items that
- * should set oil alight today: the Dynamite (its fuse sparks and blast) and the Flame Pickaxe (its flame).
+ * should set oil alight today: the Dynamite (its fuse sparks and blast), the Flame Pickaxe (its flame) and the
+ * Torch (a placed torch lights the oil it touches, ticket 064).
  *
  *  1. Creates the "Ignites" effect (the `ignites` flag) if it does not exist.
  *  2. Attaches it to each listed item that exists and does not already have it, at strength 100 (%).
@@ -13,7 +14,7 @@
 import { PrismaClient } from '@prisma/client';
 
 export const IGNITES_EFFECT_NAME = 'Ignites';
-export const IGNITING_ITEM_NAMES = ['Dynamite', 'Flame Pickaxe'];
+export const IGNITING_ITEM_NAMES = ['Dynamite', 'Flame Pickaxe', 'Torch'];
 export const DEFAULT_STRENGTH = 100;
 
 export interface ItemAttachment {

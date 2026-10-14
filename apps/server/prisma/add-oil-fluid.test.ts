@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { validateFluidGeneration } from '@mine-me/shared';
 import { planOil, loadOilDefinition, OIL_TYPE_KEY } from './add-oil-fluid';
 
 describe('add-oil-fluid', () => {
@@ -21,7 +22,9 @@ describe('add-oil-fluid', () => {
     expect(oil).toMatchObject({ typeKey: 'OIL', color: '#0b0b0d' });
     expect(oil.flammability).toBeTruthy();
     expect(oil.viscosity).toBeGreaterThan(0.5);
-    expect(oil.generation).toMatchObject({ minDepth: 8, percentage: 1.5 });
+    // The mirror follows admin edits, so only check that Oil generates and that the settings are valid, not their tuned values
+    expect(oil.generation).toBeTruthy();
+    expect(validateFluidGeneration(oil.generation)).toEqual([]);
   });
 
   it('refuses an invalid mirror', () => {

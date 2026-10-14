@@ -75,6 +75,28 @@ describe('FireRenderer', () => {
     expect(t.engines.lights.size).toBe(0);
   });
 
+  it('puts flames on the fluid as it is drawn: packed onto its floor, not hanging at a cell\'s raw level', () => {
+    // Half a cell over half a cell: drawn as one full cell resting on the floor of row 7
+    t.fluids.apply([[5, 6, 1, q(0.5)], [5, 7, 1, q(0.5)]]);
+    t.fire.set(5, 6, true);
+    t.sync();
+    expect(t.engines.particles.addEmitter.mock.calls[0][1]).toEqual({ x: 5.5 * TILE, y: 7 * TILE });
+  });
+
+  it('follows the drawn surface while it eases, so flames move with the fluid you see', () => {
+    t.burn(5, 6, 0.5);
+    t.sync();
+    t.fluids.apply([[5, 6, 1, q(0.1)]], true); // the oil burns down
+    t.sync();
+    expect(t.engines.emitters[0].position.y).toBe(6 * TILE + TILE / 2); // nothing has eased yet
+    t.fluids.update(0);
+    t.fluids.update(0.1);
+    t.sync();
+    const y = t.engines.emitters[0].position.y;
+    expect(y).toBeGreaterThan(6 * TILE + TILE / 2);
+    expect(y).toBeLessThan(7 * TILE - 0.1 * TILE);
+  });
+
   it('moves the flames down as the burning surface sinks', () => {
     t.burn(5, 6, 1);
     t.sync();

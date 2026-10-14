@@ -87,6 +87,9 @@ export function useMiningTicker({
   const animTimeRef = useRef<number>(0);
   const lastSwingTimeRef = useRef<number>(0);
   const lastSwingSoundTimeRef = useRef<number>(0);
+  // The ticker callback is created once per `app`, so read the live swing speed through a ref
+  const miningSwingSpeedRef = useRef(miningSwingSpeed);
+  miningSwingSpeedRef.current = miningSwingSpeed;
 
   useEffect(() => {
     if (!app) return;
@@ -217,9 +220,10 @@ export function useMiningTicker({
       miningProfiler.startSection('Sprites & Anim');
       const isMiningKeyDown = Boolean(keysPressedRef?.current?.miningKey);
       const nowMs = performance.now();
+      const liveSwingSpeed = miningSwingSpeedRef.current;
       const currentSwingSpeed =
-        typeof miningSwingSpeed === 'number' && miningSwingSpeed > 0
-          ? miningSwingSpeed
+        typeof liveSwingSpeed === 'number' && liveSwingSpeed > 0
+          ? liveSwingSpeed
           : DEFAULT_MINING_SWING_SPEED;
       const swingCycleDurationMs = (1 / currentSwingSpeed) * 1000;
       const swingLingerMs = Math.min(300, swingCycleDurationMs * 0.45);
@@ -257,6 +261,7 @@ export function useMiningTicker({
       world.fireRendererRef?.current?.sync(nowMs, currentPos);
       world.burningBodiesRef?.current?.move('self', currentPos.x, currentPos.y);
       world.fluidSoundsRef?.current?.syncLoops(nowMs, currentPos);
+      world.fluidRendererRef?.current?.update(nowMs / 1000);
 
       // 5. Remote Players & Active Mobs
       miningProfiler.startSection('Remote Players');

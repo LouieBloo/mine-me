@@ -1,6 +1,7 @@
 import type { ItemLightConfig } from '../../types/index';
 import type { ParticleEffectConfig } from '../../types/particles';
 import type { FluidSoundEffectsConfig } from '../../types/sound';
+import type { FluidAppearance } from '../../types/fluid';
 import { NO_FLUID } from './FluidRegistry';
 
 /** Fluid levels travel as whole numbers: this many steps per full cell (1/128 each, so a squeezed cell up to ~2 fits a byte). */
@@ -20,6 +21,8 @@ export interface FluidClientDefinition {
   /** Movement speed lost at full submersion, 0 to 1 (the client predicts its own wading with this). */
   viscosity: number;
   density: number;
+  /** Waves, highlight and depth shading. Absent: the defaults. */
+  appearance?: FluidAppearance;
   /** What a burning cell of this fluid looks like. Absent: nothing is drawn for its fire. */
   flame?: { effect: ParticleEffectConfig | null; light: ItemLightConfig | null };
   /** The fluid's playable sounds (enter, exit, ignite, burn). Absent: silent. */

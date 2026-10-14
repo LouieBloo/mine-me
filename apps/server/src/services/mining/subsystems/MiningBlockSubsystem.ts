@@ -154,7 +154,8 @@ export class MiningBlockSubsystem {
     return canPlaceBuildable(MiningTileType.TORCH, tile.type);
   }
 
-  public placeTorch(session: MiningPlayerSession | undefined, target: MiningPosition): boolean {
+  /** `itemId` is the torch item used; its Ignites effect (if any) is what lets the placed torch light oil. */
+  public placeTorch(session: MiningPlayerSession | undefined, target: MiningPosition, itemId?: string): boolean {
     if (!this.validateTorchPlacement(session, target)) return false;
 
     const tile = this.world.grid[target.y][target.x];
@@ -168,6 +169,7 @@ export class MiningBlockSubsystem {
       type: MiningTileType.TORCH,
       damageStage: 0,
     });
+    if (itemId) this.world.ignition.addTorch(target.x, target.y, itemId);
 
     return true;
   }

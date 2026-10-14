@@ -1,4 +1,4 @@
-import { layoutFluidCell, type FireField, type ItemLightConfig } from '@mine-me/shared';
+import type { FireField, ItemLightConfig } from '@mine-me/shared';
 import type { ParticleEngine, EmitterHandle } from '../../../../../components/game/particles/ParticleEngine';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
 import type { LightSource } from '../../../../../components/game/lighting/LightSource';
@@ -96,10 +96,13 @@ export class FireRenderer {
     this.syncLights(cells);
   }
 
-  /** Where flames rise from in a cell: the middle of the burning surface (the top of a burning block). */
+  /**
+   * Where flames rise from in a cell: the surface of the burning fluid as it is drawn (it eases and is packed onto
+   * its floor, so this follows the fluid you see, not the cell's raw level), or the middle of a burning block.
+   */
   private surfacePixel(x: number, y: number): { x: number; y: number } {
-    const rect = layoutFluidCell(this.fluids.field, x, y, this.tileSize);
-    return { x: (x + 0.5) * this.tileSize, y: rect ? rect.y : (y + 0.5) * this.tileSize };
+    const surface = this.fluids.drawnSurfaceY(x, y);
+    return { x: (x + 0.5) * this.tileSize, y: surface ?? (y + 0.5) * this.tileSize };
   }
 
   private syncEmitters(cells: BurningCell[]): void {

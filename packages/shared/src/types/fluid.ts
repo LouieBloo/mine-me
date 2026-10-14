@@ -39,6 +39,67 @@ export interface FluidGeneration {
   maxSize: number;
 }
 
+/**
+ * How a fluid looks beyond its colour: surface waves, the highlight on its surface and how it darkens with
+ * depth. Stored as one Json column; any missing field takes its default (`resolveFluidAppearance`), so a
+ * new look setting never needs a data migration. Thick fluids use small, slow waves; thin ones larger, faster.
+ */
+export interface FluidAppearance {
+  /** Height of the surface waves as a fraction of a cell (0 = still). */
+  waveAmplitude: number;
+  /** Wave cycles per second. */
+  waveSpeed: number;
+  /** Strength of the light line and soft glow along the surface, 0 (none) to 1. */
+  highlight: number;
+  /** How much darker the fluid gets with depth, 0 (none) to 1 (black at full depth). */
+  depthDarkening: number;
+  /** How much more opaque the fluid gets with depth, 0 (none) to 1 (fully opaque at full depth). */
+  depthOpacity: number;
+}
+
+export const DEFAULT_FLUID_APPEARANCE: Readonly<FluidAppearance> = {
+  waveAmplitude: 0.06,
+  waveSpeed: 0.6,
+  highlight: 0.5,
+  depthDarkening: 0.35,
+  depthOpacity: 0.25,
+};
+
+/** The range each appearance setting may take (the admin form and validation share it). */
+export const FLUID_APPEARANCE_LIMITS: Readonly<Record<keyof FluidAppearance, { min: number; max: number }>> = {
+  waveAmplitude: { min: 0, max: 0.3 },
+  waveSpeed: { min: 0, max: 4 },
+  highlight: { min: 0, max: 1 },
+  depthDarkening: { min: 0, max: 1 },
+  depthOpacity: { min: 0, max: 1 },
+};
+
+/** A stored appearance made whole: missing, wrong-typed or out-of-range fields fall back or clamp. */
+export function resolveFluidAppearance(value: unknown): FluidAppearance {
+  const stored = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const out = { ...DEFAULT_FLUID_APPEARANCE };
+  for (const key of Object.keys(FLUID_APPEARANCE_LIMITS) as (keyof FluidAppearance)[]) {
+    const v = stored[key];
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      const { min, max } = FLUID_APPEARANCE_LIMITS[key];
+      out[key] = Math.min(max, Math.max(min, v));
+    }
+  }
+  return out;
+}
+
+/** Problems with an appearance value, one message each (empty when it is valid). */
+export function validateFluidAppearance(value: unknown): string[] {
+  if (value === null || value === undefined) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return ['appearance must be an object or null'];
+  const a = value as Record<string, unknown>;
+  const errors: string[] = [];
+  for (const [key, { min, max }] of Object.entries(FLUID_APPEARANCE_LIMITS)) {
+    if (a[key] !== undefined && !inRange(a[key], min, max)) errors.push(`appearance.${key} must be between ${min} and ${max}`);
+  }
+  return errors;
+}
+
 /** A fluid as stored in the database and sent to the game. */
 export interface FluidDefinition {
   id: string;
@@ -60,6 +121,8 @@ export interface FluidDefinition {
   minLevel: number;
   /** A cell only spreads sideways when the level difference exceeds this. */
   flowThreshold: number;
+  /** Null (or absent): the default look (see `resolveFluidAppearance`). */
+  appearance?: Partial<FluidAppearance> | null;
   /** Null (or absent): the fluid does not burn. */
   flammability?: Flammability | null;
   /** Null (or absent): the fluid is not placed in generated mines. */
@@ -142,6 +205,7 @@ export function validateFluid(fluid: Partial<FluidDefinition>): string[] {
   if (!isNumber(fluid.flowRate) || fluid.flowRate <= 0 || fluid.flowRate > 1) errors.push('flowRate must be above 0 and at most 1');
   if (!inRange(fluid.minLevel, 0, 1)) errors.push('minLevel must be between 0 and 1');
   if (!inRange(fluid.flowThreshold, 0, 1)) errors.push('flowThreshold must be between 0 and 1');
+  errors.push(...validateFluidAppearance(fluid.appearance));
   errors.push(...validateFlammability(fluid.flammability));
   errors.push(...validateFluidGeneration(fluid.generation));
   return errors;

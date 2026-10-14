@@ -10,6 +10,7 @@ import {
   toFluidWireCell,
   type FluidCellChange,
   type FluidClientDefinition,
+  resolveFluidAppearance,
   type FluidEnvironment,
   type FluidWireCell,
   type MiningFluidSplashEvent,
@@ -188,6 +189,7 @@ export class MiningFluidSubsystem {
         opacity: def.opacity,
         viscosity: def.viscosity,
         density: def.density,
+        appearance: resolveFluidAppearance(def.appearance),
         ...(effect || light ? { flame: { effect, light } } : {}),
         ...(def.sounds && Object.keys(def.sounds).length > 0 ? { sounds: def.sounds } : {}),
       });

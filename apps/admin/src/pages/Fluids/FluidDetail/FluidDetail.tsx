@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { validateFluid, type FluidDefinition, type FluidGeneration, type Flammability } from '@mine-me/shared';
+import {
+  DEFAULT_FLUID_APPEARANCE, FLUID_APPEARANCE_LIMITS, resolveFluidAppearance, validateFluid,
+  type FluidAppearance, type FluidDefinition, type FluidGeneration, type Flammability,
+} from '@mine-me/shared';
 import { useApi } from '../../../hooks/useApi';
 import { useToast } from '../../../contexts/ToastContext';
 import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
@@ -22,6 +25,7 @@ interface FluidForm {
   flowRate: number;
   minLevel: number;
   flowThreshold: number;
+  appearance: FluidAppearance;
   flammability: Flammability | null;
   generation: FluidGeneration | null;
 }
@@ -38,6 +42,7 @@ export const NEW_FLUID: FluidForm = {
   flowRate: 0.5,
   minLevel: 0.05,
   flowThreshold: 0.02,
+  appearance: { ...DEFAULT_FLUID_APPEARANCE },
   flammability: null,
   generation: null,
 };
@@ -60,6 +65,21 @@ const PHYSICS: NumberSetting[] = [
   { key: 'flowRate', label: 'Flow Rate', hint: 'How quickly it spreads each step, above 0 up to 1 (thick fluids are low)', min: 0.01, max: 1, step: 0.05 },
   { key: 'minLevel', label: 'Minimum Level', hint: 'A cell holding less than this evaporates. Higher keeps thin films from smearing out; lower lets fluid spread thinner', min: 0, max: 1, step: 0.01 },
   { key: 'flowThreshold', label: 'Flow Threshold', hint: 'It only spreads sideways when neighbouring cells differ by more than this, which lets a pool settle', min: 0, max: 1, step: 0.01 },
+];
+
+interface AppearanceSetting {
+  key: keyof FluidAppearance;
+  label: string;
+  hint: string;
+  step: number;
+}
+
+const LOOK: AppearanceSetting[] = [
+  { key: 'waveAmplitude', label: 'Wave Height', hint: 'How far the surface moves, as a fraction of a block (0 = still; thick fluids stay low)', step: 0.01 },
+  { key: 'waveSpeed', label: 'Wave Speed', hint: 'Wave cycles per second (thick fluids are slow)', step: 0.1 },
+  { key: 'highlight', label: 'Surface Highlight', hint: 'Strength of the light line and glow along the surface, 0 to 1', step: 0.05 },
+  { key: 'depthDarkening', label: 'Depth Darkening', hint: 'How much darker it gets deeper down, 0 to 1', step: 0.05 },
+  { key: 'depthOpacity', label: 'Depth Opacity', hint: 'How much more opaque it gets deeper down, 0 to 1', step: 0.05 },
 ];
 
 const show = (n: number): number | '' => (Number.isFinite(n) ? n : '');
@@ -112,6 +132,7 @@ export default function FluidDetail() {
           flowRate: data.flowRate,
           minLevel: data.minLevel,
           flowThreshold: data.flowThreshold,
+          appearance: resolveFluidAppearance(data.appearance),
           flammability: data.flammability ?? null,
           generation: data.generation ?? null,
         });
@@ -125,8 +146,14 @@ export default function FluidDetail() {
     setProblems([]);
   };
 
+  const setLook = (key: keyof FluidAppearance, value: number) => {
+    setForm((prev) => ({ ...prev, appearance: { ...prev.appearance, [key]: value } }));
+    setProblems([]);
+  };
+
   const preview = useMemo(
     () => ({
+      appearance: resolveFluidAppearance(form.appearance),
       color: /^#[0-9a-fA-F]{6}$/.test(form.color) ? form.color : '#000000',
       opacity: Number.isFinite(form.opacity) ? Math.min(1, Math.max(0, form.opacity)) : 1,
       density: Number.isFinite(form.density) && form.density > 0 ? form.density : 1,
@@ -134,7 +161,7 @@ export default function FluidDetail() {
       minLevel: Number.isFinite(form.minLevel) ? Math.min(1, Math.max(0, form.minLevel)) : 0.05,
       flowThreshold: Number.isFinite(form.flowThreshold) ? Math.min(1, Math.max(0, form.flowThreshold)) : 0.02,
     }),
-    [form.color, form.opacity, form.density, form.flowRate, form.minLevel, form.flowThreshold]
+    [form.color, form.opacity, form.appearance, form.density, form.flowRate, form.minLevel, form.flowThreshold]
   );
 
   const handleSave = async (e: React.FormEvent) => {
@@ -290,6 +317,22 @@ export default function FluidDetail() {
                   <input id="opacity" type="number" min={0} max={1} step={0.05} value={show(form.opacity)} onChange={(e) => set('opacity', e.target.value === '' ? NaN : Number(e.target.value))} className={inputClass} />
                   <span className="text-[11px] text-slate-400 font-medium">0 is invisible, 1 is solid</span>
                 </div>
+                {LOOK.map((setting) => (
+                  <div key={setting.key} className="space-y-2">
+                    <label htmlFor={setting.key} className={labelClass}>{setting.label}</label>
+                    <input
+                      id={setting.key}
+                      type="number"
+                      min={FLUID_APPEARANCE_LIMITS[setting.key].min}
+                      max={FLUID_APPEARANCE_LIMITS[setting.key].max}
+                      step={setting.step}
+                      value={show(form.appearance[setting.key])}
+                      onChange={(e) => setLook(setting.key, e.target.value === '' ? NaN : Number(e.target.value))}
+                      className={inputClass}
+                    />
+                    <span className="text-[11px] text-slate-400 font-medium">{setting.hint}</span>
+                  </div>
+                ))}
               </div>
             </section>
 

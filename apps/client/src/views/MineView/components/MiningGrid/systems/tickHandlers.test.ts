@@ -398,21 +398,21 @@ describe('handleStateTick', () => {
 });
 
 describe('applyFluidUpdates', () => {
-  const makeRenderer = () => ({ apply: vi.fn(), render: vi.fn() });
+  const makeRenderer = () => ({ apply: vi.fn(), render: vi.fn(), onTileChanged: vi.fn() });
   const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
 
   it('does nothing before the fluid renderer exists', () => {
     expect(() => applyFluidUpdates(tick({ fluidCells: [[1, 1, 1, 64]] }), makeCtx(makeWorld()))).not.toThrow();
   });
 
-  it('applies the tick\'s changed cells and redraws', () => {
+  it('applies the tick\'s changed cells eased (the fluid flows to them) and redraws', () => {
     const renderer = makeRenderer();
     applyFluidUpdates(tick({ fluidCells: [[1, 2, 1, 64], [3, 4, 0, 0]] }), makeCtx(makeWorld({ fluidRendererRef: ref(renderer) })));
-    expect(renderer.apply).toHaveBeenCalledWith([[1, 2, 1, 64], [3, 4, 0, 0]]);
+    expect(renderer.apply).toHaveBeenCalledWith([[1, 2, 1, 64], [3, 4, 0, 0]], true);
     expect(renderer.render).toHaveBeenCalledTimes(1);
   });
 
-  it('takes the fluid in newly revealed tiles first, then the tick\'s changes (so a later change wins)', () => {
+  it('shows the fluid in newly revealed tiles at once, then eases to the tick\'s changes (so a later change wins)', () => {
     const renderer = makeRenderer();
     applyFluidUpdates(
       tick({
@@ -424,7 +424,16 @@ describe('applyFluidUpdates', () => {
       }),
       makeCtx(makeWorld({ fluidRendererRef: ref(renderer) }))
     );
-    expect(renderer.apply).toHaveBeenCalledWith([[5, 5, 1, 128], [5, 5, 1, 100]]);
+    expect(renderer.apply.mock.calls).toEqual([[[[5, 5, 1, 128]]], [[[5, 5, 1, 100]], true]]);
+  });
+
+  it('tells the renderer about every tile that changed, so the fluid beside a mined block is redrawn', () => {
+    const renderer = makeRenderer();
+    applyFluidUpdates(
+      tick({ revealedTiles: [{ x: 5, y: 5, type: MiningTileType.EMPTY }, { x: 7, y: 2, type: MiningTileType.EMPTY, fluid: [1, 64] }] }),
+      makeCtx(makeWorld({ fluidRendererRef: ref(renderer) }))
+    );
+    expect(renderer.onTileChanged.mock.calls).toEqual([[5, 5], [7, 2]]);
   });
 
   it('still redraws (cheaply) on a tick with no fluid news, and does not call apply', () => {
@@ -438,7 +447,7 @@ describe('applyFluidUpdates', () => {
     const renderer = makeRenderer();
     const world = makeWorld({ fluidRendererRef: ref(renderer) });
     handleStateTick(payload({ fluidCells: [[1, 1, 1, 10]] }), makeCtx(world));
-    expect(renderer.apply).toHaveBeenCalledWith([[1, 1, 1, 10]]);
+    expect(renderer.apply).toHaveBeenCalledWith([[1, 1, 1, 10]], true);
   });
 });
 

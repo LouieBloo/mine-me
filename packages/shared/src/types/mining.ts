@@ -1,6 +1,6 @@
 import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig, HeldLightConfig, CharacterSoundEffectsConfig, FluidSoundEffectsConfig } from './index';
 import type { ParticleEffect, ParticleEffectConfig } from './particles';
-import type { Flammability } from './fluid';
+import type { Flammability, FluidAppearance } from './fluid';
 import type { SkeletonManifest } from './modularRig';
 
 // ============================================================================
@@ -538,7 +538,7 @@ export interface MiningSessionClientState {
   /** The visible grid (fog of war applied). */
   grid: MiningClientTile[][];
   /** How to draw each fluid in the mine, sent once. Missing means the mine has no fluids. */
-  fluids?: { id: number; typeKey: string; name: string; color: string; opacity: number; viscosity: number; density: number; flame?: { effect: ParticleEffectConfig | null; light: ItemLightConfig | null }; sounds?: FluidSoundEffectsConfig }[];
+  fluids?: { id: number; typeKey: string; name: string; color: string; opacity: number; viscosity: number; density: number; appearance?: FluidAppearance; flame?: { effect: ParticleEffectConfig | null; light: ItemLightConfig | null }; sounds?: FluidSoundEffectsConfig }[];
   /** Fluid in the cells already revealed, as [x, y, fluidId, level]; later changes arrive in each tick's `fluidCells`. */
   fluidCells?: [x: number, y: number, fluidId: number, level: number][];
   /** Cells already on fire in the revealed part of the mine, as [x, y, 1]; later changes arrive in each tick's `fireCells`. */

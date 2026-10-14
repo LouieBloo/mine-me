@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MINING_CONFIG, layoutFluidCell } from '@mine-me/shared';
+import {
+  DEFAULT_FLUID_APPEARANCE, FluidDisplay, FluidLayout, MINING_CONFIG, bandBelowLine, colorToCss, darkenColor, fluidBodyBands, fluidDepthShade,
+  fluidSurfaceWave, lightenColor, parseHexColor, type FluidAppearance, type FluidLevels,
+} from '@mine-me/shared';
 import { PREVIEW_HEIGHT, PREVIEW_WIDTH, PreviewScene } from './previewScene';
 import './FluidPreview.css';
 
@@ -7,22 +10,51 @@ const TILE_PX = 28;
 /** How often the game steps its fluid, in ms. */
 export const PREVIEW_STEP_MS = Math.round((MINING_CONFIG.FLUID_STEP_TICKS / MINING_CONFIG.SERVER_TICK_RATE) * 1000);
 
+/** How often the picture is redrawn so the waves move smoothly, in ms (the simulation steps more slowly than this). */
+export const PREVIEW_FRAME_MS = 33;
+
 export interface FluidPreviewSettings {
   color: string;
   opacity: number;
+  /** Waves, highlight and depth shading. Absent: the defaults. */
+  appearance?: FluidAppearance;
   density: number;
   flowRate: number;
   minLevel: number;
   flowThreshold: number;
 }
 
-/** Draws the tank: terrain, then the fluid through the same layout the game uses. */
+type DrawContext = Pick<
+  CanvasRenderingContext2D,
+  'clearRect' | 'fillRect' | 'fillStyle' | 'globalAlpha' | 'beginPath' | 'moveTo' | 'lineTo' | 'closePath' | 'fill' | 'stroke' | 'strokeStyle' | 'lineWidth'
+>;
+
+/** Fills a flat polygon (x0, y0, x1, y1, ...). */
+function fillPolygon(ctx: DrawContext, points: number[], style: string): void {
+  ctx.beginPath();
+  ctx.moveTo(points[0], points[1]);
+  for (let i = 2; i < points.length; i += 2) ctx.lineTo(points[i], points[i + 1]);
+  ctx.closePath();
+  ctx.fillStyle = style;
+  ctx.fill();
+}
+
+/**
+ * Draws the tank: terrain, then the fluid through the same shapes the game uses (sloped joined surface,
+ * waves at `timeSec`, depth shading, streams), so what is tuned here is what the game shows. `levels` is what
+ * to draw (the eased display, like the game); without it the tank's exact levels are drawn.
+ */
 export function drawPreview(
-  ctx: Pick<CanvasRenderingContext2D, 'clearRect' | 'fillRect' | 'fillStyle' | 'globalAlpha'>,
+  ctx: DrawContext,
   scene: PreviewScene,
-  look: Pick<FluidPreviewSettings, 'color' | 'opacity'>,
-  tile: number = TILE_PX
+  look: Pick<FluidPreviewSettings, 'color' | 'opacity' | 'appearance'>,
+  tile: number = TILE_PX,
+  timeSec = 0,
+  levels: FluidLevels = scene.toField()
 ): void {
+  const appearance = look.appearance ?? DEFAULT_FLUID_APPEARANCE;
+  const color = parseHexColor(look.color);
+  const highlight = lightenColor(color, 0.45);
   ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, PREVIEW_WIDTH * tile, PREVIEW_HEIGHT * tile);
   ctx.fillStyle = '#1e1208';
@@ -35,18 +67,32 @@ export function drawPreview(
       }
     }
   }
-  const field = scene.toField();
+  const layout = new FluidLayout(levels, tile, (x, y) => scene.isSolid(x, y));
   for (let y = 0; y < PREVIEW_HEIGHT; y++) {
     for (let x = 0; x < PREVIEW_WIDTH; x++) {
-      const rect = layoutFluidCell(field, x, y, tile);
-      if (!rect) continue;
-      ctx.globalAlpha = look.opacity;
-      ctx.fillStyle = look.color;
-      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-      if (rect.surface) {
-        ctx.fillStyle = '#ffffff';
-        ctx.globalAlpha = look.opacity * 0.35;
-        ctx.fillRect(rect.x, rect.y, rect.width, Math.min(3, rect.height));
+      for (const shape of layout.shapesAt(x, y)) {
+        for (const band of fluidBodyBands(shape, tile, appearance)) {
+          const shade = fluidDepthShade(look.opacity, appearance, band.depth);
+          fillPolygon(ctx, band.points, colorToCss(darkenColor(color, shade.darken), shade.opacity));
+        }
+        if (shape.stream) {
+          ctx.fillStyle = colorToCss(highlight, look.opacity * appearance.highlight * 0.5);
+          ctx.fillRect(shape.x + shape.width * 0.15, shape.top, shape.width * 0.2, shape.bottom - shape.top);
+        }
+        const wave = fluidSurfaceWave(shape, tile, timeSec, appearance);
+        if (!wave) continue;
+        const shade = fluidDepthShade(look.opacity, appearance, shape.depth + 0.125);
+        if (wave.fill.length > 0) fillPolygon(ctx, wave.fill, colorToCss(darkenColor(color, shade.darken), shade.opacity));
+        if (appearance.highlight <= 0) continue;
+        for (let band = 3; band >= 1; band--) {
+          fillPolygon(ctx, bandBelowLine(wave.line, (band * tile) / 32, shape.bodyBottom), colorToCss(highlight, look.opacity * appearance.highlight * 0.1));
+        }
+        ctx.beginPath();
+        ctx.moveTo(wave.line[0], wave.line[1]);
+        for (let i = 2; i < wave.line.length; i += 2) ctx.lineTo(wave.line[i], wave.line[i + 1]);
+        ctx.strokeStyle = colorToCss(highlight, look.opacity * Math.min(1, appearance.highlight * 1.2));
+        ctx.lineWidth = Math.max(1, tile / 32);
+        ctx.stroke();
       }
     }
   }
@@ -64,11 +110,23 @@ export const FluidPreview: React.FC<{ fluid: FluidPreviewSettings }> = ({ fluid 
     () => new PreviewScene({ density, flowRate, minLevel, flowThreshold }),
     [density, flowRate, minLevel, flowThreshold]
   );
-  const look = useRef({ color: fluid.color, opacity: fluid.opacity });
-  look.current = { color: fluid.color, opacity: fluid.opacity };
+  const look = useRef({ color: fluid.color, opacity: fluid.opacity, appearance: fluid.appearance });
+  look.current = { color: fluid.color, opacity: fluid.opacity, appearance: fluid.appearance };
+  const startedAt = useRef(Date.now());
   const [pouring, setPouring] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
   const [stats, setStats] = useState(scene.stats());
+  // What is drawn: the tank's levels eased between steps, exactly as the game draws them
+  const display = useMemo(() => new FluidDisplay(PREVIEW_WIDTH, PREVIEW_HEIGHT), [scene]);
+  const syncDisplay = (now: boolean) => {
+    const field = scene.toField();
+    for (let y = 0; y < PREVIEW_HEIGHT; y++) {
+      for (let x = 0; x < PREVIEW_WIDTH; x++) {
+        if (now) display.setNow(x, y, field.getFluidId(x, y), field.getLevel(x, y));
+        else display.setTarget(x, y, field.getFluidId(x, y), field.getLevel(x, y));
+      }
+    }
+  };
 
   useEffect(() => {
     setPouring(false);
@@ -77,21 +135,30 @@ export const FluidPreview: React.FC<{ fluid: FluidPreviewSettings }> = ({ fluid 
 
   const draw = () => {
     const ctx = canvasRef.current?.getContext('2d');
-    if (ctx) drawPreview(ctx, scene, look.current);
+    if (ctx) drawPreview(ctx, scene, look.current, TILE_PX, (Date.now() - startedAt.current) / 1000, display);
   };
 
   useEffect(() => {
+    syncDisplay(true);
     draw();
-    const timer = setInterval(() => {
+    const stepper = setInterval(() => {
       scene.step();
-      draw();
+      syncDisplay(false);
       setStats(scene.stats());
     }, PREVIEW_STEP_MS);
-    return () => clearInterval(timer);
+    // Redrawn faster than it steps, so the fluid flows and the waves move smoothly
+    const painter = setInterval(() => {
+      display.step(PREVIEW_FRAME_MS / 1000);
+      draw();
+    }, PREVIEW_FRAME_MS);
+    return () => {
+      clearInterval(stepper);
+      clearInterval(painter);
+    };
   }, [scene]);
 
-  // Colour and opacity changes show straight away, without resetting the tank
-  useEffect(draw, [fluid.color, fluid.opacity]);
+  // Look changes show straight away, without resetting the tank
+  useEffect(draw, [fluid.color, fluid.opacity, fluid.appearance]);
 
   const togglePour = () => {
     scene.setPouring(!pouring);
@@ -103,6 +170,7 @@ export const FluidPreview: React.FC<{ fluid: FluidPreviewSettings }> = ({ fluid 
   };
   const reset = () => {
     scene.reset();
+    syncDisplay(true);
     setPouring(false);
     setGateOpen(false);
     setStats(scene.stats());

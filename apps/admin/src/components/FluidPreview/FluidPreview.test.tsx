@@ -1,19 +1,30 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import FluidPreview, { PREVIEW_STEP_MS, drawPreview, type FluidPreviewSettings } from './FluidPreview';
+import FluidPreview, { PREVIEW_FRAME_MS, PREVIEW_STEP_MS, drawPreview, type FluidPreviewSettings } from './FluidPreview';
 import { PreviewScene } from './previewScene';
+import { DEFAULT_FLUID_APPEARANCE, FluidDisplay, type FluidAppearance } from '@mine-me/shared';
 
 const OIL: FluidPreviewSettings = { color: '#0b0b0d', opacity: 0.9, density: 0.8, flowRate: 0.35, minLevel: 0.05, flowThreshold: 0.02 };
 
 function fakeContext() {
   const fills: Array<{ style: string; alpha: number; rect: number[] }> = [];
+  const polygons: string[] = [];
+  const strokes: string[] = [];
   const ctx: any = {
     fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
     globalAlpha: 1,
     clearRect: vi.fn(),
     fillRect: vi.fn((...rect: number[]) => fills.push({ style: ctx.fillStyle, alpha: ctx.globalAlpha, rect })),
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    closePath: vi.fn(),
+    fill: vi.fn(() => polygons.push(ctx.fillStyle)),
+    stroke: vi.fn(() => strokes.push(ctx.strokeStyle)),
   };
-  return { ctx, fills };
+  return { ctx, fills, polygons, strokes };
 }
 
 describe('drawPreview', () => {
@@ -24,16 +35,55 @@ describe('drawPreview', () => {
     expect(fills.some((f) => f.style === OIL.color)).toBe(false);
   });
 
-  it('draws fluid in its own colour and opacity once there is some', () => {
+  it('draws fluid as shaded polygons in its own colour once there is some', () => {
     const scene = new PreviewScene(OIL);
     scene.setPouring(true);
     scene.step();
-    const { ctx, fills } = fakeContext();
-    drawPreview(ctx, scene, OIL, 10);
-    const fluidFills = fills.filter((f) => f.style === OIL.color);
-    expect(fluidFills.length).toBeGreaterThan(0);
-    expect(fluidFills[0].alpha).toBe(OIL.opacity);
+    const { ctx, polygons } = fakeContext();
+    drawPreview(ctx, scene, { ...OIL, appearance: { ...DEFAULT_FLUID_APPEARANCE, depthDarkening: 0, depthOpacity: 0, highlight: 0 } }, 10);
+    expect(polygons.length).toBeGreaterThan(0);
+    // Oil is near-black (#0b0b0d) at 0.9 opacity; with no depth shading every slice is exactly that
+    expect(new Set(polygons)).toEqual(new Set(['rgba(11, 11, 13, 0.9)']));
     expect(ctx.globalAlpha).toBe(1);
+  });
+
+  it('draws the levels it is given (the eased display), not the tank\'s exact ones', () => {
+    const scene = new PreviewScene(OIL);
+    scene.setPouring(true);
+    for (let i = 0; i < 6; i++) scene.step();
+    const exact = fakeContext();
+    drawPreview(exact.ctx, scene, OIL, 10);
+    expect(exact.polygons.length).toBeGreaterThan(0);
+    const eased = fakeContext();
+    drawPreview(eased.ctx, scene, OIL, 10, 0, new FluidDisplay(24, 12)); // nothing has eased in yet
+    expect(eased.polygons).toHaveLength(0);
+  });
+
+  it('draws a highlight line along the surface only when the look asks for one', () => {
+    const scene = new PreviewScene(OIL);
+    scene.setPouring(true);
+    for (let i = 0; i < 6; i++) scene.step();
+    const lit = fakeContext();
+    drawPreview(lit.ctx, scene, { ...OIL, appearance: { ...DEFAULT_FLUID_APPEARANCE, highlight: 1 } }, 10);
+    expect(lit.strokes.length).toBeGreaterThan(0);
+    const dull = fakeContext();
+    drawPreview(dull.ctx, scene, { ...OIL, appearance: { ...DEFAULT_FLUID_APPEARANCE, highlight: 0 } }, 10);
+    expect(dull.strokes).toHaveLength(0);
+  });
+
+  it('moves the waves with time, and holds still with no wave amplitude', () => {
+    const scene = new PreviewScene(OIL);
+    scene.setPouring(true);
+    for (let i = 0; i < 12; i++) scene.step();
+    const surfaceAt = (appearance: FluidAppearance, t: number) => {
+      const { ctx } = fakeContext();
+      drawPreview(ctx, scene, { ...OIL, appearance }, 10, t);
+      return JSON.stringify((ctx.lineTo as any).mock.calls);
+    };
+    const waving = { ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0.2 };
+    expect(surfaceAt(waving, 0)).not.toBe(surfaceAt(waving, 0.7));
+    const flat = { ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0 };
+    expect(surfaceAt(flat, 0)).toBe(surfaceAt(flat, 0.7));
   });
 });
 
@@ -53,11 +103,21 @@ describe('FluidPreview', () => {
   const evaporated = () => screen.getByText('Evaporated').nextSibling?.textContent;
   const inTank = () => Number(screen.getByText('In tank').nextSibling?.textContent);
 
-  it('steps the simulation at the game\'s fluid rate and draws every step', () => {
+  it('redraws many times per simulation step, so the waves move smoothly', () => {
     render(<FluidPreview fluid={OIL} />);
     const initial = drawn.ctx.clearRect.mock.calls.length;
-    act(() => { vi.advanceTimersByTime(PREVIEW_STEP_MS * 3); });
+    act(() => { vi.advanceTimersByTime(PREVIEW_FRAME_MS * 3); });
     expect(drawn.ctx.clearRect.mock.calls.length).toBe(initial + 3);
+    expect(PREVIEW_FRAME_MS).toBeLessThan(PREVIEW_STEP_MS);
+  });
+
+  it('steps the simulation at the game\'s fluid rate', () => {
+    render(<FluidPreview fluid={OIL} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pour' }));
+    act(() => { vi.advanceTimersByTime(PREVIEW_STEP_MS - 1); });
+    expect(inTank()).toBe(0);
+    act(() => { vi.advanceTimersByTime(1); });
+    expect(inTank()).toBeGreaterThan(0);
   });
 
   it('pours fluid into the tank until it is stopped', () => {

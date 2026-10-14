@@ -298,17 +298,20 @@ export function applyTileUpdates(payload: MiningStateTickPayload, ctx: TickHandl
 
 /**
  * Fluid the server revealed or changed: the fluid in newly revealed tiles, then this tick's changed cells.
- * Works on the client's copy of the fluid grid, and redraws only what changed.
+ * Works on the client's copy of the fluid grid; changes are drawn eased, so the fluid flows between steps.
  */
 export function applyFluidUpdates(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
   const renderer = ctx.world.fluidRendererRef?.current;
   if (!renderer) return;
-  const cells: FluidWireCell[] = [];
+  // Fluid that just came into view shows at once; fluid that moved eases there (the renderer's per-frame update)
+  const revealed: FluidWireCell[] = [];
   for (const tile of payload.revealedTiles ?? []) {
-    if (tile.fluid) cells.push([tile.x, tile.y, tile.fluid[0], tile.fluid[1]]);
+    if (tile.fluid) revealed.push([tile.x, tile.y, tile.fluid[0], tile.fluid[1]]);
+    // A mined or placed tile changes whether the fluid beside it rests or falls (the grid is already updated)
+    renderer.onTileChanged(tile.x, tile.y);
   }
-  if (payload.fluidCells) cells.push(...payload.fluidCells);
-  if (cells.length > 0) renderer.apply(cells);
+  if (revealed.length > 0) renderer.apply(revealed);
+  if (payload.fluidCells && payload.fluidCells.length > 0) renderer.apply(payload.fluidCells, true);
   renderer.render();
 }
 

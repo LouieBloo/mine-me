@@ -556,8 +556,8 @@ export class MiningGameEngine {
     return this.blockSubsystem.placeLadder(this.players.get(characterId), target);
   }
 
-  public placeTorch(characterId: string, target: MiningPosition): boolean {
-    return this.blockSubsystem.placeTorch(this.players.get(characterId), target);
+  public placeTorch(characterId: string, target: MiningPosition, itemId?: string): boolean {
+    return this.blockSubsystem.placeTorch(this.players.get(characterId), target, itemId);
   }
 
   public spawnBlockDrops(tx: number, ty: number, tileType: MiningTileType): void {

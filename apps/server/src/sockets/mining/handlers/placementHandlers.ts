@@ -111,7 +111,7 @@ export const handleMiningPlaceTorch = async (
   }
 
   // 4. Commit placement
-  if (!engine.placeTorch(characterId, torchTarget)) {
+  if (!engine.placeTorch(characterId, torchTarget, torch.itemId)) {
     await refundInventoryItem(characterId, torch.itemId);
     await broadcastInventory(characterId);
     return { success: false, error: placeError };

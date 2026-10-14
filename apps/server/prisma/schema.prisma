@@ -281,6 +281,8 @@ model Fluid {
   minLevel        Float    @default(0.05)
   // A cell only spreads sideways when the level difference exceeds this
   flowThreshold   Float    @default(0.02)
+  // How it looks: waves, highlight and depth shading (shared FluidAppearance shape; null = defaults)
+  appearance      Json?
   // Shared Flammability shape (null = not flammable)
   flammability    Json?
   // Where it appears in generated mines (shared FluidGeneration shape; null = never generated)
