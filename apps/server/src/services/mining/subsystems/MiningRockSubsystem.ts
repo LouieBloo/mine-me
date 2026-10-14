@@ -60,7 +60,7 @@ export class MiningRockSubsystem {
 
       if (rock.hasSettled && rock.settledTile) {
         const { x, y } = rock.settledTile;
-        if (isInBounds(x, y)) {
+        if (isInBounds(x, y, this.world.grid)) {
           grid[y][x] = { type: MiningTileType.ROCK, revealed: true };
           rigidWorld.addTileCollider(x, y);
           this.world.pushTileUpdate({ x, y, type: MiningTileType.ROCK });

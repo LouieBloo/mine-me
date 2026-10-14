@@ -12,6 +12,7 @@ import {
   type MiningInputState,
   type MiningPosition,
   type Vector2D,
+  getGridDimensions,
 } from '@mine-me/shared';
 import { fallDamageRule } from '../environmentalDamage';
 import { MiningPlayerBody } from '../physics/MiningPlayerBody';
@@ -53,6 +54,8 @@ export interface MiningPlayerSession {
   /** Seconds of damage immunity left after a hit. */
   invulnerableSeconds: number;
   isDead: boolean;
+  /** Takes no damage (sandbox test tool). */
+  godMode?: boolean;
   isMining: boolean;
   miningTarget: MiningPosition | null;
   miningProgress: number;
@@ -95,7 +98,7 @@ function isObstructedBySolidTiles(
     if (tx === Math.floor(px) && ty === Math.floor(py)) continue;
     if (tx === Math.floor(mx) && ty === Math.floor(my)) continue;
 
-    if (isInBounds(tx, ty)) {
+    if (isInBounds(tx, ty, grid)) {
       const tile = grid[ty][tx];
       if (tile && isTileSolid(tile.type)) {
         return true;
@@ -148,10 +151,7 @@ export class MiningPlayerManager {
         ? Math.floor(options.maxHealth)
         : MINING_CONFIG.DEFAULT_PLAYER_MAX_HEALTH;
 
-    const initialPos = {
-      x: MINING_CONFIG.ENTRANCE_X,
-      y: MINING_CONFIG.ENTRANCE_Y,
-    };
+    const initialPos = { ...this.world.spawnPoint };
     const playerBody = new MiningPlayerBody(initialPos);
 
     session = {
@@ -272,9 +272,10 @@ export class MiningPlayerManager {
       }
 
       // FoW reveal
+      const { width, height } = getGridDimensions(this.world.grid);
       const currentGridPos = {
-        x: Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.round(session.playerBody.position.x))),
-        y: Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.round(session.playerBody.position.y))),
+        x: Math.max(0, Math.min(width - 1, Math.round(session.playerBody.position.x))),
+        y: Math.max(0, Math.min(height - 1, Math.round(session.playerBody.position.y))),
       };
       if (
         !session.lastRevealGridPos ||
@@ -401,7 +402,7 @@ export class MiningPlayerManager {
     amount: number,
     options: { ignoreInvulnerability?: boolean } = {}
   ): { applied: boolean; died: boolean } {
-    if (!session || session.isDead) return { applied: false, died: false };
+    if (!session || session.isDead || session.godMode) return { applied: false, died: false };
     if (!options.ignoreInvulnerability && session.invulnerableSeconds > 0) {
       return { applied: false, died: false };
     }
@@ -416,6 +417,35 @@ export class MiningPlayerManager {
       return { applied: true, died: true };
     }
     return { applied: true, died: false };
+  }
+
+  /**
+   * Puts a player back at the start of a freshly rebuilt world: entrance, full health, nothing in the
+   * backpack, no mining in progress, and every entity described to them again.
+   */
+  public resetForNewWorld(session: MiningPlayerSession): void {
+    this.respawnPlayer(session);
+    session.known = createKnownEntities();
+    session.temporaryBackpack = [];
+    session.backpackDirty = true;
+    session.isMining = false;
+    session.miningTarget = null;
+    session.miningProgress = 0;
+    session.miningTotal = 0;
+    session.swingCooldown = 0;
+  }
+
+  /** Brings a dead player back at the entrance with full health (modes where death does not end the run). */
+  public respawnPlayer(session: MiningPlayerSession): void {
+    const body = session.playerBody;
+    body.position = { ...this.world.spawnPoint };
+    body.velocity = { x: 0, y: 0 };
+    body.isGrounded = false;
+    session.health = session.maxHealth;
+    session.isDead = false;
+    session.invulnerableSeconds = MINING_CONFIG.PLAYER_HIT_INVULNERABILITY;
+    session.lastRevealGridPos = null;
+    this.world.notifyPlayerHealth(session.characterId, session.health, session.maxHealth);
   }
 
   public increaseVisionRange(characterId: string, amount: number = 1): number {

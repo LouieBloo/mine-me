@@ -1,4 +1,5 @@
 import { MINING_CONFIG, isTileClimbable, type MiningInputState, type Vector2D } from '../types/mining';
+import { getGridDimensions } from './gridDimensions';
 import { MiningPhysicsBody, type MiningCollisionGrid } from './MiningPhysicsBody';
 
 export class MiningPlayerBody extends MiningPhysicsBody {
@@ -26,6 +27,7 @@ export class MiningPlayerBody extends MiningPhysicsBody {
    * Check if player's collider overlaps any LADDER (or ENTRANCE) tile within ladder grab width.
    */
   public checkIsOnLadder(grid: MiningCollisionGrid): boolean {
+    const { width, height } = getGridDimensions(grid);
     const minTileX = Math.floor(this.position.x - this.halfWidth + 0.001);
     const maxTileX = Math.floor(this.position.x + this.halfWidth - 0.001);
     const minTileY = Math.floor(this.position.y - this.halfHeight + 0.001);
@@ -33,7 +35,7 @@ export class MiningPlayerBody extends MiningPhysicsBody {
 
     for (let ty = minTileY; ty <= maxTileY; ty++) {
       for (let tx = minTileX; tx <= maxTileX; tx++) {
-        if (ty < 0 || ty >= MINING_CONFIG.GRID_HEIGHT || tx < 0 || tx >= MINING_CONFIG.GRID_WIDTH) {
+        if (ty < 0 || ty >= height || tx < 0 || tx >= width) {
           continue;
         }
         const row = grid[ty];

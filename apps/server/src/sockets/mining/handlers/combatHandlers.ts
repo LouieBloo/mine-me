@@ -2,7 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { prisma } from '../../../index';
 import { ITEM_ROLE_WHERE, type GameEventResult, type ItemPhysicsConfig, type ItemSoundEffectsConfig, type Vector2D, sanitizeWorldPoint } from '@mine-me/shared';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
-import { broadcastInventory, consumeInventoryItem, refundInventoryItem } from './inventoryActions';
+import { inventoryActionsFor } from './inventoryActions';
 
 /**
  * Handler: mining_throw_dynamite & mining_throw_item
@@ -20,6 +20,7 @@ export const handleMiningThrowDynamite = async (
 
   const engine = miningSessionManager.getSession(characterId);
   if (!engine) return { success: false, error: 'No active mining session.' };
+  const inventory = inventoryActionsFor(engine.rules.persistsCharacter);
 
   const throwTarget = sanitizeWorldPoint(payload?.target);
   if (!throwTarget) {
@@ -57,7 +58,7 @@ export const handleMiningThrowDynamite = async (
   }
 
   // 2. Atomically consume one; fails if a concurrent request already used the last one
-  if (!(await consumeInventoryItem(characterId, inventoryItemToThrow.id))) {
+  if (!(await inventory.consume(characterId, inventoryItemToThrow.id))) {
     return { success: false, error: 'You do not have that throwable item.' };
   }
 
@@ -77,12 +78,12 @@ export const handleMiningThrowDynamite = async (
     explosionRadius,
   });
   if (!thrown) {
-    await refundInventoryItem(characterId, inventoryItemToThrow.itemId);
-    await broadcastInventory(characterId);
+    await inventory.refund(characterId, inventoryItemToThrow.itemId);
+    await inventory.broadcast(characterId);
     return { success: false, error: 'Failed to throw item.' };
   }
 
-  await broadcastInventory(characterId);
+  await inventory.broadcast(characterId);
   return { success: true };
 };
 

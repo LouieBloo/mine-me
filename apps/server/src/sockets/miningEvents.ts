@@ -24,3 +24,12 @@ export {
   handleMiningIncreaseVision,
   cleanupMiningSession,
 } from './mining/handlers/exitMiningSession';
+export {
+  handleSandboxPourFluid,
+  handleSandboxSpawnMob,
+  handleSandboxIgnite,
+  handleSandboxClearHazards,
+  handleSandboxSetGodMode,
+  handleSandboxSetSim,
+  handleSandboxReset,
+} from './mining/handlers/sandboxHandlers';

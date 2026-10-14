@@ -37,7 +37,7 @@ export class MiningIgnitionSubsystem {
 
   /** What burns in a cell: the fluid in it if there is some, otherwise the block there (if it can burn). */
   public flammabilityAt(x: number, y: number): Flammability | null {
-    if (!isInBounds(x, y)) return null;
+    if (!isInBounds(x, y, this.world.grid)) return null;
     const fluids = this.world.fluids;
     if (fluids.grid.getLevel(x, y) > 0) {
       const key = fluids.registry.keyOf(fluids.grid.getFluidId(x, y));
@@ -90,7 +90,7 @@ export class MiningIgnitionSubsystem {
 
   /** A torch placed in this cell from this item. From now on it lights what it touches, by the item's Ignites effect. */
   public addTorch(x: number, y: number, itemId: string): void {
-    if (isInBounds(x, y)) this.torches.set(y * this.world.grid[0].length + x, itemId);
+    if (isInBounds(x, y, this.world.grid)) this.torches.set(y * this.world.grid[0].length + x, itemId);
   }
 
   /**

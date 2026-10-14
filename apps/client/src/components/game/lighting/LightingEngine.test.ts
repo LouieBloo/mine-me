@@ -253,6 +253,49 @@ describe('LightingEngine', () => {
     engine.destroy();
   });
 
+  describe('with open sky above the ground (the sandbox)', () => {
+    // 3 rows of sky, then ground (dirt) with an open shaft at x = 2 going down
+    const skyGrid = (): MiningClientTile[][] =>
+      Array.from({ length: 9 }, (_, y) =>
+        Array.from({ length: 5 }, (_, x) => ({
+          type: y < 3 || (x === 2 && y < 8) ? MiningTileType.EMPTY : MiningTileType.DIRT,
+          revealed: true,
+        }))
+      );
+
+    it('measures sunlight from the ground surface, not from the top of the map', () => {
+      const engine = new LightingEngine(mockApp, mockContainer, 5, 9, 64, 3);
+      engine.updateGrid(skyGrid(), true);
+      const map = (engine as any).sunlightMap as number[][];
+      // The sun map covers the ground and below (9 rows - 3 sky rows), not the sky
+      expect(map.length).toBe(6);
+      // Row 0 of the sun map is the ground row: the top of the shaft is in full sun...
+      expect(map[0][2]).toBeCloseTo(1.0, 2);
+      // ...and it fades down the shaft as usual
+      expect(map[1][2]).toBeLessThan(map[0][2]);
+      expect(map[2][2]).toBeLessThan(map[1][2]);
+      engine.destroy();
+    });
+
+    it('starts the sun layer at the ground, so the sky is not double-lit', () => {
+      const engine = new LightingEngine(mockApp, mockContainer, 5, 9, 64, 3);
+      engine.updateGrid(skyGrid(), true);
+      const sprite = (engine as any).sunlightSprite;
+      if (sprite) expect(sprite.y).toBe(3 * 64);
+      engine.destroy();
+    });
+
+    it('without a surface row the same grid is lit from its top row (a normal mine)', () => {
+      const engine = new LightingEngine(mockApp, mockContainer, 5, 9, 64);
+      engine.updateGrid(skyGrid(), true);
+      const map = (engine as any).sunlightMap as number[][];
+      // Treated as a mine: the sky rows are the surface, so the ground row is already in shadow
+      expect(map.length).toBe(9);
+      expect(map[3][2]).toBeLessThan(0.9);
+      engine.destroy();
+    });
+  });
+
   it('should support deferred markSunlightDirty update on next tick', () => {
     const engine = new LightingEngine(mockApp, mockContainer, 10, 10, 64);
     const grid: MiningClientTile[][] = Array.from({ length: 5 }, () =>

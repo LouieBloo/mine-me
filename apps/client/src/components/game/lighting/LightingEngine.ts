@@ -50,18 +50,23 @@ export class LightingEngine {
   // Low-resolution lightmap smoothly scales up via GPU bilinear filtering, providing natural soft diffusion with zero blur filter overhead.
   private readonly lightmapScale: number = 0.25;
 
+  /** Row of the ground surface: sunlight, ambient depth and the sky are measured from here (0 in a normal mine). */
+  private readonly surfaceRow: number;
+
   constructor(
     app: Application,
     parentContainer: Container,
     gridWidth: number,
     gridHeight: number,
-    tileSize: number
+    tileSize: number,
+    surfaceRow: number = 0
   ) {
     this.app = app;
     this.parentContainer = parentContainer;
     this.gridWidth = gridWidth;
     this.gridHeight = gridHeight;
     this.tileSize = tileSize;
+    this.surfaceRow = Math.max(0, Math.floor(surfaceRow));
 
     // Internal offscreen container where all ambient, sun, and light sources are rendered
     this.lightsContainer = new Container();
@@ -141,7 +146,7 @@ export class LightingEngine {
     if (!grid || grid.length === 0) return;
     this.cachedGrid = grid;
     // Most grid updates are fog-of-war reveals that don't change which tiles are open air.
-    if (this.sunlightSignature === getSunlightSignature(grid)) return;
+    if (this.sunlightSignature === getSunlightSignature(this.fromSurface(grid))) return;
     if (immediate) {
       this.recalculateSunlight();
     } else {
@@ -160,11 +165,17 @@ export class LightingEngine {
     this.sunlightDirty = true;
   }
 
+  /** The part of the grid the sun reaches: the ground surface and everything below it (the sky above is already daylight). */
+  private fromSurface(grid: MiningClientTile[][]): MiningClientTile[][] {
+    return this.surfaceRow > 0 ? grid.slice(this.surfaceRow) : grid;
+  }
+
   private recalculateSunlight(): void {
     if (!this.cachedGrid) return;
     this.sunlightDirty = false;
-    this.sunlightSignature = getSunlightSignature(this.cachedGrid);
-    this.sunlightMap = calculateSunlightMap(this.cachedGrid);
+    const ground = this.fromSurface(this.cachedGrid);
+    this.sunlightSignature = getSunlightSignature(ground);
+    this.sunlightMap = calculateSunlightMap(ground);
     this.renderSunlight();
     this.isLightmapDirty = true;
   }
@@ -259,8 +270,9 @@ export class LightingEngine {
     const worldWidth = this.gridWidth * this.tileSize;
     const worldHeight = this.gridHeight * this.tileSize;
 
-    // 1. Sky & Surface above ground (y <= 0): 100% daylight white
-    g.rect(-this.sideMargin, -this.skyMargin, worldWidth + this.sideMargin * 2, this.skyMargin);
+    // 1. Sky above the ground surface: 100% daylight white
+    const surfaceY = this.surfaceRow * this.tileSize;
+    g.rect(-this.sideMargin, -this.skyMargin, worldWidth + this.sideMargin * 2, this.skyMargin + surfaceY);
     g.fill({ color: 0xffffff, alpha: 1.0 });
 
     // 2. Depth gradient steps for underground (y in [0, gridHeight])
@@ -280,7 +292,7 @@ export class LightingEngine {
     for (let y = 0; y < maxGradientDepth; y++) {
       const topColor = depthColors[y].color;
       const bottomColor = depthColors[Math.min(y + 1, depthColors.length - 1)].color;
-      const yStart = y * this.tileSize;
+      const yStart = surfaceY + y * this.tileSize;
       const yHeight = this.tileSize;
 
       // Draw sub-stripes for smooth gradient transitions
@@ -297,7 +309,7 @@ export class LightingEngine {
     }
 
     // 3. Deep underground below max gradient depth: Solid deep darkness (0x060814)
-    const deepY = maxGradientDepth * this.tileSize;
+    const deepY = surfaceY + maxGradientDepth * this.tileSize;
     const deepHeight = worldHeight - deepY + this.sideMargin;
     if (deepHeight > 0) {
       g.rect(-this.sideMargin, deepY, worldWidth + this.sideMargin * 2, deepHeight);
@@ -316,7 +328,7 @@ export class LightingEngine {
     const ppt = Math.max(1, Math.round(this.tileSize * this.lightmapScale));
     const { pixels, width, height } = buildSunlightPixels(
       this.sunlightMap,
-      this.cachedGrid,
+      this.fromSurface(this.cachedGrid),
       { pixelsPerTile: ppt, color: 0xfffbeb, maxAlpha: 0.95 },
       this.sunlightPixels
     );
@@ -337,6 +349,7 @@ export class LightingEngine {
       this.sunlightSprite = new Sprite(new Texture({ source: this.sunlightSource }));
       this.sunlightSprite.width = this.sunlightMap[0].length * this.tileSize;
       this.sunlightSprite.height = this.sunlightMap.length * this.tileSize;
+      this.sunlightSprite.y = this.surfaceRow * this.tileSize;
       // Sits between the ambient layer and the dynamic lights
       this.lightsContainer.addChildAt(this.sunlightSprite, 1);
     } else {

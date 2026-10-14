@@ -27,6 +27,7 @@ import {
   getMobSpriteUrl,
   type MobAIConfig,
   type MobAIType,
+  getGridDimensions,
 } from '@mine-me/shared';
 import { isInBounds, type ServerMiningGrid } from '../../miningMap.service';
 import type { MiningPlayerSession } from './MiningPlayerManager';
@@ -217,8 +218,9 @@ export class MiningMobSubsystem {
     const grid = this.world.grid;
     const candidates: Vector2D[] = [];
     const startY = Math.max(2, minDepth);
-    for (let y = startY; y < MINING_CONFIG.GRID_HEIGHT - 3; y++) {
-      for (let x = 2; x < MINING_CONFIG.GRID_WIDTH - 2; x++) {
+    const { width, height } = getGridDimensions(grid);
+    for (let y = startY; y < height - 3; y++) {
+      for (let x = 2; x < width - 2; x++) {
         if (Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= 3 && y <= 5) continue;
         const tile = grid[y]?.[x];
         const floor = grid[y + 1]?.[x];
@@ -486,7 +488,7 @@ export class MiningMobSubsystem {
    */
   public handleMobMining(mob: MiningActiveMobSession, target: MiningPosition): void {
     const grid = this.world.grid;
-    if (!isInBounds(target.x, target.y)) {
+    if (!isInBounds(target.x, target.y, this.world.grid)) {
       this.stopMobMining(mob);
       return;
     }

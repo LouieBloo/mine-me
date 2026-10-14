@@ -159,7 +159,14 @@ export function useMiningTicker({
       miningProfiler.startSection('Camera');
       if (cameraRef.current) {
         cameraRef.current.setScreenSize(app.screen.width, app.screen.height);
-        cameraRef.current.update({ x: playerContainer.x, y: playerContainer.y }, dt);
+        const freeCamera = world.freeCameraRef?.current;
+        const lookAt = freeCamera?.active
+          ? freeCamera.update(dt, cameraRef.current.getZoom(), {
+              width: (grid?.[0]?.length ?? 0) * TILE_SIZE,
+              height: (grid?.length ?? 0) * TILE_SIZE,
+            })
+          : { x: playerContainer.x, y: playerContainer.y };
+        cameraRef.current.update(lookAt, dt);
       } else {
         const screenWidth = app.screen.width;
         const screenHeight = app.screen.height;

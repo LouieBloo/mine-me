@@ -1,5 +1,6 @@
-import { MINING_CONFIG, isTileSolid, type Vector2D, type MiningTileType } from '../types/mining';
+import { isTileSolid, type Vector2D, type MiningTileType } from '../types/mining';
 import type { MiningCollisionGrid } from './MiningPhysicsBody';
+import { getGridDimensions } from './gridDimensions';
 
 export interface GridRayHit {
   /** The solid tile that was hit, or null when the ray hit the cavern wall/floor outside the grid. */
@@ -16,10 +17,10 @@ export interface GridRayOptions {
 }
 
 /** Solid for ray purposes: the side walls and floor of the cavern are solid, the sky above row 0 is open. */
-function isSolidCell(grid: MiningCollisionGrid, tx: number, ty: number): boolean {
-  if (tx < 0 || tx >= MINING_CONFIG.GRID_WIDTH) return ty >= 0;
+function isSolidCell(grid: MiningCollisionGrid, tx: number, ty: number, width: number, height: number): boolean {
+  if (tx < 0 || tx >= width) return ty >= 0;
   if (ty < 0) return false;
-  if (ty >= MINING_CONFIG.GRID_HEIGHT) return true;
+  if (ty >= height) return true;
   const tile = grid[ty]?.[tx] as { type: MiningTileType } | undefined;
   return tile ? isTileSolid(tile.type) : false;
 }
@@ -34,6 +35,7 @@ export function raycastSolidTiles(
   to: Vector2D,
   options: GridRayOptions = {}
 ): GridRayHit | null {
+  const { width, height } = getGridDimensions(grid);
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   if (![from.x, from.y, dx, dy].every(Number.isFinite) || (dx === 0 && dy === 0)) return null;
@@ -61,9 +63,9 @@ export function raycastSolidTiles(
       cy += stepY;
     }
     if (t > 1) return null;
-    if (!isSolidCell(grid, cx, cy)) continue;
+    if (!isSolidCell(grid, cx, cy, width, height)) continue;
 
-    const inGrid = cx >= 0 && cx < MINING_CONFIG.GRID_WIDTH && cy >= 0 && cy < MINING_CONFIG.GRID_HEIGHT;
+    const inGrid = cx >= 0 && cx < width && cy >= 0 && cy < height;
     const hit: GridRayHit = {
       tile: inGrid ? { x: cx, y: cy } : null,
       point: { x: from.x + dx * t, y: from.y + dy * t },

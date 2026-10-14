@@ -68,3 +68,4 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Set `
 | [062](062-fire-and-fluid-sounds.md) | Fire and fluid sounds through the sound library | P2 (Done; needs audio files) |
 | [063](063-fluid-look.md) | Fluid look: smooth surface, waves, depth shading, streams | P2 (Done; judge the look in the game) |
 | [064](064-torches-ignite-oil.md) | Torches light oil | P2 (Done; data applied, restart server) |
+| [065](065-sandbox-mode.md) | Sandbox mode (90x30 test map, fluid/mob tools, free camera, reset) | P2 (Done; try it by hand) |

@@ -9,6 +9,7 @@ import {
   type MiningDroppedItem,
   type MiningClientTile,
   DEFAULT_DYNAMITE_PHYSICS_CONFIG,
+  getGridDimensions,
 } from '@mine-me/shared';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 import type { ActiveFallingRock } from '../renderers/MiningEntityRenderer';
@@ -109,10 +110,11 @@ export class MiningDebugRenderer {
 
     // 7. Block Colliders
     if (grid) {
+      const { width: gridWidth, height: gridHeight } = getGridDimensions(grid);
       const minTileX = Math.max(0, Math.floor(currentPos.x - 22));
-      const maxTileX = Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.ceil(currentPos.x + 22));
+      const maxTileX = Math.min(gridWidth - 1, Math.ceil(currentPos.x + 22));
       const minTileY = Math.max(0, Math.floor(currentPos.y - 18));
-      const maxTileY = Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.ceil(currentPos.y + 18));
+      const maxTileY = Math.min(gridHeight - 1, Math.ceil(currentPos.y + 18));
 
       for (let ty = minTileY; ty <= maxTileY; ty++) {
         const row = grid[ty];

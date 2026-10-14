@@ -47,7 +47,7 @@ export class MiningBlockSubsystem {
     if (!session) return false;
     const grid = this.world.grid;
     if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return false;
-    if (!isInBounds(target.x, target.y)) return false;
+    if (!isInBounds(target.x, target.y, this.world.grid)) return false;
 
     const playerSpeed =
       typeof session.miningSpeed === 'function' ? session.miningSpeed() : session.miningSpeed;
@@ -98,7 +98,7 @@ export class MiningBlockSubsystem {
     const x = target ? target.x : Math.floor(session.playerBody.position.x);
     const y = target ? target.y : Math.floor(session.playerBody.position.y);
 
-    if (!isInBounds(x, y)) return null;
+    if (!isInBounds(x, y, this.world.grid)) return null;
 
     if (target && typeof target.x === 'number' && typeof target.y === 'number') {
       const tileCenterX = target.x + 0.5;
@@ -140,7 +140,7 @@ export class MiningBlockSubsystem {
     if (!session) return false;
     const grid = this.world.grid;
     if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return false;
-    if (!isInBounds(target.x, target.y)) return false;
+    if (!isInBounds(target.x, target.y, this.world.grid)) return false;
 
     const tileCenterX = target.x + 0.5;
     const tileCenterY = target.y + 0.5;
@@ -203,7 +203,7 @@ export class MiningBlockSubsystem {
       }
 
       if (!session.isMining && isTargeting && target && canMineStance && playerSpeed > 0) {
-        if (isInBounds(target.x, target.y)) {
+        if (isInBounds(target.x, target.y, this.world.grid)) {
           const tile = grid[target.y][target.x];
           if (isTileMineable(tile.type)) {
             this.startMining(session, { x: target.x, y: target.y });

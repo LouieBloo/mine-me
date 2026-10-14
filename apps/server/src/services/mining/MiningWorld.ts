@@ -36,6 +36,8 @@ export interface MiningWorld {
   readonly data: MiningDataManager;
   readonly mapConfig?: Partial<MiningMapConfigData>;
   readonly players: ReadonlyMap<string, MiningPlayerSession>;
+  /** Where players start and respawn: the entrance, on the ground surface. */
+  readonly spawnPoint: { x: number; y: number };
   /** Simulation time in seconds (advances one fixed step per tick). */
   readonly simTime: number;
   /** Number of simulation ticks run so far. */

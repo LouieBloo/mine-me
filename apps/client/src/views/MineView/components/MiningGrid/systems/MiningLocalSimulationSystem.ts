@@ -8,6 +8,7 @@ import {
   type MiningDroppedItem,
   type MiningClientTile,
   DEFAULT_PARTICLE_EFFECTS,
+  getGridDimensions,
 } from '@mine-me/shared';
 import { MiningEntityRenderer, type ActiveFallingRock } from '../renderers/MiningEntityRenderer';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
@@ -157,8 +158,7 @@ export class MiningLocalSimulationSystem {
 
         // Check collision for client-predicted bullets against solid tiles and cavern bounds
         if (proj.id.startsWith('client_proj_') && grid) {
-          const maxW = grid[0]?.length || MINING_CONFIG.GRID_WIDTH;
-          const maxH = grid.length || MINING_CONFIG.GRID_HEIGHT;
+          const { width: maxW, height: maxH } = getGridDimensions(grid);
 
           const steps = Math.max(1, Math.ceil(moveDist / 0.2));
           for (let s = 1; s <= steps; s++) {

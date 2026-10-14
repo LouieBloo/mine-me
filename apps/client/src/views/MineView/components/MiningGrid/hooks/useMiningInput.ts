@@ -11,6 +11,7 @@ export interface UseMiningInputOptions {
     | 'playerFacingDirRef'
     | 'isFacingLeftRef'
     | 'mouseControllerRef'
+    | 'freeCameraRef'
   >;
   sendGameEvent: (event: any) => Promise<any> | void;
   onToggleDebug?: () => void;
@@ -29,7 +30,7 @@ export function useMiningInput({
   onVisionChange,
   onReload,
 }: UseMiningInputOptions) {
-  const { playerSpriteRef, flashlightRef, showDebugRef, playerFacingDirRef, isFacingLeftRef, mouseControllerRef } = world;
+  const { playerSpriteRef, flashlightRef, showDebugRef, playerFacingDirRef, isFacingLeftRef, mouseControllerRef, freeCameraRef } = world;
   const onReloadRef = useRef(onReload);
   onReloadRef.current = onReload;
   const onToggleDebugRef = useRef(onToggleDebug);
@@ -148,6 +149,13 @@ export function useMiningInput({
       const key = e.key.toLowerCase();
       let changed = false;
       const current = keysPressedRef.current;
+
+      // With the sandbox free camera on, movement keys pan the camera and never reach the character
+      const freeCamera = freeCameraRef?.current;
+      if (freeCamera?.active) {
+        const panned = freeCamera.handleKey(key, isKeyDown);
+        if (panned || key === ' ' || e.code === 'Space') return;
+      }
 
       if (key === 'w' || key === 'arrowup') {
         if (current.up !== isKeyDown) {

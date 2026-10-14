@@ -5,9 +5,11 @@ vi.mock('../../../index', () => ({ prisma: { inventoryItem: { findFirst: (...arg
 const consume = vi.fn();
 const refund = vi.fn();
 vi.mock('./inventoryActions', () => ({
-  broadcastInventory: vi.fn(),
-  consumeInventoryItem: (...args: unknown[]) => consume(...args),
-  refundInventoryItem: (...args: unknown[]) => refund(...args),
+  inventoryActionsFor: () => ({
+    broadcast: vi.fn(),
+    consume: (...args: unknown[]) => consume(...args),
+    refund: (...args: unknown[]) => refund(...args),
+  }),
 }));
 
 import { handleMiningPlaceTorch } from './placementHandlers';
@@ -15,7 +17,7 @@ import { miningSessionManager } from '../../../services/mining/MiningSessionMana
 
 describe('handleMiningPlaceTorch', () => {
   const socket = { data: { characterId: 'torch-char' } } as any;
-  const engine = { canPlaceTorch: vi.fn(() => true), placeTorch: vi.fn(() => true) };
+  const engine = { rules: { persistsCharacter: true }, canPlaceTorch: vi.fn(() => true), placeTorch: vi.fn(() => true) };
 
   beforeEach(() => {
     vi.clearAllMocks();

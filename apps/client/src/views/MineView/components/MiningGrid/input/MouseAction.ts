@@ -30,6 +30,8 @@ export interface MouseActionConfig {
   cooldownMs?: number;
   /** When true, this action targets continuous world float coordinates rather than snapped grid tiles */
   isContinuous?: boolean;
+  /** When true, a cursor outside the map targets the nearest edge tile (see IMouseAction.clampsToGrid) */
+  clampsToGrid?: boolean;
 }
 
 /**
@@ -41,6 +43,11 @@ export interface IMouseAction {
   readonly triggerMode: MouseActionTriggerMode;
   readonly cooldownMs?: number;
   readonly isContinuous?: boolean;
+  /**
+   * When true, a cursor outside the map targets the nearest tile on its edge instead of nothing
+   * (the sandbox's fluid and fire tools work above and beside the map).
+   */
+  readonly clampsToGrid?: boolean;
   canExecute(target: MiningPosition | Vector2D, playerPos: Vector2D, grid: MiningClientTile[][]): boolean;
   execute(target: MiningPosition | Vector2D, playerPos: Vector2D): Promise<boolean> | boolean;
   getReticleStyle(target: MiningPosition | Vector2D, playerPos: Vector2D, grid: MiningClientTile[][]): ReticleStyle;
@@ -54,12 +61,14 @@ export abstract class BaseMouseAction implements IMouseAction {
   public readonly triggerMode: MouseActionTriggerMode;
   public readonly cooldownMs: number;
   public readonly isContinuous: boolean;
+  public readonly clampsToGrid: boolean;
 
   constructor(config: MouseActionConfig) {
     this.name = config.name;
     this.triggerMode = config.triggerMode;
     this.cooldownMs = config.cooldownMs ?? 0;
     this.isContinuous = config.isContinuous ?? false;
+    this.clampsToGrid = config.clampsToGrid ?? false;
   }
 
   public abstract canExecute(

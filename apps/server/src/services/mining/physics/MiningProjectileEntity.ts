@@ -1,5 +1,5 @@
 import { MiningPhysicsBody, type MiningCollisionGrid } from './MiningPhysicsBody';
-import { type Vector2D, MINING_CONFIG, raycastSolidTiles } from '@mine-me/shared';
+import { type Vector2D, MINING_CONFIG, raycastSolidTiles, getGridDimensions } from '@mine-me/shared';
 
 /** A bullet does not hit the tiles right at its muzzle, so a shooter pressed against a wall can still fire. */
 const MUZZLE_CLEARANCE = 0.35;
@@ -117,12 +117,13 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
     this.position.y += this.velocity.y * dt;
     this.angle = Math.atan2(this.velocity.y, this.velocity.x);
 
+    const { width, height } = getGridDimensions(grid);
     // Boundary check (allows open sky flight above ground up to y = -40, and wide horizontal trajectory)
     if (
       this.position.x < -20 ||
-      this.position.x >= MINING_CONFIG.GRID_WIDTH + 20 ||
+      this.position.x >= width + 20 ||
       this.position.y < -40 ||
-      this.position.y >= MINING_CONFIG.GRID_HEIGHT + 10
+      this.position.y >= height + 10
     ) {
       this.hasHit = true;
       this.expired = true;

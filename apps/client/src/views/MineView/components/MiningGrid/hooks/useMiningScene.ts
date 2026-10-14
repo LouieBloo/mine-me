@@ -21,6 +21,7 @@ import {
   getAssetUrl,
   type MiningSessionClientState,
   type Vector2D,
+  getGridDimensions,
 } from '@mine-me/shared';
 import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
@@ -149,17 +150,20 @@ export function useMiningScene({
 
     // Render background: Sky above ground (y <= 0), rich underground dirt backdrop (y > 0)
     const bgGraphics = new Graphics();
-    const bgWidth = MINING_CONFIG.GRID_WIDTH * TILE_SIZE;
-    const bgHeight = MINING_CONFIG.GRID_HEIGHT * TILE_SIZE;
+    const { width: gridWidth, height: gridHeight } = getGridDimensions(initialSessionState.grid);
+    const surfaceRow = initialSessionState.surfaceRow ?? 0; // the sandbox has open sky rows above the ground
+    const surfaceY = surfaceRow * TILE_SIZE;
+    const bgWidth = gridWidth * TILE_SIZE;
+    const bgHeight = gridHeight * TILE_SIZE;
     const skyHeight = 800;
     const extraMargin = 600;
 
     // Sky above ground (nice vibrant blue)
-    bgGraphics.rect(-extraMargin, -skyHeight, bgWidth + extraMargin * 2, skyHeight);
+    bgGraphics.rect(-extraMargin, -skyHeight, bgWidth + extraMargin * 2, skyHeight + surfaceY);
     bgGraphics.fill(0x38bdf8);
 
     // Underground base earthen tone fallback (y >= 0)
-    bgGraphics.rect(-extraMargin, 0, bgWidth + extraMargin * 2, bgHeight + extraMargin * 2);
+    bgGraphics.rect(-extraMargin, surfaceY, bgWidth + extraMargin * 2, bgHeight - surfaceY + extraMargin * 2);
     bgGraphics.fill(0x23140c);
 
     backgroundContainer.addChild(bgGraphics);
@@ -202,11 +206,10 @@ export function useMiningScene({
     playerContainerRef.current = playerContainer;
     particlesContainerRef.current = particlesContainer;
 
-    const gridRows = initialSessionState.grid.length;
     const fluidRenderer = new FluidRenderer(
       fluidsContainer,
-      initialSessionState.grid[0]?.length ?? MINING_CONFIG.GRID_WIDTH,
-      gridRows || MINING_CONFIG.GRID_HEIGHT,
+      gridWidth,
+      gridHeight,
       initialSessionState.fluids ?? []
     );
     fluidRenderer.apply(initialSessionState.fluidCells ?? []);
@@ -251,9 +254,10 @@ export function useMiningScene({
     const lightingEngine = new LightingEngine(
       app,
       gridContainer,
-      MINING_CONFIG.GRID_WIDTH,
-      MINING_CONFIG.GRID_HEIGHT,
-      TILE_SIZE
+      gridWidth,
+      gridHeight,
+      TILE_SIZE,
+      surfaceRow
     );
     remotePlayerRenderer.setLightingEngine(lightingEngine);
 
@@ -273,7 +277,7 @@ export function useMiningScene({
 
     const entranceTorch = new PointLight(
       'entrance_torch',
-      { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: MINING_CONFIG.ENTRANCE_Y + 0.5 },
+      { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: surfaceRow + MINING_CONFIG.ENTRANCE_Y + 0.5 },
       0xf59e0b,
       1.15,
       MINING_CONFIG.TORCH_RADIUS,
@@ -319,10 +323,10 @@ export function useMiningScene({
           const dirtTilingSprite = new TilingSprite({
             texture,
             width: bgWidth,
-            height: bgHeight,
+            height: bgHeight - surfaceY,
           });
           dirtTilingSprite.x = 0;
-          dirtTilingSprite.y = 0;
+          dirtTilingSprite.y = surfaceY;
           dirtTilingSprite.tileScale.set(0.5); // Rich natural underground dirt repeat
           dirtTilingSprite.cullable = true;
           backgroundContainer.addChild(dirtTilingSprite);

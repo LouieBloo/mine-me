@@ -1,0 +1,136 @@
+import { describe, it, expect, vi } from 'vitest';
+import '@testing-library/jest-dom';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { SandboxPanel, type SandboxPanelProps } from './SandboxPanel';
+
+const props = (over: Partial<SandboxPanelProps> = {}): SandboxPanelProps => ({
+  fluids: [{ typeKey: 'OIL', name: 'Oil' }, { typeKey: 'WATER', name: 'Water' }],
+  mobs: [{ id: 'm1', name: 'Mole Person' }, { id: 'm2', name: 'Target Dummy' }],
+  tool: { kind: 'mine' },
+  onToolChange: vi.fn(),
+  freeCamera: false,
+  onFreeCameraChange: vi.fn(),
+  status: { godMode: false, paused: false, speed: 1 },
+  onGodMode: vi.fn(),
+  onPausedChange: vi.fn(),
+  onStep: vi.fn(),
+  onSpeedChange: vi.fn(),
+  onClearHazards: vi.fn(),
+  onReset: vi.fn(),
+  onLeave: vi.fn(),
+  ...over,
+});
+
+describe('SandboxPanel', () => {
+  it('picks the pour tool with the chosen fluid', () => {
+    const p = props();
+    render(<SandboxPanel {...p} />);
+    fireEvent.change(screen.getByLabelText('Fluid to pour'), { target: { value: 'WATER' } });
+    expect(p.onToolChange).not.toHaveBeenCalled(); // choosing a fluid does not switch tools by itself
+    fireEvent.click(screen.getByText('Pour fluid'));
+    expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'pour', fluidKey: 'WATER' });
+  });
+
+  it('changes the fluid being poured when the pour tool is already active', () => {
+    const p = props({ tool: { kind: 'pour', fluidKey: 'OIL' } });
+    render(<SandboxPanel {...p} />);
+    fireEvent.change(screen.getByLabelText('Fluid to pour'), { target: { value: 'WATER' } });
+    expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'pour', fluidKey: 'WATER' });
+  });
+
+  it('lists every mob and spawns the chosen one', () => {
+    const p = props();
+    render(<SandboxPanel {...p} />);
+    expect(screen.getByRole('option', { name: 'Mole Person' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Target Dummy' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Mob to spawn'), { target: { value: 'm2' } });
+    fireEvent.click(screen.getByText('Spawn mob'));
+    expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'spawn', mobId: 'm2' });
+  });
+
+  it('selects the light-fire and normal tools', () => {
+    const p = props({ tool: { kind: 'ignite' } });
+    render(<SandboxPanel {...p} />);
+    fireEvent.click(screen.getByText('Normal'));
+    expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'mine' });
+    fireEvent.click(screen.getByText('Light fire'));
+    expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'ignite' });
+  });
+
+  it('marks the active tool', () => {
+    render(<SandboxPanel {...props({ tool: { kind: 'ignite' } })} />);
+    expect(screen.getByText('Light fire').className).toContain('bg-violet-600');
+    expect(screen.getByText('Normal').className).not.toContain('bg-violet-600');
+  });
+
+  it('turns the free camera on and off, and locks the tools while it is on', () => {
+    const p = props();
+    const { rerender } = render(<SandboxPanel {...p} />);
+    fireEvent.click(screen.getByText('Free camera'));
+    expect(p.onFreeCameraChange).toHaveBeenCalledWith(true);
+
+    rerender(<SandboxPanel {...p} freeCamera />);
+    expect(screen.getByText('Free camera on')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Pour fluid')).toBeDisabled();
+    expect(screen.getByText('Spawn mob')).toBeDisabled();
+    fireEvent.click(screen.getByText('Free camera on'));
+    expect(p.onFreeCameraChange).toHaveBeenCalledWith(false);
+  });
+
+  it('pauses, resumes, steps and changes the speed of the simulation', () => {
+    const p = props();
+    const { rerender } = render(<SandboxPanel {...p} />);
+    expect(screen.getByText('Step')).toBeDisabled(); // only while paused
+    fireEvent.click(screen.getByText('Pause'));
+    expect(p.onPausedChange).toHaveBeenCalledWith(true);
+    fireEvent.change(screen.getByLabelText('Simulation speed'), { target: { value: '4' } });
+    expect(p.onSpeedChange).toHaveBeenCalledWith(4);
+
+    rerender(<SandboxPanel {...p} status={{ godMode: false, paused: true, speed: 0.5 }} />);
+    expect(screen.getByLabelText('Simulation speed')).toHaveValue('0.5');
+    fireEvent.click(screen.getByText('Step'));
+    expect(p.onStep).toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Resume'));
+    expect(p.onPausedChange).toHaveBeenCalledWith(false);
+  });
+
+  it('toggles god mode, clears hazards, resets and leaves', () => {
+    const p = props();
+    render(<SandboxPanel {...p} />);
+    fireEvent.click(screen.getByText('God mode'));
+    expect(p.onGodMode).toHaveBeenCalledWith(true);
+    fireEvent.click(screen.getByText('Clear fluid and fire'));
+    expect(p.onClearHazards).toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Reset sandbox'));
+    expect(p.onReset).toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Leave sandbox'));
+    expect(p.onLeave).toHaveBeenCalled();
+  });
+
+  it('shows the shared spinner and holds the buttons while a command is running', () => {
+    render(<SandboxPanel {...props({ busy: true })} />);
+    expect(screen.getByTestId('sandbox-busy')).toBeInTheDocument();
+    expect(screen.getByText('Reset sandbox')).toBeDisabled();
+    expect(screen.getByText('God mode')).toBeDisabled();
+  });
+
+  it('has no spinner when idle', () => {
+    render(<SandboxPanel {...props()} />);
+    expect(screen.queryByTestId('sandbox-busy')).not.toBeInTheDocument();
+  });
+
+  it('copes with no fluids or mobs loaded', () => {
+    render(<SandboxPanel {...props({ fluids: [], mobs: [] })} />);
+    expect(screen.getByText('Pour fluid')).toBeDisabled();
+    expect(screen.getByText('Spawn mob')).toBeDisabled();
+    expect(screen.queryByLabelText('Fluid to pour')).not.toBeInTheDocument();
+  });
+
+  it('collapses out of the way', () => {
+    render(<SandboxPanel {...props()} />);
+    fireEvent.click(screen.getByText('🧪 Sandbox'));
+    expect(screen.queryByText('Reset sandbox')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('🧪 Sandbox'));
+    expect(screen.getByText('Reset sandbox')).toBeInTheDocument();
+  });
+});

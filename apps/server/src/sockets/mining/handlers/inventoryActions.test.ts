@@ -17,7 +17,7 @@ import { prisma } from '../../../index';
 import { broadcastStatUpdate } from '../../../services/characterBroadcast';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
 import { MiningTileType } from '@mine-me/shared';
-import { consumeInventoryItem, refundInventoryItem, broadcastInventory } from './inventoryActions';
+import { consumeInventoryItem, refundInventoryItem, broadcastInventory, inventoryActionsFor } from './inventoryActions';
 import { handleMiningPlaceLadder, handleMiningPlaceTorch } from './placementHandlers';
 import { handleMiningThrowDynamite } from './combatHandlers';
 
@@ -209,5 +209,27 @@ describe('handlers: race & failure behaviour', () => {
       expect(spy.mock.calls[1][1].forceRatio).toBeUndefined();
       miningSessionManager.cancelSession('throw-force');
     });
+  });
+});
+
+describe('inventoryActionsFor', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('saves to the database for a mode that persists the character', () => {
+    const actions = inventoryActionsFor(true);
+    expect(actions.consume).toBe(consumeInventoryItem);
+    expect(actions.refund).toBe(refundInventoryItem);
+    expect(actions.broadcast).toBe(broadcastInventory);
+  });
+
+  it('spends nothing and writes nothing for a mode that does not (the sandbox)', async () => {
+    const actions = inventoryActionsFor(false);
+    expect(await actions.consume('c', 'row')).toBe(true);
+    await actions.refund('c', 'item');
+    await actions.broadcast('c');
+    expect(prisma.inventoryItem.updateMany).not.toHaveBeenCalled();
+    expect(prisma.inventoryItem.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.inventoryItem.create).not.toHaveBeenCalled();
+    expect(broadcastStatUpdate).not.toHaveBeenCalled();
   });
 });

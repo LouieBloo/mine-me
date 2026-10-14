@@ -8,6 +8,7 @@ import {
   DEFAULT_MINING_MAP_CONFIG,
   type FluidDefinition,
   type MiningMapConfigData,
+  getGridDimensions,
 } from '@mine-me/shared';
 import { MiningDataManager } from './mining/subsystems/MiningDataManager';
 
@@ -583,8 +584,9 @@ interface MiningPosition {
 /**
  * Check if a position is within grid bounds.
  */
-export function isInBounds(x: number, y: number): boolean {
-  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && x < MINING_CONFIG.GRID_WIDTH && y >= 0 && y < MINING_CONFIG.GRID_HEIGHT;
+export function isInBounds(x: number, y: number, grid: ServerMiningGrid): boolean {
+  const { width, height } = getGridDimensions(grid);
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && x < width && y >= 0 && y < height;
 }
 
 /**
@@ -618,14 +620,15 @@ export function resolveGravity(
   grid: ServerMiningGrid,
   playerPosition: MiningPosition,
 ): { moves: GravityMove[]; rocksLanded: MiningPosition[]; playerCrushed: boolean } {
+  const { width, height } = getGridDimensions(grid);
   const moves: GravityMove[] = [];
   const rocksLanded: MiningPosition[] = [];
   let playerCrushed = false;
 
   // Scan columns bottom-to-top so we process falls correctly
-  for (let x = 0; x < MINING_CONFIG.GRID_WIDTH; x++) {
+  for (let x = 0; x < width; x++) {
     // We iterate top-to-bottom to find rocks that should fall
-    for (let y = 0; y < MINING_CONFIG.GRID_HEIGHT - 1; y++) {
+    for (let y = 0; y < height - 1; y++) {
       if (grid[y][x].type !== MiningTileType.ROCK) continue;
 
       // Check if tile below is not solid (rock can fall through non-solid spaces)
@@ -634,7 +637,7 @@ export function resolveGravity(
 
       // Rock needs to fall — find final resting position
       let finalY = belowY;
-      while (finalY + 1 < MINING_CONFIG.GRID_HEIGHT) {
+      while (finalY + 1 < height) {
         const nextBelow = grid[finalY + 1][x];
         if (!isTileSolid(nextBelow.type)) {
           finalY++;
@@ -673,7 +676,7 @@ export function revealTiles(grid: ServerMiningGrid, position: MiningPosition, vi
       const nx = position.x + dx;
       const ny = position.y + dy;
 
-      if (isInBounds(nx, ny)) {
+      if (isInBounds(nx, ny, grid)) {
         grid[ny][nx].revealed = true;
       }
     }

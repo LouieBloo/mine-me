@@ -2,8 +2,9 @@ import { Server, Socket } from 'socket.io';
 import { prisma } from '../../../index';
 import { broadcastStatUpdate } from '../../../services/characterBroadcast';
 import { buildMiningLoadout } from '../../../services/mining/miningLoadout';
-import { type GameEventResult } from '@mine-me/shared';
+import { type GameEventResult, type MiningGameMode } from '@mine-me/shared';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
+import { isMiningGameMode } from '../../../services/mining/gameModeRules';
 import { getActiveMiningConfig } from '../../../services/miningConfig.service';
 
 /**
@@ -13,7 +14,7 @@ import { getActiveMiningConfig } from '../../../services/miningConfig.service';
 export const handleMiningStart = async (
   io: Server,
   socket: Socket,
-  payload?: { forceNew?: boolean; mode?: 'singleplayer' | 'multiplayer' },
+  payload?: { forceNew?: boolean; mode?: MiningGameMode },
 ): Promise<GameEventResult> => {
   const userId = socket.data.userId;
   const characterId = socket.data.characterId;
@@ -62,6 +63,7 @@ export const handleMiningStart = async (
     });
 
     const mode = payload?.mode ?? 'singleplayer';
+    if (!isMiningGameMode(mode)) return { success: false, error: 'Unknown mining mode.' };
     const engine = miningSessionManager.createSession(
       characterId,
       character.cityId,
@@ -84,7 +86,7 @@ export const handleMiningStart = async (
 
     // A run starts at full health; show that in the app's health bar (and the current value on re-entry)
     const runSession = engine.getPlayer(characterId);
-    if (runSession) {
+    if (runSession && engine.rules.persistsCharacter) {
       broadcastStatUpdate(characterId, {
         health: Math.max(0, Math.round(runSession.health)),
         maxHealth: runSession.maxHealth,

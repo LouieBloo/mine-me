@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { MiningGameEngine } from './MiningGameEngine';
-import { isInBounds } from '../miningMap.service';
+import { isInBounds, type ServerMiningGrid } from '../miningMap.service';
 import { MINING_CONFIG } from '@mine-me/shared';
 import { hitMob, hitPlayer } from './testHelpers';
 
@@ -33,17 +33,27 @@ describe('MiningGameEngine tick safety & input validation', () => {
   });
 
   describe('isInBounds', () => {
+    const makeGrid = (w: number, h: number) =>
+      Array.from({ length: h }, () => Array.from({ length: w }, () => ({ type: 0, revealed: true }))) as unknown as ServerMiningGrid;
+    const grid = makeGrid(MINING_CONFIG.GRID_WIDTH, MINING_CONFIG.GRID_HEIGHT);
+
     it('accepts integer tiles inside the grid', () => {
-      expect(isInBounds(0, 0)).toBe(true);
-      expect(isInBounds(MINING_CONFIG.GRID_WIDTH - 1, MINING_CONFIG.GRID_HEIGHT - 1)).toBe(true);
+      expect(isInBounds(0, 0, grid)).toBe(true);
+      expect(isInBounds(MINING_CONFIG.GRID_WIDTH - 1, MINING_CONFIG.GRID_HEIGHT - 1, grid)).toBe(true);
     });
     it('rejects out-of-range, non-integer and non-finite coordinates', () => {
-      expect(isInBounds(-1, 0)).toBe(false);
-      expect(isInBounds(MINING_CONFIG.GRID_WIDTH, 0)).toBe(false);
-      expect(isInBounds(1.5, 3)).toBe(false);
-      expect(isInBounds(3, 0.2)).toBe(false);
-      expect(isInBounds(NaN, 0)).toBe(false);
-      expect(isInBounds(Infinity, 0)).toBe(false);
+      expect(isInBounds(-1, 0, grid)).toBe(false);
+      expect(isInBounds(MINING_CONFIG.GRID_WIDTH, 0, grid)).toBe(false);
+      expect(isInBounds(1.5, 3, grid)).toBe(false);
+      expect(isInBounds(3, 0.2, grid)).toBe(false);
+      expect(isInBounds(NaN, 0, grid)).toBe(false);
+      expect(isInBounds(Infinity, 0, grid)).toBe(false);
+    });
+    it('uses the size of the grid it is given, not the default mine size', () => {
+      const small = makeGrid(30, 20);
+      expect(isInBounds(29, 19, small)).toBe(true);
+      expect(isInBounds(30, 0, small)).toBe(false);
+      expect(isInBounds(0, 20, small)).toBe(false);
     });
   });
 

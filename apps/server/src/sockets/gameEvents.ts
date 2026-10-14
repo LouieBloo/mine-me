@@ -15,6 +15,13 @@ import {
   handleMiningIncreaseVision,
   handleMiningExit,
   handleMiningCancel,
+  handleSandboxPourFluid,
+  handleSandboxSpawnMob,
+  handleSandboxIgnite,
+  handleSandboxClearHazards,
+  handleSandboxSetGodMode,
+  handleSandboxSetSim,
+  handleSandboxReset,
 } from './miningEvents';
 import { miningSessionManager } from '../services/mining/MiningSessionManager';
 import { InventoryService } from '../services/inventory.service';
@@ -564,6 +571,13 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   mining_increase_vision: handleMiningIncreaseVision,
   mining_exit: handleMiningExit,
   mining_cancel: handleMiningCancel,
+  sandbox_pour_fluid: handleSandboxPourFluid,
+  sandbox_spawn_mob: handleSandboxSpawnMob,
+  sandbox_ignite: handleSandboxIgnite,
+  sandbox_clear_hazards: handleSandboxClearHazards,
+  sandbox_set_god_mode: handleSandboxSetGodMode,
+  sandbox_set_sim: handleSandboxSetSim,
+  sandbox_reset: handleSandboxReset,
   equip_item: handleEquipItem,
   unequip_item: handleUnequipItem,
   consume_item: handleConsumeItem,

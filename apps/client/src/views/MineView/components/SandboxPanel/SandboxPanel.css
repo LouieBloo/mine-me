@@ -1,0 +1,5 @@
+/* The panel floats over the game canvas; it must not let clicks through to the mining controls. */
+.sandbox-panel {
+  pointer-events: auto;
+  user-select: none;
+}

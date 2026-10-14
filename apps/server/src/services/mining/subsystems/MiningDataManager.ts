@@ -36,6 +36,9 @@ const TILE_TYPE_KEYS: Record<number, string> = {
   [MiningTileType.SILVERIUM]: 'SILVERIUM',
 };
 
+/** Every tile type that is a block with a definition (dirt, rock, ores, chests...): new ones are listed automatically. */
+export const BLOCK_TILE_TYPES: readonly MiningTileType[] = Object.keys(TILE_TYPE_KEYS).map(Number) as MiningTileType[];
+
 /**
  * MiningDataManager serves static game definitions (items, blocks, mobs) from memory.
  *
@@ -246,6 +249,11 @@ export class MiningDataManager {
    */
   public getItemSoundEffects(itemId: string): ItemSoundEffectsConfig | undefined {
     return this.getItemData(itemId)?.soundEffects ?? undefined;
+  }
+
+  /** All mob definitions, in load order. */
+  public getMobs(): Mob[] {
+    return this.mobs;
   }
 
   /**

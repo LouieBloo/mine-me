@@ -11,12 +11,14 @@ import {
   type MiningGearLayer,
   type MiningBackpackItem,
   MINING_CONFIG,
+  type MiningGameMode,
 } from '@mine-me/shared';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 import { toClientGrid } from '../miningMap.service';
+import { getGameModeRules, roomIdFor } from './gameModeRules';
 import { dynamiteDefinition, toRemotePlayer } from './MiningEntitySync';
 
-export const DEFAULT_MULTIPLAYER_ROOM_ID = 'lobby_multiplayer_default';
+export { DEFAULT_MULTIPLAYER_ROOM_ID } from './gameModeRules';
 
 export class MiningSessionManager {
   private static instance: MiningSessionManager;
@@ -43,7 +45,7 @@ export class MiningSessionManager {
     socket: Socket,
     forceNew = false,
     miningSpeed = 0,
-    mode: 'singleplayer' | 'multiplayer' = 'singleplayer',
+    mode: MiningGameMode = 'singleplayer',
     characterName?: string,
     gearLayers?: MiningGearLayer[],
     mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>,
@@ -51,7 +53,8 @@ export class MiningSessionManager {
     equippedWeaponId: string | null = null,
     maxHealth?: number,
   ): MiningGameEngine {
-    const targetRoomId = mode === 'multiplayer' ? DEFAULT_MULTIPLAYER_ROOM_ID : `solo_${characterId}`;
+    const rules = getGameModeRules(mode);
+    const targetRoomId = roomIdFor(mode, characterId);
     const prevRoomId = this.playerToRoom.get(characterId);
 
     // If player is moving from a different room, leave the old room first
@@ -63,7 +66,7 @@ export class MiningSessionManager {
 
     // If forceNew is requested for solo mode, destroy the old instance
     // For multiplayer, never destroy an active lobby while players are in it
-    if (engine && (mode === 'singleplayer' ? forceNew : engine.playerCount === 0)) {
+    if (engine && (rules.restartsOnEntry ? forceNew : engine.playerCount === 0)) {
       engine.stop();
       this.activeRooms.delete(targetRoomId);
       engine = undefined;
@@ -82,9 +85,12 @@ export class MiningSessionManager {
           this.cleanupRoom(roomId);
         },
         // Keep the app's health bar in step with damage taken in the mine
-        onPlayerHealthChanged: (characterId, health) => {
-          broadcastStatUpdate(characterId, { health: Math.max(0, Math.round(health)) });
-        },
+        // (not in modes that do not save to the character: damage there must not touch the real health bar)
+        onPlayerHealthChanged: rules.persistsCharacter
+          ? (characterId, health) => {
+              broadcastStatUpdate(characterId, { health: Math.max(0, Math.round(health)) });
+            }
+          : undefined,
         onPlayerDeath: (characterId) => {
           this.handlePlayerDeath(characterId);
         },
@@ -134,7 +140,7 @@ export class MiningSessionManager {
     const session = engine.getPlayer(characterId);
     if (!session) throw new Error(`Player ${characterId} is not in this mining room.`);
     const pos = session.playerBody.position;
-    const isAtEntrance = Math.round(pos.x) === MINING_CONFIG.ENTRANCE_X && Math.round(pos.y) === MINING_CONFIG.ENTRANCE_Y;
+    const isAtEntrance = Math.round(pos.x) === MINING_CONFIG.ENTRANCE_X && Math.round(pos.y) - engine.surfaceRow === MINING_CONFIG.ENTRANCE_Y;
 
     const otherPlayers: MiningRemotePlayer[] = [];
     for (const other of engine.players.values()) {
@@ -162,11 +168,31 @@ export class MiningSessionManager {
       miningTarget: session.miningTarget || undefined,
       miningTotal: session.miningTotal || undefined,
       gameMode: engine.gameMode,
+      surfaceRow: engine.surfaceRow || undefined,
+      sandbox: engine.sandbox
+        ? { mobs: engine.sandbox.mobOptions(), status: engine.sandbox.status(characterId) }
+        : undefined,
       otherPlayers,
       activeDynamites: engine.activeDynamites.length > 0 ? engine.activeDynamites.map(dynamiteDefinition) : undefined,
       mobs: activeMobs,
       characterSounds: MiningDataManager.getInstance().getCharacterSounds(),
     };
+  }
+
+  /**
+   * Resets a sandbox room to its starting state and tells everyone in it, handing each client a
+   * fresh full state to rebuild their view from. Returns false if the character is not in a sandbox.
+   */
+  public resetSandbox(characterId: string): boolean {
+    const engine = this.getSession(characterId);
+    if (!engine?.sandbox || !engine.getPlayer(characterId)) return false;
+    engine.sandbox.reset();
+    for (const [id, session] of engine.players) {
+      if (session.socket?.connected) {
+        session.socket.emit('mining_sandbox_reset', { sessionState: this.buildClientState(engine, id) });
+      }
+    }
+    return true;
   }
 
   /** Health a character keeps when a run ends: dying leaves 1 HP, otherwise at least 1. */
@@ -226,6 +252,9 @@ export class MiningSessionManager {
       this.activeRooms.delete(roomId);
     }
 
+    // A mode that does not save to the character (the sandbox) leaves loot and health behind
+    if (!engine.rules.persistsCharacter) return { extractedItems: [] };
+
     const extractedItems = removeResult?.extractedItems ?? [];
 
     await this.persistHealth(characterId, finalHealth);
@@ -261,7 +290,7 @@ export class MiningSessionManager {
         engine.stop();
         this.activeRooms.delete(roomId);
       }
-      if (options.persistHealth !== false) {
+      if (options.persistHealth !== false && engine.rules.persistsCharacter) {
         void this.persistHealth(characterId, finalHealth);
       }
     }
@@ -276,7 +305,9 @@ export class MiningSessionManager {
     if (engine) {
       engine.stop();
       for (const [charId, session] of engine.players) {
-        void this.persistHealth(charId, MiningSessionManager.finalHealth(session));
+        if (engine.rules.persistsCharacter) {
+          void this.persistHealth(charId, MiningSessionManager.finalHealth(session));
+        }
         this.playerToRoom.delete(charId);
       }
       this.activeRooms.delete(roomId);

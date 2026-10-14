@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, ChatMessage, MiningStateTickPayload, MiningPlayerDamagedEvent, MiningSessionEndedEvent, MiningNoticeEvent } from '@mine-me/shared';
+import type { PlayerState, GameCity, CharacterStatUpdate, GameEventPayload, GameEventResult, ChatMessage, MiningStateTickPayload, MiningPlayerDamagedEvent, MiningSessionEndedEvent, MiningNoticeEvent, MiningSessionClientState } from '@mine-me/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -22,6 +22,8 @@ export type SocketEventMap = {
   mining_session_timeout: { message?: string };
   // The server ended this player's run (e.g. they died in the mine)
   mining_session_ended: MiningSessionEndedEvent;
+  // The sandbox was reset: a fresh full state for everyone in it
+  mining_sandbox_reset: { sessionState: MiningSessionClientState };
   // This player took damage in the mine (health itself arrives via character_stat_update)
   player_damaged: MiningPlayerDamagedEvent;
   // A short message about the player's tool/action (e.g. their pickaxe is too weak for a block)

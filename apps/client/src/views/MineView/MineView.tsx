@@ -9,10 +9,12 @@ import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
 import { MiningLoadingScreen } from './components/MiningLoadingScreen/MiningLoadingScreen';
 import { notificationService } from '../../services/notificationService';
-import { type MiningBackpackItem, MINING_CONFIG } from '@mine-me/shared';
+import { type MiningBackpackItem, type MiningGameMode, MINING_CONFIG } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
 import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
 import { ExpeditionModeModal } from './components/ExpeditionModeModal/ExpeditionModeModal';
+import { SandboxPanel } from './components/SandboxPanel/SandboxPanel';
+import { useSandboxController } from './hooks/useSandboxController';
 import './MineView.css';
 
 export const MineView: React.FC = () => {
@@ -25,6 +27,9 @@ export const MineView: React.FC = () => {
   const [isAssetsLoaded, setIsAssetsLoaded] = useState<boolean>(false);
   const [loadProgress, setLoadProgress] = useState<number>(0);
   const [sessionKey, setSessionKey] = useState<number>(0);
+
+  // Sandbox tools (inert unless the session is a sandbox)
+  const sandbox = useSandboxController(sendGameEvent, miningSession);
 
   // Camera Zoom State (persisted in localStorage, default 150%, range 100% - 200%)
   const [zoom, setZoom] = useState<number>(() => {
@@ -157,9 +162,20 @@ export const MineView: React.FC = () => {
     };
   }, [sendGameEvent, setMiningSession]);
 
-  // Start Expedition Session with chosen mode ('singleplayer' or 'multiplayer')
+  // The sandbox was reset (by anyone in it): rebuild the view from the fresh state the server sent
+  useEffect(() => {
+    return onEvent('mining_sandbox_reset', (payload) => {
+      if (!payload?.sessionState) return;
+      setIsAssetsLoaded(false);
+      setMiningSession(payload.sessionState);
+      setSessionKey((prev) => prev + 1);
+      notificationService.info('Sandbox reset', 'The sandbox is back to its starting state.');
+    });
+  }, [onEvent, setMiningSession]);
+
+  // Start Expedition Session with chosen mode
   const handleStartExpedition = useCallback(
-    async (mode: 'singleplayer' | 'multiplayer', forceNew = false) => {
+    async (mode: MiningGameMode, forceNew = false) => {
       setShowModeModal(false);
       try {
         setLoading(true);
@@ -205,7 +221,8 @@ export const MineView: React.FC = () => {
 
   // Track if player has moved off the entrance and then landed back on it to trigger modal
   useEffect(() => {
-    if (!miningSession) return;
+    // (the sandbox has no exit ladder to confirm: it has a Leave button)
+    if (!miningSession || miningSession.gameMode === 'sandbox') return;
     const isAtEntrance = miningSession.position.x === MINING_CONFIG.ENTRANCE_X && miningSession.position.y === MINING_CONFIG.ENTRANCE_Y;
     if (!isAtEntrance) {
       setHasMovedOffEntrance(true);
@@ -221,6 +238,12 @@ export const MineView: React.FC = () => {
       const result = await sendGameEvent({ type: 'mining_exit' });
       if (result.success) {
         isCleanedUpRef.current = true;
+        if (miningSession?.gameMode === 'sandbox') {
+          // Nothing is saved in the sandbox, so there are no spoils to show
+          setMiningSession(null);
+          navigate('/home');
+          return;
+        }
         const items = result.data?.extractedItems || [];
         setSummaryLoot(items);
         setShowSummaryModal(true);
@@ -234,7 +257,7 @@ export const MineView: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [sendGameEvent, setMiningSession]);
+  }, [sendGameEvent, setMiningSession, miningSession?.gameMode, navigate]);
 
   // Abandon Session Handler (without extraction)
   const handleAbandon = useCallback(() => {
@@ -324,6 +347,7 @@ export const MineView: React.FC = () => {
             onToggleDebug={handleToggleDebug}
             onVisionChange={handleVisionChange}
             onBackpackChange={handleBackpackChange}
+            sandbox={sandbox.view}
           />
         </PixiStageProvider>
       )}
@@ -341,6 +365,27 @@ export const MineView: React.FC = () => {
           onZoomChange={handleZoomChange}
           showDebug={showDebug}
           onToggleDebug={handleToggleDebug}
+        />
+      )}
+
+      {/* Sandbox tool panel */}
+      {miningSession && sandbox.info && (
+        <SandboxPanel
+          fluids={(miningSession.fluids ?? []).map((f) => ({ typeKey: f.typeKey, name: f.name }))}
+          mobs={sandbox.info.mobs}
+          tool={sandbox.tool}
+          onToolChange={sandbox.setTool}
+          freeCamera={sandbox.freeCamera}
+          onFreeCameraChange={sandbox.setFreeCamera}
+          status={sandbox.status}
+          onGodMode={sandbox.setGodMode}
+          onPausedChange={sandbox.setPaused}
+          onStep={sandbox.step}
+          onSpeedChange={sandbox.setSpeed}
+          onClearHazards={sandbox.clearHazards}
+          onReset={sandbox.reset}
+          onLeave={handleExit}
+          busy={sandbox.busy}
         />
       )}
 

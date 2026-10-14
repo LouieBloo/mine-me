@@ -116,7 +116,7 @@ export class MiningDamageSystem {
     event: DamageEvent,
     miners?: MiningPlayerSession[]
   ): TileDamageResult {
-    if (!isInBounds(x, y) || !isValidDamageAmount(event.amount)) return NO_TILE_DAMAGE;
+    if (!isInBounds(x, y, this.world.grid) || !isValidDamageAmount(event.amount)) return NO_TILE_DAMAGE;
 
     const tile = this.world.grid[y][x];
     if (!tile || !isTileMineable(tile.type)) return NO_TILE_DAMAGE;

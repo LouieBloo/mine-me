@@ -102,6 +102,11 @@ export class MiningFluidSubsystem {
   /** Runs once per tick; steps the simulation on every Nth tick. */
   public update(): void {
     if (this.world.tick % MINING_CONFIG.FLUID_STEP_TICKS !== 0) return;
+    this.step();
+  }
+
+  /** One flow step, whatever the tick (the sandbox drives this itself to pause, step and change speed). */
+  public step(): void {
     this.grid.step();
   }
 

@@ -1,4 +1,4 @@
-import type { MiningPosition, MiningDirection, MiningInputState, Vector2D } from './mining';
+import type { MiningPosition, MiningDirection, MiningGameMode, MiningInputState, Vector2D } from './mining';
 
 // ============================================================================
 // Game Event Types — Discriminated Union Pattern
@@ -62,7 +62,7 @@ export interface LeaveTrainingPayload extends GameEventBase {
 export interface MiningStartPayload extends GameEventBase {
   type: 'mining_start';
   forceNew?: boolean;
-  mode?: 'singleplayer' | 'multiplayer';
+  mode?: MiningGameMode;
 }
 
 // ----------------------------------------------------------------------------
@@ -188,6 +188,51 @@ export interface MiningReloadPayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
+// Sandbox commands (only accepted in a sandbox room)
+// ----------------------------------------------------------------------------
+export interface SandboxPourFluidPayload extends GameEventBase {
+  type: 'sandbox_pour_fluid';
+  x: number;
+  y: number;
+  /** The fluid's typeKey (e.g. 'OIL'). */
+  fluidKey: string;
+}
+
+export interface SandboxSpawnMobPayload extends GameEventBase {
+  type: 'sandbox_spawn_mob';
+  mobId: string;
+  x: number;
+  y: number;
+}
+
+export interface SandboxResetPayload extends GameEventBase {
+  type: 'sandbox_reset';
+}
+
+export interface SandboxSetGodModePayload extends GameEventBase {
+  type: 'sandbox_set_god_mode';
+  enabled: boolean;
+}
+
+export interface SandboxSetSimPayload extends GameEventBase {
+  type: 'sandbox_set_sim';
+  paused?: boolean;
+  speed?: number;
+  /** Run one fluid/fire step (while paused). */
+  step?: boolean;
+}
+
+export interface SandboxClearHazardsPayload extends GameEventBase {
+  type: 'sandbox_clear_hazards';
+}
+
+export interface SandboxIgnitePayload extends GameEventBase {
+  type: 'sandbox_ignite';
+  x: number;
+  y: number;
+}
+
+// ----------------------------------------------------------------------------
 // Union of all game event payloads.
 // Extend this as new events are added.
 // ----------------------------------------------------------------------------
@@ -211,6 +256,13 @@ export type GameEventPayload =
   | MiningMineCompletePayload
   | MiningExitPayload
   | MiningCancelPayload
+  | SandboxPourFluidPayload
+  | SandboxSpawnMobPayload
+  | SandboxResetPayload
+  | SandboxSetGodModePayload
+  | SandboxSetSimPayload
+  | SandboxClearHazardsPayload
+  | SandboxIgnitePayload
   | EquipItemPayload
   | UnequipItemPayload
   | ConsumeItemPayload;

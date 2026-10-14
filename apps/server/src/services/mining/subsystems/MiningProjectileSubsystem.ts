@@ -255,7 +255,7 @@ export class MiningProjectileSubsystem {
       // 3. Tile hit handling
       if (proj.hitTile) {
         const { x, y } = proj.hitTile;
-        if (isInBounds(x, y)) {
+        if (isInBounds(x, y, this.world.grid)) {
           this.world.damage.damageTile(x, y, hitEvent(proj));
         }
       }

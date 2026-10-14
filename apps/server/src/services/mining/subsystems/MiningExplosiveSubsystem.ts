@@ -186,7 +186,7 @@ export class MiningExplosiveSubsystem {
         if (dx * dx + dy * dy > radiusSq) continue;
         const tx = cx + dx;
         const ty = cy + dy;
-        if (!isInBounds(tx, ty)) continue;
+        if (!isInBounds(tx, ty, this.world.grid)) continue;
         const tile = grid[ty][tx];
         if (tile.type === MiningTileType.EMPTY || isTileBlastProof(tile.type)) continue;
 

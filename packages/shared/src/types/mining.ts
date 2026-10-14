@@ -418,6 +418,34 @@ export interface MiningPosition {
 }
 
 /** Movement direction for the mining grid. */
+/** How a mining room is run: a private mine, the shared lobby, or the shared test sandbox. */
+export type MiningGameMode = 'singleplayer' | 'multiplayer' | 'sandbox';
+
+/** Speeds the sandbox can run the fluid and fire simulation at (1 = normal). */
+export const SANDBOX_SIM_SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
+
+/** A mob the sandbox can spawn. */
+export interface SandboxMobOption {
+  id: string;
+  name: string;
+}
+
+/** The sandbox settings that change while it runs. */
+export interface SandboxStatus {
+  /** The viewing player takes no damage. */
+  godMode: boolean;
+  /** The fluid and fire simulation is paused (it can still be single-stepped). */
+  paused: boolean;
+  /** Fluid and fire simulation speed (one of SANDBOX_SIM_SPEEDS). */
+  speed: number;
+}
+
+/** What a sandbox client needs to build its tool panel (fluids come with the session's `fluids`). */
+export interface SandboxClientInfo {
+  mobs: SandboxMobOption[];
+  status: SandboxStatus;
+}
+
 export type MiningDirection = 'up' | 'down' | 'left' | 'right';
 
 /**
@@ -565,8 +593,12 @@ export interface MiningSessionClientState {
   miningTotal?: number;
   /** If mining, the server timestamp when mining started. */
   miningStartedAt?: number;
-  /** Current game mode ('singleplayer' or 'multiplayer'). */
-  gameMode?: 'singleplayer' | 'multiplayer';
+  /** Current game mode. */
+  gameMode?: MiningGameMode;
+  /** Row of the ground surface (0 in the normal mine; the sandbox has open sky rows above it). */
+  surfaceRow?: number;
+  /** Sandbox tool options and settings (sandbox rooms only). */
+  sandbox?: SandboxClientInfo;
   /** Other players in the shared mining room (if multiplayer). An empty array means "none". */
   otherPlayers?: MiningRemotePlayer[];
   /** Active thrown dynamites in the cavern world. */

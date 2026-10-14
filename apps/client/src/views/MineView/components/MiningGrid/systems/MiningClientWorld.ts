@@ -32,6 +32,7 @@ import type { ProjectileVisualManager } from '../renderers/ProjectileVisualManag
 import type { ProjectileTextureCache } from './ProjectileTextureCache';
 import type { MiningPredictionState } from './MiningPredictionState';
 import type { CharacterSoundPlayer } from './CharacterSoundPlayer';
+import type { FreeCamera } from './FreeCamera';
 
 type Ref<T> = React.MutableRefObject<T>;
 type NullableRef<T> = React.RefObject<T | null>;
@@ -71,6 +72,8 @@ export interface MiningEntityRefs {
 /** Pixi containers, sprite maps, textures, renderers and engines. */
 export interface MiningSceneRefs {
   cameraRef: NullableRef<Camera2D>;
+  /** The sandbox's detachable camera (absent outside the sandbox). */
+  freeCameraRef?: Ref<FreeCamera>;
   gridContainerRef: NullableRef<Container>;
   tilesContainerRef: NullableRef<Container>;
   /** Draws the fluid the server has revealed (and holds the client's copy of the fluid grid). */

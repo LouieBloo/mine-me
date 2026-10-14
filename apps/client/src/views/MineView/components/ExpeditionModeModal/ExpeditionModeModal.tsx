@@ -1,10 +1,11 @@
 import React from 'react';
+import type { MiningGameMode } from '@mine-me/shared';
 import { Modal } from '../../../../components/Modal/Modal';
 import './ExpeditionModeModal.css';
 
 export interface ExpeditionModeModalProps {
   isOpen: boolean;
-  onSelectMode: (mode: 'singleplayer' | 'multiplayer') => void;
+  onSelectMode: (mode: MiningGameMode) => void;
   onCancel: () => void;
 }
 
@@ -74,6 +75,32 @@ export const ExpeditionModeModal: React.FC<ExpeditionModeModalProps> = ({
             </div>
             <div className="mt-5 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs font-bold text-cyan-400 group-hover:translate-x-1 transition-transform">
               <span>Enter Shared Lobby</span>
+              <span>&rarr;</span>
+            </div>
+          </button>
+
+          {/* Sandbox Card: a test map with every block, fluid pools and spawn tools */}
+          <button
+            type="button"
+            onClick={() => onSelectMode('sandbox')}
+            className="expedition-card sm:col-span-2 flex flex-col justify-between p-5 rounded-xl bg-slate-800/80 border-2 border-slate-700 hover:border-violet-400 hover:bg-slate-850 hover:shadow-lg hover:shadow-violet-400/10 text-left transition cursor-pointer group focus:outline-none focus:ring-2 focus:ring-violet-400"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">🧪</span>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-violet-950/80 border border-violet-500/30 text-violet-300">
+                  TESTING
+                </span>
+              </div>
+              <h4 className="text-lg font-bold text-white group-hover:text-violet-300 transition-colors mb-2">
+                Sandbox
+              </h4>
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                A small test mine with every block, fluid pools and full vision. Pour fluids, spawn mobs and pan the camera. Nothing you do here is saved, and other players can join.
+              </p>
+            </div>
+            <div className="mt-5 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs font-bold text-violet-400 group-hover:translate-x-1 transition-transform">
+              <span>Enter Sandbox</span>
               <span>&rarr;</span>
             </div>
           </button>

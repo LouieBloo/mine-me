@@ -27,6 +27,9 @@ import { useMiningScene } from './hooks/useMiningScene';
 import { useMiningActions } from './hooks/useMiningActions';
 import { useMiningAmbientEffects } from './hooks/useMiningAmbientEffects';
 import { useMiningStateSync } from './hooks/useMiningStateSync';
+import { useSandboxMouseAction, useSandboxFreeCamera } from './hooks/useSandboxClient';
+import { FreeCamera } from './systems/FreeCamera';
+import type { SandboxViewState } from '../../sandbox/sandboxTool';
 import { ReloadSoundTrigger } from './systems/ReloadSoundTrigger';
 import { CharacterSoundPlayer } from './systems/CharacterSoundPlayer';
 import { usePlayerDamageEvents } from './hooks/usePlayerDamageEvents';
@@ -60,6 +63,8 @@ interface MiningGridProps {
   onToggleDebug?: () => void;
   onVisionChange?: (newVision: number) => void;
   onBackpackChange?: (newBackpack: MiningBackpackItem[]) => void;
+  /** Sandbox tool and camera settings (only in a sandbox). */
+  sandbox?: SandboxViewState;
 }
 
 export const MiningGrid: React.FC<MiningGridProps> = ({
@@ -81,6 +86,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onToggleDebug,
   onVisionChange,
   onBackpackChange,
+  sandbox,
 }) => {
   const { app } = usePixiStage();
   const { onEvent, sendGameEvent } = useSocket();
@@ -109,6 +115,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       up: false, down: false, left: false, right: false, jump: false, miningKey: false, sequence: 0,
     });
   }
+
+  // The sandbox's detachable camera (idle unless the sandbox turns it on)
+  const freeCameraRef = useRef<FreeCamera>(new FreeCamera());
 
   // Interaction and mining state refs
   const isMiningRef = useRef<boolean>(initialSessionState.isMining ?? false);
@@ -385,11 +394,15 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     torchEmittersRef,
     blockEmittersRef,
     blockParticleConfigsRef,
+    freeCameraRef,
   };
 
   // One trigger shared by the R key and the server's ammo ticks, so a reload sounds once however it starts
   const reloadSoundRef = useRef<ReloadSoundTrigger | null>(null);
   if (!reloadSoundRef.current) reloadSoundRef.current = new ReloadSoundTrigger();
+
+  // The sandbox panel's tool (pour, spawn, ignite) or the free camera replaces the item's mouse action
+  const overrideAction = useSandboxMouseAction(sandbox, sendGameEvent);
 
   const { weaponSoundUrlRef, weaponSoundVolumeRef, weaponAmmoStateRef, handleWeaponReload } = useMiningActions({
     world: sceneWorld,
@@ -407,6 +420,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     activeThrowableItem,
     onDynamiteThrown,
     reloadSound: reloadSoundRef.current,
+    overrideAction,
   });
 
   const lastWeaponSoundTimeRef = useRef<number>(0);
@@ -420,6 +434,15 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     onZoomChange,
     onVisionChange,
     onReload: handleWeaponReload,
+  });
+
+  // The sandbox's free camera: detaches the view from the character and lets the mouse drag it
+  useSandboxFreeCamera({
+    enabled: sandbox?.freeCamera ?? false,
+    freeCamera: freeCameraRef.current,
+    world: { cameraRef, keysPressedRef, playerContainerRef },
+    canvas: app?.canvas ?? null,
+    sendGameEvent,
   });
 
   // Initial Full-Grid Render & Initial Dynamic Ambient Tile Lights/Emitters

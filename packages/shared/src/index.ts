@@ -16,6 +16,7 @@ export * from './utils/experience';
 export * from './utils/stamina';
 export * from './utils/url';
 export * from './physics/MiningPhysicsBody';
+export * from './physics/gridDimensions';
 export * from './physics/gridRaycast';
 export * from './physics/segmentAabb';
 export * from './physics/MiningPlayerBody';

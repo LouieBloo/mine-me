@@ -268,6 +268,171 @@ describe('MineView Navigation & Session Lifecycle', () => {
     });
   });
 
+  describe('sandbox', () => {
+    const sandboxState = (over: Record<string, unknown> = {}) => ({
+      grid: [], position: { x: 22, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3,
+      canExtract: false, isMining: false, gameMode: 'sandbox',
+      fluids: [{ typeKey: 'OIL', name: 'Oil' }],
+      sandbox: { mobs: [{ id: 'm1', name: 'Mole Person' }], status: { godMode: false, paused: false, speed: 1 } },
+      ...over,
+    });
+
+    const enterSandbox = async (handlers: Record<string, (p: any) => void> = {}) => {
+      mockOnEvent.mockImplementation((name: string, handler: (p: any) => void) => {
+        handlers[name] = handler;
+        return () => {};
+      });
+      let session: any = 'uninitialized';
+      let path = '';
+      const Probe = () => {
+        session = useGame().miningSession;
+        path = useLocation().pathname;
+        return null;
+      };
+      render(
+        <MemoryRouter initialEntries={['/mine']}>
+          <GameProvider>
+            <Probe />
+            <MineView />
+          </GameProvider>
+        </MemoryRouter>
+      );
+      mockSendGameEvent.mockResolvedValueOnce({ success: true, data: { sessionState: sandboxState() } });
+      await act(async () => {
+        screen.getByText('Sandbox').click();
+      });
+      return { getSession: () => session, getPath: () => path };
+    };
+
+    it('starts the shared sandbox without restarting an existing room', async () => {
+      await enterSandbox();
+      expect(mockSendGameEvent).toHaveBeenCalledWith({ type: 'mining_start', mode: 'sandbox', forceNew: false });
+    });
+
+    it('shows the tool panel with the loaded fluids and mobs', async () => {
+      await enterSandbox();
+      expect(screen.getByText('Reset sandbox')).toBeDefined();
+      expect(screen.getByRole('option', { name: 'Oil' })).toBeDefined();
+      expect(screen.getByRole('option', { name: 'Mole Person' })).toBeDefined();
+    });
+
+    it('does not show the tool panel in a normal mine', async () => {
+      mockOnEvent.mockReturnValue(() => {});
+      render(
+        <MemoryRouter initialEntries={['/mine']}>
+          <GameProvider>
+            <MineView />
+          </GameProvider>
+        </MemoryRouter>
+      );
+      mockSendGameEvent.mockResolvedValueOnce({
+        success: true,
+        data: { sessionState: { grid: [], position: { x: 22, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3, canExtract: true, isMining: false, gameMode: 'singleplayer' } },
+      });
+      await act(async () => {
+        screen.getByText(/Single Player/i).click();
+      });
+      expect(screen.queryByText('Reset sandbox')).toBeNull();
+    });
+
+    it('leaves straight to town, with no loot summary, when Leave sandbox is pressed', async () => {
+      const { getSession, getPath } = await enterSandbox();
+      mockSendGameEvent.mockResolvedValueOnce({ success: true, data: { extractedItems: [] } });
+      await act(async () => {
+        screen.getByText('Leave sandbox').click();
+      });
+      expect(mockSendGameEvent).toHaveBeenCalledWith({ type: 'mining_exit' });
+      expect(getSession()).toBeNull();
+      expect(getPath()).toBe('/home');
+      expect(screen.queryByText(/Expedition Summary/i)).toBeNull();
+    });
+
+    it('never asks "Leave Mine?" when the player walks back to the spawn', async () => {
+      let setSession: (fn: (prev: any) => any) => void = () => {};
+      const Mover = () => {
+        setSession = useGame().setMiningSession as any;
+        return null;
+      };
+      mockOnEvent.mockReturnValue(() => {});
+      render(
+        <MemoryRouter initialEntries={['/mine']}>
+          <GameProvider>
+            <Mover />
+            <MineView />
+          </GameProvider>
+        </MemoryRouter>
+      );
+      mockSendGameEvent.mockResolvedValueOnce({ success: true, data: { sessionState: sandboxState() } });
+      await act(async () => {
+        screen.getByText('Sandbox').click();
+      });
+      // Off the entrance, then back on it: a normal mine would offer to extract here
+      await act(async () => setSession((prev) => ({ ...prev, position: { x: 30, y: 8 } })));
+      await act(async () => setSession((prev) => ({ ...prev, position: { x: 22, y: 0 } })));
+      expect(screen.queryByText(/Leave Mine\?/)).toBeNull();
+    });
+
+    it('does ask in a normal mine (control for the test above)', async () => {
+      let setSession: (fn: (prev: any) => any) => void = () => {};
+      const Mover = () => {
+        setSession = useGame().setMiningSession as any;
+        return null;
+      };
+      mockOnEvent.mockReturnValue(() => {});
+      render(
+        <MemoryRouter initialEntries={['/mine']}>
+          <GameProvider>
+            <Mover />
+            <MineView />
+          </GameProvider>
+        </MemoryRouter>
+      );
+      mockSendGameEvent.mockResolvedValueOnce({
+        success: true,
+        data: { sessionState: { grid: [], position: { x: 22, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3, canExtract: true, isMining: false, gameMode: 'singleplayer' } },
+      });
+      await act(async () => {
+        screen.getByText(/Single Player/i).click();
+      });
+      await act(async () => setSession((prev) => ({ ...prev, position: { x: 30, y: 8 } })));
+      await act(async () => setSession((prev) => ({ ...prev, position: { x: 22, y: 0 } })));
+      expect(screen.getByText(/Leave Mine\?/)).toBeDefined();
+    });
+
+    it('rebuilds the session and tells the user when the sandbox is reset', async () => {
+      const infoSpy = vi.spyOn(notificationService, 'info').mockImplementation(() => undefined as any);
+      const handlers: Record<string, (p: any) => void> = {};
+      const { getSession } = await enterSandbox(handlers);
+      const fresh = sandboxState({ position: { x: 22, y: 0 }, visionRange: 7 });
+
+      await act(async () => {
+        handlers['mining_sandbox_reset']({ sessionState: fresh });
+      });
+
+      expect(getSession().visionRange).toBe(7);
+      expect(infoSpy).toHaveBeenCalledWith('Sandbox reset', expect.any(String));
+    });
+
+    it('ignores a reset event with no state', async () => {
+      const handlers: Record<string, (p: any) => void> = {};
+      const { getSession } = await enterSandbox(handlers);
+      const before = getSession();
+      await act(async () => {
+        handlers['mining_sandbox_reset']({});
+      });
+      expect(getSession()).toBe(before);
+    });
+
+    it('sends reset from the panel', async () => {
+      await enterSandbox();
+      mockSendGameEvent.mockResolvedValueOnce({ success: true });
+      await act(async () => {
+        screen.getByText('Reset sandbox').click();
+      });
+      expect(mockSendGameEvent).toHaveBeenCalledWith({ type: 'sandbox_reset' });
+    });
+  });
+
   it('safely catches and absorbs mining_input rejections when session is inactive on server', async () => {
     // Import useMiningInput dynamically or test its hook directly
     const { renderHook } = await import('@testing-library/react');

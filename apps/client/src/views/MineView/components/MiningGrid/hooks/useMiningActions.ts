@@ -11,6 +11,7 @@ import {
   LadderPlacementAction,
   ThrowableItemAction,
   ShootWeaponAction,
+  type IMouseAction,
 } from '../input/MouseAction';
 import type { SoundManager } from '../../../../../services/sound';
 import { withVolume } from '../../../../../services/sound/sfxVolume';
@@ -53,6 +54,8 @@ export interface UseMiningActionsOptions {
   onDynamiteThrown?: () => void;
   /** Shared with the ammo ticks so a reload sounds once however it started. */
   reloadSound?: ReloadSoundTrigger;
+  /** A tool that replaces whatever the equipped item would do with the mouse (the sandbox's tools). */
+  overrideAction?: IMouseAction | null;
 }
 
 export function useMiningActions({
@@ -71,6 +74,7 @@ export function useMiningActions({
   activeThrowableItem = null,
   onDynamiteThrown,
   reloadSound: reloadSoundOption,
+  overrideAction = null,
 }: UseMiningActionsOptions) {
   const {
     playerSpriteRef,
@@ -165,6 +169,10 @@ export function useMiningActions({
 
   useEffect(() => {
     const mouseController = mouseControllerRef.current;
+    if (overrideAction) {
+      mouseController.setActiveAction(overrideAction);
+      return;
+    }
     if (isPlacingTorch) {
       const torchItem = playerState?.inventory?.items?.find(
         (inv: any) =>
@@ -440,6 +448,7 @@ export function useMiningActions({
       mouseController.setActiveAction(null);
     }
   }, [
+    overrideAction,
     isPlacingTorch,
     isPlacingLadder,
     isThrowingItem,

@@ -174,6 +174,29 @@ export class MiningMouseController {
   }
 
   /**
+   * Like `screenToGridTile`, but a cursor outside the map gives the nearest tile on the map's edge.
+   * Used by tools that work above and beside the map (the sandbox's pour and fire tools).
+   */
+  public screenToGridTileClamped(screenX: number, screenY: number): MiningPosition | null {
+    if (!this.camera || !this.canvas || this.grid.length === 0) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    const worldPos = this.camera.screenToWorld({ x: screenX - rect.left, y: screenY - rect.top });
+    const maxX = (this.grid[0]?.length ?? 1) - 1;
+    const maxY = this.grid.length - 1;
+    return {
+      x: Math.min(maxX, Math.max(0, Math.floor(worldPos.x / this.tileSize))),
+      y: Math.min(maxY, Math.max(0, Math.floor(worldPos.y / this.tileSize))),
+    };
+  }
+
+  /** The tile under the cursor for the active action: clamped to the map for tools that ask for it. */
+  private targetTileAt(screenX: number, screenY: number): MiningPosition | null {
+    return this.activeAction?.clampsToGrid
+      ? this.screenToGridTileClamped(screenX, screenY)
+      : this.screenToGridTile(screenX, screenY);
+  }
+
+  /**
    * Checks if a target tile is within reach (cardinal or diagonal).
    */
   public isWithinReach(target: MiningPosition): boolean {
@@ -317,7 +340,7 @@ export class MiningMouseController {
   public update(): void {
     if (!this.screenMousePos || !this.camera || !this.canvas) return;
 
-    const tile = this.screenToGridTile(this.screenMousePos.x, this.screenMousePos.y);
+    const tile = this.targetTileAt(this.screenMousePos.x, this.screenMousePos.y);
 
     const prevTile = this.hoveredTile;
     const isDifferent =
@@ -376,7 +399,7 @@ export class MiningMouseController {
 
     this.isMouseDown = true;
     this.screenMousePos = { x: e.clientX, y: e.clientY };
-    const tile = this.screenToGridTile(e.clientX, e.clientY) || this.hoveredTile;
+    const tile = this.targetTileAt(e.clientX, e.clientY) || this.hoveredTile;
     this.hoveredTile = tile;
     this.lastExecutedTarget = null;
 

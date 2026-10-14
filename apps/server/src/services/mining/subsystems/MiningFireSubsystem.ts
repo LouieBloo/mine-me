@@ -45,6 +45,11 @@ export class MiningFireSubsystem {
   /** Runs once per tick; on every Nth tick it collects sparks from torches and carried items, takes new sparks and steps the fire on every Nth tick. */
   public update(): void {
     if (this.world.tick % MINING_CONFIG.FLUID_STEP_TICKS !== 0) return;
+    this.step();
+  }
+
+  /** One fire step, whatever the tick (the sandbox drives this itself to pause, step and change speed). */
+  public step(): void {
     this.world.ignition.emitFromSources();
     for (const cell of this.world.ignition.takeIgnited()) this.grid.ignite(cell.x, cell.y);
     this.grid.step(FIRE_STEP_SECONDS);

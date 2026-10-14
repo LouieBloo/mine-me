@@ -62,3 +62,27 @@ export async function broadcastInventory(characterId: string): Promise<void> {
     broadcastStatUpdate(characterId, { inventory: InventoryService.mapCharacterInventory(updatedChar) });
   }
 }
+
+/** The inventory operations a mining handler uses; one set saves to the database, the other changes nothing. */
+export interface InventoryActions {
+  consume: typeof consumeInventoryItem;
+  refund: typeof refundInventoryItem;
+  broadcast: typeof broadcastInventory;
+}
+
+const REAL_INVENTORY: InventoryActions = {
+  consume: consumeInventoryItem,
+  refund: refundInventoryItem,
+  broadcast: broadcastInventory,
+};
+
+/** Used in modes that do not save to the character (the sandbox): items are checked but never spent. */
+const UNSPENT_INVENTORY: InventoryActions = {
+  consume: async () => true,
+  refund: async () => {},
+  broadcast: async () => {},
+};
+
+export function inventoryActionsFor(persistsCharacter: boolean): InventoryActions {
+  return persistsCharacter ? REAL_INVENTORY : UNSPENT_INVENTORY;
+}

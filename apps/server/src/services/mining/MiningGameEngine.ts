@@ -8,6 +8,8 @@ import {
   type MiningDroppedItem,
   type MiningFallingRock,
   type MiningGearLayer,
+  type MiningGameMode,
+  getGridDimensions,
   type MiningInputState,
   type MiningPosition,
   type MiningStateTickPayload,
@@ -24,7 +26,6 @@ import {
 } from '@mine-me/shared';
 import * as planck from 'planck';
 import {
-  generateMiningMapWithFluids,
   getDamageStage,
   isInBounds,
   type ServerMiningGrid,
@@ -57,6 +58,9 @@ import { MiningRockSubsystem } from './subsystems/MiningRockSubsystem';
 import { MiningExplosiveSubsystem, type ThrowRequest } from './subsystems/MiningExplosiveSubsystem';
 import { MiningProjectileSubsystem, type ShootResult } from './subsystems/MiningProjectileSubsystem';
 import { MiningFluidSubsystem } from './subsystems/MiningFluidSubsystem';
+import { buildMapForMode } from './mapSources';
+import { SandboxTools } from './sandbox/SandboxTools';
+import { getGameModeRules, type GameModeRules } from './gameModeRules';
 import { MiningIgnitionSubsystem } from './subsystems/MiningIgnitionSubsystem';
 import { MiningFireSubsystem } from './subsystems/MiningFireSubsystem';
 import { MiningBurningSubsystem } from './subsystems/MiningBurningSubsystem';
@@ -66,7 +70,7 @@ export type { MiningPlayerSession, MiningActiveMobSession };
 
 export interface MiningEngineOptions extends Partial<MiningCombatStats> {
   roomId?: string;
-  gameMode?: 'singleplayer' | 'multiplayer';
+  gameMode?: MiningGameMode;
   characterId?: string;
   characterName?: string;
   cityId: string;
@@ -95,12 +99,18 @@ export interface MiningEngineOptions extends Partial<MiningCombatStats> {
  */
 export class MiningGameEngine {
   public readonly roomId: string;
-  public readonly gameMode: 'singleplayer' | 'multiplayer';
+  public readonly gameMode: MiningGameMode;
+  /** What this mode allows and saves (see gameModeRules). */
+  public readonly rules: GameModeRules;
   public readonly cityId: string;
   public readonly seed: number;
 
-  public grid: ServerMiningGrid;
-  public rigidWorld: MiningRigidWorld;
+  // The map and everything simulated on it. Only `rebuildWorld` assigns these (at start, and when the
+  // sandbox is reset), so a subsystem always reaches the current ones through its world.
+  /** Row of the ground surface (0 except in the sandbox, which has open sky above it). */
+  public surfaceRow = 0;
+  public grid!: ServerMiningGrid;
+  public rigidWorld!: MiningRigidWorld;
   public mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>;
 
   public maxDurationSeconds = MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
@@ -111,6 +121,10 @@ export class MiningGameEngine {
   private onPlayerHealthChanged?: MiningEngineOptions['onPlayerHealthChanged'];
   private onPlayerDeath?: MiningEngineOptions['onPlayerDeath'];
   private pendingDeaths: string[] = [];
+  /** The test tools, in a sandbox room (null elsewhere). */
+  public readonly sandbox: SandboxTools | null;
+  /** The one view of this room every subsystem is given (see buildWorld). */
+  private readonly worldView: MiningWorld;
 
   /** Consecutive ticks in which at least one step threw; the room is ended at this limit. */
   public static readonly MAX_CONSECUTIVE_FAILED_TICKS = 10;
@@ -129,24 +143,25 @@ export class MiningGameEngine {
   // Dedicated Subsystems
   public readonly dataManager: MiningDataManager;
   public readonly playerManager: MiningPlayerManager;
-  public readonly blockSubsystem: MiningBlockSubsystem;
-  public readonly dropSubsystem: MiningDropSubsystem;
-  public readonly rockSubsystem: MiningRockSubsystem;
-  public readonly explosiveSubsystem: MiningExplosiveSubsystem;
-  public readonly projectileSubsystem: MiningProjectileSubsystem;
-  public readonly mobSubsystem: MiningMobSubsystem;
-  public readonly fluidSubsystem: MiningFluidSubsystem;
-  public readonly ignitionSubsystem: MiningIgnitionSubsystem;
-  public readonly fireSubsystem: MiningFireSubsystem;
-  public readonly burningSubsystem: MiningBurningSubsystem;
+  public blockSubsystem!: MiningBlockSubsystem;
+  public dropSubsystem!: MiningDropSubsystem;
+  public rockSubsystem!: MiningRockSubsystem;
+  public explosiveSubsystem!: MiningExplosiveSubsystem;
+  public projectileSubsystem!: MiningProjectileSubsystem;
+  public mobSubsystem!: MiningMobSubsystem;
+  public fluidSubsystem!: MiningFluidSubsystem;
+  public ignitionSubsystem!: MiningIgnitionSubsystem;
+  public fireSubsystem!: MiningFireSubsystem;
+  public burningSubsystem!: MiningBurningSubsystem;
   /** The single place hits are applied (see MiningDamageSystem). */
-  public readonly damageSystem: MiningDamageSystem;
+  public damageSystem!: MiningDamageSystem;
 
   constructor(options: MiningEngineOptions) {
     this.roomId =
       options.roomId ??
       (options.characterId ? `solo_${options.characterId}` : `room_${Math.random().toString(36).substring(2, 9)}`);
     this.gameMode = options.gameMode ?? 'singleplayer';
+    this.rules = getGameModeRules(this.gameMode);
     this.cityId = options.cityId;
     this.seed = options.seed ?? Math.floor(Math.random() * 2147483647);
     this.maxDurationSeconds = options.maxDurationSeconds ?? MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
@@ -157,51 +172,13 @@ export class MiningGameEngine {
     this.onPlayerDeath = options.onPlayerDeath;
     this.mapConfig = options.mapConfig;
 
-    // Generate authoritative grid
-    const generated = generateMiningMapWithFluids({
-      seed: this.seed,
-      config: options.mapConfig,
-      fluids: MiningDataManager.getInstance().getFluids(),
-    });
-    this.grid = generated.grid;
-
-    // Initialize Planck.js rigid body physics world
-    this.rigidWorld = new MiningRigidWorld({
-      width: options.mapConfig?.gridWidth ?? MINING_CONFIG.GRID_WIDTH,
-      height: options.mapConfig?.gridHeight ?? MINING_CONFIG.GRID_HEIGHT,
-      gravityEnabled: options.mapConfig?.gravityEnabled ?? true,
-      gravity: options.mapConfig?.gravity ?? MINING_CONFIG.GRAVITY,
-      dynamiteBounciness: options.mapConfig?.dynamiteBounciness,
-      dynamiteFriction: options.mapConfig?.dynamiteFriction,
-      dynamiteThrowPower: options.mapConfig?.dynamiteThrowPower,
-      rockGravityScale: options.mapConfig?.rockGravityScale,
-      rockRestitution: options.mapConfig?.rockRestitution,
-    });
-    this.rigidWorld.setGrid(this.grid);
-
     // Initialize subsystems. Each one is given the same world (its view of this room) and reaches
     // its collaborators through it, so none of them needs the engine or each other's constructors.
     this.dataManager = MiningDataManager.getInstance();
-    const world = this.buildWorld();
-    this.playerManager = new MiningPlayerManager(world);
-    this.blockSubsystem = new MiningBlockSubsystem(world);
-    this.dropSubsystem = new MiningDropSubsystem(world);
-    this.rockSubsystem = new MiningRockSubsystem(world);
-    this.explosiveSubsystem = new MiningExplosiveSubsystem(world);
-    this.projectileSubsystem = new MiningProjectileSubsystem(world);
-    this.mobSubsystem = new MiningMobSubsystem(world);
-    this.fluidSubsystem = new MiningFluidSubsystem(world);
-    this.ignitionSubsystem = new MiningIgnitionSubsystem(world);
-    this.fireSubsystem = new MiningFireSubsystem(world);
-    this.burningSubsystem = new MiningBurningSubsystem(world);
-    for (const cell of generated.fluidCells) this.fluidSubsystem.placeFluid(cell.x, cell.y, cell.typeKey, cell.level);
-    this.damageSystem = new MiningDamageSystem(world);
-    this.blockSubsystem.onToolTooWeak = (session, blockName) =>
-      this.playerManager.sendNotice(session, 'tool_too_weak', `Your tool isn't strong enough to break ${blockName}.`);
-
-    // Automatically spawn cavern mobs if configured
-    this.populateCavernMobs();
-    this.spawnSurfaceTargetDummy();
+    this.worldView = this.buildWorld();
+    this.playerManager = new MiningPlayerManager(this.worldView);
+    this.sandbox = this.rules.hasSandboxTools ? new SandboxTools(this) : null;
+    this.rebuildWorld();
 
     // If options included an initial character and socket, initialize player session
     if (options.characterId && options.socket) {
@@ -218,6 +195,59 @@ export class MiningGameEngine {
         equippedWeaponId: options.equippedWeaponId,
         maxHealth: options.maxHealth,
       });
+    }
+  }
+
+  /**
+   * (Re)builds the map and everything simulated on it: the grid, the physics world, every subsystem
+   * and the starting fluid and mobs. Players are kept (see `resetSandbox`).
+   */
+  private rebuildWorld(): void {
+    const mapConfig = this.mapConfig;
+    const built = buildMapForMode(this.gameMode, {
+      seed: this.seed,
+      mapConfig,
+      fluids: MiningDataManager.getInstance().getFluids(),
+    });
+    this.grid = built.grid;
+    this.surfaceRow = built.surfaceRow ?? 0;
+    const gridSize = getGridDimensions(this.grid);
+
+    this.rigidWorld = new MiningRigidWorld({
+      width: gridSize.width,
+      height: gridSize.height,
+      gravityEnabled: mapConfig?.gravityEnabled ?? true,
+      gravity: mapConfig?.gravity ?? MINING_CONFIG.GRAVITY,
+      dynamiteBounciness: mapConfig?.dynamiteBounciness,
+      dynamiteFriction: mapConfig?.dynamiteFriction,
+      dynamiteThrowPower: mapConfig?.dynamiteThrowPower,
+      rockGravityScale: mapConfig?.rockGravityScale,
+      rockRestitution: mapConfig?.rockRestitution,
+    });
+    this.rigidWorld.setGrid(this.grid);
+
+    const world = this.worldView;
+    this.blockSubsystem = new MiningBlockSubsystem(world);
+    this.dropSubsystem = new MiningDropSubsystem(world);
+    this.rockSubsystem = new MiningRockSubsystem(world);
+    this.explosiveSubsystem = new MiningExplosiveSubsystem(world);
+    this.projectileSubsystem = new MiningProjectileSubsystem(world);
+    this.mobSubsystem = new MiningMobSubsystem(world);
+    this.fluidSubsystem = new MiningFluidSubsystem(world);
+    this.ignitionSubsystem = new MiningIgnitionSubsystem(world);
+    this.fireSubsystem = new MiningFireSubsystem(world);
+    this.burningSubsystem = new MiningBurningSubsystem(world);
+    for (const cell of built.fluidCells) this.fluidSubsystem.placeFluid(cell.x, cell.y, cell.typeKey, cell.level);
+    this.damageSystem = new MiningDamageSystem(world);
+    this.blockSubsystem.onToolTooWeak = (session, blockName) =>
+      this.playerManager.sendNotice(session, 'tool_too_weak', `Your tool isn't strong enough to break ${blockName}.`);
+
+    // Starting mobs: the map's own list, or the usual cavern mobs plus the surface dummy
+    if (built.mobs) {
+      for (const mob of built.mobs) this.spawnSurfaceTargetDummy({ x: mob.x, y: mob.y });
+    } else {
+      this.populateCavernMobs();
+      this.spawnSurfaceTargetDummy();
     }
   }
 
@@ -294,6 +324,17 @@ export class MiningGameEngine {
       this.onRoomEmpty(this.roomId);
     }
     return res;
+  }
+
+  /**
+   * Rebuilds the map and everything on it from scratch and sends every player back to the start
+   * (sandbox reset). Nothing but the players survives, so a reset always matches a fresh room.
+   */
+  public resetWorld(): void {
+    this.pendingRevealedTiles = [];
+    this.pendingDeaths = [];
+    this.rebuildWorld();
+    for (const session of this.players.values()) this.playerManager.resetForNewWorld(session);
   }
 
   public getPlayer(characterId: string): MiningPlayerSession | undefined {
@@ -409,7 +450,7 @@ export class MiningGameEngine {
     this.elapsedTimeSeconds += dt;
 
     // Check max session duration limit
-    if (this.elapsedTimeSeconds >= this.maxDurationSeconds) {
+    if (this.rules.timeLimited && this.elapsedTimeSeconds >= this.maxDurationSeconds) {
       this.handleSessionTimeout();
       return;
     }
@@ -457,11 +498,20 @@ export class MiningGameEngine {
     // 4. Falling rocks simulation
     this.runStep('rocks', () => this.rockSubsystem.updateFallingRocks(dt));
 
-    // 4.5 Fluids flow (every Nth tick)
-    this.runStep('fluids', () => this.fluidSubsystem.update());
+    // 4.5 Fluids flow (every Nth tick; the sandbox can pause, step and change the speed)
+    const worldSteps = this.sandbox
+      ? this.sandbox.clock.stepsForTick(this.tickCount % MINING_CONFIG.FLUID_STEP_TICKS === 0)
+      : null;
+    this.runStep('fluids', () => {
+      if (worldSteps === null) this.fluidSubsystem.update();
+      else for (let i = 0; i < worldSteps; i++) this.fluidSubsystem.step();
+    });
 
     // 4.6 Fire takes new sparks, spreads and burns (same beat as fluids, right after them)
-    this.runStep('fire', () => this.fireSubsystem.update());
+    this.runStep('fire', () => {
+      if (worldSteps === null) this.fireSubsystem.update();
+      else for (let i = 0; i < worldSteps; i++) this.fireSubsystem.step();
+    });
 
     // 4.7 Fire hurts: burning and heat on everyone in the room
     this.runStep('burning', () => this.burningSubsystem.update(dt));
@@ -499,6 +549,10 @@ export class MiningGameEngine {
     for (const characterId of dead) {
       const session = this.players.get(characterId);
       if (!session) continue;
+      if (!this.rules.endsRunOnDeath) {
+        this.playerManager.respawnPlayer(session);
+        continue;
+      }
       if (session.socket && session.socket.connected) {
         const ended: MiningSessionEndedEvent = {
           reason: 'death',
@@ -647,6 +701,9 @@ export class MiningGameEngine {
       get tick() {
         return engine.tickCount;
       },
+      get spawnPoint() {
+        return { x: MINING_CONFIG.ENTRANCE_X, y: engine.surfaceRow + MINING_CONFIG.ENTRANCE_Y };
+      },
       get simTime() {
         return engine.elapsedTimeSeconds;
       },
@@ -724,7 +781,7 @@ export class MiningGameEngine {
         if (Math.abs(dx) + Math.abs(dy) > visionRange) continue;
         const nx = cx + dx;
         const ny = cy + dy;
-        if (isInBounds(nx, ny) && !this.grid[ny][nx].revealed) {
+        if (isInBounds(nx, ny, this.grid) && !this.grid[ny][nx].revealed) {
           this.grid[ny][nx].revealed = true;
           const fluid = this.fluidSubsystem.contentsAt(nx, ny);
           this.pendingRevealedTiles.push({

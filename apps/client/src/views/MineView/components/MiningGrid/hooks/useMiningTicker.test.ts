@@ -20,6 +20,7 @@ function useMiningTicker(flat: Record<string, unknown>) {
 import { renderHook, act } from '@testing-library/react';
 import { miningProfiler } from '../utils/MiningProfiler';
 import { MiningPredictionState } from '../systems/MiningPredictionState';
+import { FreeCamera } from '../systems/FreeCamera';
 
 describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
   let mockApp: any;
@@ -170,6 +171,42 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
     expect(playerBodyRef.current.position.x).toBeGreaterThan(2.05);
     // The sprite is drawn through the partial step after the body's last one, so it is at or just ahead of the body
     expect(playerContainer.x).toBeGreaterThanOrEqual(playerBodyRef.current.position.x * 64 - 1e-6);
+  });
+
+  describe('camera', () => {
+    const fakeCamera = () => ({ setScreenSize: vi.fn(), update: vi.fn(), getZoom: vi.fn(() => 1.5) });
+
+    it('follows the player normally', () => {
+      cameraRef.current = fakeCamera();
+      mount();
+      frames(1);
+      expect(cameraRef.current.update).toHaveBeenCalledWith({ x: playerContainer.x, y: playerContainer.y }, expect.any(Number));
+    });
+
+    it('looks where the sandbox free camera says while it is on, and the player keeps being simulated', () => {
+      cameraRef.current = fakeCamera();
+      const freeCamera = new FreeCamera();
+      freeCamera.enable({ x: 300, y: 200 });
+      const hook = renderHook(() =>
+        useMiningTicker({
+          app: mockApp,
+          playerContainerRef: { current: playerContainer },
+          gridContainerRef: { current: gridContainer },
+          fallingRocksContainerRef: { current: null },
+          currentRenderPosRef, targetServerPosRef, isFacingLeftRef, playerFacingDirRef, playerSpriteRef,
+          activeFallingRocksRef, fallingRockGraphicsMap, debugGraphicsRef, showDebugRef, flashlightRef,
+          lightingEngineRef, cameraRef, playerBodyRef, gridRef, keysPressedRef, isMiningRef, miningTargetRef,
+          predictionRef: { current: new MiningPredictionState(playerBodyRef.current, keysPressedRef.current) },
+          freeCameraRef: { current: freeCamera },
+        }),
+      );
+      expect(hook).toBeDefined();
+      tickerCallbacks[0]();
+      expect(cameraRef.current.update).toHaveBeenLastCalledWith({ x: 300, y: 200 }, expect.any(Number));
+      freeCamera.disable();
+      tickerCallbacks[0]();
+      expect(cameraRef.current.update).toHaveBeenLastCalledWith({ x: playerContainer.x, y: playerContainer.y }, expect.any(Number));
+    });
   });
 
   it('paces the swing animation with the latest swing speed, not the one from the first render', () => {

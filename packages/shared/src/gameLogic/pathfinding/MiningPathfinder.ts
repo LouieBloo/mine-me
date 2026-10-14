@@ -1,5 +1,4 @@
 import {
-  MINING_CONFIG,
   getTileMaxHealth,
   isTileClimbable,
   isTileMineable,
@@ -8,6 +7,7 @@ import {
   type MiningPosition,
 } from '../../types/mining';
 import type { MiningCollisionGrid } from '../../physics/MiningPhysicsBody';
+import { getGridDimensions } from '../../physics/gridDimensions';
 import { MinHeap } from '../../utils/MinHeap';
 
 export interface MiningPathfinderOptions {
@@ -42,24 +42,25 @@ export class MiningPathfinder {
     grid: MiningCollisionGrid,
     options?: MiningPathfinderOptions
   ): MiningPathWaypoint[] {
+    const { width: gridWidth, height: gridHeight } = getGridDimensions(grid);
     const canMine = options?.canMine ?? true;
     const maxJumpTiles = options?.maxJumpTiles ?? 2;
     const canClimbLadders = options?.canClimbLadders ?? true;
     const maxSearchDepth = options?.maxSearchDepth ?? 600;
 
     const checkSolid = (x: number, y: number): boolean => {
-      if (x < 0 || x >= MINING_CONFIG.GRID_WIDTH) return true;
-      if (y >= MINING_CONFIG.GRID_HEIGHT) return true;
+      if (x < 0 || x >= gridWidth) return true;
+      if (y >= gridHeight) return true;
       if (y < 0) return false;
       const row = grid[y];
       const tile = row ? row[x] : undefined;
       return tile ? isTileSolid(tile.type) : false;
     };
 
-    let sx = Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.floor(start.x)));
-    let sy = Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.floor(start.y)));
-    let gx = Math.max(0, Math.min(MINING_CONFIG.GRID_WIDTH - 1, Math.floor(target.x)));
-    let gy = Math.max(0, Math.min(MINING_CONFIG.GRID_HEIGHT - 1, Math.floor(target.y)));
+    let sx = Math.max(0, Math.min(gridWidth - 1, Math.floor(start.x)));
+    let sy = Math.max(0, Math.min(gridHeight - 1, Math.floor(start.y)));
+    let gx = Math.max(0, Math.min(gridWidth - 1, Math.floor(target.x)));
+    let gy = Math.max(0, Math.min(gridHeight - 1, Math.floor(target.y)));
 
     // Ensure start node is not accidentally snapped into solid floor
     if (checkSolid(sx, sy) && sy > 0 && !checkSolid(sx, sy - 1)) {
@@ -75,7 +76,7 @@ export class MiningPathfinder {
     }
 
     // Cells are keyed by a single number (no string building in the hot loop)
-    const key = (x: number, y: number) => y * MINING_CONFIG.GRID_WIDTH + x;
+    const key = (x: number, y: number) => y * gridWidth + x;
     const heuristic = (x: number, y: number) => Math.abs(x - gx) + Math.abs(y - gy);
 
     // Open set: a binary heap with lazy deletion (a better route to a cell pushes a fresh entry;
@@ -102,8 +103,8 @@ export class MiningPathfinder {
     let iterations = 0;
 
     const isSolid = (x: number, y: number): boolean => {
-      if (x < 0 || x >= MINING_CONFIG.GRID_WIDTH) return true;
-      if (y >= MINING_CONFIG.GRID_HEIGHT) return true;
+      if (x < 0 || x >= gridWidth) return true;
+      if (y >= gridHeight) return true;
       if (y < 0) return false;
       const row = grid[y];
       const tile = row ? row[x] : undefined;
@@ -111,7 +112,7 @@ export class MiningPathfinder {
     };
 
     const isClimbable = (x: number, y: number): boolean => {
-      if (x < 0 || x >= MINING_CONFIG.GRID_WIDTH || y < 0 || y >= MINING_CONFIG.GRID_HEIGHT) {
+      if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
         return false;
       }
       const row = grid[y];
@@ -120,7 +121,7 @@ export class MiningPathfinder {
     };
 
     const isMineable = (x: number, y: number): boolean => {
-      if (x < 0 || x >= MINING_CONFIG.GRID_WIDTH || y < 0 || y >= MINING_CONFIG.GRID_HEIGHT) {
+      if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
         return false;
       }
       const row = grid[y];
@@ -137,7 +138,7 @@ export class MiningPathfinder {
     };
 
     const isSupported = (x: number, y: number): boolean => {
-      return y + 1 >= MINING_CONFIG.GRID_HEIGHT || isSolid(x, y + 1) || isClimbable(x, y);
+      return y + 1 >= gridHeight || isSolid(x, y + 1) || isClimbable(x, y);
     };
 
     while (openSet.size > 0 && iterations < maxSearchDepth) {
@@ -168,7 +169,7 @@ export class MiningPathfinder {
       for (const dx of [-1, 1]) {
         const nx = current.x + dx;
         const ny = current.y;
-        if (nx < 0 || nx >= MINING_CONFIG.GRID_WIDTH) continue;
+        if (nx < 0 || nx >= gridWidth) continue;
 
         if (!isSolid(nx, ny)) {
           // Empty space
@@ -207,7 +208,7 @@ export class MiningPathfinder {
         for (const dx of [-1, 1]) {
           const dnx = current.x + dx;
           const dny = current.y - 1;
-          if (dnx >= 0 && dnx < MINING_CONFIG.GRID_WIDTH && dny >= 0) {
+          if (dnx >= 0 && dnx < gridWidth && dny >= 0) {
             // Headroom check
             if (!isSolid(current.x, dny) && !isSolid(dnx, dny) && isSupported(dnx, dny)) {
               neighbors.push({ x: dnx, y: dny, cost: 1.6, action: 'JUMP' });
@@ -219,7 +220,7 @@ export class MiningPathfinder {
         for (const dx of [-2, 2]) {
           const pitMidX = current.x + dx / 2;
           const landX = current.x + dx;
-          if (landX >= 0 && landX < MINING_CONFIG.GRID_WIDTH) {
+          if (landX >= 0 && landX < gridWidth) {
             // Mid tile must be open air with no floor underneath (a real pit)
             const isMidPit = !isSolid(pitMidX, current.y) && !isSolid(pitMidX, current.y + 1);
             if (isMidPit && !isSolid(landX, current.y) && isSupported(landX, current.y)) {
@@ -231,7 +232,7 @@ export class MiningPathfinder {
 
       // 3. Falling / Downward Movement
       const downY = current.y + 1;
-      if (downY < MINING_CONFIG.GRID_HEIGHT) {
+      if (downY < gridHeight) {
         if (!isSolid(current.x, downY)) {
           neighbors.push({ x: current.x, y: downY, cost: 1.0, action: 'FALL' });
         } else if (canMine && isMineable(current.x, downY)) {
@@ -247,8 +248,8 @@ export class MiningPathfinder {
             neighbors.push({ x: current.x, y: climbUpY, cost: 1.1, action: 'CLIMB' });
           }
         }
-        if (onLadder || (downY < MINING_CONFIG.GRID_HEIGHT && isClimbable(current.x, downY))) {
-          if (downY < MINING_CONFIG.GRID_HEIGHT && !isSolid(current.x, downY)) {
+        if (onLadder || (downY < gridHeight && isClimbable(current.x, downY))) {
+          if (downY < gridHeight && !isSolid(current.x, downY)) {
             neighbors.push({ x: current.x, y: downY, cost: 1.1, action: 'CLIMB' });
           }
         }

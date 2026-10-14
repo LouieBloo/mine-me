@@ -55,6 +55,15 @@ describe('ExpeditionModeModal', () => {
     expect(handleSelectMode).toHaveBeenCalledWith('multiplayer');
   });
 
+  it('offers the sandbox and selects it', () => {
+    const handleSelectMode = vi.fn();
+    render(<ExpeditionModeModal isOpen={true} onSelectMode={handleSelectMode} onCancel={vi.fn()} />);
+
+    expect(screen.getByText('Enter Sandbox')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Sandbox'));
+    expect(handleSelectMode).toHaveBeenCalledWith('sandbox');
+  });
+
   it('calls onCancel when Return to Town button is clicked', () => {
     const handleSelectMode = vi.fn();
     const handleCancel = vi.fn();

@@ -1,4 +1,5 @@
 import { MINING_CONFIG, isTileSolid, type Vector2D, type MiningTileType } from '../types/mining';
+import { getGridDimensions } from './gridDimensions';
 import { movementFactorAt, type FluidEnvironment } from '../gameLogic/fluid/fluidSubmersion';
 
 export interface MiningCollisionGrid {
@@ -92,12 +93,13 @@ export abstract class MiningPhysicsBody {
    * Checks if there is a solid tile immediately beneath the body's feet.
    */
   public checkGround(grid: MiningCollisionGrid): { isGrounded: boolean; floorTileY?: number } {
+    const { width, height } = getGridDimensions(grid);
     const feetY = this.position.y + this.halfHeight;
     const floorTileY = Math.floor(feetY + 0.05);
 
     // Bedrock floor at bottom of map
-    if (floorTileY >= MINING_CONFIG.GRID_HEIGHT) {
-      return { isGrounded: true, floorTileY: MINING_CONFIG.GRID_HEIGHT };
+    if (floorTileY >= height) {
+      return { isGrounded: true, floorTileY: height };
     }
     if (floorTileY < 0) {
       return { isGrounded: false };
@@ -112,7 +114,7 @@ export abstract class MiningPhysicsBody {
     }
 
     for (let tx = minTileX; tx <= maxTileX; tx++) {
-      if (tx < 0 || tx >= MINING_CONFIG.GRID_WIDTH) continue;
+      if (tx < 0 || tx >= width) continue;
       const tile = row[tx];
       if (tile && isTileSolid(tile.type)) {
         return { isGrounded: true, floorTileY };
@@ -144,6 +146,7 @@ export abstract class MiningPhysicsBody {
 
   /** One collision-resolved integration step (axis-separated: vertical, then horizontal). */
   private step(dt: number, grid: MiningCollisionGrid): void {
+    const { width, height } = getGridDimensions(grid);
     // 1. Ground stability check:
     // If the body is marked as grounded and not jumping upward, verify whether solid ground remains underneath.
     if (this.isGrounded && this.velocity.y >= 0) {
@@ -169,7 +172,7 @@ export abstract class MiningPhysicsBody {
     // 3. Perform separated vertical collision check if airborne or moving vertically
     if (!this.isGrounded || this.velocity.y !== 0) {
       let targetY = this.position.y + this.velocity.y * dt;
-      targetY = Math.max(-50, Math.min(MINING_CONFIG.GRID_HEIGHT - this.halfHeight, targetY));
+      targetY = Math.max(-50, Math.min(height - this.halfHeight, targetY));
 
       if (!this.checkTileCollision(this.position.x, targetY, grid)) {
         this.position.y = targetY;
@@ -195,7 +198,7 @@ export abstract class MiningPhysicsBody {
 
     // 4. Horizontal Movement test
     let targetX = this.position.x + this.velocity.x * dt;
-    targetX = Math.max(this.halfWidth, Math.min(MINING_CONFIG.GRID_WIDTH - this.halfWidth, targetX));
+    targetX = Math.max(this.halfWidth, Math.min(width - this.halfWidth, targetX));
 
     if (!this.checkTileCollision(targetX, this.position.y, grid)) {
       this.position.x = targetX;
@@ -227,6 +230,7 @@ export abstract class MiningPhysicsBody {
    * Collision check against solid unmined tiles using AABB bounds.
    */
   public checkTileCollision(x: number, y: number, grid: MiningCollisionGrid): boolean {
+    const { width, height } = getGridDimensions(grid);
     const minTileX = Math.floor(x - this.halfWidth + 0.001);
     const maxTileX = Math.floor(x + this.halfWidth - 0.001);
     const minTileY = Math.floor(y - this.halfHeight + 0.001);
@@ -235,9 +239,9 @@ export abstract class MiningPhysicsBody {
     for (let ty = minTileY; ty <= maxTileY; ty++) {
       for (let tx = minTileX; tx <= maxTileX; tx++) {
         // Left & Right world boundaries
-        if (tx < 0 || tx >= MINING_CONFIG.GRID_WIDTH) return true;
+        if (tx < 0 || tx >= width) return true;
         // Bottom bedrock boundary
-        if (ty >= MINING_CONFIG.GRID_HEIGHT) return true;
+        if (ty >= height) return true;
         // Above ground (ty < 0) is open sky (no collision)
         if (ty < 0) continue;
 

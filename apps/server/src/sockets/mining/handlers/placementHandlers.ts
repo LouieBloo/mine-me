@@ -2,7 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { prisma } from '../../../index';
 import { ITEM_ROLE_WHERE, type GameEventResult, sanitizeTilePosition } from '@mine-me/shared';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
-import { broadcastInventory, consumeInventoryItem, refundInventoryItem } from './inventoryActions';
+import { inventoryActionsFor } from './inventoryActions';
 
 /**
  * Handler: mining_place_ladder
@@ -20,6 +20,7 @@ export const handleMiningPlaceLadder = async (
 
   const engine = miningSessionManager.getSession(characterId);
   if (!engine) return { success: false, error: 'No active mining session.' };
+  const inventory = inventoryActionsFor(engine.rules.persistsCharacter);
 
   let target: { x: number; y: number } | undefined;
   if (payload?.target !== undefined && payload?.target !== null) {
@@ -48,18 +49,18 @@ export const handleMiningPlaceLadder = async (
   }
 
   // 3. Atomically consume; fails if a concurrent request already used the last one
-  if (!(await consumeInventoryItem(characterId, ladder.id))) {
+  if (!(await inventory.consume(characterId, ladder.id))) {
     return { success: false, error: 'You do not have a ladder to place.' };
   }
 
   // 4. Commit placement (state may have changed while awaiting the DB)
   if (!engine.placeLadder(characterId, target)) {
-    await refundInventoryItem(characterId, ladder.itemId);
-    await broadcastInventory(characterId);
+    await inventory.refund(characterId, ladder.itemId);
+    await inventory.broadcast(characterId);
     return { success: false, error: 'Cannot place ladder here.' };
   }
 
-  await broadcastInventory(characterId);
+  await inventory.broadcast(characterId);
   return { success: true };
 };
 
@@ -78,6 +79,7 @@ export const handleMiningPlaceTorch = async (
 
   const engine = miningSessionManager.getSession(characterId);
   if (!engine) return { success: false, error: 'No active mining session.' };
+  const inventory = inventoryActionsFor(engine.rules.persistsCharacter);
 
   const torchTarget = sanitizeTilePosition(payload?.target);
   if (!torchTarget) {
@@ -106,17 +108,17 @@ export const handleMiningPlaceTorch = async (
   }
 
   // 3. Atomically consume
-  if (!(await consumeInventoryItem(characterId, torch.id))) {
+  if (!(await inventory.consume(characterId, torch.id))) {
     return { success: false, error: 'You do not have a torch to place.' };
   }
 
   // 4. Commit placement
   if (!engine.placeTorch(characterId, torchTarget, torch.itemId)) {
-    await refundInventoryItem(characterId, torch.itemId);
-    await broadcastInventory(characterId);
+    await inventory.refund(characterId, torch.itemId);
+    await inventory.broadcast(characterId);
     return { success: false, error: placeError };
   }
 
-  await broadcastInventory(characterId);
+  await inventory.broadcast(characterId);
   return { success: true };
 };
