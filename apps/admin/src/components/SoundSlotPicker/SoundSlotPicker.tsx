@@ -49,7 +49,7 @@ interface SoundSlotPickerProps {
   testIdPrefix: string;
 }
 
-const CATEGORY_LABEL: Record<string, string> = { CHARACTER: 'Character sounds', FLUID: 'Fluid & fire sounds', MOB: 'Mob sounds', ITEM: 'Item sounds', BLOCK: 'Block sounds', GENERAL: 'General' };
+const CATEGORY_LABEL: Record<string, string> = { CHARACTER: 'Character sounds', FLUID: 'Fluid & fire sounds', GAS: 'Gas sounds', MOB: 'Mob sounds', ITEM: 'Item sounds', BLOCK: 'Block sounds', GENERAL: 'General' };
 const UNLISTED = '__unlisted__';
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.webm', '.m4a', '.aac', '.flac'];
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;

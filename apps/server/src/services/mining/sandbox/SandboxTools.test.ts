@@ -236,3 +236,116 @@ describe('reset', () => {
     expect(engine.fluidSubsystem.grid.totalVolume()).toBeGreaterThan(0);
   });
 });
+
+const gasAt = (x: number, y: number) => engine.gasSubsystem.grid.getConcentration(x, y);
+
+describe('releaseGas', () => {
+  it('adds gas to an open cell, up to a full cell', () => {
+    expect(tools().releaseGas(35, SKY - 3, 'HYDROGEN')).toEqual({ ok: true });
+    expect(gasAt(35, SKY - 3)).toBeGreaterThan(0);
+    expect(tools().releaseGas(35, SKY - 3, 'HYDROGEN')).toMatchObject({ ok: false }); // already full
+  });
+
+  it.each([
+    ['a solid tile', [10, SKY + 5, 'HYDROGEN'], /cannot hold/],
+    ['an unknown gas', [35, SKY, 'NOPE9'], /Unknown gas/],
+    ['a tile off the map', [90, SKY, 'HYDROGEN'], /inside the map/],
+    ['a fractional tile', [35.5, SKY, 'HYDROGEN'], /inside the map/],
+    ['a non-number', ['a', SKY, 'HYDROGEN'], /inside the map/],
+    ['a missing gas', [35, SKY, undefined], /Unknown gas/],
+    ['a cell holding another gas', [64, SKY + 4, 'NITROGEN'], /cannot hold/],
+  ])('refuses %s', (_name, [x, y, key], message) => {
+    const res = tools().releaseGas(x, y, key);
+    expect(res.ok).toBe(false);
+    expect((res as { error: string }).error).toMatch(message as RegExp);
+  });
+
+  it('refuses a cell that holds fluid: fluid wins the cell', () => {
+    tools().pourFluid(35, SKY - 3, 'OIL');
+    expect(tools().releaseGas(35, SKY - 3, 'HYDROGEN')).toMatchObject({ ok: false });
+  });
+
+  it('lets hydrogen released in the open sky rise and fade away', () => {
+    tools().releaseGas(5, SKY - 2, 'HYDROGEN');
+    tick(60);
+    // Hydrogen is going up (and out): there is some above where it was let go
+    let hydrogenHigh = 0;
+    for (let y = 0; y < SKY - 2; y++) for (let x = 0; x < 90; x++) hydrogenHigh += gasAt(x, y) * (x >= 3 && x <= 7 ? 1 : 0);
+    expect(hydrogenHigh + engine.gasSubsystem.grid.ventedVolume).toBeGreaterThan(0.2);
+    tick(900);
+    expect(engine.gasSubsystem.grid.totalVolume(engine.gasSubsystem.registry.idOf('HYDROGEN')!) - startingHydrogen()).toBeLessThan(0.5);
+  });
+});
+
+/** Hydrogen already in the sealed chamber (it never leaves while the roof is on). */
+const startingHydrogen = () => 48;
+
+describe('the sandbox start', () => {
+  it('begins with sealed hydrogen and nitrogen chambers that sit still', () => {
+    const hydrogen = engine.gasSubsystem.registry.idOf('HYDROGEN')!;
+    const nitrogen = engine.gasSubsystem.registry.idOf('NITROGEN')!;
+    expect(engine.gasSubsystem.grid.totalVolume(hydrogen)).toBeCloseTo(48, 3);
+    expect(engine.gasSubsystem.grid.totalVolume(nitrogen)).toBeCloseTo(48, 3);
+    tick(300);
+    expect(engine.gasSubsystem.grid.ventedVolume).toBe(0);
+    expect(engine.gasSubsystem.grid.totalVolume(hydrogen)).toBeCloseTo(48, 1);
+  });
+
+  it('lets hydrogen out when the roof is mined through, and it rises out and fades', () => {
+    const grid = engine.gasSubsystem.grid;
+    const hydrogen = engine.gasSubsystem.registry.idOf('HYDROGEN')!;
+    for (const y of [SKY, SKY + 1]) {
+      engine.grid[y][63] = { type: MiningTileType.EMPTY, revealed: true };
+      (engine as any).buildWorld().pushTileUpdate({ x: 63, y, type: MiningTileType.EMPTY });
+    }
+    expect(grid.isOpenToSky(63, SKY + 5)).toBe(true);
+    tick(1500);
+    expect(grid.ventedVolume).toBeGreaterThan(10);
+    expect(grid.totalVolume(hydrogen)).toBeLessThan(48);
+    // The nitrogen chamber next door is untouched
+    expect(grid.totalVolume(engine.gasSubsystem.registry.idOf('NITROGEN')!)).toBeCloseTo(48, 1);
+  });
+});
+
+describe('igniting gas', () => {
+  it('sets off hydrogen as an explosion, with no dice, and the front crosses the chamber', () => {
+    expect(tools().ignite(63, SKY + 4)).toEqual({ ok: true });
+    expect(engine.gasExplosionSubsystem.pendingCount).toBe(1);
+    expect(engine.fireSubsystem.grid.burningCount).toBe(0);
+    tick(60);
+    // Nearly all of it went up; only a thin cloud (too thin to burn) is left
+    expect(engine.gasSubsystem.grid.totalVolume(engine.gasSubsystem.registry.idOf('HYDROGEN')!)).toBeLessThan(12);
+    expect(engine.gasExplosionSubsystem.pendingCount).toBe(0);
+  });
+
+  it('cannot light nitrogen or clear air, and still lights oil as before', () => {
+    expect(tools().ignite(73, SKY + 4)).toEqual({ ok: false, error: 'Nothing there can burn.' });
+    expect(tools().ignite(5, SKY - 3)).toEqual({ ok: false, error: 'Nothing there can burn.' });
+    tools().pourFluid(35, SKY + 3, 'OIL');
+    expect(tools().ignite(35, SKY + 3)).toEqual({ ok: true });
+  });
+});
+
+describe('clearing hazards removes gas too', () => {
+  it('empties every chamber and every cloud', () => {
+    tools().releaseGas(5, SKY - 2, 'HYDROGEN');
+    tools().clearHazards();
+    expect(engine.gasSubsystem.grid.totalVolume()).toBe(0);
+  });
+});
+
+describe('the simulation control also governs gas', () => {
+  it('a paused sandbox holds gas still, a single step moves it, and a reset restores the chambers', () => {
+    tools().releaseGas(5, SKY - 2, 'HYDROGEN');
+    tools().setSim({ paused: true });
+    tick(60);
+    expect(gasAt(5, SKY - 3)).toBe(0);
+    tools().setSim({ step: true });
+    tick(1);
+    expect(gasAt(5, SKY - 3)).toBeGreaterThan(0);
+    tools().clearHazards();
+    tools().reset();
+    expect(engine.gasSubsystem.grid.totalVolume(engine.gasSubsystem.registry.idOf('HYDROGEN')!)).toBeCloseTo(48, 3);
+    expect(engine.gasSubsystem.grid.getConcentration(5, SKY - 2)).toBe(0);
+  });
+});

@@ -37,6 +37,31 @@ export class PourFluidAction extends BaseMouseAction {
   }
 }
 
+/** Sandbox: release the chosen gas into the open tile under the cursor (hold to keep releasing). */
+export class ReleaseGasAction extends BaseMouseAction {
+  public readonly gasKey: string;
+  private readonly onRelease: (target: MiningPosition) => Promise<boolean> | boolean;
+
+  constructor(gasKey: string, onRelease: (target: MiningPosition) => Promise<boolean> | boolean) {
+    super({ name: 'sandbox_release_gas', triggerMode: MouseActionTriggerMode.HOLD, cooldownMs: 60, clampsToGrid: true });
+    this.gasKey = gasKey;
+    this.onRelease = onRelease;
+  }
+
+  public canExecute(target: MiningPosition, _playerPos: Vector2D, grid: MiningClientTile[][]): boolean {
+    if (!inGrid(grid, target.x, target.y)) return false;
+    return !isTileSolid(grid[target.y][target.x].type);
+  }
+
+  public execute(target: MiningPosition): Promise<boolean> | boolean {
+    return this.onRelease(target);
+  }
+
+  public getReticleStyle(target: MiningPosition, playerPos: Vector2D, grid: MiningClientTile[][]): ReticleStyle {
+    return toolReticle(0xa78bfa, 0xc4b5fd, this.canExecute(target, playerPos, grid));
+  }
+}
+
 /** Sandbox: spawn the chosen mob at the cursor (one per click, at the exact point). */
 export class SpawnMobAction extends BaseMouseAction {
   public readonly mobId: string;

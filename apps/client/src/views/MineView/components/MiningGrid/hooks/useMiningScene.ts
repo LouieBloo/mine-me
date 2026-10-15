@@ -27,6 +27,7 @@ import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
 import { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
 import { FluidRenderer } from '../renderers/FluidRenderer';
+import { GasRenderer } from '../renderers/GasRenderer';
 import { FireRenderer } from '../renderers/FireRenderer';
 import { BurningBodies } from '../renderers/BurningBodies';
 import { ProjectileTextureCache } from '../systems/ProjectileTextureCache';
@@ -73,6 +74,7 @@ export function useMiningScene({
   const backgroundContainerRef = useRef<Container | null>(null);
   const tilesContainerRef = useRef<Container | null>(null);
   const fluidRendererRef = useRef<FluidRenderer | null>(null);
+  const gasRendererRef = useRef<GasRenderer | null>(null);
   const fireFieldRef = useRef<FireField | null>(null);
   const fireRendererRef = useRef<FireRenderer | null>(null);
   const burningBodiesRef = useRef<BurningBodies | null>(null);
@@ -137,6 +139,7 @@ export function useMiningScene({
     const backgroundContainer = new Container();
     const tilesContainer = new Container();
     const fluidsContainer = new Container();
+    const gasContainer = new Container();
     const fallingRocksContainer = new Container();
     const droppedItemsContainer = new Container();
     const dynamitesContainer = new Container();
@@ -187,6 +190,8 @@ export function useMiningScene({
     gridContainer.addChild(mobsContainer);
     gridContainer.addChild(otherPlayersContainer);
     gridContainer.addChild(playerContainer);
+    // Gas drifts in front of the characters, faint enough to see them through
+    gridContainer.addChild(gasContainer);
     gridContainer.addChild(projectilesContainer);
     gridContainer.addChild(particlesContainer);
     gridContainer.addChild(floatingTextContainer);
@@ -215,6 +220,11 @@ export function useMiningScene({
     fluidRenderer.apply(initialSessionState.fluidCells ?? []);
     fluidRenderer.render();
     fluidRendererRef.current = fluidRenderer;
+
+    const gasRenderer = new GasRenderer(gasContainer, gridWidth, gridHeight, initialSessionState.gases ?? []);
+    gasRenderer.apply(initialSessionState.gasCells ?? []);
+    gasRenderer.render();
+    gasRendererRef.current = gasRenderer;
 
     const fireField = new FireField(fluidRenderer.field.width, fluidRenderer.field.height);
     fireField.apply(initialSessionState.fireCells ?? []);
@@ -297,6 +307,7 @@ export function useMiningScene({
     // Fire: flames and lights on burning cells, and the effect on burning players and mobs (all data driven)
     const fireRenderer = new FireRenderer(fireField, fluidRenderer);
     fireRenderer.setEngines(particleEngine, lightingEngine);
+    gasRenderer.setEngines(particleEngine, lightingEngine);
     fireRenderer.setBlockFlames(initialSessionState.blockFlames ?? []);
     fireRendererRef.current = fireRenderer;
     const burningBodies = new BurningBodies();
@@ -614,6 +625,8 @@ export function useMiningScene({
       burningBodiesRef.current = null;
       fluidRenderer.destroy();
       fluidRendererRef.current = null;
+      gasRenderer.destroy();
+      gasRendererRef.current = null;
       fireFieldRef.current = null;
       lightingEngine.destroy();
       lightingEngineRef.current = null;
@@ -640,6 +653,7 @@ export function useMiningScene({
     backgroundContainerRef,
     tilesContainerRef,
     fluidRendererRef,
+    gasRendererRef,
     fireFieldRef,
     fireRendererRef,
     burningBodiesRef,

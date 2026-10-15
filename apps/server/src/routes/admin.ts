@@ -15,6 +15,8 @@ import * as EffectController from '../controllers/admin/effect.controller';
 import * as BlockController from '../controllers/admin/block.controller';
 import * as FluidController from '../controllers/admin/fluid.controller';
 import * as FluidSoundController from '../controllers/admin/fluidSound.controller';
+import * as GasController from '../controllers/admin/gas.controller';
+import * as GasSoundController from '../controllers/admin/gasSound.controller';
 import * as MiningConfigController from '../controllers/admin/miningConfig.controller';
 import * as ParticleEffectController from '../controllers/admin/particleEffect.controller';
 import * as SoundController from '../controllers/admin/sound.controller';
@@ -100,6 +102,14 @@ adminRouter.post('/fluids', FluidController.createFluid);
 adminRouter.put('/fluids/:id', FluidController.updateFluid);
 adminRouter.delete('/fluids/:id', FluidController.deleteFluid);
 adminRouter.patch('/fluids/:id/sound-effects/:slot', FluidSoundController.requireFluidSoundSlot, FluidSoundController.setFluidSoundSlot);
+
+// GASES
+adminRouter.get('/gases', GasController.getGases);
+adminRouter.get('/gases/:id', GasController.getGas);
+adminRouter.post('/gases', GasController.createGas);
+adminRouter.put('/gases/:id', GasController.updateGas);
+adminRouter.delete('/gases/:id', GasController.deleteGas);
+adminRouter.patch('/gases/:id/sound-effects/:slot', GasSoundController.requireGasSoundSlot, GasSoundController.setGasSoundSlot);
 
 // MINING BLOCKS
 adminRouter.get('/blocks', BlockController.getBlocks);

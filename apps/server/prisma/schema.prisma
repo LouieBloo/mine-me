@@ -293,6 +293,36 @@ model Fluid {
   updatedAt       DateTime @updatedAt
 }
 
+model Gas {
+  id               String   @id @default(cuid())
+  // Open key, e.g. HYDROGEN. Gases are rows, not code: a new gas needs no new enum value.
+  typeKey          String   @unique
+  name             String
+  description      String?
+  // CSS hex colour the client draws the gas with
+  color            String   @default("#cccccc")
+  // Opacity at full concentration
+  opacity          Float    @default(0.5)
+  // Relative to air = 1: below 1 the gas rises, above 1 it sinks
+  density          Float    @default(1)
+  // Share of a cell's gas shared with open neighbours per simulation step, 0 to 1
+  diffusionRate    Float    @default(0.25)
+  // A cell below this concentration is dropped
+  minConcentration Float    @default(0.02)
+  // Seconds gas lingers (still rising) in open-to-sky cells before it fades and despawns
+  ventLifetime     Float    @default(6)
+  // How it looks: edge softness and drift (shared GasAppearance shape; null = defaults)
+  appearance       Json?
+  // Shared Flammability shape (null = inert)
+  flammability     Json?
+  // Where it appears in generated mines (shared GasGeneration shape; null = never generated)
+  generation       Json?
+  // Sound slots (enter, exit, ignite, explode, vent): library sounds by id, each with its own volume
+  soundEffects     Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model MiningMapConfig {
   id                String   @id @default(cuid())
   name              String   @default("Default")
@@ -405,6 +435,7 @@ enum SoundCategory {
   MOB
   CHARACTER
   FLUID
+  GAS
 }
 
 /// The player character's sounds (hurt, jump...). One row (id "default"); `soundEffects` maps a slot to a library sound id.

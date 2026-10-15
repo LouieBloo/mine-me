@@ -1,9 +1,9 @@
 export type SoundType = 'BGM' | 'SFX';
 
 /** Where a library sound is used. Music is `type: 'BGM'`; sound effects are grouped by what plays them. */
-export type SoundCategory = 'GENERAL' | 'ITEM' | 'BLOCK' | 'MOB' | 'CHARACTER' | 'FLUID';
+export type SoundCategory = 'GENERAL' | 'ITEM' | 'BLOCK' | 'MOB' | 'CHARACTER' | 'FLUID' | 'GAS';
 
-export const SOUND_CATEGORIES: readonly SoundCategory[] = ['GENERAL', 'ITEM', 'BLOCK', 'MOB', 'CHARACTER', 'FLUID'];
+export const SOUND_CATEGORIES: readonly SoundCategory[] = ['GENERAL', 'ITEM', 'BLOCK', 'MOB', 'CHARACTER', 'FLUID', 'GAS'];
 
 export interface SoundTrack {
   id: string;
@@ -117,6 +117,26 @@ export interface FluidSoundSlotResolved extends SoundEffectSlotConfig {
 
 export type FluidSoundEffectsConfig = Partial<Record<FluidSoundSlot, FluidSoundSlotResolved>>;
 
+export type GasSoundSlot = 'enter' | 'exit' | 'ignite' | 'explode' | 'vent';
+
+/** What the admin stores for one gas slot: a library sound by id (the url is resolved at load). */
+export interface GasSoundSlotRef {
+  soundId?: string | null;
+  loop?: boolean;
+  /** Volume of this sound on this gas, 0 to 1 (1 when absent). */
+  volume?: number;
+}
+
+export type GasSoundSlotRefs = Partial<Record<GasSoundSlot, GasSoundSlotRef>>;
+
+/** A gas slot after its library sound has been resolved to something the client can play. */
+export interface GasSoundSlotResolved extends SoundEffectSlotConfig {
+  soundId?: string | null;
+  volume?: number;
+}
+
+export type GasSoundEffectsConfig = Partial<Record<GasSoundSlot, GasSoundSlotResolved>>;
+
 export type AudioFalloffModel = 'linear' | 'quadratic' | 'smoothstep' | 'exponential';
 
 export interface SpatialAudioConfig {
@@ -154,6 +174,34 @@ export const DEFAULT_SPATIAL_AUDIO_CONFIG: Required<SpatialAudioConfig> = {
 export const MINING_SPATIAL_AUDIO_PRESETS = {
   FLUID_SPLASH: {
     maxDistance: 18,
+    minDistance: 2,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 12,
+    enablePanning: true,
+  },
+  GAS_ENTER: {
+    maxDistance: 14,
+    minDistance: 2,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 10,
+    enablePanning: true,
+  },
+  GAS_IGNITE: {
+    maxDistance: 18,
+    minDistance: 2,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 12,
+    enablePanning: true,
+  },
+  GAS_EXPLOSION: {
+    maxDistance: 28,
+    minDistance: 3,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 16,
+    enablePanning: true,
+  },
+  GAS_VENT: {
+    maxDistance: 16,
     minDistance: 2,
     falloffModel: 'linear' as AudioFalloffModel,
     panRange: 12,

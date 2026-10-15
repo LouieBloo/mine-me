@@ -372,6 +372,7 @@ export const MineView: React.FC = () => {
       {miningSession && sandbox.info && (
         <SandboxPanel
           fluids={(miningSession.fluids ?? []).map((f) => ({ typeKey: f.typeKey, name: f.name }))}
+          gases={(miningSession.gases ?? []).map((g) => ({ typeKey: g.typeKey, name: g.name }))}
           mobs={sandbox.info.mobs}
           tool={sandbox.tool}
           onToolChange={sandbox.setTool}

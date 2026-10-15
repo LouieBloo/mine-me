@@ -6,6 +6,7 @@ import {
   isThrowableItem,
   type CharacterSoundEffectsConfig,
   type FluidDefinition,
+  type GasDefinition,
   type GameItem,
   type Mob,
   type MiningBlockConfig,
@@ -21,6 +22,8 @@ export interface GameDefinitions {
   blocks: MiningBlockConfig[];
   /** Fluids (oil...). Absent means none are defined. */
   fluids?: FluidDefinition[];
+  /** Gases (hydrogen...). Absent means none are defined. */
+  gases?: GasDefinition[];
   /** The particle effect library, so fluids and fire can name an effect by id. Absent means none. */
   particleEffects?: ParticleEffect[];
   /** The player character's resolved sounds (hurt, jump...). Missing means none are set. */
@@ -56,6 +59,9 @@ export class MiningDataManager {
   private readonly fluids: FluidDefinition[] = [];
   private readonly fluidsByTypeKey = new Map<string, FluidDefinition>();
   private readonly fluidsById = new Map<string, FluidDefinition>();
+  private readonly gases: GasDefinition[] = [];
+  private readonly gasesByTypeKey = new Map<string, GasDefinition>();
+  private readonly gasesById = new Map<string, GasDefinition>();
   private readonly particleEffectsById = new Map<string, ParticleEffect>();
 
   private readonly itemsById = new Map<string, GameItem>();
@@ -86,6 +92,12 @@ export class MiningDataManager {
       this.fluids.push(fluid);
       this.fluidsByTypeKey.set(fluid.typeKey, fluid);
       MiningDataManager.putFirst(this.fluidsById, fluid.id, fluid);
+    }
+    for (const gas of definitions.gases ?? []) {
+      if (!gas?.typeKey || this.gasesByTypeKey.has(gas.typeKey)) continue;
+      this.gases.push(gas);
+      this.gasesByTypeKey.set(gas.typeKey, gas);
+      MiningDataManager.putFirst(this.gasesById, gas.id, gas);
     }
     for (const item of this.items) {
       MiningDataManager.putFirst(this.itemsById, item.id, item);
@@ -174,6 +186,17 @@ export class MiningDataManager {
   public getFluid(keyOrId: string): FluidDefinition | undefined {
     if (typeof keyOrId !== 'string') return undefined;
     return this.fluidsByTypeKey.get(keyOrId) ?? this.fluidsById.get(keyOrId);
+  }
+
+  /** All gas definitions, in load order (the first of any duplicated typeKey wins). */
+  public getGases(): GasDefinition[] {
+    return this.gases;
+  }
+
+  /** Gas definition by typeKey (e.g. 'HYDROGEN') or by database id. */
+  public getGas(keyOrId: string): GasDefinition | undefined {
+    if (typeof keyOrId !== 'string') return undefined;
+    return this.gasesByTypeKey.get(keyOrId) ?? this.gasesById.get(keyOrId);
   }
 
   /**

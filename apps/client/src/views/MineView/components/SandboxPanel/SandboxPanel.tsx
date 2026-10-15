@@ -9,8 +9,15 @@ export interface SandboxFluidOption {
   name: string;
 }
 
+export interface SandboxGasOption {
+  typeKey: string;
+  name: string;
+}
+
 export interface SandboxPanelProps {
   fluids: SandboxFluidOption[];
+  /** The gases that can be released (absent or empty hides the gas tool). */
+  gases?: SandboxGasOption[];
   mobs: SandboxMobOption[];
   tool: SandboxToolSelection;
   onToolChange: (tool: SandboxToolSelection) => void;
@@ -38,6 +45,7 @@ const SELECT =
 /** The sandbox's tool panel: what the mouse does, the free camera, simulation controls and reset. */
 export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   fluids,
+  gases = [],
   mobs,
   tool,
   onToolChange,
@@ -55,9 +63,11 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [fluidKey, setFluidKey] = useState(fluids[0]?.typeKey ?? '');
+  const [gasKey, setGasKey] = useState(gases[0]?.typeKey ?? '');
   const [mobId, setMobId] = useState(mobs[0]?.id ?? '');
 
   const selectedFluid = fluids.some((f) => f.typeKey === fluidKey) ? fluidKey : fluids[0]?.typeKey ?? '';
+  const selectedGas = gases.some((g) => g.typeKey === gasKey) ? gasKey : gases[0]?.typeKey ?? '';
   const selectedMob = mobs.some((m) => m.id === mobId) ? mobId : mobs[0]?.id ?? '';
 
   return (
@@ -95,6 +105,14 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
               </button>
               <button
                 type="button"
+                className={`${BUTTON} ${tool.kind === 'releaseGas' ? ACTIVE : IDLE}`}
+                onClick={() => onToolChange({ kind: 'releaseGas', gasKey: selectedGas })}
+                disabled={freeCamera || gases.length === 0}
+              >
+                Release gas
+              </button>
+              <button
+                type="button"
                 className={`${BUTTON} ${tool.kind === 'spawn' ? ACTIVE : IDLE}`}
                 onClick={() => onToolChange({ kind: 'spawn', mobId: selectedMob })}
                 disabled={freeCamera || mobs.length === 0}
@@ -123,6 +141,23 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 {fluids.map((f) => (
                   <option key={f.typeKey} value={f.typeKey}>
                     {f.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {gases.length > 0 && (
+              <select
+                aria-label="Gas to release"
+                className={SELECT}
+                value={selectedGas}
+                onChange={(e) => {
+                  setGasKey(e.target.value);
+                  if (tool.kind === 'releaseGas') onToolChange({ kind: 'releaseGas', gasKey: e.target.value });
+                }}
+              >
+                {gases.map((g) => (
+                  <option key={g.typeKey} value={g.typeKey}>
+                    {g.name}
                   </option>
                 ))}
               </select>
@@ -160,7 +195,7 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
           </section>
 
           <section aria-label="Simulation" className="flex flex-col gap-1.5">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fluid and fire</h3>
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fluid, gas and fire</h3>
             <div className="grid grid-cols-2 gap-1.5">
               <button
                 type="button"
@@ -189,7 +224,7 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
               ))}
             </select>
             <button type="button" className={`${BUTTON} ${IDLE}`} onClick={onClearHazards} disabled={busy}>
-              Clear fluid and fire
+              Clear fluid, gas and fire
             </button>
           </section>
 

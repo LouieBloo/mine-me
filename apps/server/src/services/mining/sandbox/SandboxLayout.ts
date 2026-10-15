@@ -20,7 +20,9 @@ export type SandboxZone =
   /** One tile of each type, left to right, `spacing` apart. */
   | { kind: 'blockRow'; y: number; startX: number; spacing: number; tiles: readonly MiningTileType[] }
   /** Carves the rectangle open and fills it with the fluid in `fluidSlot` (the loaded fluids in key order); a slot with no fluid stays dry. */
-  | { kind: 'pool'; rect: TileRect; fluidSlot: number; fillFromY?: number };
+  | { kind: 'pool'; rect: TileRect; fluidSlot: number; fillFromY?: number }
+  /** Carves the rectangle open and fills it with `concentration` (default 1) of the gas in `gasSlot` (the loaded gases in key order); a slot with no gas stays empty. Leave solid ground around it and it is a sealed pocket. */
+  | { kind: 'chamber'; rect: TileRect; gasSlot: number; concentration?: number };
 
 /** A mob the sandbox starts with. */
 export interface SandboxMobSpawn {
@@ -55,7 +57,7 @@ const { EMPTY, DIRT, ROCK, MINERAL, CHEST, LADDER, COPPERIUM, SILVERIUM } = Mini
 /**
  * The standard sandbox, 90 wide by 30 deep, under {@link SANDBOX_SKY_ROWS} rows of open sky. Left to right on the surface: spawn (x 22), two target dummies, the
  * ladder shaft into the hall (x 12-14), and two pools side by side (x 32-43 and 45-56) that open onto
- * the surface so you can jump straight in. Underground: a long open hall with one of every block and a
+ * the surface so you can jump straight in, then two sealed gas chambers under the ground (x 60-67 hydrogen, x 70-77 nitrogen). Underground: a long open hall with one of every block and a
  * rock tower, and a bed of ore and chests to dig through.
  *
  * `blockTiles` is every block type in the game, so a new block shows up in the gallery by itself.
@@ -86,6 +88,11 @@ export function createDefaultSandboxLayout(blockTiles: readonly MiningTileType[]
       // Two surface pools side by side (floor on row 8). Break the shared wall to mix them.
       { kind: 'pool', rect: rect(32, 0, 43, 7), fluidSlot: 0, fillFromY: 1 },
       { kind: 'pool', rect: rect(45, 0, 56, 7), fluidSlot: 1, fillFromY: 1 },
+      // Two sealed gas chambers in the ground (hydrogen, then nitrogen: the first two gases in key order) under a
+      // two-block roof of dirt. Mine down through the roof to let one out and watch it rise or sink.
+      { kind: 'chamber', rect: rect(60, 2, 67, 7), gasSlot: 0 },
+      { kind: 'chamber', rect: rect(70, 2, 77, 7), gasSlot: 1 },
+
       // Pool walls made of different blocks
       { kind: 'fill', tile: ROCK, rect: rect(31, 4, 31, 5) },
       { kind: 'tiles', tile: COPPERIUM, at: [{ x: 31, y: 2 }, { x: 31, y: 3 }] },

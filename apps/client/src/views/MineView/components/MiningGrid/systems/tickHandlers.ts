@@ -2,6 +2,7 @@ import { withVolume } from '../../../../../services/sound/sfxVolume';
 import {
   type FireWireCell,
   type FluidWireCell,
+  type GasWireCell,
   type MiningStateTickPayload,
   MiningTileType,
   MINING_CONFIG,
@@ -315,6 +316,25 @@ export function applyFluidUpdates(payload: MiningStateTickPayload, ctx: TickHand
   renderer.render();
 }
 
+/**
+ * Gas the server revealed or changed: the gas in newly revealed tiles, then this tick's changed cells.
+ * Works on the client's copy of the gas grid; changes are drawn eased, so a cloud thickens and thins smoothly.
+ */
+export function applyGasUpdates(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  const renderer = ctx.world.gasRendererRef?.current;
+  if (!renderer) return;
+  // Gas that just came into view shows at once; gas that moved eases there (the renderer's per-frame update)
+  const revealed: GasWireCell[] = [];
+  for (const tile of payload.revealedTiles ?? []) {
+    if (tile.gas) revealed.push([tile.x, tile.y, tile.gas[0], tile.gas[1]]);
+  }
+  if (revealed.length > 0) renderer.apply(revealed);
+  if (payload.gasCells && payload.gasCells.length > 0) renderer.apply(payload.gasCells, true);
+  renderer.render();
+  // Explosive gas that went off this tick: the flash and sparks in each cell the front crossed
+  if (payload.gasExplosions && payload.gasExplosions.length > 0) renderer.playExplosions(payload.gasExplosions);
+}
+
 /** Fires that started or stopped: in newly revealed tiles, then this tick's changes. Updates the client's copy of the fire grid. */
 export function applyFireUpdates(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
   const field = ctx.world.fireFieldRef?.current;
@@ -325,6 +345,14 @@ export function applyFireUpdates(payload: MiningStateTickPayload, ctx: TickHandl
   }
   if (payload.fireCells) cells.push(...payload.fireCells);
   if (cells.length > 0) field.apply(cells);
+}
+
+/** The sounds of gas: bodies entering and leaving a cloud, ignition, the boom of an explosion, gas starting to vent. */
+export function applyGasSounds(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  const sounds = ctx.world.gasSoundsRef?.current;
+  if (!sounds) return;
+  if (payload.gasEvents && payload.gasEvents.length > 0) sounds.onEvents(payload.gasEvents);
+  if (payload.gasExplosions && payload.gasExplosions.length > 0) sounds.onExplosions(payload.gasExplosions, performance.now());
 }
 
 /** Splashes of bodies crossing a fluid's surface, and the sound of cells catching fire. */
@@ -423,8 +451,10 @@ export function handleStateTick(payload: MiningStateTickPayload, ctx: TickHandle
   applyEffects(payload, ctx); // explosions are remembered here for applyTileUpdates
   applyTileUpdates(payload, ctx);
   applyFluidUpdates(payload, ctx);
+  applyGasUpdates(payload, ctx);
   applyFireUpdates(payload, ctx);
   applyFluidSounds(payload, ctx); // after the fluid and fire fields are up to date
+  applyGasSounds(payload, ctx);
   applyBurning(payload, ctx);
   miningProfiler.recordExternal('Socket Tick Handler', performance.now() - start);
 }

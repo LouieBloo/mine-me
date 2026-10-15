@@ -5,6 +5,8 @@ import type { MiningBlockSubsystem } from './subsystems/MiningBlockSubsystem';
 import type { MiningDataManager } from './subsystems/MiningDataManager';
 import type { MiningDropSubsystem } from './subsystems/MiningDropSubsystem';
 import type { MiningFluidSubsystem } from './subsystems/MiningFluidSubsystem';
+import type { MiningGasSubsystem } from './subsystems/MiningGasSubsystem';
+import type { MiningGasExplosionSubsystem } from './subsystems/MiningGasExplosionSubsystem';
 import type { MiningIgnitionSubsystem } from './subsystems/MiningIgnitionSubsystem';
 import type { MiningFireSubsystem } from './subsystems/MiningFireSubsystem';
 import type { MiningExplosiveSubsystem } from './subsystems/MiningExplosiveSubsystem';
@@ -52,6 +54,10 @@ export interface MiningWorld {
   readonly projectiles: MiningProjectileSubsystem;
   readonly mobs: MiningMobSubsystem;
   readonly fluids: MiningFluidSubsystem;
+  /** Gases drifting through the mine (hydrogen, nitrogen...). */
+  readonly gases: MiningGasSubsystem;
+  /** Explosive gas going off as a front. */
+  readonly gasExplosions: MiningGasExplosionSubsystem;
   /** Where fire starts: sparks from items, blasts and (later) fire itself. */
   readonly ignition: MiningIgnitionSubsystem;
   /** Fire burning through the mine's fuel. */

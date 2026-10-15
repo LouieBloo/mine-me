@@ -8,6 +8,7 @@ import { SANDBOX_SKY_ROWS as SKY } from '../../../services/mining/sandbox/Sandbo
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
 import {
   handleSandboxPourFluid,
+  handleSandboxReleaseGas,
   handleSandboxSpawnMob,
   handleSandboxIgnite,
   handleSandboxClearHazards,
@@ -35,6 +36,7 @@ describe('sandbox handlers', () => {
       const socket = socketFor('hs-solo');
       const results = await Promise.all([
         handleSandboxPourFluid(io, socket, { x: 1, y: 1, fluidKey: 'OIL' }),
+        handleSandboxReleaseGas(io, socket, { x: 1, y: 1, gasKey: 'HYDROGEN' }),
         handleSandboxSpawnMob(io, socket, { mobId: 'Mole Person', x: 1, y: 1 }),
         handleSandboxIgnite(io, socket, { x: 1, y: 1 }),
         handleSandboxClearHazards(io, socket),
@@ -62,6 +64,16 @@ describe('sandbox handlers', () => {
       expect(await handleSandboxPourFluid(io, socket, undefined as any)).toMatchObject({ success: false });
       expect(await handleSandboxSpawnMob(io, socket, { mobId: 'Mole Person', x: 61.5, y: SKY + 13 })).toMatchObject({ success: true });
       expect(await handleSandboxSpawnMob(io, socket, { mobId: 'nope', x: 61.5, y: SKY + 13 })).toEqual({ success: false, error: 'Unknown mob.' });
+    });
+
+    it('releases gas, and reports bad input', async () => {
+      join('hs-a', 'sandbox');
+      const socket = socketFor('hs-a');
+      expect(await handleSandboxReleaseGas(io, socket, { x: 60, y: SKY - 3, gasKey: 'HYDROGEN' })).toEqual({ success: true, data: undefined });
+      expect(miningSessionManager.getSession('hs-a')!.gasSubsystem.grid.getConcentration(60, SKY - 3)).toBeGreaterThan(0);
+      expect(await handleSandboxReleaseGas(io, socket, { x: 60, y: SKY - 3, gasKey: 'NOPE' })).toEqual({ success: false, error: 'Unknown gas.' });
+      expect(await handleSandboxReleaseGas(io, socket, { x: 'a', y: SKY - 3, gasKey: 'HYDROGEN' })).toMatchObject({ success: false });
+      expect(await handleSandboxReleaseGas(io, socket, undefined as any)).toMatchObject({ success: false });
     });
 
     it('returns the settings after changing them', async () => {

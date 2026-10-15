@@ -1,10 +1,12 @@
-import { MiningTileType, type FluidDefinition } from '@mine-me/shared';
-import type { GeneratedFluidCell, ServerMiningGrid } from '../../miningMap.service';
+import { MiningTileType, type FluidDefinition, type GasDefinition } from '@mine-me/shared';
+import type { GeneratedFluidCell, GeneratedGasCell, ServerMiningGrid } from '../../miningMap.service';
 import type { SandboxLayout, SandboxMobSpawn, TileRect } from './SandboxLayout';
 
 export interface SandboxMap {
   grid: ServerMiningGrid;
   fluidCells: GeneratedFluidCell[];
+  /** Gas the map starts with (sealed chambers), in map coordinates. */
+  gasCells: GeneratedGasCell[];
   /** Mobs the map starts with, in map coordinates (the sky rows are already added to `y`). */
   mobs: readonly SandboxMobSpawn[];
   /** Row of the ground surface: where the sky ends. */
@@ -16,7 +18,7 @@ export interface SandboxMap {
  * fire reach every client through the normal wire format. Throws if a zone lies outside the map,
  * so a typo in a layout fails loudly instead of leaving a silent hole.
  */
-export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDefinition[]): SandboxMap {
+export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDefinition[], gases: readonly GasDefinition[] = []): SandboxMap {
   const { width, skyRows } = layout;
   const height = layout.height + skyRows;
   // Open sky first, then the ground and everything below it
@@ -24,7 +26,10 @@ export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDef
     Array.from({ length: width }, () => ({ type: y < skyRows ? MiningTileType.EMPTY : layout.base, revealed: true })),
   );
   const fluidCells: GeneratedFluidCell[] = [];
-  const bySlot = [...fluids].sort((a, b) => (a.typeKey < b.typeKey ? -1 : a.typeKey > b.typeKey ? 1 : 0));
+  const gasCells: GeneratedGasCell[] = [];
+  const byKey = <T extends { typeKey: string }>(list: readonly T[]) => [...list].sort((a, b) => (a.typeKey < b.typeKey ? -1 : a.typeKey > b.typeKey ? 1 : 0));
+  const bySlot = byKey(fluids);
+  const gasBySlot = byKey(gases);
 
   // Layout coordinates are relative to the ground surface; `check` validates them, `row` converts to the grid
   const check = (x: number, y: number, what: string) => {
@@ -54,6 +59,14 @@ export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDef
       case 'blockRow':
         zone.tiles.forEach((tile, i) => set(zone.startX + i * zone.spacing, zone.y, tile, 'block row'));
         break;
+      case 'chamber': {
+        const gas = gasBySlot[zone.gasSlot];
+        eachInRect(zone.rect, 'chamber', (x, y) => {
+          set(x, y, MiningTileType.EMPTY, 'chamber');
+          if (gas) gasCells.push({ x, y: y + skyRows, typeKey: gas.typeKey, concentration: zone.concentration ?? 1 });
+        });
+        break;
+      }
       case 'pool': {
         const fluid = bySlot[zone.fluidSlot];
         const fillFrom = zone.fillFromY ?? zone.rect.y0;
@@ -68,5 +81,5 @@ export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDef
 
   for (const mob of layout.mobs) check(Math.floor(mob.x), Math.floor(mob.y), 'mob');
   const mobs = layout.mobs.map((mob) => ({ ...mob, y: mob.y + skyRows }));
-  return { grid, fluidCells, mobs, surfaceRow: skyRows };
+  return { grid, fluidCells, gasCells, mobs, surfaceRow: skyRows };
 }

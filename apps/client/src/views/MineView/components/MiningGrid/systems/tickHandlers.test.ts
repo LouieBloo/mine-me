@@ -7,6 +7,8 @@ import {
   applyFluidSounds,
   applyFireUpdates,
   applyFluidUpdates,
+  applyGasUpdates,
+  applyGasSounds,
   applySelfState,
   applySessionData,
   applyTileUpdates,
@@ -448,6 +450,91 @@ describe('applyFluidUpdates', () => {
     const world = makeWorld({ fluidRendererRef: ref(renderer) });
     handleStateTick(payload({ fluidCells: [[1, 1, 1, 10]] }), makeCtx(world));
     expect(renderer.apply).toHaveBeenCalledWith([[1, 1, 1, 10]], true);
+  });
+});
+
+describe('applyGasUpdates', () => {
+  const makeRenderer = () => ({ apply: vi.fn(), render: vi.fn(), playExplosions: vi.fn() });
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+
+  it('does nothing before the gas renderer exists', () => {
+    expect(() => applyGasUpdates(tick({ gasCells: [[1, 1, 1, 64]] }), makeCtx(makeWorld()))).not.toThrow();
+  });
+
+  it('applies the tick\'s changed cells eased (the cloud thickens and thins) and redraws', () => {
+    const renderer = makeRenderer();
+    applyGasUpdates(tick({ gasCells: [[1, 2, 1, 64], [3, 4, 0, 0]] }), makeCtx(makeWorld({ gasRendererRef: ref(renderer) })));
+    expect(renderer.apply).toHaveBeenCalledWith([[1, 2, 1, 64], [3, 4, 0, 0]], true);
+    expect(renderer.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the gas in newly revealed tiles at once, then eases to the tick\'s changes (so a later change wins)', () => {
+    const renderer = makeRenderer();
+    applyGasUpdates(
+      tick({
+        revealedTiles: [
+          { x: 5, y: 5, type: MiningTileType.EMPTY, gas: [1, 200] },
+          { x: 6, y: 5, type: MiningTileType.EMPTY },
+        ],
+        gasCells: [[5, 5, 1, 100]],
+      }),
+      makeCtx(makeWorld({ gasRendererRef: ref(renderer) }))
+    );
+    expect(renderer.apply.mock.calls).toEqual([[[[5, 5, 1, 200]]], [[[5, 5, 1, 100]], true]]);
+  });
+
+  it('still redraws (cheaply) on a tick with no gas news, and does not call apply', () => {
+    const renderer = makeRenderer();
+    applyGasUpdates(tick({}), makeCtx(makeWorld({ gasRendererRef: ref(renderer) })));
+    expect(renderer.apply).not.toHaveBeenCalled();
+    expect(renderer.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('plays the cells of gas that went off this tick, after the gas is up to date, and only when there are some', () => {
+    const renderer = makeRenderer();
+    const order: string[] = [];
+    renderer.render.mockImplementation(() => order.push('render'));
+    renderer.playExplosions.mockImplementation(() => order.push('play'));
+    applyGasUpdates(tick({ gasExplosions: [[4, 5, 1], [5, 5, 1]] }), makeCtx(makeWorld({ gasRendererRef: ref(renderer) })));
+    expect(renderer.playExplosions).toHaveBeenCalledWith([[4, 5, 1], [5, 5, 1]]);
+    expect(order).toEqual(['render', 'play']);
+    renderer.playExplosions.mockClear();
+    applyGasUpdates(tick({}), makeCtx(makeWorld({ gasRendererRef: ref(renderer) })));
+    expect(renderer.playExplosions).not.toHaveBeenCalled();
+  });
+
+  it('runs as part of a full state tick', () => {
+    const renderer = makeRenderer();
+    handleStateTick(payload({ gasCells: [[1, 1, 1, 10]] }), makeCtx(makeWorld({ gasRendererRef: ref(renderer) })));
+    expect(renderer.apply).toHaveBeenCalledWith([[1, 1, 1, 10]], true);
+  });
+});
+
+describe('applyGasSounds', () => {
+  const makeSounds = () => ({ onEvents: vi.fn(), onExplosions: vi.fn() });
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+
+  it('does nothing before the gas sounds exist', () => {
+    expect(() => applyGasSounds(tick({ gasEvents: [{ kind: 'enter', gasId: 1, x: 1, y: 1 }] }), makeCtx(makeWorld()))).not.toThrow();
+  });
+
+  it('hands the tick\'s gas events and detonated cells to the sounds, and nothing when there are none', () => {
+    const sounds = makeSounds();
+    const events = [{ kind: 'vent', gasId: 1, x: 4.5, y: 2.5 }] as const;
+    applyGasSounds(tick({ gasEvents: [...events], gasExplosions: [[4, 5, 1]] }), makeCtx(makeWorld({ gasSoundsRef: ref(sounds) })));
+    expect(sounds.onEvents).toHaveBeenCalledWith(events);
+    expect(sounds.onExplosions).toHaveBeenCalledWith([[4, 5, 1]], expect.any(Number));
+    sounds.onEvents.mockClear();
+    sounds.onExplosions.mockClear();
+    applyGasSounds(tick({}), makeCtx(makeWorld({ gasSoundsRef: ref(sounds) })));
+    expect(sounds.onEvents).not.toHaveBeenCalled();
+    expect(sounds.onExplosions).not.toHaveBeenCalled();
+  });
+
+  it('runs as part of a full state tick', () => {
+    const sounds = makeSounds();
+    handleStateTick(payload({ gasEvents: [{ kind: 'ignite', gasId: 1, x: 1, y: 1 }] }), makeCtx(makeWorld({ gasSoundsRef: ref(sounds) })));
+    expect(sounds.onEvents).toHaveBeenCalledTimes(1);
   });
 });
 

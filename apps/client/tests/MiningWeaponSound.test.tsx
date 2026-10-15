@@ -74,6 +74,7 @@ vi.mock('../src/views/MineView/components/MiningGrid/hooks/useMiningScene', () =
   useMiningScene: () => ({
     containersReady: true,
     fluidRendererRef: { current: null },
+    gasRendererRef: { current: null },
     fireFieldRef: { current: null },
     fireRendererRef: { current: null },
     burningBodiesRef: { current: null },

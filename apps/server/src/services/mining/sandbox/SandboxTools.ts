@@ -7,7 +7,7 @@ export type SandboxResult<T = object> = ({ ok: true } & T) | { ok: false; error:
 const fail = (error: string): { ok: false; error: string } => ({ ok: false, error });
 
 /**
- * The sandbox's test tools: pour fluid, spawn a mob, light a fire, clear fluid and fire, god mode,
+ * The sandbox's test tools: pour fluid, release gas, spawn a mob, light a fire, clear fluid, fire and gas, god mode,
  * simulation speed, and reset. Each one checks its input (it comes from a client) and works through
  * the engine's own subsystems, so the sandbox exercises the real game code.
  */
@@ -42,6 +42,14 @@ export class SandboxTools {
     return { ok: true };
   }
 
+  /** Adds gas to an open cell (up to a full cell, or tops one up if it holds the same gas). */
+  public releaseGas(x: unknown, y: unknown, gasKey: unknown): SandboxResult {
+    if (typeof x !== 'number' || typeof y !== 'number' || !this.inGrid(x, y)) return fail('Pick a tile inside the map.');
+    if (typeof gasKey !== 'string' || !this.engine.dataManager.getGas(gasKey)) return fail('Unknown gas.');
+    if (!this.engine.gasSubsystem.placeGas(x, y, gasKey, 1)) return fail('That tile cannot hold that gas.');
+    return { ok: true };
+  }
+
   /** Spawns a mob at a point in open space. */
   public spawnMob(mobId: unknown, x: unknown, y: unknown): SandboxResult<{ instanceId: string }> {
     if (typeof mobId !== 'string') return fail('Pick a mob.');
@@ -56,19 +64,29 @@ export class SandboxTools {
     return { ok: true, instanceId: spawned.id };
   }
 
-  /** Sets a cell alight if it can burn (uses the same flammability rules as everything else). */
+  /**
+   * Sets a cell alight if it can burn (uses the same flammability rules as everything else). Explosive gas does not
+   * burn like a fluid: it is set off as an explosion instead, whatever its ignition chance.
+   */
   public ignite(x: unknown, y: unknown): SandboxResult {
     if (typeof x !== 'number' || typeof y !== 'number' || !this.inGrid(x, y)) return fail('Pick a tile inside the map.');
+    if (this.engine.gasExplosionSubsystem.ignite(x, y)) return { ok: true };
     if (!this.engine.fireSubsystem.grid.ignite(x, y)) return fail('Nothing there can burn.');
     return { ok: true };
   }
 
-  /** Removes every fluid and fire in the room. */
+  /** Removes every fluid, fire and gas in the room. */
   public clearHazards(): void {
     const fluids = this.engine.fluidSubsystem.grid;
     for (let y = 0; y < fluids.height; y++) {
       for (let x = 0; x < fluids.width; x++) {
         if (fluids.getLevel(x, y) > 0) fluids.drainFluid(x, y, Infinity);
+      }
+    }
+    const gases = this.engine.gasSubsystem.grid;
+    for (let y = 0; y < gases.height; y++) {
+      for (let x = 0; x < gases.width; x++) {
+        if (gases.getConcentration(x, y) > 0) gases.drainGas(x, y, Infinity);
       }
     }
     const fire = this.engine.fireSubsystem.grid;
@@ -85,7 +103,7 @@ export class SandboxTools {
     return { ok: true };
   }
 
-  /** Pauses or resumes the fluid and fire simulation, changes its speed, or runs one step. */
+  /** Pauses or resumes the fluid, gas and fire simulation, changes its speed, or runs one step. */
   public setSim(options: { paused?: unknown; speed?: unknown; step?: unknown }): SandboxResult {
     const { paused, speed, step } = options;
     if (paused !== undefined && typeof paused !== 'boolean') return fail('Invalid setting.');

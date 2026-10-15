@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { FreeCamera } from '../systems/FreeCamera';
-import { FreeCameraAction, IgniteAction, PourFluidAction, SpawnMobAction } from '../input/SandboxActions';
+import { FreeCameraAction, IgniteAction, PourFluidAction, ReleaseGasAction, SpawnMobAction } from '../input/SandboxActions';
 import { sendSandboxCommand, useSandboxFreeCamera, useSandboxMouseAction } from './useSandboxClient';
 import { MINE_TOOL, type SandboxViewState } from '../../../sandbox/sandboxTool';
 import { notificationService } from '../../../../../services/notificationService';
@@ -26,6 +26,7 @@ describe('useSandboxMouseAction', () => {
 
   it('builds the tool the panel picked', () => {
     expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'pour', fluidKey: 'OIL' } }), send)).result.current).toBeInstanceOf(PourFluidAction);
+    expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'releaseGas', gasKey: 'HYDROGEN' } }), send)).result.current).toBeInstanceOf(ReleaseGasAction);
     expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'spawn', mobId: 'm' } }), send)).result.current).toBeInstanceOf(SpawnMobAction);
     expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'ignite' } }), send)).result.current).toBeInstanceOf(IgniteAction);
   });
@@ -34,6 +35,10 @@ describe('useSandboxMouseAction', () => {
     const pour = renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'pour', fluidKey: 'OIL' } }), send)).result.current!;
     await pour.execute({ x: 4, y: 2 }, { x: 0, y: 0 });
     expect(send).toHaveBeenCalledWith({ type: 'sandbox_pour_fluid', x: 4, y: 2, fluidKey: 'OIL' });
+
+    const release = renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'releaseGas', gasKey: 'HYDROGEN' } }), send)).result.current!;
+    await release.execute({ x: 6, y: 3 }, { x: 0, y: 0 });
+    expect(send).toHaveBeenCalledWith({ type: 'sandbox_release_gas', x: 6, y: 3, gasKey: 'HYDROGEN' });
 
     const spawn = renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'spawn', mobId: 'mole' } }), send)).result.current!;
     await spawn.execute({ x: 5.5, y: 3.25 }, { x: 0, y: 0 });
@@ -58,6 +63,12 @@ describe('useSandboxMouseAction', () => {
     expect(result.current).toBe(first);
     rerender({ s: view({ tool: { kind: 'pour', fluidKey: 'WATER' } }) });
     expect(result.current).not.toBe(first);
+    const gas = renderHook(({ s }) => useSandboxMouseAction(s, send), { initialProps: { s: view({ tool: { kind: 'releaseGas', gasKey: 'HYDROGEN' } }) } });
+    const gasFirst = gas.result.current;
+    gas.rerender({ s: view({ tool: { kind: 'releaseGas', gasKey: 'HYDROGEN' } }) });
+    expect(gas.result.current).toBe(gasFirst);
+    gas.rerender({ s: view({ tool: { kind: 'releaseGas', gasKey: 'NITROGEN' } }) });
+    expect(gas.result.current).not.toBe(gasFirst);
   });
 });
 

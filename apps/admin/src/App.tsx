@@ -24,6 +24,8 @@ import Blocks from './pages/Blocks/Blocks';
 import BlockDetail from './pages/Blocks/BlockDetail/BlockDetail';
 import Fluids from './pages/Fluids/Fluids';
 import FluidDetail from './pages/Fluids/FluidDetail/FluidDetail';
+import Gases from './pages/Gases/Gases';
+import GasDetail from './pages/Gases/GasDetail/GasDetail';
 import MiningConfig from './pages/MiningConfig/MiningConfig';
 import Music from './pages/Music/Music';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
@@ -91,6 +93,14 @@ const router = createBrowserRouter([
       {
         path: "fluids/:id",
         element: <FluidDetail />
+      },
+      {
+        path: "gases",
+        element: <Gases />
+      },
+      {
+        path: "gases/:id",
+        element: <GasDetail />
       },
       {
         path: "mining-config",

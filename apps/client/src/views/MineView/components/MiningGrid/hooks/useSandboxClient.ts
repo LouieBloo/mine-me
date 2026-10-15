@@ -3,7 +3,7 @@ import type { MiningPosition, Vector2D } from '@mine-me/shared';
 import { notificationService } from '../../../../../services/notificationService';
 import type { SandboxViewState } from '../../../sandbox/sandboxTool';
 import type { IMouseAction } from '../input/MouseAction';
-import { FreeCameraAction, IgniteAction, PourFluidAction, SpawnMobAction } from '../input/SandboxActions';
+import { FreeCameraAction, IgniteAction, PourFluidAction, ReleaseGasAction, SpawnMobAction } from '../input/SandboxActions';
 import type { FreeCamera } from '../systems/FreeCamera';
 import type { MiningClientWorld } from '../systems/MiningClientWorld';
 
@@ -23,7 +23,7 @@ export async function sendSandboxCommand(
 }
 
 /**
- * The mouse tool the sandbox panel selected (pour, spawn, ignite), or the do-nothing action used
+ * The mouse tool the sandbox panel selected (pour, release gas, spawn, ignite), or the do-nothing action used
  * while the free camera is on. Returned as an override for the normal item-driven action; null
  * means "no override" (the equipped item decides, as in a normal mine).
  */
@@ -34,6 +34,7 @@ export function useSandboxMouseAction(
   const tool = sandbox?.tool;
   const freeCameraOn = sandbox?.freeCamera ?? false;
   const fluidKey = tool?.kind === 'pour' ? tool.fluidKey : null;
+  const gasKey = tool?.kind === 'releaseGas' ? tool.gasKey : null;
   const mobId = tool?.kind === 'spawn' ? tool.mobId : null;
 
   return useMemo<IMouseAction | null>(() => {
@@ -43,6 +44,10 @@ export function useSandboxMouseAction(
       case 'pour':
         return new PourFluidAction(fluidKey!, (t: MiningPosition) =>
           sendSandboxCommand(sendGameEvent, { type: 'sandbox_pour_fluid', x: t.x, y: t.y, fluidKey }),
+        );
+      case 'releaseGas':
+        return new ReleaseGasAction(gasKey!, (t: MiningPosition) =>
+          sendSandboxCommand(sendGameEvent, { type: 'sandbox_release_gas', x: t.x, y: t.y, gasKey }),
         );
       case 'spawn':
         return new SpawnMobAction(mobId!, (p: Vector2D) =>
@@ -55,7 +60,7 @@ export function useSandboxMouseAction(
       default:
         return null;
     }
-  }, [!!sandbox, freeCameraOn, tool?.kind, fluidKey, mobId, sendGameEvent]);
+  }, [!!sandbox, freeCameraOn, tool?.kind, fluidKey, gasKey, mobId, sendGameEvent]);
 }
 
 export interface UseSandboxFreeCameraOptions {

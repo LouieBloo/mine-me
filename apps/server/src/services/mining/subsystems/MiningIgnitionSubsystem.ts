@@ -35,7 +35,7 @@ export class MiningIgnitionSubsystem {
     private readonly random: () => number = Math.random
   ) {}
 
-  /** What burns in a cell: the fluid in it if there is some, otherwise the block there (if it can burn). */
+  /** What burns in a cell: the fluid in it if there is some, otherwise the block there (if it can burn). Explosive gas is not here: it goes off as a front (see `emit`). */
   public flammabilityAt(x: number, y: number): Flammability | null {
     if (!isInBounds(x, y, this.world.grid)) return null;
     const fluids = this.world.fluids;
@@ -60,6 +60,11 @@ export class MiningIgnitionSubsystem {
     for (let ty = cy - reach; ty <= cy + reach; ty++) {
       for (let tx = cx - reach; tx <= cx + reach; tx++) {
         if (Math.hypot(tx + 0.5 - x, ty + 0.5 - y) > radius) continue;
+        // Explosive gas does not burn like a fluid: if it catches it goes off as a front instead
+        if (this.world.gasExplosions.canIgnite(tx, ty)) {
+          if (this.tryIgniteGas(tx, ty, strength)) caught++;
+          continue;
+        }
         const flammability = this.flammabilityAt(tx, ty);
         if (!flammability) continue;
         const key = ty * this.world.grid[0].length + tx;
@@ -68,6 +73,33 @@ export class MiningIgnitionSubsystem {
           this.ignited.set(key, { x: tx, y: ty, flammability });
           caught++;
         }
+      }
+    }
+    return caught;
+  }
+
+  /** Rolls the chance that sparks of this strength set off the explosive gas in a cell, and lines it up to go off if they do. */
+  private tryIgniteGas(x: number, y: number, strength: number): boolean {
+    const flammability = this.world.gasExplosions.flammabilityAt(x, y);
+    if (!flammability || this.random() >= ignitionChance(flammability, strength)) return false;
+    return this.world.gasExplosions.ignite(x, y);
+  }
+
+  /**
+   * Sparks at (x, y), reaching `radius` tiles, that can only set off explosive gas (not fluids or blocks).
+   * What fire already burning does to gas next to it: fluids and blocks are the fire simulation's own business.
+   * Returns how many cells of gas were set off.
+   */
+  public igniteGas(x: number, y: number, radius: number, strength: number): number {
+    if (!(strength > 0) || !(radius >= 0)) return 0;
+    let caught = 0;
+    const reach = Math.ceil(radius);
+    const cx = Math.floor(x);
+    const cy = Math.floor(y);
+    for (let ty = cy - reach; ty <= cy + reach; ty++) {
+      for (let tx = cx - reach; tx <= cx + reach; tx++) {
+        if (Math.hypot(tx + 0.5 - x, ty + 0.5 - y) > radius) continue;
+        if (this.world.gasExplosions.canIgnite(tx, ty) && this.tryIgniteGas(tx, ty, strength)) caught++;
       }
     }
     return caught;

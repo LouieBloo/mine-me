@@ -35,6 +35,13 @@ export * from './utils/pixiParticlesConverter';
 export * from './sound';
 
 export * from './utils/miningInputValidation';
+export * from './gameLogic/CellIdRegistry';
+export * from './gameLogic/gas/GasRegistry';
+export * from './gameLogic/gas/GasGrid';
+export * from './gameLogic/gas/gasWire';
+export * from './gameLogic/gas/gasEnvironment';
+export * from './gameLogic/gas/gasLook';
+export * from './gameLogic/gas/ExplosionFront';
 export * from './gameLogic/fluid/FluidRegistry';
 export * from './gameLogic/fluid/FluidGrid';
 export * from './gameLogic/fluid/fluidWire';

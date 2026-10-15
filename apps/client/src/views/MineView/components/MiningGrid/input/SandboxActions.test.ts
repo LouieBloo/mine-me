@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MiningTileType, MouseActionTriggerMode, type MiningClientTile } from '@mine-me/shared';
-import { FreeCameraAction, IgniteAction, PourFluidAction, SpawnMobAction } from './SandboxActions';
+import { FreeCameraAction, IgniteAction, PourFluidAction, ReleaseGasAction, SpawnMobAction } from './SandboxActions';
 
 /** 6 wide, 4 tall: sky is outside (y < 0), open row 0-1, dirt below. */
 const grid = (): MiningClientTile[][] =>
@@ -8,6 +8,31 @@ const grid = (): MiningClientTile[][] =>
     Array.from({ length: 6 }, () => ({ type: y >= 2 ? MiningTileType.DIRT : MiningTileType.EMPTY, revealed: true, damageStage: 0 })),
   );
 const player = { x: 1, y: 1 };
+
+describe('ReleaseGasAction', () => {
+  it('releases into open tiles anywhere (no reach limit) and not into solid ones or off the map', () => {
+    const action = new ReleaseGasAction('HYDROGEN', vi.fn());
+    expect(action.canExecute({ x: 5, y: 0 }, player, grid())).toBe(true);
+    expect(action.canExecute({ x: 2, y: 2 }, player, grid())).toBe(false);
+    expect(action.canExecute({ x: 6, y: 0 }, player, grid())).toBe(false);
+    expect(action.canExecute({ x: 0, y: -1 }, player, grid())).toBe(false);
+  });
+
+  it('holds to keep releasing, and sends the tile', async () => {
+    const onRelease = vi.fn().mockResolvedValue(true);
+    const action = new ReleaseGasAction('HYDROGEN', onRelease);
+    expect(action.triggerMode).toBe(MouseActionTriggerMode.HOLD);
+    expect(action.gasKey).toBe('HYDROGEN');
+    await action.execute({ x: 3, y: 1 });
+    expect(onRelease).toHaveBeenCalledWith({ x: 3, y: 1 });
+  });
+
+  it('shows a red reticle where it cannot release', () => {
+    const action = new ReleaseGasAction('HYDROGEN', vi.fn());
+    expect(action.getReticleStyle({ x: 1, y: 0 }, player, grid()).isValid).toBe(true);
+    expect(action.getReticleStyle({ x: 1, y: 3 }, player, grid()).isValid).toBe(false);
+  });
+});
 
 describe('PourFluidAction', () => {
   it('pours into open tiles anywhere (no reach limit) and not into solid ones or off the map', () => {

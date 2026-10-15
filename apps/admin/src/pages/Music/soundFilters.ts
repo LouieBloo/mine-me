@@ -9,6 +9,7 @@ export const FILTERS: { key: Filter; label: string }[] = [
   { key: 'CHARACTER', label: 'Character SFX' },
   { key: 'MOB', label: 'Mob SFX' },
   { key: 'FLUID', label: 'Fluid & Fire SFX' },
+  { key: 'GAS', label: 'Gas SFX' },
   { key: 'ITEM', label: 'Item SFX' },
   { key: 'BLOCK', label: 'Block SFX' },
   { key: 'GENERAL', label: 'Other SFX' },

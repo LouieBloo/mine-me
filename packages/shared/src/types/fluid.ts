@@ -2,6 +2,25 @@ import type { ItemLightConfig } from './index';
 import type { FluidSoundEffectsConfig, FluidSoundSlotRefs } from './sound';
 
 /**
+ * What happens when an explosive gas is set alight: instead of burning like a fluid does, it detonates as a
+ * front that races through the connected gas. Optional on `Flammability`, so any flammable thing could be
+ * explosive, but only gases are handled today.
+ */
+export interface ExplosionSettings {
+  /** Tiles around a detonating cell in which people and mobs are hurt. */
+  blastRadius: number;
+  /** Damage at the centre of a full cell of this gas, less with distance and with how thin the gas is. */
+  damage: number;
+  /** How many cells the front moves each gas step (fast, but slow enough to watch). */
+  frontSpeed: number;
+  /** The thinnest gas that still detonates; thinner gas is left alone and does not carry the front on. Default 0.1. */
+  minConcentration?: number;
+}
+
+/** The thinnest gas a front crosses when the settings do not say. */
+export const DEFAULT_EXPLOSION_MIN_CONCENTRATION = 0.1;
+
+/**
  * How a material (a fluid now, blocks later) burns. Shared by every flammable thing so fire logic
  * has one code path. A material with no Flammability does not burn. Ticket 056 finishes the exact
  * semantics; the fields are stored as one Json column.
@@ -21,6 +40,8 @@ export interface Flammability {
   flameEffectId?: string | null;
   /** The light a burning cell of this material gives off. None: no light. */
   flameLight?: ItemLightConfig | null;
+  /** Gases only: set alight, this detonates as a travelling front instead of burning (see `ExplosionSettings`). None: it burns. */
+  explosion?: ExplosionSettings | null;
 }
 
 /**
@@ -164,6 +185,22 @@ export function validateFlammability(value: unknown): string[] {
     } else if (!isNumber(light.radius) || light.radius <= 0 || !isNumber(light.intensity) || light.intensity <= 0) {
       errors.push('flammability.flameLight needs a radius and intensity above 0');
     }
+  }
+  errors.push(...validateExplosion(f.explosion));
+  return errors;
+}
+
+/** Problems with an explosion value, one message each (empty when it is valid). */
+export function validateExplosion(value: unknown): string[] {
+  if (value === null || value === undefined) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return ['flammability.explosion must be an object or null'];
+  const e = value as Record<string, unknown>;
+  const errors: string[] = [];
+  if (!isNumber(e.blastRadius) || e.blastRadius <= 0) errors.push('flammability.explosion.blastRadius must be greater than 0');
+  if (!isNumber(e.damage) || e.damage <= 0) errors.push('flammability.explosion.damage must be greater than 0');
+  if (!isNumber(e.frontSpeed) || e.frontSpeed < 1 || !Number.isInteger(e.frontSpeed)) errors.push('flammability.explosion.frontSpeed must be a whole number of 1 or more');
+  if (e.minConcentration !== undefined && e.minConcentration !== null && (!isNumber(e.minConcentration) || e.minConcentration <= 0 || e.minConcentration > 1)) {
+    errors.push('flammability.explosion.minConcentration must be above 0 and at most 1');
   }
   return errors;
 }

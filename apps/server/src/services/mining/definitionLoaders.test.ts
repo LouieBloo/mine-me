@@ -2,15 +2,16 @@ import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds, attachFluidSounds } from './definitionLoaders';
+import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds, attachFluidSounds, attachGasSounds } from './definitionLoaders';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 
-const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
+const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
   ({
     item: { findMany: vi.fn().mockResolvedValue(data.items ?? [{ id: 'i1', name: 'Thing' }]) },
     mob: { findMany: vi.fn().mockResolvedValue(data.mobs ?? [{ id: 'm1', name: 'Mole' }]) },
     miningBlock: { findMany: vi.fn().mockResolvedValue(data.blocks ?? [{ id: 'b1', typeKey: 'DIRT' }]) },
     fluid: { findMany: vi.fn().mockResolvedValue(data.fluids ?? []) },
+    gas: { findMany: vi.fn().mockResolvedValue(data.gases ?? []) },
     particleEffect: { findMany: vi.fn().mockResolvedValue(data.particleEffects ?? []) },
     sound: { findMany: vi.fn().mockResolvedValue(data.sounds ?? []) },
     characterSoundConfig: { findUnique: vi.fn().mockResolvedValue(data.characterSounds ?? null) },
@@ -94,6 +95,60 @@ describe('particle effects', () => {
 
   it('allows an empty library', async () => {
     await expect(loadDefinitionsFromDatabase(fakePrisma({ particleEffects: [] }))).resolves.toMatchObject({ particleEffects: [] });
+  });
+});
+
+describe('gases', () => {
+  const hydrogen = { id: 'g1', typeKey: 'HYDROGEN', name: 'Hydrogen' };
+
+  it('loads the gas table, oldest first', async () => {
+    const prisma = fakePrisma({ gases: [hydrogen] });
+    const defs = await loadDefinitionsFromDatabase(prisma);
+    expect(defs.gases).toEqual([hydrogen]);
+    expect(prisma.gas.findMany).toHaveBeenCalledWith({ orderBy: { createdAt: 'asc' } });
+  });
+
+  it('allows an empty gas table', async () => {
+    await expect(loadDefinitionsFromDatabase(fakePrisma({ gases: [] }))).resolves.toMatchObject({ gases: [] });
+  });
+
+  it('propagates database errors from the gas table', async () => {
+    const prisma = fakePrisma({});
+    prisma.gas.findMany.mockRejectedValue(new Error('no such table'));
+    await expect(loadDefinitionsFromDatabase(prisma)).rejects.toThrow('no such table');
+  });
+
+  it('installs gases so the running game can look them up by key or id; the first of a duplicated key wins', async () => {
+    await installDefinitionsFromDatabase(fakePrisma({ gases: [hydrogen, { ...hydrogen, id: 'g2', name: 'Copy' }, { id: 'g3', name: 'No key' }] }));
+    const data = MiningDataManager.getInstance();
+    expect(data.getGas('HYDROGEN')?.name).toBe('Hydrogen');
+    expect(data.getGas('g1')?.name).toBe('Hydrogen');
+    expect(data.getGases()).toHaveLength(1);
+    expect(data.getGas('NOPE')).toBeUndefined();
+  });
+
+  it('reads the dev seed mirror, which has hydrogen and nitrogen', () => {
+    const defs = loadDefinitionsFromFiles(path.resolve(__dirname, '../../../../../packages/shared/src/data'));
+    expect(defs.gases?.map((g) => g.typeKey).sort()).toEqual(['HYDROGEN', 'NITROGEN']);
+  });
+
+  describe('sounds', () => {
+    const library = [
+      { id: 's1', url: '/assets/sounds/boom.mp3', volume: 0.7, isActive: true },
+      { id: 's2', url: '/assets/sounds/off.mp3', volume: 1, isActive: false },
+    ];
+
+    it('resolves stored sound references to playable urls, at the volume set on this gas', () => {
+      const [gas] = attachGasSounds([{ id: 'g1', typeKey: 'HYDROGEN', soundEffects: { explode: { soundId: 's1', volume: 0.3 }, vent: { soundId: 's2' } } } as any], library);
+      expect(gas.sounds).toEqual({ explode: { soundId: 's1', url: '/assets/sounds/boom.mp3', volume: 0.3, loop: false } });
+    });
+
+    it('leaves a gas with no references alone, and is applied by the database loader', async () => {
+      const plain = { id: 'g1', typeKey: 'NITROGEN' } as any;
+      expect(attachGasSounds([plain], library)[0]).toBe(plain);
+      const defs = await loadDefinitionsFromDatabase(fakePrisma({ gases: [{ id: 'g1', typeKey: 'HYDROGEN', soundEffects: { ignite: { soundId: 's1' } } }], sounds: library }));
+      expect(defs.gases?.[0].sounds?.ignite).toMatchObject({ url: '/assets/sounds/boom.mp3', volume: 1 });
+    });
   });
 });
 
@@ -196,7 +251,7 @@ describe('loadDefinitionsFromFiles', () => {
     write('items.json', [{ id: 'a' }]);
     write('mobs.json', []);
     write('blocks.json', [{ typeKey: 'DIRT' }]);
-    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], particleEffects: [], characterSounds: {} });
+    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], particleEffects: [], characterSounds: {} });
   });
 
   it('reads fluids.json when it exists', () => {

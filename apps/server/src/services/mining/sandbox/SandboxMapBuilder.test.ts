@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { MiningTileType, isTileSolid, type FluidDefinition } from '@mine-me/shared';
+import { MiningTileType, isTileSolid, type FluidDefinition, type GasDefinition } from '@mine-me/shared';
 import { buildSandboxMap } from './SandboxMapBuilder';
 import { createDefaultSandboxLayout, SANDBOX_SKY_ROWS, type SandboxLayout } from './SandboxLayout';
 import { BLOCK_TILE_TYPES } from '../subsystems/MiningDataManager';
 
 const SKY = SANDBOX_SKY_ROWS;
 const fluid = (typeKey: string) => ({ typeKey }) as FluidDefinition;
-const build = (fluids: FluidDefinition[] = [fluid('OIL'), fluid('WATER')]) =>
-  buildSandboxMap(createDefaultSandboxLayout(BLOCK_TILE_TYPES), fluids);
+const gas = (typeKey: string) => ({ typeKey }) as GasDefinition;
+const build = (fluids: FluidDefinition[] = [fluid('OIL'), fluid('WATER')], gases: GasDefinition[] = [gas('HYDROGEN'), gas('NITROGEN')]) =>
+  buildSandboxMap(createDefaultSandboxLayout(BLOCK_TILE_TYPES), fluids, gases);
 /** A tile by surface-relative coordinates (y = 0 is the ground; negative is sky). */
 const at = (grid: ReturnType<typeof build>['grid'], x: number, y: number) => grid[y + SKY][x];
 
@@ -128,3 +129,46 @@ describe('sandbox layouts', () => {
 function at2(grid: ReturnType<typeof build>['grid'], x: number, y: number) {
   return grid[y + 3][x];
 }
+
+describe('the sandbox gas chambers', () => {
+  const chamber = (cells: ReturnType<typeof build>['gasCells'], key: string) => cells.filter((c) => c.typeKey === key);
+
+  it('puts the first two gases in key order in two chambers: hydrogen on the left, nitrogen on the right', () => {
+    const { gasCells } = build([], [gas('NITROGEN'), gas('HYDROGEN')]);
+    const hydrogen = chamber(gasCells, 'HYDROGEN');
+    const nitrogen = chamber(gasCells, 'NITROGEN');
+    expect(hydrogen.length).toBe(8 * 6);
+    expect(nitrogen.length).toBe(8 * 6);
+    expect(Math.max(...hydrogen.map((c) => c.x))).toBeLessThan(Math.min(...nitrogen.map((c) => c.x)));
+    for (const c of gasCells) expect(c.concentration).toBe(1);
+  });
+
+  it('seals each chamber in solid ground, under a roof two blocks thick that can be mined through', () => {
+    const { grid, gasCells } = build();
+    const inChamber = new Set(gasCells.map((c) => `${c.x},${c.y}`));
+    for (const c of gasCells) {
+      expect(grid[c.y][c.x].type).toBe(MiningTileType.EMPTY);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (inChamber.has(`${c.x + dx},${c.y + dy}`)) continue;
+        expect(isTileSolid(grid[c.y + dy][c.x + dx].type)).toBe(true);
+      }
+    }
+    // The roof over the hydrogen: two plain dirt blocks, with open sky above them
+    for (const y of [0, 1]) expect(at(grid, 63, y).type).toBe(MiningTileType.DIRT);
+    expect(grid[SKY - 1][63].type).toBe(MiningTileType.EMPTY);
+  });
+
+  it('leaves a chamber empty when there is no gas for its slot, and all of them when there are no gases', () => {
+    const one = build([], [gas('HYDROGEN')]);
+    expect(chamber(one.gasCells, 'HYDROGEN').length).toBe(48);
+    expect(one.gasCells.length).toBe(48);
+    const none = build([], []);
+    expect(none.gasCells).toEqual([]);
+    // The chambers are still carved out, just empty
+    expect(at(none.grid, 63, 4).type).toBe(MiningTileType.EMPTY);
+  });
+
+  it('does not touch the pools', () => {
+    expect(build().fluidCells).toEqual(build([fluid('OIL'), fluid('WATER')], []).fluidCells);
+  });
+});

@@ -58,6 +58,8 @@ import { MiningRockSubsystem } from './subsystems/MiningRockSubsystem';
 import { MiningExplosiveSubsystem, type ThrowRequest } from './subsystems/MiningExplosiveSubsystem';
 import { MiningProjectileSubsystem, type ShootResult } from './subsystems/MiningProjectileSubsystem';
 import { MiningFluidSubsystem } from './subsystems/MiningFluidSubsystem';
+import { MiningGasSubsystem } from './subsystems/MiningGasSubsystem';
+import { MiningGasExplosionSubsystem } from './subsystems/MiningGasExplosionSubsystem';
 import { buildMapForMode } from './mapSources';
 import { SandboxTools } from './sandbox/SandboxTools';
 import { getGameModeRules, type GameModeRules } from './gameModeRules';
@@ -150,6 +152,8 @@ export class MiningGameEngine {
   public projectileSubsystem!: MiningProjectileSubsystem;
   public mobSubsystem!: MiningMobSubsystem;
   public fluidSubsystem!: MiningFluidSubsystem;
+  public gasSubsystem!: MiningGasSubsystem;
+  public gasExplosionSubsystem!: MiningGasExplosionSubsystem;
   public ignitionSubsystem!: MiningIgnitionSubsystem;
   public fireSubsystem!: MiningFireSubsystem;
   public burningSubsystem!: MiningBurningSubsystem;
@@ -208,6 +212,7 @@ export class MiningGameEngine {
       seed: this.seed,
       mapConfig,
       fluids: MiningDataManager.getInstance().getFluids(),
+      gases: MiningDataManager.getInstance().getGases(),
     });
     this.grid = built.grid;
     this.surfaceRow = built.surfaceRow ?? 0;
@@ -234,10 +239,13 @@ export class MiningGameEngine {
     this.projectileSubsystem = new MiningProjectileSubsystem(world);
     this.mobSubsystem = new MiningMobSubsystem(world);
     this.fluidSubsystem = new MiningFluidSubsystem(world);
+    this.gasSubsystem = new MiningGasSubsystem(world);
+    this.gasExplosionSubsystem = new MiningGasExplosionSubsystem(world);
     this.ignitionSubsystem = new MiningIgnitionSubsystem(world);
     this.fireSubsystem = new MiningFireSubsystem(world);
     this.burningSubsystem = new MiningBurningSubsystem(world);
     for (const cell of built.fluidCells) this.fluidSubsystem.placeFluid(cell.x, cell.y, cell.typeKey, cell.level);
+    for (const cell of built.gasCells ?? []) this.gasSubsystem.placeGas(cell.x, cell.y, cell.typeKey, cell.concentration);
     this.damageSystem = new MiningDamageSystem(world);
     this.blockSubsystem.onToolTooWeak = (session, blockName) =>
       this.playerManager.sendNotice(session, 'tool_too_weak', `Your tool isn't strong enough to break ${blockName}.`);
@@ -507,6 +515,17 @@ export class MiningGameEngine {
       else for (let i = 0; i < worldSteps; i++) this.fluidSubsystem.step();
     });
 
+    // 4.55 Gas drifts (same beat as fluids, right after them: fluid wins any cell they both want)
+    this.runStep('gases', () => {
+      if (worldSteps === null) this.gasSubsystem.update();
+      else for (let i = 0; i < worldSteps; i++) this.gasSubsystem.step();
+    });
+    // 4.56 Explosive gas that has been set alight goes off, a few cells further each step
+    this.runStep('gasExplosions', () => {
+      if (worldSteps === null) this.gasExplosionSubsystem.update();
+      else for (let i = 0; i < worldSteps; i++) this.gasExplosionSubsystem.step();
+    });
+
     // 4.6 Fire takes new sparks, spreads and burns (same beat as fluids, right after them)
     this.runStep('fire', () => {
       if (worldSteps === null) this.fireSubsystem.update();
@@ -533,6 +552,9 @@ export class MiningGameEngine {
 
     // 9. Update Active Mobs (AI, Physics, Mining, Combat)
     this.runStep('mobs', () => this.mobSubsystem.updateActiveMobs(dt));
+
+    // 9.4 Who just walked into or out of a gas cloud (for sounds)
+    this.runStep('gasBodies', () => this.gasSubsystem.trackBodies());
 
     // 9.5 Who just waded into or out of a fluid (for splash sounds)
     this.runStep('fluidSplashes', () => this.fluidSubsystem.trackSplashes());
@@ -731,6 +753,12 @@ export class MiningGameEngine {
       get fluids() {
         return engine.fluidSubsystem;
       },
+      get gases() {
+        return engine.gasSubsystem;
+      },
+      get gasExplosions() {
+        return engine.gasExplosionSubsystem;
+      },
       get fire() {
         return engine.fireSubsystem;
       },
@@ -743,6 +771,7 @@ export class MiningGameEngine {
       pushTileUpdate: (update) => {
         engine.pendingRevealedTiles.push(update);
         engine.fluidSubsystem.onTileChanged(update.x, update.y);
+        engine.gasSubsystem.onTileChanged(update.x, update.y);
       },
       revealAround: (position, visionRange) => engine.revealAndTrackTiles(position, visionRange),
       notifyPlayerHealth: (characterId, health, maxHealth) =>
@@ -784,12 +813,14 @@ export class MiningGameEngine {
         if (isInBounds(nx, ny, this.grid) && !this.grid[ny][nx].revealed) {
           this.grid[ny][nx].revealed = true;
           const fluid = this.fluidSubsystem.contentsAt(nx, ny);
+          const gas = this.gasSubsystem.wireContentsAt(nx, ny);
           this.pendingRevealedTiles.push({
             x: nx,
             y: ny,
             type: this.grid[ny][nx].type,
             damageStage: getDamageStage(this.grid[ny][nx]),
             ...(fluid ? { fluid } : {}),
+            ...(gas ? { gas } : {}),
             ...(this.fireSubsystem.isBurning(nx, ny) ? { fire: 1 as const } : {}),
           });
         }
@@ -808,6 +839,9 @@ export class MiningGameEngine {
     const dropsDirty = this.dropSubsystem.droppedItemsDirty;
     // Taken every tick even with nobody connected, so changes never pile up
     const fluidChanges = this.fluidSubsystem.takeVisibleChanges();
+    const gasChanges = this.gasSubsystem.takeVisibleChanges();
+    const gasExplosions = this.gasExplosionSubsystem.takeVisibleDetonations();
+    const gasEventsToSend = this.gasSubsystem.takeEvents();
     const fireChanges = this.fireSubsystem.takeVisibleChanges();
     const splashesToSend = this.fluidSubsystem.takeSplashes();
 
@@ -841,6 +875,7 @@ export class MiningGameEngine {
       const explosionsNear = explosionsToSend.filter((e) => isInInterest(center, e.position));
       const gunshotsNear = gunshotsToSend.filter((g) => isInInterest(center, g.position));
       const splashesNear = splashesToSend.filter((s) => isInInterest(center, { x: s.x, y: s.y }));
+      const gasEventsNear = gasEventsToSend.filter((e) => isInInterest(center, { x: e.x, y: e.y }));
 
       const spawned = collectSpawned(known, {
         mobs: mobsNear,
@@ -879,6 +914,9 @@ export class MiningGameEngine {
         miningTarget: session.miningTarget ?? undefined,
         revealedTiles: this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined,
         fluidCells: fluidChanges.length > 0 ? fluidChanges : undefined,
+        gasCells: gasChanges.length > 0 ? gasChanges : undefined,
+        gasExplosions: gasExplosions.length > 0 ? gasExplosions : undefined,
+        gasEvents: gasEventsNear.length > 0 ? gasEventsNear : undefined,
         fireCells: fireChanges.length > 0 ? fireChanges : undefined,
         fluidSplashes: splashesNear.length > 0 ? splashesNear : undefined,
         fallingRocks: fallingRockPayloads.length > 0 ? fallingRockPayloads : undefined,

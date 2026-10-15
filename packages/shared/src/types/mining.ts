@@ -1,6 +1,7 @@
 import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig, HeldLightConfig, CharacterSoundEffectsConfig, FluidSoundEffectsConfig } from './index';
 import type { ParticleEffect, ParticleEffectConfig } from './particles';
 import type { Flammability, FluidAppearance } from './fluid';
+import type { GasClientDefinition, GasEvent, GasExplosionCell, GasWireCell } from '../gameLogic/gas/gasWire';
 import type { SkeletonManifest } from './modularRig';
 
 // ============================================================================
@@ -98,6 +99,11 @@ export const MINING_CONFIG = {
   FLUID_SPLASH_COOLDOWN_SECONDS: 0.4, // fewest seconds between splashes of the same body
   FLUID_MIN_FALL_FACTOR: 0.2, // fluid never slows a fall below this share of the normal top speed
   FLUID_STEP_TICKS: 3, // the fluid simulation steps every Nth tick (10 Hz at 30 Hz ticks)
+  GAS_STEP_TICKS: 3, // the gas simulation steps every Nth tick (10 Hz at 30 Hz ticks)
+  GAS_ENTER_CONCENTRATION: 0.3, // a body counts as in a gas cloud once the gas around it is this thick
+  GAS_EXIT_CONCENTRATION: 0.1, // ...and as out once it is thinner than this (the gap stops sound spam at the edge of a cloud)
+  GAS_EVENT_COOLDOWN_SECONDS: 0.5, // fewest seconds between enter/exit sounds of the same body
+  GAS_VENT_EVENT_MIN_CONCENTRATION: 0.2, // gas thinner than this does not make a venting sound when the roof opens
   MAX_CATCHUP_TICKS: 5, // most steps run in one loop wake-up; any more lag is dropped instead of spiralling
   DEFAULT_PLAYER_MAX_HEALTH: 100,
   PLAYER_HIT_INVULNERABILITY: 0.5,
@@ -569,6 +575,10 @@ export interface MiningSessionClientState {
   fluids?: { id: number; typeKey: string; name: string; color: string; opacity: number; viscosity: number; density: number; appearance?: FluidAppearance; flame?: { effect: ParticleEffectConfig | null; light: ItemLightConfig | null }; sounds?: FluidSoundEffectsConfig }[];
   /** Fluid in the cells already revealed, as [x, y, fluidId, level]; later changes arrive in each tick's `fluidCells`. */
   fluidCells?: [x: number, y: number, fluidId: number, level: number][];
+  /** How to draw each gas in the mine, sent once. Missing means the mine has no gases. */
+  gases?: GasClientDefinition[];
+  /** Gas in the cells already revealed, as [x, y, gasId, concentration]; later changes arrive in each tick's `gasCells`. */
+  gasCells?: GasWireCell[];
   /** Cells already on fire in the revealed part of the mine, as [x, y, 1]; later changes arrive in each tick's `fireCells`. */
   fireCells?: [x: number, y: number, burning: 0 | 1][];
   /** The particle effect drawn on anything that is on fire (a player or a mob). Absent: none. */
@@ -774,12 +784,21 @@ export interface MiningStateTickPayload {
   explosions?: MiningExplosionEvent[];
   /** Block damage hit events (e.g. tool swing hits dealing damage) triggered during this tick. */
   blockHits?: MiningBlockHitEvent[];
-  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; fluid?: [fluidId: number, level: number]; fire?: 1 }[];
+  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; fluid?: [fluidId: number, level: number]; gas?: [gasId: number, concentration: number]; fire?: 1 }[];
   /**
    * Fluid cells that changed this tick, as [x, y, fluidId, level]. Only cells the fog of war has revealed
    * are ever sent (a newly revealed tile carries its fluid in `revealedTiles`).
    */
   fluidCells?: [x: number, y: number, fluidId: number, level: number][];
+  /**
+   * Gas cells that changed this tick, as [x, y, gasId, concentration]. Only cells the fog of war has revealed
+   * are ever sent (a newly revealed tile carries its gas in `revealedTiles`).
+   */
+  gasCells?: GasWireCell[];
+  /** Cells of explosive gas that detonated this tick, as [x, y, gasId]. Only revealed cells are ever sent. */
+  gasExplosions?: GasExplosionCell[];
+  /** Gas sounds to play near the receiving player: bodies entering or leaving a cloud, gas set alight, gas starting to escape. */
+  gasEvents?: GasEvent[];
   /** Players and mobs that waded into or climbed out of a fluid this tick, near the receiving player (for splash sounds). */
   fluidSplashes?: MiningFluidSplashEvent[];
   /** Cells where fire started (1) or stopped (0) this tick, as [x, y, burning]. Only revealed cells are ever sent. */

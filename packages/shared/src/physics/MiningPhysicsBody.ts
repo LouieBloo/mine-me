@@ -1,6 +1,7 @@
 import { MINING_CONFIG, isTileSolid, type Vector2D, type MiningTileType } from '../types/mining';
 import { getGridDimensions } from './gridDimensions';
 import { movementFactorAt, type FluidEnvironment } from '../gameLogic/fluid/fluidSubmersion';
+import { sampleGasContact, type GasContact, type GasEnvironment } from '../gameLogic/gas/gasEnvironment';
 
 export interface MiningCollisionGrid {
   [y: number]: { [x: number]: { type: MiningTileType } };
@@ -56,6 +57,10 @@ export abstract class MiningPhysicsBody {
   public fluidEnvironment: FluidEnvironment | null = null;
   /** Speed multiplier from wading through fluid, 1 when dry (see `updateFluidContact`). */
   public movementFactor = 1;
+  /** The gas around the body, if the room has any. Set by whoever steps the body (server or client prediction). */
+  public gasEnvironment: GasEnvironment | null = null;
+  /** The gas the body is in right now (null in clear air). Nothing reads it yet: gases do not affect bodies for now. */
+  public gasContact: GasContact | null = null;
 
   constructor(options: PhysicsBodyOptions) {
     this._position = { ...options.position };
@@ -82,6 +87,14 @@ export abstract class MiningPhysicsBody {
   public updateFluidContact(): number {
     this.movementFactor = movementFactorAt(this.fluidEnvironment, this.position.x, this.position.y, this.halfWidth, this.halfHeight);
     return this.movementFactor;
+  }
+
+  /** Works out which gas the body is in right now (see `gasContact`). */
+  public updateGasContact(): GasContact | null {
+    this.gasContact = this.gasEnvironment
+      ? sampleGasContact(this.gasEnvironment.sampler, this.position.x, this.position.y, this.halfWidth, this.halfHeight)
+      : null;
+    return this.gasContact;
   }
 
   public applyImpulse(impulse: Vector2D): void {
@@ -134,6 +147,7 @@ export abstract class MiningPhysicsBody {
   public update(dt: number, grid: MiningCollisionGrid): void {
     // Fresh every step, so a body that moves out of (or into) fluid is never held to the last reading
     this.updateFluidContact();
+    this.updateGasContact();
     const cap = MINING_CONFIG.MAX_ENTITY_SPEED;
     this.velocity.x = Math.max(-cap, Math.min(cap, this.velocity.x));
     this.velocity.y = Math.max(-cap, Math.min(cap, this.velocity.y));

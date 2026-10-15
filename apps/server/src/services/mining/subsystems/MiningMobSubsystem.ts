@@ -229,7 +229,8 @@ export class MiningMobSubsystem {
           tile.type === MiningTileType.EMPTY &&
           floor &&
           isTileSolid(floor.type) &&
-          this.world.fluids.grid.getLevel(x, y) <= 0 // not inside a sealed oil pocket
+          this.world.fluids.grid.getLevel(x, y) <= 0 && // not inside a sealed oil pocket
+          this.world.gases.grid.getConcentration(x, y) <= 0 // ...or a sealed gas pocket
         ) {
           candidates.push({ x: x + 0.5, y: y + 1.0 });
         }
@@ -328,6 +329,7 @@ export class MiningMobSubsystem {
       const intent = mob.ai.update(dt, aiContext);
 
       mob.mobBody.fluidEnvironment = this.world.fluids.environment;
+      mob.mobBody.gasEnvironment = this.world.gases.environment;
       mob.mobBody.processMovement(
         intent.moveX,
         intent.jump,

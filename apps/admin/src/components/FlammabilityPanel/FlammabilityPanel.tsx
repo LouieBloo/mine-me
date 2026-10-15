@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Flammability } from '@mine-me/shared';
+import { DEFAULT_EXPLOSION_MIN_CONCENTRATION, type ExplosionSettings, type Flammability } from '@mine-me/shared';
 import ItemLightEffectConfig from '../ItemLightEffectConfig/ItemLightEffectConfig';
 import './FlammabilityPanel.css';
 
@@ -11,7 +11,33 @@ interface FlammabilityPanelProps {
   description?: string;
   /** The particle effect library to pick the flames from. Leave out to hide the flame settings. */
   particleEffects?: Array<{ id: string; name: string }>;
+  /** Gases: also offer "explodes when lit", with its blast settings, and word the flame settings as the explosion's flash. */
+  allowExplosion?: boolean;
 }
+
+/** Starting values when "Explodes when lit" is switched on. */
+export const DEFAULT_EXPLOSION: ExplosionSettings = {
+  blastRadius: 3,
+  damage: 8,
+  frontSpeed: 3,
+  minConcentration: DEFAULT_EXPLOSION_MIN_CONCENTRATION,
+};
+
+interface ExplosionField {
+  key: keyof ExplosionSettings;
+  label: string;
+  hint: string;
+  min: number;
+  max?: number;
+  step: number;
+}
+
+const EXPLOSION_FIELDS: ExplosionField[] = [
+  { key: 'blastRadius', label: 'Blast Radius', hint: 'Tiles around each exploding cell in which players and mobs are hurt', min: 0.5, step: 0.5 },
+  { key: 'damage', label: 'Damage per Cell', hint: 'Damage at the centre of a full cell of this gas. Every cell that reaches someone adds its own, less with distance and thinner gas, so a big pocket is far worse than a wisp', min: 1, step: 1 },
+  { key: 'frontSpeed', label: 'Front Speed', hint: 'How many cells the explosion moves each gas step (a whole number: higher is faster, lower is easier to watch)', min: 1, step: 1 },
+  { key: 'minConcentration', label: 'Minimum Concentration', hint: 'The thinnest gas that still explodes; thinner gas does not go off and does not carry the explosion on', min: 0.01, max: 1, step: 0.01 },
+];
 
 /** Starting values when "Can burn" is switched on. */
 export const DEFAULT_FLAMMABILITY: Flammability = {
@@ -45,8 +71,10 @@ export const FlammabilityPanel: React.FC<FlammabilityPanelProps> = ({
   title = 'Flammability',
   description = 'Whether it catches fire, how fast fire spreads through it and what it leaves behind',
   particleEffects,
+  allowExplosion = false,
 }) => {
   const canBurn = Boolean(value);
+  const explodes = Boolean(value?.explosion);
 
   const update = (patch: Partial<Flammability>) => onChange({ ...DEFAULT_FLAMMABILITY, ...value, ...patch });
 
@@ -89,6 +117,42 @@ export const FlammabilityPanel: React.FC<FlammabilityPanelProps> = ({
               <span className="text-[11px] text-slate-400 font-medium">{field.hint}</span>
             </div>
           ))}
+          {allowExplosion && (
+            <div className="sm:col-span-2 space-y-4 bg-white border border-slate-200 rounded-xl p-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  aria-label="Explodes when lit"
+                  checked={explodes}
+                  onChange={(e) => update({ explosion: e.target.checked ? { ...DEFAULT_EXPLOSION } : null })}
+                  className="w-5 h-5 rounded cursor-pointer accent-red-500"
+                />
+                <span className="text-xs font-black uppercase tracking-wider text-slate-700">{explodes ? 'Explodes when lit' : 'Burns without exploding'}</span>
+              </label>
+              {value.explosion && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {EXPLOSION_FIELDS.map((field) => (
+                    <div key={field.key} className="space-y-1">
+                      <label htmlFor={`explosion-${field.key}`} className="block text-xs font-black uppercase text-slate-600 tracking-wider">
+                        {field.label}
+                      </label>
+                      <input
+                        id={`explosion-${field.key}`}
+                        type="number"
+                        value={Number.isFinite(value.explosion![field.key]) ? (value.explosion![field.key] as number) : ''}
+                        min={field.min}
+                        max={field.max}
+                        step={field.step}
+                        onChange={(e) => update({ explosion: { ...DEFAULT_EXPLOSION, ...value.explosion, [field.key]: e.target.value === '' ? NaN : Number(e.target.value) } })}
+                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-800"
+                      />
+                      <span className="text-[11px] text-slate-400 font-medium">{field.hint}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-1 sm:col-span-2">
             <label htmlFor="flammability-burnsInto" className="block text-xs font-black uppercase text-slate-600 tracking-wider">
               Burns Into (block key)
@@ -108,7 +172,7 @@ export const FlammabilityPanel: React.FC<FlammabilityPanelProps> = ({
             <>
               <div className="space-y-1 sm:col-span-2">
                 <label htmlFor="flammability-flameEffectId" className="block text-xs font-black uppercase text-slate-600 tracking-wider">
-                  Flame Effect
+                  {allowExplosion ? 'Flame / Explosion Effect' : 'Flame Effect'}
                 </label>
                 <select
                   id="flammability-flameEffectId"
@@ -123,14 +187,16 @@ export const FlammabilityPanel: React.FC<FlammabilityPanelProps> = ({
                     </option>
                   ))}
                 </select>
-                <span className="text-[11px] text-slate-400 font-medium">The particle effect that rises from every burning cell</span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {allowExplosion ? 'The particle effect that bursts from every cell as the explosion passes through it' : 'The particle effect that rises from every burning cell'}
+                </span>
               </div>
               <div className="sm:col-span-2">
                 <ItemLightEffectConfig
                   lightConfig={value.flameLight}
                   onChange={(light) => update({ flameLight: light })}
                   title="Flame Light"
-                  description="The light every burning cell gives off"
+                  description={allowExplosion ? 'The flash of light every exploding cell gives off' : 'The light every burning cell gives off'}
                 />
               </div>
             </>

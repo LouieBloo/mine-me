@@ -36,6 +36,16 @@ export const handleSandboxPourFluid = async (
   return toResult(ctx.tools.pourFluid(payload?.x, payload?.y, payload?.fluidKey));
 };
 
+export const handleSandboxReleaseGas = async (
+  _io: Server,
+  socket: Socket,
+  payload: { x?: unknown; y?: unknown; gasKey?: unknown },
+): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.releaseGas(payload?.x, payload?.y, payload?.gasKey));
+};
+
 export const handleSandboxSpawnMob = async (
   _io: Server,
   socket: Socket,

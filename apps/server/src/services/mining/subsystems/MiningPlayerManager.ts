@@ -254,6 +254,7 @@ export class MiningPlayerManager {
       session.invulnerableSeconds = Math.max(0, session.invulnerableSeconds - dt);
       session.inputAge++;
       session.playerBody.fluidEnvironment = this.world.fluids.environment;
+      session.playerBody.gasEnvironment = this.world.gases.environment;
       session.playerBody.processInputs(session.inputs, grid);
       session.playerBody.update(dt, grid);
       this.applyFallDamage(session);

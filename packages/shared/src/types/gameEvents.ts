@@ -198,6 +198,14 @@ export interface SandboxPourFluidPayload extends GameEventBase {
   fluidKey: string;
 }
 
+export interface SandboxReleaseGasPayload extends GameEventBase {
+  type: 'sandbox_release_gas';
+  x: number;
+  y: number;
+  /** The gas's typeKey (e.g. 'HYDROGEN'). */
+  gasKey: string;
+}
+
 export interface SandboxSpawnMobPayload extends GameEventBase {
   type: 'sandbox_spawn_mob';
   mobId: string;
@@ -257,6 +265,7 @@ export type GameEventPayload =
   | MiningExitPayload
   | MiningCancelPayload
   | SandboxPourFluidPayload
+  | SandboxReleaseGasPayload
   | SandboxSpawnMobPayload
   | SandboxResetPayload
   | SandboxSetGodModePayload

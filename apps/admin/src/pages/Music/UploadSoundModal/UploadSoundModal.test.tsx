@@ -24,7 +24,7 @@ describe('UploadSoundModal category', () => {
     fireEvent.change(screen.getByDisplayValue('Background Music (BGM)'), { target: { value: 'SFX' } });
     const select = screen.getByLabelText('Used For') as HTMLSelectElement;
     expect(select.value).toBe('GENERAL');
-    expect(Array.from(select.options).map((o) => o.value)).toEqual(['GENERAL', 'MOB', 'ITEM', 'BLOCK', 'CHARACTER', 'FLUID']);
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(['GENERAL', 'MOB', 'ITEM', 'BLOCK', 'CHARACTER', 'FLUID', 'GAS']);
   });
 
   it("fills the name with the file's own name, unchanged, so it is found under that name later", () => {

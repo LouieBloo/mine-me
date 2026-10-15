@@ -269,6 +269,7 @@ export function useMiningTicker({
       world.burningBodiesRef?.current?.move('self', currentPos.x, currentPos.y);
       world.fluidSoundsRef?.current?.syncLoops(nowMs, currentPos);
       world.fluidRendererRef?.current?.update(nowMs / 1000);
+      world.gasRendererRef?.current?.update(nowMs / 1000);
 
       // 5. Remote Players & Active Mobs
       miningProfiler.startSection('Remote Players');

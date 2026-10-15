@@ -376,4 +376,5 @@ export * from './mining';
 export * from './modularRig';
 export * from './particles';
 export * from './fluid';
+export * from './gas';
 export * from './sound';

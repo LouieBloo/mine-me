@@ -37,6 +37,7 @@ import { useMiningTicker } from './hooks/useMiningTicker';
 import { TILE_SIZE } from './renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from './renderers/DynamiteVisualManager';
 import { FluidSounds } from './renderers/FluidSounds';
+import { GasSounds } from './renderers/GasSounds';
 import { DroppedItemVisualManager } from './renderers/DroppedItemVisualManager';
 import { ProjectileVisualManager } from './renderers/ProjectileVisualManager';
 import { MiningPredictionState } from './systems/MiningPredictionState';
@@ -270,6 +271,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     gridContainerRef,
     tilesContainerRef,
     fluidRendererRef,
+    gasRendererRef,
     fireFieldRef,
     fireRendererRef,
     burningBodiesRef,
@@ -321,6 +323,15 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     };
   }, [containersReady, fluidRendererRef]);
 
+  // ...and the same gas (which does nothing to a body yet, but the prediction senses it exactly as the server does)
+  useEffect(() => {
+    const body = playerBodyRef.current;
+    body.gasEnvironment = gasRendererRef.current?.environment ?? null;
+    return () => {
+      body.gasEnvironment = null;
+    };
+  }, [containersReady, gasRendererRef]);
+
   // What fluids and fire sound like (needs the scene's fluid and fire state, so it is made once they exist)
   const fluidSoundsRef = useRef<FluidSounds | null>(null);
   useEffect(() => {
@@ -334,6 +345,17 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       fluidSoundsRef.current = null;
     };
   }, [containersReady, fluidRendererRef, fireFieldRef, soundManager]);
+
+  // What gases sound like (needs the scene's gas renderer, so it is made once that exists)
+  const gasSoundsRef = useRef<GasSounds | null>(null);
+  useEffect(() => {
+    const gases = gasRendererRef.current;
+    if (!containersReady || !gases) return;
+    gasSoundsRef.current = new GasSounds(soundManager, gases);
+    return () => {
+      gasSoundsRef.current = null;
+    };
+  }, [containersReady, gasRendererRef, soundManager]);
 
   // Falling fluid is drawn as a stream, which needs to know which neighbouring cells are solid terrain
   useEffect(() => {
@@ -475,10 +497,12 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     lastWeaponSoundTimeRef,
     cameraRef,
     fluidRendererRef,
+    gasRendererRef,
     fireFieldRef,
     fireRendererRef,
     burningBodiesRef,
     fluidSoundsRef,
+    gasSoundsRef,
     fallingRocksContainerRef,
     droppedItemsContainerRef,
     dynamitesContainerRef,

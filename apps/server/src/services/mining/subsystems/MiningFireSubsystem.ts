@@ -1,6 +1,11 @@
 import { FireGrid, MINING_CONFIG, type FireWireCell, type FireWorld, type Flammability } from '@mine-me/shared';
 import type { MiningWorld } from '../MiningWorld';
 
+/** Radius (tiles) around a burning cell in which it sets off explosive gas: the cell and the ones touching it. */
+export const FIRE_GAS_IGNITION_RADIUS = 1.01;
+/** Sparks a burning cell gives explosive gas, as a multiplier on the gas's own ignition chance (1 = as is). */
+export const FIRE_GAS_IGNITION_STRENGTH = 1;
+
 /** Seconds of fire simulated per step: fire steps on the same beat as fluids. */
 export const FIRE_STEP_SECONDS = MINING_CONFIG.FLUID_STEP_TICKS / MINING_CONFIG.SERVER_TICK_RATE;
 
@@ -53,6 +58,10 @@ export class MiningFireSubsystem {
     this.world.ignition.emitFromSources();
     for (const cell of this.world.ignition.takeIgnited()) this.grid.ignite(cell.x, cell.y);
     this.grid.step(FIRE_STEP_SECONDS);
+    // Fire sets off explosive gas next to it
+    this.grid.forEachBurning((x, y) => {
+      this.world.ignition.igniteGas(x + 0.5, y + 0.5, FIRE_GAS_IGNITION_RADIUS, FIRE_GAS_IGNITION_STRENGTH);
+    });
   }
 
   private isRevealed(x: number, y: number): boolean {

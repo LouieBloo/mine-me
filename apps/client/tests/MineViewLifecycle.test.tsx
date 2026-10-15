@@ -273,6 +273,7 @@ describe('MineView Navigation & Session Lifecycle', () => {
       grid: [], position: { x: 22, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3,
       canExtract: false, isMining: false, gameMode: 'sandbox',
       fluids: [{ typeKey: 'OIL', name: 'Oil' }],
+      gases: [{ typeKey: 'HYDROGEN', name: 'Hydrogen' }, { typeKey: 'NITROGEN', name: 'Nitrogen' }],
       sandbox: { mobs: [{ id: 'm1', name: 'Mole Person' }], status: { godMode: false, paused: false, speed: 1 } },
       ...over,
     });
@@ -314,6 +315,13 @@ describe('MineView Navigation & Session Lifecycle', () => {
       expect(screen.getByText('Reset sandbox')).toBeDefined();
       expect(screen.getByRole('option', { name: 'Oil' })).toBeDefined();
       expect(screen.getByRole('option', { name: 'Mole Person' })).toBeDefined();
+    });
+
+    it('lists the loaded gases in the panel so they can be released', async () => {
+      await enterSandbox();
+      expect(screen.getByRole('option', { name: 'Hydrogen' })).toBeDefined();
+      expect(screen.getByRole('option', { name: 'Nitrogen' })).toBeDefined();
+      expect(screen.getByText('Release gas')).toBeDefined();
     });
 
     it('does not show the tool panel in a normal mine', async () => {

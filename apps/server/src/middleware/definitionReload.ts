@@ -3,7 +3,7 @@ import { DEFINITIONS_RELOAD_FAILED_HEADER } from '@mine-me/shared';
 import { reloadDefinitions } from '../services/mining/definitionReloader';
 
 /** Admin route prefixes whose data ends up in the in-memory game definitions. */
-export const DEFINITION_ROUTE_PREFIXES = ['/items', '/mobs', '/blocks', '/fluids', '/sounds', '/character-sounds', '/effects', '/particle-effects'];
+export const DEFINITION_ROUTE_PREFIXES = ['/items', '/mobs', '/blocks', '/fluids', '/gases', '/sounds', '/character-sounds', '/effects', '/particle-effects'];
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 

@@ -69,3 +69,11 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Set `
 | [063](063-fluid-look.md) | Fluid look: smooth surface, waves, depth shading, streams | P2 (Done; judge the look in the game) |
 | [064](064-torches-ignite-oil.md) | Torches light oil | P2 (Done; data applied, restart server) |
 | [065](065-sandbox-mode.md) | Sandbox mode (90x30 test map, fluid/mob tools, free camera, reset) | P2 (Done; try it by hand) |
+| [066](066-gas-data-model.md) | Gas data model (table, shared type, loader, hydrogen + nitrogen script) | P1 (Done; script not applied yet) |
+| [067](067-gas-simulation.md) | Gas cell simulation (buoyancy, diffusion, venting) | P1 (Done) |
+| [068](068-gas-in-map-generation.md) | Gas pockets in map generation | P2 (Done) |
+| [069](069-gas-network-and-rendering.md) | Gas wire format and client rendering | P1 (Done; judge the look in the game) |
+| [070](070-gas-explosion.md) | Explosive gases and the explosion front | P1 (Done; judge the look and damage in the game) |
+| [071](071-admin-gases-page.md) | Admin: Gases page | P1 (Done; judge the preview by hand) |
+| [072](072-gas-sandbox-support.md) | Gases in sandbox mode | P2 (Done; try it by hand) |
+| [073](073-gas-effects-and-sounds.md) | Gas visuals and sounds | P2 (Done; needs audio files assigned in the admin) |

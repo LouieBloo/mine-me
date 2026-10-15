@@ -1,0 +1,32 @@
+# 067 - Gas cell simulation
+
+**Priority:** P1 - **Status:** Done (2026-10-14) - **Depends on:** 066
+
+## Problem
+Gases must spread out to fill space, with heavy gases sinking, light gases rising and leaving the map, and open-to-sky cells venting them.
+
+## Design
+- A pure, deterministic `GasGrid` in `packages/shared/src/gameLogic/gas/` (like `FluidGrid`: no clock, no randomness, double-buffered, alternating iteration order, active-cell set so a still gas costs nothing). Row 0 is the top. Each cell holds `{gasId, concentration}` (0 empty .. 1 full).
+- Server `MiningGasSubsystem` steps it on the sim clock every `GAS_STEP_TICKS` (add to `MINING_CONFIG`), wired into the tick next to the fluid step, and `onTileChanged` wakes cells when terrain changes (breaking a block releases a sealed pocket).
+- Per step, per active cell: (1) **buoyancy**: move a share of the concentration up (density < 1) or down (density > 1) into an open neighbour, scaled by `|1 - density|`; (2) **diffusion**: share concentration with open side neighbours (and the other vertical neighbour) by `diffusionRate` when the difference exceeds a threshold; (3) a cell below `minConcentration` is dropped; (4) a denser gas swaps below a lighter gas when two gases meet (one gas per cell, so the displaced gas moves to a neighbour with room).
+- **Fluid vs gas:** fluid wins a cell. A gas cell that fluid flows into pushes its gas to a neighbour (up, sideways, then down); what does not fit is lost. Gas never enters a cell holding fluid.
+- **Venting:** an "open to sky" cell is a non-solid cell with a clear path of non-solid cells straight up to row 0 / the surface (computed per column, recomputed on `onTileChanged`). Gas in those cells keeps rising and starts a per-cell age; once age passes the gas's `ventLifetime` the cell fades (concentration decays towards 0) and despawns. Venting is counted (`ventedVolume`) for diagnostics, like `evaporatedVolume`.
+- API: `addGas(x, y, gasId, amount)`, `setCell`, `getGasId`, `getConcentration`, `totalVolume(gasId?)`, `wake`, `drainChanges()`, `takeVisibleChanges` / `visibleSnapshot` (for 069), `drainGas` (used by 070 when gas burns).
+- Solid terrain blocks gas. Non-solid tiles (ladders, torches) let gas through. Items, mobs and players do not block it.
+
+## Decisions (owner, 2026-10-14)
+- One gas per cell; fluid wins a cell.
+- Any open-to-sky cell vents; gas keeps rising there for a while, then despawns (`ventLifetime`).
+
+## Tests
+Hydrogen in a sealed cavern pools at the ceiling and spreads along it; nitrogen sinks to the floor; both fill a cavern when it is small; breaking the ceiling lets hydrogen rise out and despawn after the lifetime; a still gas becomes inactive (`activeCount` 0); conservation (minus vented/dropped); denser gas displaces lighter; fluid entering a gas cell pushes the gas out; determinism (same input, same result); solids block; change reporting. Mutation-check: remove the buoyancy term and the venting rule, confirm tests fail.
+
+## Implementation notes
+- **Shared:** `GasGrid` (`gameLogic/gas/GasGrid.ts`), `gasBuoyancy(density)` = clamp(1 - density, -1, 1), `MINING_CONFIG.GAS_STEP_TICKS` (3, 10 Hz). API as designed, except `addGas` returns the amount actually accepted (0 = refused) rather than a boolean, since emitters need to know when a cell is full; the subsystem's `placeGas` stays boolean. Also `evictFromFluid()`, `isOpenToSky`, `refreshSky`, `drainChanges`, counters `droppedVolume`, `ventedVolume`, `lostVolume`, `drainedVolume`.
+- **Rules per step:** (1) a denser gas swaps below a lighter one; (2) each vertical neighbour pair is one net flow, `alpha * c_from - beta * c_to`, where alpha = |buoyancy| + share and beta = share (share = diffusionRate / 4 x (1 - |buoyancy|)); this is what packs hydrogen against a ceiling, layers a slightly heavy gas towards the floor (thicker lower down), and lets a gas settle instead of ping-ponging between buoyancy and diffusion; (3) sideways diffusion `(diff / 4) x diffusionRate` when the difference is over 0.01; (4) a cell holds at most 1, one gas, and a gas never enters solid terrain or a fluid cell; (5) open air: proportional decay tuned so a full cell reaches `minConcentration` in exactly `ventLifetime` seconds, whatever shape the cloud has; (6) cells below the minimum are dropped.
+- **Open to the sky:** a cell and every cell above it up to row 0 are non-solid (so an open cell in row 0 counts). Worked out per column; `onTileChanged` redoes the column and wakes the gas below. In the generated mine row 0 is solid, so gas vents only where a shaft has been dug through to an open cell at the surface (nothing is open to the sky at the start); in the sandbox the sky rows above the ground are open air.
+- **Leak guards (the same kind `FluidGrid` has):** a neighbour is never handed less than the minimum (it tops it up to the minimum if the donor can spare it), and a donor is never left with a trace below the minimum (it keeps the minimum or hands over everything). Without both, a cloud in a sealed room slowly dissolved away. Levels are 32-bit floats, so drops use a small epsilon.
+- **Known limit:** a cell at about 2 x `minConcentration` cannot hand a piece to a neighbour (the piece would be dropped), so faint traces stay in dead ends after most of a pocket has vented (about 1-3% per cell). Letting thin cells hop whole would make them wander forever and never settle. The renderer (069) and the explosion (070) should ignore concentrations below a visible/burnable threshold.
+- **Server:** `MiningGasSubsystem` (`placeGas`, `update`, `step`, `onTileChanged`, `drainChanges`, `contentsAt`), built right after the fluids in `rebuildWorld`, stepped as tick step 4.55 (after fluids, on the sandbox clock too), `MiningWorld.gases`, and `pushTileUpdate` tells it about every tile change. While any fluid is moving, the gas steps start by pushing gas out of cells fluid has entered.
+- **Not done here (by design):** wire format (069), generation (068), explosion (070).
+- **Tests:** shared `GasGrid.test.ts` (32: rises, sinks, neutral, stacking, spreading along a roof, diffusion bounds, swaps, never two gases in a cell, venting and its lifetime, breaking and closing a roof, conservation, settling, determinism, solids, tile changes, fluid wins) and server `MiningGameEngine.gases.test.ts` (9). Mutation-checked: removing buoyancy (6 fail), venting (3), the residue guard (1), the engine tile-change hook (2), fluid eviction (1) and the fluid lookup (1).

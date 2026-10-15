@@ -5,6 +5,7 @@ import { SandboxPanel, type SandboxPanelProps } from './SandboxPanel';
 
 const props = (over: Partial<SandboxPanelProps> = {}): SandboxPanelProps => ({
   fluids: [{ typeKey: 'OIL', name: 'Oil' }, { typeKey: 'WATER', name: 'Water' }],
+  gases: [{ typeKey: 'HYDROGEN', name: 'Hydrogen' }, { typeKey: 'NITROGEN', name: 'Nitrogen' }],
   mobs: [{ id: 'm1', name: 'Mole Person' }, { id: 'm2', name: 'Target Dummy' }],
   tool: { kind: 'mine' },
   onToolChange: vi.fn(),
@@ -36,6 +37,39 @@ describe('SandboxPanel', () => {
     render(<SandboxPanel {...p} />);
     fireEvent.change(screen.getByLabelText('Fluid to pour'), { target: { value: 'WATER' } });
     expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'pour', fluidKey: 'WATER' });
+  });
+
+  it('picks the release-gas tool with the chosen gas', () => {
+    const p = props();
+    render(<SandboxPanel {...p} />);
+    expect(screen.getByRole('option', { name: 'Hydrogen' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Gas to release'), { target: { value: 'NITROGEN' } });
+    expect(p.onToolChange).not.toHaveBeenCalled(); // choosing a gas does not switch tools by itself
+    fireEvent.click(screen.getByText('Release gas'));
+    expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'releaseGas', gasKey: 'NITROGEN' });
+  });
+
+  it('changes the gas being released when the gas tool is already active', () => {
+    const p = props({ tool: { kind: 'releaseGas', gasKey: 'HYDROGEN' } });
+    render(<SandboxPanel {...p} />);
+    fireEvent.change(screen.getByLabelText('Gas to release'), { target: { value: 'NITROGEN' } });
+    expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'releaseGas', gasKey: 'NITROGEN' });
+  });
+
+  it('disables the gas tool, and hides its picker, when the room has no gases (or the camera is free)', () => {
+    const { unmount } = render(<SandboxPanel {...props({ gases: [] })} />);
+    expect(screen.getByText('Release gas')).toBeDisabled();
+    expect(screen.queryByLabelText('Gas to release')).not.toBeInTheDocument();
+    unmount();
+    render(<SandboxPanel {...props({ freeCamera: true })} />);
+    expect(screen.getByText('Release gas')).toBeDisabled();
+  });
+
+  it('works without a gas list at all (older sessions)', () => {
+    const p = props();
+    delete (p as Partial<SandboxPanelProps>).gases;
+    render(<SandboxPanel {...p} />);
+    expect(screen.getByText('Release gas')).toBeDisabled();
   });
 
   it('lists every mob and spawns the chosen one', () => {
@@ -99,7 +133,7 @@ describe('SandboxPanel', () => {
     render(<SandboxPanel {...p} />);
     fireEvent.click(screen.getByText('God mode'));
     expect(p.onGodMode).toHaveBeenCalledWith(true);
-    fireEvent.click(screen.getByText('Clear fluid and fire'));
+    fireEvent.click(screen.getByText('Clear fluid, gas and fire'));
     expect(p.onClearHazards).toHaveBeenCalled();
     fireEvent.click(screen.getByText('Reset sandbox'));
     expect(p.onReset).toHaveBeenCalled();

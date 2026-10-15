@@ -1,0 +1,79 @@
+[
+  {
+    "id": "gas_hydrogen",
+    "typeKey": "HYDROGEN",
+    "name": "Hydrogen",
+    "description": "A very light, clear gas. It rises fast, pools under ceilings, and explodes when lit.",
+    "color": "#dff1ff",
+    "opacity": 0.35,
+    "density": 0.07,
+    "diffusionRate": 0.35,
+    "minConcentration": 0.02,
+    "ventLifetime": 6,
+    "appearance": {
+      "softness": 0.6,
+      "driftSpeed": 0.4,
+      "driftAmount": 0.15
+    },
+    "flammability": {
+      "ignitionChance": 0.9,
+      "spreadChance": 1,
+      "burnDuration": 0.5,
+      "heat": 4,
+      "burnsInto": null,
+      "flameEffectId": "pe_dynamite_explosion_flash",
+      "flameLight": {
+        "type": "POINT",
+        "color": "#cfe8ff",
+        "effect": "FLICKER",
+        "radius": 3,
+        "enabled": true,
+        "intensity": 0.9,
+        "flickerSpeed": 14,
+        "flickerAmount": 0.3
+      },
+      "explosion": {
+        "blastRadius": 3,
+        "damage": 8,
+        "frontSpeed": 3,
+        "minConcentration": 0.1
+      }
+    },
+    "generation": {
+      "minDepth": 3,
+      "maxDepth": null,
+      "percentage": 3,
+      "minSize": 2,
+      "maxSize": 4,
+      "concentration": 1
+    },
+    "soundEffects": null
+  },
+  {
+    "id": "gas_nitrogen",
+    "typeKey": "NITROGEN",
+    "name": "Nitrogen",
+    "description": "A harmless, non-flammable gas, a little heavier than air here so it settles low. The test gas.",
+    "color": "#9db7cc",
+    "opacity": 0.3,
+    "density": 1.15,
+    "diffusionRate": 0.25,
+    "minConcentration": 0.02,
+    "ventLifetime": 6,
+    "appearance": {
+      "softness": 0.6,
+      "driftSpeed": 0.25,
+      "driftAmount": 0.12
+    },
+    "flammability": null,
+    "generation": {
+      "minDepth": 2,
+      "maxDepth": null,
+      "percentage": 3,
+      "minSize": 2,
+      "maxSize": 4,
+      "concentration": 1
+    },
+    "soundEffects": null
+  }
+]

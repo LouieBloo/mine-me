@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import FlammabilityPanel, { DEFAULT_FLAMMABILITY } from './FlammabilityPanel';
+import FlammabilityPanel, { DEFAULT_EXPLOSION, DEFAULT_FLAMMABILITY } from './FlammabilityPanel';
 import type { Flammability } from '@mine-me/shared';
 
 const BURNS: Flammability = { ignitionChance: 0.8, spreadChance: 0.5, burnDuration: 8, heat: 3, burnsInto: null };
@@ -98,5 +98,60 @@ describe('FlammabilityPanel', () => {
   it('uses a custom title for other materials', () => {
     render(<FlammabilityPanel value={null} onChange={vi.fn()} title="Block Flammability" />);
     expect(screen.getByText('Block Flammability')).toBeInTheDocument();
+  });
+});
+
+describe('FlammabilityPanel for gases that can explode', () => {
+  const EXPLODES: Flammability = { ...BURNS, explosion: { blastRadius: 3, damage: 8, frontSpeed: 3, minConcentration: 0.1 } };
+
+  it('offers no explosion settings unless asked to (fluids and blocks never explode)', () => {
+    render(<FlammabilityPanel value={EXPLODES} onChange={vi.fn()} />);
+    expect(screen.queryByLabelText('Explodes when lit')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Blast Radius')).not.toBeInTheDocument();
+  });
+
+  it('shows "burns without exploding" until switched on, then starts from sensible values', () => {
+    const onChange = vi.fn();
+    render(<FlammabilityPanel value={BURNS} onChange={onChange} allowExplosion />);
+    expect(screen.getByLabelText('Explodes when lit')).not.toBeChecked();
+    expect(screen.getByText('Burns without exploding')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Blast Radius')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Explodes when lit'));
+    expect(onChange).toHaveBeenCalledWith({ ...BURNS, explosion: DEFAULT_EXPLOSION });
+  });
+
+  it('switching it off saves null for the explosion and keeps the rest of the fire settings', () => {
+    const onChange = vi.fn();
+    render(<FlammabilityPanel value={EXPLODES} onChange={onChange} allowExplosion />);
+    expect(screen.getByLabelText('Explodes when lit')).toBeChecked();
+    fireEvent.click(screen.getByLabelText('Explodes when lit'));
+    expect(onChange).toHaveBeenCalledWith({ ...BURNS, explosion: null });
+  });
+
+  it('shows each blast setting and edits one at a time', () => {
+    const onChange = vi.fn();
+    render(<FlammabilityPanel value={EXPLODES} onChange={onChange} allowExplosion />);
+    expect(screen.getByLabelText('Blast Radius')).toHaveValue(3);
+    expect(screen.getByLabelText('Damage per Cell')).toHaveValue(8);
+    expect(screen.getByLabelText('Front Speed')).toHaveValue(3);
+    expect(screen.getByLabelText('Minimum Concentration')).toHaveValue(0.1);
+    fireEvent.change(screen.getByLabelText('Damage per Cell'), { target: { value: '12' } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...EXPLODES, explosion: { ...EXPLODES.explosion, damage: 12 } });
+    fireEvent.change(screen.getByLabelText('Front Speed'), { target: { value: '5' } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...EXPLODES, explosion: { ...EXPLODES.explosion, frontSpeed: 5 } });
+  });
+
+  it('turns an emptied blast field into NaN so validation can reject it', () => {
+    const onChange = vi.fn();
+    render(<FlammabilityPanel value={EXPLODES} onChange={onChange} allowExplosion />);
+    fireEvent.change(screen.getByLabelText('Blast Radius'), { target: { value: '' } });
+    expect(onChange.mock.calls[0][0].explosion.blastRadius).toBeNaN();
+  });
+
+  it('words the flame settings as the explosion\'s flash', () => {
+    render(<FlammabilityPanel value={EXPLODES} onChange={vi.fn()} allowExplosion particleEffects={[{ id: 'pe1', name: 'Flash' }]} />);
+    expect(screen.getByLabelText('Flame / Explosion Effect')).toBeInTheDocument();
+    expect(screen.getByText(/The particle effect that bursts from every cell/)).toBeInTheDocument();
+    expect(screen.getByText(/The flash of light every exploding cell gives off/)).toBeInTheDocument();
   });
 });

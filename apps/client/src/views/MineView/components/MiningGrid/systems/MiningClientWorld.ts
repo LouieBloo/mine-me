@@ -22,9 +22,11 @@ import type { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayer
 import type { MiningMobRenderer } from '../renderers/MiningMobRenderer';
 import type { FireField } from '@mine-me/shared';
 import type { FluidRenderer } from '../renderers/FluidRenderer';
+import type { GasRenderer } from '../renderers/GasRenderer';
 import type { FireRenderer } from '../renderers/FireRenderer';
 import type { BurningBodies } from '../renderers/BurningBodies';
 import type { FluidSounds } from '../renderers/FluidSounds';
+import type { GasSounds } from '../renderers/GasSounds';
 import type { ActiveFallingRock } from '../renderers/MiningEntityRenderer';
 import type { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
 import type { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
@@ -78,6 +80,8 @@ export interface MiningSceneRefs {
   tilesContainerRef: NullableRef<Container>;
   /** Draws the fluid the server has revealed (and holds the client's copy of the fluid grid). */
   fluidRendererRef: NullableRef<FluidRenderer>;
+  /** Draws the gas the server has revealed (and holds the client's copy of the gas grid). */
+  gasRendererRef?: NullableRef<GasRenderer>;
   /** Which visible cells are on fire, as the server last said (ticket 061 draws it). */
   fireFieldRef: NullableRef<FireField>;
   /** Flames and lights on the burning cells. */
@@ -86,6 +90,8 @@ export interface MiningSceneRefs {
   burningBodiesRef: NullableRef<BurningBodies>;
   /** Splashes, fire catching and the crackle loops. */
   fluidSoundsRef: NullableRef<FluidSounds>;
+  /** Gas sounds: walking into a cloud, ignition, the boom and the venting. */
+  gasSoundsRef?: NullableRef<GasSounds>;
   fallingRocksContainerRef: NullableRef<Container>;
   droppedItemsContainerRef: NullableRef<Container>;
   dynamitesContainerRef: NullableRef<Container>;

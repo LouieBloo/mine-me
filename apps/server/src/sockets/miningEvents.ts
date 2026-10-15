@@ -26,6 +26,7 @@ export {
 } from './mining/handlers/exitMiningSession';
 export {
   handleSandboxPourFluid,
+  handleSandboxReleaseGas,
   handleSandboxSpawnMob,
   handleSandboxIgnite,
   handleSandboxClearHazards,
