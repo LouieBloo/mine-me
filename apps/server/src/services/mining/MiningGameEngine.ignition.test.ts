@@ -55,6 +55,24 @@ describe('sparks in a mining room', () => {
     expect(lit()).toEqual(['23,20']);
   });
 
+  it('sparks never reach oil on the far side of the block being mined', () => {
+    // Player at x 22.5 mines the dirt at (23, 20) from the left; oil sits right behind it at (24, 20)
+    engine.grid[20][23] = { type: MiningTileType.DIRT, revealed: true };
+    engine.fluidSubsystem.placeFluid(24, 20, 'OIL', 1);
+    engine.fluidSubsystem.placeFluid(22, 20, 'OIL', 1); // on the player's side, still lights
+    me().equippedWeaponId = 'torch-pick';
+    me().inputs = { ...me().inputs, miningKey: true, miningTarget: { x: 23, y: 20 } };
+    tick(1);
+    expect(lit()).toEqual(['22,20']);
+  });
+
+  it('a hit with no known attacker position only reaches the struck block', () => {
+    engine.grid[20][24] = { type: MiningTileType.DIRT, revealed: true };
+    engine.fluidSubsystem.placeFluid(25, 20, 'OIL', 1);
+    engine.fluidSubsystem.placeFluid(23, 20, 'OIL', 1);
+    expect(engine.ignitionSubsystem.fromTileHit({ source: { kind: 'player', itemId: 'torch-pick' } }, 24, 20)).toBe(0);
+  });
+
   it('mining with an ordinary tool lights nothing', () => {
     mineBlockNextToOil('plain-pick');
     expect(lit()).toEqual([]);

@@ -1,4 +1,4 @@
-import { MiningTileType, type DamageEvent, type Flammability } from '@mine-me/shared';
+import { MiningTileType, isTileSolid, type DamageEvent, type Flammability } from '@mine-me/shared';
 import { isInBounds } from '../../miningMap.service';
 import { getIgnitionStrength, ignitionChance } from '../ignition';
 import type { MiningWorld } from '../MiningWorld';
@@ -51,7 +51,7 @@ export class MiningIgnitionSubsystem {
    * Sparks at (x, y), reaching `radius` tiles, with `strength` (see `getIgnitionStrength`). Every flammable
    * cell whose centre is in reach rolls once. Returns how many caught.
    */
-  public emit(x: number, y: number, radius: number, strength: number): number {
+  public emit(x: number, y: number, radius: number, strength: number, reaches?: (tx: number, ty: number) => boolean): number {
     if (!(strength > 0) || !(radius >= 0)) return 0;
     let caught = 0;
     const reach = Math.ceil(radius);
@@ -60,6 +60,7 @@ export class MiningIgnitionSubsystem {
     for (let ty = cy - reach; ty <= cy + reach; ty++) {
       for (let tx = cx - reach; tx <= cx + reach; tx++) {
         if (Math.hypot(tx + 0.5 - x, ty + 0.5 - y) > radius) continue;
+        if (reaches && !reaches(tx, ty)) continue;
         // Explosive gas does not burn like a fluid: if it catches it goes off as a front instead
         if (this.world.gasExplosions.canIgnite(tx, ty)) {
           if (this.tryIgniteGas(tx, ty, strength)) caught++;
@@ -111,6 +112,27 @@ export class MiningIgnitionSubsystem {
     if (!itemId) return 0;
     const strength = getIgnitionStrength(this.world.data.getItemData(itemId));
     return strength > 0 ? this.emit(x, y, HIT_IGNITION_RADIUS, strength) : 0;
+  }
+
+  /**
+   * A hit on a block by an item: the sparks fly on the side the hit came from. They reach the block that was
+   * struck, and the open cells touching it that face the attacker, but never the far side of a block, so oil
+   * behind a wall of dirt stays dark. With no attacker position only the struck block itself can catch.
+   */
+  public fromTileHit(event: Pick<DamageEvent, 'source'>, tileX: number, tileY: number): number {
+    const itemId = event.source.itemId;
+    if (!itemId) return 0;
+    const strength = getIgnitionStrength(this.world.data.getItemData(itemId));
+    if (!(strength > 0)) return 0;
+    const from = event.source.position;
+    const reaches = (tx: number, ty: number): boolean => {
+      if (tx === tileX && ty === tileY) return true;
+      if (!from) return false;
+      const facesAttacker = (tx - tileX) * (from.x - (tileX + 0.5)) + (ty - tileY) * (from.y - (tileY + 0.5)) > 0;
+      const tile = this.world.grid[ty]?.[tx];
+      return facesAttacker && !!tile && !isTileSolid(tile.type);
+    };
+    return this.emit(tileX + 0.5, tileY + 0.5, HIT_IGNITION_RADIUS, strength, reaches);
   }
 
   /** An explosion of an item: sparks across the whole blast if the item ignites. */

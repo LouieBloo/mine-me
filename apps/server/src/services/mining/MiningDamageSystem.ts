@@ -124,7 +124,7 @@ export class MiningDamageSystem {
     const amount = event.amount; // tiles have no modifiers yet (pickaxe power etc. come with ticket 012)
     const prevStage = getDamageStage(tile);
     // Sparks fly from the block that was struck, whether or not it breaks
-    this.world.ignition.fromHit(event, x + 0.5, y + 0.5);
+    this.world.ignition.fromTileHit(event, x, y);
     tile.damage = (tile.damage || 0) + amount;
 
     const maxHealth = this.world.data.getBlockMaxHealth(tile.type);

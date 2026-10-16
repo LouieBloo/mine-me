@@ -61,8 +61,8 @@ describe('subsystems depend only on the world they are given', () => {
 
   it('tile damage runs against a stand-in world: cracks announce a stage, breaking is delegated', () => {
     const completeMiningBlock = vi.fn();
-    const fromHit = vi.fn();
-    const world = stubWorld({ blocks: { completeMiningBlock }, ignition: { fromHit } });
+    const fromTileHit = vi.fn();
+    const world = stubWorld({ blocks: { completeMiningBlock }, ignition: { fromTileHit } });
     world.grid[8][8] = { type: MiningTileType.DIRT, revealed: true };
     const damage = new MiningDamageSystem(world);
     const max = world.data.getBlockMaxHealth(MiningTileType.DIRT);
@@ -75,9 +75,9 @@ describe('subsystems depend only on the world they are given', () => {
     const kill = damage.damageTile(8, 8, { amount: max, type: 'mining', source: { kind: 'player' } }, [] as any);
     expect(kill).toMatchObject({ applied: true, destroyed: true });
     expect(completeMiningBlock).toHaveBeenCalledWith({ x: 8, y: 8 }, [], { dropItems: true });
-    // Every strike offers the point hit (the block's centre) to the ignition system
-    expect(fromHit).toHaveBeenCalledTimes(2);
-    expect(fromHit).toHaveBeenCalledWith(expect.objectContaining({ type: 'mining' }), 8.5, 8.5);
+    // Every strike offers the struck block to the ignition system
+    expect(fromTileHit).toHaveBeenCalledTimes(2);
+    expect(fromTileHit).toHaveBeenCalledWith(expect.objectContaining({ type: 'mining' }), 8, 8);
   });
 
   it('subsystems read the world lazily, so they always see current state', () => {
