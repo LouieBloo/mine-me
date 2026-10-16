@@ -120,6 +120,9 @@ export class MiningReticleRenderer {
         if (reticleState.style.previewType === 'LADDER') {
           const ladderTex = blockTextures?.get(MiningTileType.LADDER);
           MiningTileRenderer.drawLadder(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, ladderTex);
+        } else if (reticleState.style.previewType === 'BRIDGE') {
+          const bridgeTex = blockTextures?.get(MiningTileType.BRIDGE);
+          MiningTileRenderer.drawBridge(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, bridgeTex);
         } else {
           const torchTex = blockTextures?.get(MiningTileType.TORCH);
           MiningTileRenderer.drawTorch(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, torchTex);

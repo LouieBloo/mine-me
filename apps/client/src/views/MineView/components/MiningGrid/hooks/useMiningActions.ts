@@ -3,12 +3,14 @@ import type { GameItem, PlayerState, } from '@mine-me/shared';
 import {
   getAssetUrl,
   MiningTileType,
+  isBridgeItem,
 } from '@mine-me/shared';
 import { notificationService } from '../../../../../services/notificationService';
 import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
 import {
   TorchPlacementAction,
   LadderPlacementAction,
+  BridgePlacementAction,
   ThrowableItemAction,
   ShootWeaponAction,
   type IMouseAction,
@@ -48,6 +50,7 @@ export interface UseMiningActionsOptions {
   onTorchPlaced?: () => void;
   isPlacingLadder?: boolean;
   onLadderPlaced?: () => void;
+  isPlacingBridge?: boolean;
   isThrowingDynamite?: boolean;
   isThrowingItem?: boolean;
   activeThrowableItem?: GameItem | null;
@@ -69,6 +72,7 @@ export function useMiningActions({
   onTorchPlaced,
   isPlacingLadder = false,
   onLadderPlaced,
+  isPlacingBridge = false,
   isThrowingDynamite = false,
   isThrowingItem = false,
   activeThrowableItem = null,
@@ -258,6 +262,43 @@ export function useMiningActions({
             return false;
           }
         }, ladderItem?.triggerMode)
+      );
+    } else if (isPlacingBridge) {
+      const bridgeItem = playerState?.inventory?.items?.find((inv: any) => isBridgeItem(inv.item))?.item;
+
+      mouseController.setActiveAction(
+        new BridgePlacementAction(async (target) => {
+          try {
+            const res = await sendGameEvent({ type: 'mining_place_bridge', target });
+            if (res.success) {
+              const tile = gridRef.current[target.y]?.[target.x];
+              if (tile) {
+                tile.type = MiningTileType.BRIDGE;
+                tile.revealed = true;
+                tile.damageStage = 0;
+              }
+              const tilesContainer = tilesContainerRef.current;
+              if (tilesContainer && containersReady) {
+                MiningTileRenderer.updateRevealedTiles(
+                  tilesContainer,
+                  [{ x: target.x, y: target.y, type: MiningTileType.BRIDGE }],
+                  gridRef.current,
+                  blockTexturesRef.current,
+                  tileGraphicsMap.current,
+                  tileSpritesMap.current,
+                  TILE_SIZE
+                );
+              }
+              return true;
+            }
+            notificationService.error('Cannot Place Bridge', res.error || 'Invalid placement position.');
+            return false;
+          } catch (err: any) {
+            console.error('[MiningGrid] mining_place_bridge error:', err);
+            notificationService.error('Error', err.message || 'Failed to place bridge.');
+            return false;
+          }
+        }, bridgeItem?.triggerMode)
       );
     } else if (isThrowingItem || isThrowingDynamite) {
       const targetItem =
@@ -451,6 +492,7 @@ export function useMiningActions({
     overrideAction,
     isPlacingTorch,
     isPlacingLadder,
+    isPlacingBridge,
     isThrowingItem,
     isThrowingDynamite,
     activeThrowableItem,

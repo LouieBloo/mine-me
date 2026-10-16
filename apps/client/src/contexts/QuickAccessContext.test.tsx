@@ -43,6 +43,14 @@ describe('QuickAccessContext', () => {
       inventory: {
         items: [
           {
+            id: 'inv-bridge-1',
+            characterId: 'char-1',
+            itemId: 'item-bridge-def',
+            quantity: 2,
+            equipped: false,
+            item: { id: 'item-bridge-def', name: 'Bridge', type: 'CONSUMABLE', subType: 'BRIDGE' },
+          },
+          {
             id: 'inv-ladder-1',
             characterId: 'char-1',
             quantity: 5,
@@ -123,6 +131,36 @@ describe('QuickAccessContext', () => {
 
     expect(result.current.isPlacingTorch).toBe(true);
     expect(result.current.isPlacingLadder).toBe(false);
+  });
+
+  it('toggles isPlacingBridge for a bridge slot and switches the other placement modes off', async () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QuickAccessProvider>{children}</QuickAccessProvider>
+    );
+    const { result } = renderHook(() => useQuickAccess(), { wrapper });
+    act(() => {
+      result.current.setSlotItem(0, 'item-bridge-def');
+      result.current.setSlotItem(1, 'item-torch-def');
+      result.current.setSlotItem(2, 'item-ladder-def');
+    });
+
+    await act(async () => { await result.current.selectSlot(0); });
+    expect(result.current.isPlacingBridge).toBe(true);
+    expect(result.current.isPlacingLadder).toBe(false);
+    expect(result.current.isPlacingTorch).toBe(false);
+
+    await act(async () => { await result.current.selectSlot(0); });
+    expect(result.current.isPlacingBridge).toBe(false);
+
+    await act(async () => { await result.current.selectSlot(0); });
+    await act(async () => { await result.current.selectSlot(1); });
+    expect(result.current.isPlacingBridge).toBe(false);
+    expect(result.current.isPlacingTorch).toBe(true);
+
+    await act(async () => { await result.current.selectSlot(0); });
+    await act(async () => { await result.current.selectSlot(2); });
+    expect(result.current.isPlacingBridge).toBe(false);
+    expect(result.current.isPlacingLadder).toBe(true);
   });
 
   it('does not enable isPlacingLadder if player has 0 ladders', async () => {

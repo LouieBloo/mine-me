@@ -37,6 +37,7 @@ const TILE_TYPE_KEYS: Record<number, string> = {
   [MiningTileType.CHEST]: 'CHEST',
   [MiningTileType.COPPERIUM]: 'COPPERIUM',
   [MiningTileType.SILVERIUM]: 'SILVERIUM',
+  [MiningTileType.BRIDGE]: 'BRIDGE',
 };
 
 /** Every tile type that is a block with a definition (dirt, rock, ores, chests...): new ones are listed automatically. */

@@ -7,13 +7,12 @@ import { LightingEngine } from '../../../../../components/game/lighting/Lighting
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
 import { SpotLight } from '../../../../../components/game/lighting/SpotLight';
 import { Camera2D } from '../../../../../components/game/camera/Camera2D';
+import { placedTileUrls } from '../systems/placedTiles';
 import { ParticleEngine } from '../../../../../components/game/particles/ParticleEngine';
 import {
   MiningTileType,
   MINING_CONFIG,
   FireField,
-  isTorchItem,
-  isLadderItem,
   isThrowableItem,
   DEFAULT_PARTICLE_EFFECTS,
   clampSoundVolume,
@@ -485,34 +484,19 @@ export function useMiningScene({
         console.warn('[MiningGrid] Could not load dynamic items:', err);
       }
 
-      // Always load Torch and Ladder tile textures dynamically from item definitions
-      const torchItem = dynamicItems.find(
-        (i) => isTorchItem(i)
-      );
-      const torchTileUrl = getAssetUrl(torchItem?.iconUrl || torchItem?.inGameSpriteUrl || '/assets/icons/items/cmt4m445e0000xx0vdu7ve6q0_icon.png');
-      const torchPromise = Assets.load(torchTileUrl)
-        .then((texture) => {
-          blockTexturesRef.current.set(MiningTileType.TORCH, texture);
-          setTileTextureLoaded((prev) => prev + 1);
-        })
-        .catch((e) => {
-          console.warn('[MiningGrid] Could not load torch texture:', e);
-        });
-      blockPromises.push(torchPromise);
-
-      const ladderItem = dynamicItems.find(
-        (i) => isLadderItem(i)
-      );
-      const ladderAlwaysTileUrl = getAssetUrl(ladderItem?.iconUrl || ladderItem?.inGameSpriteUrl || '/assets/mining/block_entrance-block.png');
-      const ladderAlwaysPromise = Assets.load(ladderAlwaysTileUrl)
-        .then((texture) => {
-          blockTexturesRef.current.set(MiningTileType.LADDER, texture);
-          setTileTextureLoaded((prev) => prev + 1);
-        })
-        .catch((e) => {
-          console.warn('[MiningGrid] Could not load ladder texture:', e);
-        });
-      blockPromises.push(ladderAlwaysPromise);
+      // Tiles that items place (torch, ladder, bridge) are drawn from the placing item's own art
+      for (const { tileType, url } of placedTileUrls(dynamicItems)) {
+        blockPromises.push(
+          Assets.load(getAssetUrl(url))
+            .then((texture) => {
+              blockTexturesRef.current.set(tileType, texture);
+              setTileTextureLoaded((prev) => prev + 1);
+            })
+            .catch((e) => {
+              console.warn(`[MiningGrid] Could not load the tile texture for ${tileType}:`, e);
+            })
+        );
+      }
 
       // Create Modular Character Sprite (initially hidden)
       const sprite = new ModularCharacterSprite(playerContainer);

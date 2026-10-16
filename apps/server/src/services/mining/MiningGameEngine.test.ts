@@ -364,6 +364,9 @@ describe('MiningGameEngine', () => {
     });
 
     engine.getPlayer('char-1')!.playerBody.position = { x: 12.5, y: 5.5 };
+    // Ladders only go into empty space
+    engine.grid[5][12] = { type: MiningTileType.EMPTY, revealed: true };
+    engine.grid[6][12] = { type: MiningTileType.EMPTY, revealed: true };
 
     // Place ladder at player position
     const placed = engine.placeLadder('char-1');

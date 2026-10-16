@@ -28,6 +28,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -40,7 +41,33 @@
     "muzzleOffsetY": 0,
     "createdAt": "2026-08-22T16:48:26.114Z",
     "updatedAt": "2026-08-22T16:48:26.114Z",
-    "itemEffects": [],
+    "itemEffects": [
+      {
+        "id": "cmv7hxxkv0001hdnududhrb7b",
+        "itemId": "cmt4m445e0000xx0vdu7ve6q0",
+        "mobId": null,
+        "effectId": "cmv7d4t2j000096jn81do5me3",
+        "value": 100,
+        "createdAt": "2026-10-14T02:34:22.400Z",
+        "updatedAt": "2026-10-14T02:34:22.400Z",
+        "effect": {
+          "id": "cmv7d4t2j000096jn81do5me3",
+          "name": "Ignites",
+          "description": "Sets flammable things alight. The value is the strength in percent (100 = the material's own ignition chance).",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": false,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "ignites": true,
+          "createdAt": "2026-10-14T00:19:45.067Z",
+          "updatedAt": "2026-10-14T00:19:45.067Z"
+        }
+      }
+    ],
     "particleEffect": null
   },
   {
@@ -72,6 +99,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -116,6 +144,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -160,6 +189,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -204,6 +234,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -248,6 +279,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -292,6 +324,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -336,6 +369,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -380,6 +414,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -424,6 +459,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -468,6 +504,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -501,6 +538,7 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
+          "ignites": false,
           "createdAt": "2026-06-22T00:13:18.699Z",
           "updatedAt": "2026-10-08T01:04:34.172Z"
         }
@@ -537,6 +575,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -581,6 +620,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -625,6 +665,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -669,6 +710,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -713,6 +755,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": {
       "type": "POINT",
@@ -811,6 +854,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -855,6 +899,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -899,6 +944,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -943,6 +989,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -976,6 +1023,7 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
+          "ignites": false,
           "createdAt": "2026-06-22T00:13:18.717Z",
           "updatedAt": "2026-10-08T01:04:34.179Z"
         }
@@ -1012,6 +1060,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -1045,6 +1094,7 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
+          "ignites": false,
           "createdAt": "2026-10-09T01:51:55.968Z",
           "updatedAt": "2026-10-09T01:51:55.968Z"
         }
@@ -1069,6 +1119,7 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
+          "ignites": false,
           "createdAt": "2026-08-21T00:20:10.026Z",
           "updatedAt": "2026-10-08T01:04:34.183Z"
         }
@@ -1093,6 +1144,7 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
+          "ignites": false,
           "createdAt": "2026-10-07T23:25:46.378Z",
           "updatedAt": "2026-10-08T01:04:34.191Z"
         }
@@ -1129,6 +1181,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -1173,6 +1226,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -1226,6 +1280,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": true,
@@ -1270,6 +1325,7 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
+          "ignites": false,
           "createdAt": "2026-10-07T23:25:46.378Z",
           "updatedAt": "2026-10-08T01:04:34.191Z"
         }
@@ -1349,6 +1405,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": {
       "mass": 1,
       "friction": 0.4,
@@ -1464,6 +1521,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": {
       "mass": 0.2,
       "friction": 0.4,
@@ -1538,6 +1596,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": {
       "mass": 1,
       "friction": 0.4,
@@ -1573,6 +1632,31 @@
     "updatedAt": "2026-09-29T00:35:14.956Z",
     "itemEffects": [
       {
+        "id": "cmv7d4t2o000296jnhzo4qem0",
+        "itemId": "cmtz702uk0001nu7bn2tidnx0",
+        "mobId": null,
+        "effectId": "cmv7d4t2j000096jn81do5me3",
+        "value": 100,
+        "createdAt": "2026-10-14T00:19:45.073Z",
+        "updatedAt": "2026-10-14T00:19:45.073Z",
+        "effect": {
+          "id": "cmv7d4t2j000096jn81do5me3",
+          "name": "Ignites",
+          "description": "Sets flammable things alight. The value is the strength in percent (100 = the material's own ignition chance).",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": false,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "ignites": true,
+          "createdAt": "2026-10-14T00:19:45.067Z",
+          "updatedAt": "2026-10-14T00:19:45.067Z"
+        }
+      },
+      {
         "id": "cmuyu3c6l000biwklqehrwf20",
         "itemId": "cmtz702uk0001nu7bn2tidnx0",
         "mobId": null,
@@ -1592,6 +1676,7 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": true,
+          "ignites": false,
           "createdAt": "2026-09-22T22:01:08.305Z",
           "updatedAt": "2026-10-08T01:04:34.187Z"
         }
@@ -1671,6 +1756,7 @@
     "heldParticleEffectId": null,
     "heldParticleOffsetX": 0,
     "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
     "physicsConfig": null,
     "lightConfig": {
       "type": "POINT",
@@ -1766,9 +1852,21 @@
     "throwable": false,
     "triggerMode": "SINGLE",
     "particleEffectId": null,
-    "heldParticleEffectId": "cmv78o51g0000hkf6x3w3qveh",
+    "heldParticleEffectId": "cmv79i1qr0000j1drmo4qfwum",
     "heldParticleOffsetX": 18,
     "heldParticleOffsetY": -204,
+    "heldLightConfig": {
+      "type": "POINT",
+      "color": "#ff8a2a",
+      "effect": "FLICKER",
+      "radius": 3.5,
+      "enabled": true,
+      "offsetX": 0,
+      "offsetY": 0,
+      "intensity": 0.9,
+      "flickerSpeed": 9,
+      "flickerAmount": 0.18
+    },
     "physicsConfig": null,
     "lightConfig": null,
     "shootsProjectiles": false,
@@ -1780,7 +1878,7 @@
     "muzzleOffsetX": 0,
     "muzzleOffsetY": 0,
     "createdAt": "2026-10-13T22:14:48.971Z",
-    "updatedAt": "2026-10-13T22:29:21.987Z",
+    "updatedAt": "2026-10-13T22:38:04.378Z",
     "itemEffects": [
       {
         "id": "cmv799f040007xvy8fi1jdr6b",
@@ -1802,6 +1900,7 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
+          "ignites": false,
           "createdAt": "2026-10-09T01:51:55.968Z",
           "updatedAt": "2026-10-09T01:51:55.968Z"
         }
@@ -1826,6 +1925,7 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
+          "ignites": false,
           "createdAt": "2026-08-21T00:20:10.026Z",
           "updatedAt": "2026-10-08T01:04:34.183Z"
         }
@@ -1850,11 +1950,82 @@
           "pickPowerModifier": false,
           "knockbackModifier": false,
           "explodes": false,
+          "ignites": false,
           "createdAt": "2026-10-07T23:25:46.378Z",
           "updatedAt": "2026-10-08T01:04:34.191Z"
         }
+      },
+      {
+        "id": "cmv7d4t2w000496jny1d4ywbp",
+        "itemId": "cmv78o51n0002hkf6g7q6nm9t",
+        "mobId": null,
+        "effectId": "cmv7d4t2j000096jn81do5me3",
+        "value": 100,
+        "createdAt": "2026-10-14T00:19:45.081Z",
+        "updatedAt": "2026-10-14T00:19:45.081Z",
+        "effect": {
+          "id": "cmv7d4t2j000096jn81do5me3",
+          "name": "Ignites",
+          "description": "Sets flammable things alight. The value is the strength in percent (100 = the material's own ignition chance).",
+          "healthGain": false,
+          "staminaGain": false,
+          "miningSpeedModifier": false,
+          "damageModifier": false,
+          "toolDamageModifier": false,
+          "pickPowerModifier": false,
+          "knockbackModifier": false,
+          "explodes": false,
+          "ignites": true,
+          "createdAt": "2026-10-14T00:19:45.067Z",
+          "updatedAt": "2026-10-14T00:19:45.067Z"
+        }
       }
     ],
+    "particleEffect": null
+  },
+  {
+    "id": "item_bridge",
+    "itemKey": "bridge",
+    "name": "Bridge",
+    "description": "A sturdy plank to lay across a gap. Walk on it, build with it. Mine it to take it back.",
+    "type": "CONSUMABLE",
+    "subType": "BRIDGE",
+    "vendorBuyPrice": 0,
+    "vendorSellPrice": 0,
+    "userSellPrice": 0,
+    "userBuyPrice": 0,
+    "rarity": "LOW",
+    "iconUrl": "/assets/icons/items/item_bridge_icon.png",
+    "gearImageUrl": null,
+    "inGameSpriteUrl": "/assets/sprites/items/item_bridge_ingame.png",
+    "soundEffectUrl": null,
+    "soundEffects": null,
+    "isStartingPiece": false,
+    "experience": 0,
+    "combatScore": 0,
+    "defenseScore": 0,
+    "canBeDamaged": false,
+    "canBeClimbed": false,
+    "throwable": false,
+    "triggerMode": "HOLD",
+    "particleEffectId": null,
+    "heldParticleEffectId": null,
+    "heldParticleOffsetX": 0,
+    "heldParticleOffsetY": 0,
+    "heldLightConfig": null,
+    "physicsConfig": null,
+    "lightConfig": null,
+    "shootsProjectiles": false,
+    "projectileConfig": null,
+    "inGameScale": 1,
+    "holdOffsetX": 0,
+    "holdOffsetY": 0,
+    "holdRotation": 0,
+    "muzzleOffsetX": 0,
+    "muzzleOffsetY": 0,
+    "createdAt": "2026-10-16T01:32:19.342Z",
+    "updatedAt": "2026-10-16T02:28:53.909Z",
+    "itemEffects": [],
     "particleEffect": null
   }
 ]

@@ -2,6 +2,7 @@ import {
   MINING_CONFIG,
   MiningTileType,
   canBreakBlock,
+  bodyOverlapsCell,
   canPlaceBuildable,
   isTileMineable,
   isTileSolid,
@@ -14,6 +15,9 @@ import type { MiningPlayerSession } from './MiningPlayerManager';
 import type { MiningWorld, PendingTileUpdate } from '../MiningWorld';
 
 export type { PendingTileUpdate };
+
+/** Why a buildable was refused. */
+export type PlacementProblem = 'no_player' | 'out_of_bounds' | 'out_of_reach' | 'hidden' | 'occupied' | 'body_in_way';
 
 export class MiningBlockSubsystem {
   private pendingBlockHits: MiningBlockHitEvent[] = [];
@@ -105,8 +109,8 @@ export class MiningBlockSubsystem {
       const tileCenterY = target.y + 0.5;
       const dx = Math.abs(tileCenterX - session.playerBody.position.x);
       const dy = Math.abs(tileCenterY - session.playerBody.position.y);
-      if (dx > MINING_CONFIG.TORCH_PLACEMENT_REACH || dy > MINING_CONFIG.TORCH_PLACEMENT_REACH)
-        return null;
+      const reach = MINING_CONFIG.TORCH_PLACEMENT_REACH + MINING_CONFIG.PLACEMENT_LAG_SLACK;
+      if (dx > reach || dy > reach) return null;
     }
 
     const tile = grid[y][x];
@@ -135,23 +139,30 @@ export class MiningBlockSubsystem {
     return true;
   }
 
+  /**
+   * Why a buildable cannot go at target, or null if it can: out of the map, out of reach, in fog, or the
+   * cell is not empty. The server allows a little extra reach (PLACEMENT_LAG_SLACK) because while the
+   * player runs, their position here trails what their own screen shows, so a target that was in reach
+   * when clicked would otherwise be refused.
+   */
+  public torchPlacementProblem(session: MiningPlayerSession | undefined, target: MiningPosition): PlacementProblem | null {
+    if (!session) return 'no_player';
+    if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return 'out_of_bounds';
+    if (!isInBounds(target.x, target.y, this.world.grid)) return 'out_of_bounds';
+
+    const dx = Math.abs(target.x + 0.5 - session.playerBody.position.x);
+    const dy = Math.abs(target.y + 0.5 - session.playerBody.position.y);
+    const reach = MINING_CONFIG.TORCH_PLACEMENT_REACH + MINING_CONFIG.PLACEMENT_LAG_SLACK;
+    if (dx > reach || dy > reach) return 'out_of_reach';
+
+    const tile = this.world.grid[target.y][target.x];
+    if (!tile.revealed) return 'hidden';
+    return canPlaceBuildable(MiningTileType.TORCH, tile.type) ? null : 'occupied';
+  }
+
   /** Returns true if a torch can currently be placed at target. */
   public validateTorchPlacement(session: MiningPlayerSession | undefined, target: MiningPosition): boolean {
-    if (!session) return false;
-    const grid = this.world.grid;
-    if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return false;
-    if (!isInBounds(target.x, target.y, this.world.grid)) return false;
-
-    const tileCenterX = target.x + 0.5;
-    const tileCenterY = target.y + 0.5;
-    const dx = Math.abs(tileCenterX - session.playerBody.position.x);
-    const dy = Math.abs(tileCenterY - session.playerBody.position.y);
-    if (dx > MINING_CONFIG.TORCH_PLACEMENT_REACH || dy > MINING_CONFIG.TORCH_PLACEMENT_REACH)
-      return false;
-
-    const tile = grid[target.y][target.x];
-    if (!tile.revealed) return false;
-    return canPlaceBuildable(MiningTileType.TORCH, tile.type);
+    return this.torchPlacementProblem(session, target) === null;
   }
 
   /** `itemId` is the torch item used; its Ignites effect (if any) is what lets the placed torch light oil. */
@@ -172,6 +183,40 @@ export class MiningBlockSubsystem {
     if (itemId) this.world.ignition.addTorch(target.x, target.y, itemId);
 
     return true;
+  }
+
+  /** Why a bridge cannot go at target, or null if it can: the buildable rules, plus no player or mob inside the cell (a solid tile placed on a body would trap it). */
+  public bridgePlacementProblem(session: MiningPlayerSession | undefined, target: MiningPosition): PlacementProblem | null {
+    const problem = this.torchPlacementProblem(session, target);
+    if (problem) return problem;
+    return this.bodyOverlapsCell(target.x, target.y) ? 'body_in_way' : null;
+  }
+
+  public validateBridgePlacement(session: MiningPlayerSession | undefined, target: MiningPosition): boolean {
+    return this.bridgePlacementProblem(session, target) === null;
+  }
+
+  /** Places a bridge: a solid tile with a physics collider. Returns false (changing nothing) if it cannot go there. */
+  public placeBridge(session: MiningPlayerSession | undefined, target: MiningPosition): boolean {
+    if (!this.validateBridgePlacement(session, target)) return false;
+
+    const tile = this.world.grid[target.y][target.x];
+    tile.type = MiningTileType.BRIDGE;
+    tile.revealed = true;
+    tile.damage = 0;
+
+    this.world.rigidWorld.addTileCollider(target.x, target.y);
+    this.world.pushTileUpdate({ x: target.x, y: target.y, type: MiningTileType.BRIDGE, damageStage: 0 });
+    return true;
+  }
+
+  /** Whether any living player or mob body overlaps the tile cell (x, y). */
+  private bodyOverlapsCell(x: number, y: number): boolean {
+    const overlaps = (b: { position: { x: number; y: number }; halfWidth: number; halfHeight: number }) =>
+      bodyOverlapsCell(b.position, b.halfWidth, b.halfHeight, x, y);
+    for (const p of this.world.players.values()) if (!p.isDead && overlaps(p.playerBody)) return true;
+    for (const m of this.world.mobs.activeMobs.values()) if (m.health > 0 && overlaps(m.mobBody)) return true;
+    return false;
   }
 
   public updateMiningProgress(_dt: number): void {

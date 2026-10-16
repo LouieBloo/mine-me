@@ -95,6 +95,36 @@ describe('BlockDetail Page', () => {
     expect(screen.getByText('View FX ↗')).toBeInTheDocument();
   });
 
+  it('shows the texture upload for a terrain block, but a note instead for a block an item places', async () => {
+    const renderFor = (id: string) =>
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={[`/blocks/${id}`]}>
+            <Routes>
+              <Route path="/blocks/:id" element={<BlockDetail />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      );
+
+    setupMockData();
+    const first = renderFor('block_copperium');
+    await waitFor(() => expect(screen.getByText('Copperium Ore')).toBeInTheDocument());
+    expect(screen.queryByTestId('block-art-from-item')).not.toBeInTheDocument();
+    first.unmount();
+
+    // The same page for a bridge
+    const bridge = { id: 'block_bridge', typeKey: 'BRIDGE', name: 'Bridge', textureUrl: null, mineTimeMs: 0, staminaCost: 1 };
+    mockFetchWithAuth.mockImplementation((url: string) => {
+      if (url.includes('/api/admin/blocks/block_bridge')) return Promise.resolve({ ok: true, json: async () => bridge });
+      if (url.includes('/api/admin/particle-effects')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.reject(new Error(`Unhandled URL: ${url}`));
+    });
+    renderFor('block_bridge');
+    await waitFor(() => expect(screen.getByTestId('block-art-from-item')).toBeInTheDocument());
+    expect(screen.getByTestId('block-art-from-item')).toHaveTextContent(/In-Game Sprite/);
+  });
+
   it('allows changing the idle particle effect and saving', async () => {
     setupMockData();
 

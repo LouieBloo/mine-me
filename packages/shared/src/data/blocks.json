@@ -264,5 +264,43 @@
       ]
     },
     "requiredPickPower": 0
+  },
+  {
+    "id": "block_bridge",
+    "typeKey": "BRIDGE",
+    "name": "Bridge",
+    "description": "A placed bridge. Solid from every side.",
+    "textureUrl": null,
+    "soundEffectUrl": null,
+    "health": 20,
+    "staminaCost": 1,
+    "idleParticleEffectId": null,
+    "createdAt": "2026-10-15T00:00:00.000Z",
+    "updatedAt": "2026-10-15T00:00:00.000Z",
+    "idleParticleEffect": null,
+    "dropTable": {
+      "id": "droptable_bridge",
+      "solMin": 0,
+      "solMax": 0,
+      "experience": 0,
+      "mobId": null,
+      "characterLevelId": null,
+      "miningBlockId": "block_bridge",
+      "createdAt": "2026-10-15T00:00:00.000Z",
+      "updatedAt": "2026-10-15T00:00:00.000Z",
+      "items": [
+        {
+          "id": "dropitem_bridge",
+          "dropTableId": "droptable_bridge",
+          "itemId": "item_bridge",
+          "chance": 100,
+          "minQuantity": 1,
+          "maxQuantity": 1,
+          "createdAt": "2026-10-15T00:00:00.000Z",
+          "updatedAt": "2026-10-15T00:00:00.000Z"
+        }
+      ]
+    },
+    "requiredPickPower": 0
   }
 ]

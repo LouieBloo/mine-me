@@ -3,6 +3,7 @@ import { prisma } from '../../../index';
 import { ITEM_ROLE_WHERE, type GameEventResult, sanitizeTilePosition } from '@mine-me/shared';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
 import { inventoryActionsFor } from './inventoryActions';
+import type { PlacementProblem } from '../../../services/mining/subsystems/MiningBlockSubsystem';
 
 /**
  * Handler: mining_place_ladder
@@ -115,6 +116,59 @@ export const handleMiningPlaceTorch = async (
   // 4. Commit placement
   if (!engine.placeTorch(characterId, torchTarget, torch.itemId)) {
     await inventory.refund(characterId, torch.itemId);
+    await inventory.broadcast(characterId);
+    return { success: false, error: placeError };
+  }
+
+  await inventory.broadcast(characterId);
+  return { success: true };
+};
+
+const BRIDGE_PROBLEM_TEXT: Record<PlacementProblem, string> = {
+  no_player: 'No active player.',
+  out_of_bounds: 'Cannot place a bridge outside the mine.',
+  out_of_reach: 'Cannot place bridge here: too far away.',
+  hidden: 'Cannot place bridge here: you have not uncovered that space yet.',
+  occupied: 'Cannot place bridge here: that space is not empty.',
+  body_in_way: 'Cannot place bridge here: a player or mob is in that space.',
+};
+
+/**
+ * Handler: mining_place_bridge
+ * Places a bridge (a solid, walkable tile) at the target if the player has one and the cell is empty and in reach.
+ * Order: validate placement -> atomically consume -> commit (refund if refused).
+ */
+export const handleMiningPlaceBridge = async (
+  io: Server,
+  socket: Socket,
+  payload: { target: { x: number; y: number } },
+): Promise<GameEventResult> => {
+  const characterId = socket.data.characterId;
+  if (!characterId) return { success: false, error: 'No character selected.' };
+
+  const engine = miningSessionManager.getSession(characterId);
+  if (!engine) return { success: false, error: 'No active mining session.' };
+  const inventory = inventoryActionsFor(engine.rules.persistsCharacter);
+
+  const target = sanitizeTilePosition(payload?.target);
+  if (!target) return { success: false, error: 'Target position is required.' };
+
+  const bridge = await prisma.inventoryItem.findFirst({
+    where: { characterId, quantity: { gt: 0 }, item: ITEM_ROLE_WHERE.bridge },
+    include: { item: true },
+  });
+  if (!bridge) return { success: false, error: 'You do not have a bridge to place.' };
+
+  const problem = engine.bridgePlacementProblem(characterId, target);
+  if (problem) return { success: false, error: BRIDGE_PROBLEM_TEXT[problem] };
+  const placeError = BRIDGE_PROBLEM_TEXT.occupied;
+
+  if (!(await inventory.consume(characterId, bridge.id))) {
+    return { success: false, error: 'You do not have a bridge to place.' };
+  }
+
+  if (!engine.placeBridge(characterId, target)) {
+    await inventory.refund(characterId, bridge.itemId);
     await inventory.broadcast(characterId);
     return { success: false, error: placeError };
   }

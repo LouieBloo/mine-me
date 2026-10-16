@@ -144,6 +144,8 @@ export const MINING_CONFIG = {
   TORCH_RADIUS: 3.8, // tiles
   TORCH_FLICKER_SPEED: 4.0, // Hz
   TORCH_FLICKER_AMOUNT: 0.15, // intensity variation
+  /** Extra reach (tiles) the server allows when placing, because the player's server position trails what they see while running (about 130 ms at MOVE_SPEED). */
+  PLACEMENT_LAG_SLACK: 0.6,
   TORCH_PLACEMENT_REACH: 1.85, // max center-to-center tile reach distance (allows adjacent tiles regardless of player sub-tile position)
 
   CLIMB_SPEED: 3.5, // Grid tiles per second while ascending or descending ladders
@@ -170,11 +172,12 @@ export const MiningTileType = {
   TORCH: 7,
   COPPERIUM: 8,
   SILVERIUM: 9,
+  BRIDGE: 10,
 } as const;
 
 export type MiningTileType = (typeof MiningTileType)[keyof typeof MiningTileType];
 
-export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE' | 'COPPERIUM' | 'SILVERIUM';
+export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE' | 'COPPERIUM' | 'SILVERIUM' | 'BRIDGE';
 
 export interface MiningBlockConfig {
   id: string;
@@ -324,6 +327,18 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     health: 400,
     defaultMineTimeMs: 2000,
   },
+  // A placed bridge: solid from every side (walk on it, cannot pass up through it) and breaks in a hit or two
+  [MiningTileType.BRIDGE]: {
+    type: MiningTileType.BRIDGE,
+    name: 'Bridge',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    health: 20,
+    defaultMineTimeMs: 200,
+  },
 };
 
 export function getTileDefinition(type: MiningTileType): MiningTileDefinition {
@@ -394,10 +409,24 @@ export function getTileParticleEffect(
   return getTileDefinition(type).particleEffect;
 }
 
-export function canPlaceBuildable(buildableType: MiningTileType, targetType: MiningTileType): boolean {
-  if (targetType === MiningTileType.ENTRANCE) return false;
-  if (targetType === buildableType) return false;
-  return true;
+/** Buildables (ladders, torches, bridges) can only go into empty space, never over a block, ore, chest, ladder or entrance. */
+export function canPlaceBuildable(_buildableType: MiningTileType, targetType: MiningTileType): boolean {
+  return targetType === MiningTileType.EMPTY;
+}
+
+/** Whether a body (centre `position`, half extents) overlaps tile cell (x, y). A body resting exactly against the cell does not count. */
+export function bodyOverlapsCell(
+  position: Vector2D,
+  halfWidth: number,
+  halfHeight: number,
+  x: number,
+  y: number
+): boolean {
+  const EDGE = 0.01;
+  return (
+    Math.abs(position.x - (x + 0.5)) < halfWidth + 0.5 - EDGE &&
+    Math.abs(position.y - (y + 0.5)) < halfHeight + 0.5 - EDGE
+  );
 }
 
 /**

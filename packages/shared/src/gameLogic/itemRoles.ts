@@ -1,11 +1,12 @@
 import type { GameItem } from '../types';
+import { MiningTileType } from '../types/mining';
 
 /**
  * What an item *does* in the mine, decided from the item table's own category data (type, subType,
  * flags) and never from names or ids. Any number of items can share a role - several kinds of
  * torch, different dynamite - and a new one only needs the right category in the admin app.
  */
-export type ItemRole = 'TORCH' | 'LADDER' | 'THROWABLE' | 'CURRENCY' | 'RANGED_WEAPON';
+export type ItemRole = 'TORCH' | 'LADDER' | 'BRIDGE' | 'THROWABLE' | 'CURRENCY' | 'RANGED_WEAPON';
 
 type ItemCategory = Pick<GameItem, 'type' | 'subType' | 'throwable' | 'shootsProjectiles'> | null | undefined;
 
@@ -17,6 +18,9 @@ export const isTorchItem = (item: ItemCategory): boolean => sub(item) === 'TORCH
 /** A placeable ladder (subType LADDER). */
 export const isLadderItem = (item: ItemCategory): boolean => sub(item) === 'LADDER';
 
+/** A placeable bridge (subType BRIDGE): a solid tile you can walk on. */
+export const isBridgeItem = (item: ItemCategory): boolean => sub(item) === 'BRIDGE';
+
 /** Can be thrown: flagged `throwable`, or dynamite. */
 export const isThrowableItem = (item: ItemCategory): boolean => item?.throwable === true || sub(item) === 'DYNAMITE';
 
@@ -26,11 +30,31 @@ export const isCurrencyItem = (item: ItemCategory): boolean => item?.type === 'C
 /** A gun: fires projectiles. */
 export const isRangedWeaponItem = (item: ItemCategory): boolean => item?.shootsProjectiles === true;
 
+/**
+ * Items that turn into a tile when placed, and which tile. The tile is drawn from the item's own art
+ * (`placedTileTextureUrl`), so a new placeable item needs a role above, a tile type and a line here, but
+ * no texture of its own anywhere else.
+ */
+export const PLACED_ITEM_TILES: readonly { tileType: MiningTileType; matches: (item: ItemCategory) => boolean }[] = [
+  { tileType: MiningTileType.TORCH, matches: isTorchItem },
+  { tileType: MiningTileType.LADDER, matches: isLadderItem },
+  { tileType: MiningTileType.BRIDGE, matches: isBridgeItem },
+];
+
+/** Whether a block type key (e.g. 'BRIDGE') is a tile that an item places, whose art comes from that item rather than the block. */
+export const isItemPlacedBlockKey = (typeKey: string): boolean =>
+  PLACED_ITEM_TILES.some((p) => MiningTileType[typeKey as keyof typeof MiningTileType] === p.tileType);
+
+/** The art for a placed tile: the item's in-game sprite, or its icon when it has none. */
+export const placedTileTextureUrl = (item: { inGameSpriteUrl?: string | null; iconUrl?: string | null } | null | undefined): string | null =>
+  item?.inGameSpriteUrl || item?.iconUrl || null;
+
 /** All roles an item has. */
 export function getItemRoles(item: ItemCategory): ItemRole[] {
   const roles: ItemRole[] = [];
   if (isTorchItem(item)) roles.push('TORCH');
   if (isLadderItem(item)) roles.push('LADDER');
+  if (isBridgeItem(item)) roles.push('BRIDGE');
   if (isThrowableItem(item)) roles.push('THROWABLE');
   if (isCurrencyItem(item)) roles.push('CURRENCY');
   if (isRangedWeaponItem(item)) roles.push('RANGED_WEAPON');
@@ -55,6 +79,7 @@ const INSENSITIVE = 'insensitive' as const;
 export const ITEM_ROLE_WHERE = {
   torch: { subType: { equals: 'TORCH', mode: INSENSITIVE } },
   ladder: { subType: { equals: 'LADDER', mode: INSENSITIVE } },
+  bridge: { subType: { equals: 'BRIDGE', mode: INSENSITIVE } },
   // Not `as const`: Prisma's `OR` wants a mutable array.
   throwable: {
     OR: [{ throwable: true }, { subType: { equals: 'DYNAMITE', mode: INSENSITIVE } }],

@@ -623,6 +623,18 @@ export class MiningGameEngine {
     return this.blockSubsystem.validateLadderPlacement(this.players.get(characterId), target) !== null;
   }
 
+  public bridgePlacementProblem(characterId: string, target: MiningPosition) {
+    return this.blockSubsystem.bridgePlacementProblem(this.players.get(characterId), target);
+  }
+
+  public canPlaceBridge(characterId: string, target: MiningPosition): boolean {
+    return this.blockSubsystem.validateBridgePlacement(this.players.get(characterId), target);
+  }
+
+  public placeBridge(characterId: string, target: MiningPosition): boolean {
+    return this.blockSubsystem.placeBridge(this.players.get(characterId), target);
+  }
+
   public canPlaceTorch(characterId: string, target: MiningPosition): boolean {
     return this.blockSubsystem.validateTorchPlacement(this.players.get(characterId), target);
   }

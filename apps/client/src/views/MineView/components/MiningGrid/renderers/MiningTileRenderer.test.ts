@@ -82,6 +82,21 @@ describe('MiningTileRenderer', () => {
     expect(fillSpy).toHaveBeenCalled();
   });
 
+  it('draws a bridge from planks, or from its texture when it has one', () => {
+    const g1 = new Graphics();
+    const rect1 = vi.spyOn(g1, 'rect');
+    MiningTileRenderer.drawBridge(g1, 64, 1, 0, 0);
+    expect(rect1.mock.calls.length).toBeGreaterThan(1);
+
+    const g2 = new Graphics();
+    const rect2 = vi.spyOn(g2, 'rect');
+    const fill2 = vi.spyOn(g2, 'fill');
+    const texture = { width: 64, height: 64 } as any;
+    MiningTileRenderer.drawBridge(g2, 64, 1, 0, 0, texture);
+    expect(rect2).toHaveBeenCalledTimes(1);
+    expect(fill2).toHaveBeenCalledWith({ texture, alpha: 1 });
+  });
+
   it('does not render damage cracks for TORCH, LADDER, EMPTY, or ENTRANCE even if damageStage is > 0', () => {
     const drawCracksSpy = vi.spyOn(MiningTileRenderer, 'drawDamageCracks');
 

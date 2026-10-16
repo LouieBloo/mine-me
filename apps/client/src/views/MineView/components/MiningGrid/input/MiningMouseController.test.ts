@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MiningMouseController } from './MiningMouseController';
-import { TorchPlacementAction, LadderPlacementAction, DynamiteThrowAction, ThrowableItemAction, ShootWeaponAction } from './MouseAction';
+import { TorchPlacementAction, LadderPlacementAction, BridgePlacementAction, DynamiteThrowAction, ThrowableItemAction, ShootWeaponAction } from './MouseAction';
 import { MiningTileType, MouseActionTriggerMode, type MiningClientTile } from '@mine-me/shared';
 
 describe('MiningMouseController and MouseAction', () => {
@@ -62,6 +62,15 @@ describe('MiningMouseController and MouseAction', () => {
       expect(style.showPreview).toBe(false);
     });
 
+    it('rejects placement over any block, ore or chest', () => {
+      const action = new LadderPlacementAction(vi.fn());
+      for (const type of [MiningTileType.DIRT, MiningTileType.COPPERIUM, MiningTileType.CHEST, MiningTileType.TORCH]) {
+        mockGrid[5][5].type = type;
+        expect(action.canExecute({ x: 5, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(false);
+        expect(new TorchPlacementAction(vi.fn()).canExecute({ x: 5, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(false);
+      }
+    });
+
     it('executes the onPlace callback on execute()', async () => {
       const onPlace = vi.fn().mockResolvedValue(true);
       const action = new LadderPlacementAction(onPlace);
@@ -69,6 +78,36 @@ describe('MiningMouseController and MouseAction', () => {
       const res = await action.execute({ x: 5, y: 5 });
       expect(res).toBe(true);
       expect(onPlace).toHaveBeenCalledWith({ x: 5, y: 5 });
+    });
+  });
+
+  describe('BridgePlacementAction', () => {
+    it('holds to keep placing, and previews a bridge', () => {
+      const action = new BridgePlacementAction(vi.fn());
+      expect(action.triggerMode).toBe(MouseActionTriggerMode.HOLD);
+      expect(action.name).toBe('place_bridge');
+      const style = action.getReticleStyle({ x: 6, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid);
+      expect(style.isValid).toBe(true);
+      expect(style.previewType).toBe('BRIDGE');
+    });
+
+    it('only goes into empty space within reach', () => {
+      const action = new BridgePlacementAction(vi.fn());
+      const player = { x: 5.5, y: 5.5 };
+      mockGrid[5][6].type = MiningTileType.DIRT;
+      expect(action.canExecute({ x: 6, y: 5 }, player, mockGrid)).toBe(false);
+      mockGrid[5][6].type = MiningTileType.BRIDGE;
+      expect(action.canExecute({ x: 6, y: 5 }, player, mockGrid)).toBe(false);
+      mockGrid[5][6].type = MiningTileType.EMPTY;
+      expect(action.canExecute({ x: 6, y: 5 }, player, mockGrid)).toBe(true);
+      expect(action.canExecute({ x: 0, y: 0 }, player, mockGrid)).toBe(false);
+    });
+
+    it('cannot be placed into the player\'s own space', () => {
+      const action = new BridgePlacementAction(vi.fn());
+      expect(action.canExecute({ x: 5, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(false);
+      // Just below the feet is fine
+      expect(action.canExecute({ x: 5, y: 6 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(true);
     });
   });
 

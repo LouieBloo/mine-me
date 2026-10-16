@@ -18,7 +18,7 @@ import { broadcastStatUpdate } from '../../../services/characterBroadcast';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
 import { MiningTileType } from '@mine-me/shared';
 import { consumeInventoryItem, refundInventoryItem, broadcastInventory, inventoryActionsFor } from './inventoryActions';
-import { handleMiningPlaceLadder, handleMiningPlaceTorch } from './placementHandlers';
+import { handleMiningPlaceLadder, handleMiningPlaceTorch, handleMiningPlaceBridge } from './placementHandlers';
 import { handleMiningThrowDynamite } from './combatHandlers';
 
 const inv = prisma.inventoryItem as any;
@@ -143,6 +143,54 @@ describe('handlers: race & failure behaviour', () => {
     expect(res.success).toBe(false);
     expect(inv.findFirst).not.toHaveBeenCalled();
     miningSessionManager.cancelSession('bad-torch');
+  });
+
+  it('bridge: looks up a bridge item, consumes it and places it', async () => {
+    const socket = mkSocket('ok-bridge');
+    const engine = miningSessionManager.createSession('ok-bridge', 'city', socket, true);
+    engine.getPlayer('ok-bridge')!.playerBody.position = { x: 10.5, y: 5.5 };
+    engine.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
+    inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'bridge-id', quantity: 1, item: { subType: 'BRIDGE' } });
+
+    const res = await handleMiningPlaceBridge(io, socket, { target: { x: 11, y: 5 } });
+
+    expect(res.success).toBe(true);
+    expect(inv.findFirst.mock.calls[0][0].where.item).toEqual({ subType: { equals: 'BRIDGE', mode: 'insensitive' } });
+    expect(engine.grid[5][11].type).toBe(MiningTileType.BRIDGE);
+    expect(inv.updateMany).toHaveBeenCalledTimes(1); // consumed once
+    miningSessionManager.cancelSession('ok-bridge');
+  });
+
+  it('bridge: has no bridge, malformed target, or invalid cell: nothing is consumed', async () => {
+    const socket = mkSocket('bad-bridge');
+    const engine = miningSessionManager.createSession('bad-bridge', 'city', socket, true);
+    engine.getPlayer('bad-bridge')!.playerBody.position = { x: 10.5, y: 5.5 };
+    expect((await handleMiningPlaceBridge(io, socket, { target: { x: 1.5, y: 2 } })).success).toBe(false);
+    expect(inv.findFirst).not.toHaveBeenCalled();
+
+    inv.findFirst.mockResolvedValue(null);
+    expect(await handleMiningPlaceBridge(io, socket, { target: { x: 11, y: 5 } })).toEqual({ success: false, error: 'You do not have a bridge to place.' });
+
+    inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'bridge-id', quantity: 1, item: { subType: 'BRIDGE' } });
+    engine.grid[5][11] = { type: MiningTileType.DIRT, revealed: true };
+    expect((await handleMiningPlaceBridge(io, socket, { target: { x: 11, y: 5 } })).success).toBe(false);
+    expect(inv.updateMany).not.toHaveBeenCalled();
+    miningSessionManager.cancelSession('bad-bridge');
+  });
+
+  it('bridge: refunds the item if the commit is refused after consuming', async () => {
+    const socket = mkSocket('refund-bridge');
+    const engine = miningSessionManager.createSession('refund-bridge', 'city', socket, true);
+    engine.getPlayer('refund-bridge')!.playerBody.position = { x: 10.5, y: 5.5 };
+    engine.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
+    inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'bridge-id', quantity: 1, item: { subType: 'BRIDGE' } });
+    vi.spyOn(engine, 'placeBridge').mockReturnValue(false);
+
+    const res = await handleMiningPlaceBridge(io, socket, { target: { x: 11, y: 5 } });
+
+    expect(res.success).toBe(false);
+    expect(inv.updateMany).toHaveBeenCalledWith({ where: { characterId: 'refund-bridge', itemId: 'bridge-id' }, data: { quantity: { increment: 1 } } });
+    miningSessionManager.cancelSession('refund-bridge');
   });
 
   describe('throw', () => {

@@ -56,6 +56,7 @@ interface MiningGridProps {
   onTorchPlaced?: () => void;
   isPlacingLadder?: boolean;
   onLadderPlaced?: () => void;
+  isPlacingBridge?: boolean;
   isThrowingDynamite?: boolean;
   isThrowingItem?: boolean;
   activeThrowableItem?: GameItem | null;
@@ -79,6 +80,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onTorchPlaced,
   isPlacingLadder = false,
   onLadderPlaced,
+  isPlacingBridge = false,
   isThrowingDynamite = false,
   isThrowingItem = false,
   activeThrowableItem = null,
@@ -437,6 +439,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     onTorchPlaced,
     isPlacingLadder,
     onLadderPlaced,
+    isPlacingBridge,
     isThrowingDynamite,
     isThrowingItem,
     activeThrowableItem,

@@ -2,6 +2,7 @@ import {
   MiningTileType,
   MINING_CONFIG,
   canPlaceBuildable,
+  bodyOverlapsCell,
   MouseActionTriggerMode,
   calculateThrowVelocity,
   type MiningClientTile,
@@ -9,13 +10,16 @@ import {
   type Vector2D,
 } from '@mine-me/shared';
 
+const PLAYER_HALF_WIDTH = MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE / 2;
+const PLAYER_HALF_HEIGHT = MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE / 2;
+
 export interface ReticleStyle {
   color: number;
   alpha: number;
   strokeColor: number;
   isValid: boolean;
   showPreview?: boolean;
-  previewType?: 'TORCH' | 'LADDER';
+  previewType?: 'TORCH' | 'LADDER' | 'BRIDGE';
   isFreeAim?: boolean;
   trajectoryPoints?: Vector2D[];
   isCharging?: boolean;
@@ -88,9 +92,10 @@ export abstract class BaseMouseAction implements IMouseAction {
 
 export interface BuildablePlacementConfig extends MouseActionConfig {
   buildableType: MiningTileType;
-  previewType: 'TORCH' | 'LADDER';
+  previewType: 'TORCH' | 'LADDER' | 'BRIDGE';
   onPlace: (target: MiningPosition) => Promise<boolean> | boolean;
   reach?: number;
+  blockedByPlayer?: boolean;
 }
 
 /**
@@ -100,9 +105,11 @@ export interface BuildablePlacementConfig extends MouseActionConfig {
  */
 export abstract class BaseBuildablePlacementAction extends BaseMouseAction {
   public readonly buildableType: MiningTileType;
-  public readonly previewType: 'TORCH' | 'LADDER';
+  public readonly previewType: 'TORCH' | 'LADDER' | 'BRIDGE';
   public readonly reach: number;
   protected onPlace: (target: MiningPosition) => Promise<boolean> | boolean;
+  /** True for solid buildables (bridges), which cannot be placed into the player's own space. */
+  protected readonly blockedByPlayer: boolean;
 
   constructor(config: BuildablePlacementConfig) {
     super({
@@ -114,6 +121,7 @@ export abstract class BaseBuildablePlacementAction extends BaseMouseAction {
     this.previewType = config.previewType;
     this.reach = config.reach ?? MINING_CONFIG.TORCH_PLACEMENT_REACH;
     this.onPlace = config.onPlace;
+    this.blockedByPlayer = config.blockedByPlayer ?? false;
   }
 
   /**
@@ -149,6 +157,11 @@ export abstract class BaseBuildablePlacementAction extends BaseMouseAction {
     }
 
     if (!canPlaceBuildable(this.buildableType, tile.type)) {
+      return false;
+    }
+
+    // Something solid cannot go on top of the player
+    if (this.blockedByPlayer && bodyOverlapsCell(playerPos, PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT, target.x, target.y)) {
       return false;
     }
 
@@ -215,6 +228,26 @@ export class LadderPlacementAction extends BaseBuildablePlacementAction {
       previewType: 'LADDER',
       triggerMode,
       onPlace,
+    });
+  }
+}
+
+/**
+ * Action for placing a Bridge (a solid, walkable tile) within reach of the player. Defaults to HOLD so a
+ * bridge can be laid down while running, but can be configured dynamically by item definition.
+ */
+export class BridgePlacementAction extends BaseBuildablePlacementAction {
+  constructor(
+    onPlace: (target: MiningPosition) => Promise<boolean> | boolean,
+    triggerMode: MouseActionTriggerMode = MouseActionTriggerMode.HOLD
+  ) {
+    super({
+      name: 'place_bridge',
+      buildableType: MiningTileType.BRIDGE,
+      previewType: 'BRIDGE',
+      triggerMode,
+      onPlace,
+      blockedByPlayer: true,
     });
   }
 }

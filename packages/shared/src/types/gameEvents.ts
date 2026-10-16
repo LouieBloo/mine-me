@@ -150,6 +150,11 @@ export interface MiningPlaceLadderPayload extends GameEventBase {
   target?: MiningPosition;
 }
 
+export interface MiningPlaceBridgePayload extends GameEventBase {
+  type: 'mining_place_bridge';
+  target: MiningPosition;
+}
+
 export interface MiningPlaceTorchPayload extends GameEventBase {
   type: 'mining_place_torch';
   target: MiningPosition;
@@ -253,6 +258,7 @@ export type GameEventPayload =
   | MiningInputPayload
   | MiningInteractPayload
   | MiningPlaceLadderPayload
+  | MiningPlaceBridgePayload
   | MiningPlaceTorchPayload
   | MiningThrowDynamitePayload
   | MiningThrowItemPayload

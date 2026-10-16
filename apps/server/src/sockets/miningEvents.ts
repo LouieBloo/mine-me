@@ -10,6 +10,7 @@ export {
 } from './mining/handlers/inputMiningSession';
 export {
   handleMiningPlaceLadder,
+  handleMiningPlaceBridge,
   handleMiningPlaceTorch,
 } from './mining/handlers/placementHandlers';
 export {

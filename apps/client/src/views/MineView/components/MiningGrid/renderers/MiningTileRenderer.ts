@@ -74,6 +74,9 @@ export class MiningTileRenderer {
       case MiningTileType.TORCH:
         MiningTileRenderer.drawTorch(graphics, tileSize);
         break;
+      case MiningTileType.BRIDGE:
+        MiningTileRenderer.drawBridge(graphics, tileSize);
+        break;
       case MiningTileType.COPPERIUM:
         // Dark shale with warm copper nuggets and cyan energy flecks
         graphics.rect(0, 0, tileSize, tileSize);
@@ -136,6 +139,32 @@ export class MiningTileRenderer {
       graphics.rect(offsetX + 14, offsetY + ry, tileSize - 28, 4);
     }
     graphics.fill({ color: 0xb45309, alpha });
+  }
+
+  /** A bridge: wooden planks across the tile. Used until the bridge has a texture set on its block in the admin. */
+  public static drawBridge(
+    graphics: Graphics,
+    tileSize: number = TILE_SIZE,
+    alpha: number = 1.0,
+    offsetX: number = 0,
+    offsetY: number = 0,
+    texture?: Texture
+  ): void {
+    if (texture) {
+      graphics.rect(offsetX, offsetY, tileSize, tileSize);
+      graphics.fill({ texture, alpha });
+      return;
+    }
+
+    // Planks along the top of the tile, with a darker beam underneath
+    graphics.rect(offsetX, offsetY, tileSize, tileSize * 0.3);
+    graphics.fill({ color: 0xb45309, alpha });
+    graphics.rect(offsetX, offsetY + tileSize * 0.3, tileSize, tileSize * 0.12);
+    graphics.fill({ color: 0x78350f, alpha });
+    for (let px = tileSize / 4; px < tileSize; px += tileSize / 4) {
+      graphics.rect(offsetX + px - 1, offsetY, 2, tileSize * 0.3);
+    }
+    graphics.fill({ color: 0x78350f, alpha: alpha * 0.8 });
   }
 
   public static drawTorch(

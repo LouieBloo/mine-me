@@ -7,7 +7,7 @@ import BlockTextureUpload from './BlockTextureUpload';
 import BlockSoundEffectUpload from './BlockSoundEffectUpload/BlockSoundEffectUpload';
 import { DropTableEditor } from '../../../components/DropTableEditor/DropTableEditor';
 import FlammabilityPanel from '../../../components/FlammabilityPanel/FlammabilityPanel';
-import type { MiningBlockConfig, DropTable, Flammability } from '@mine-me/shared';
+import { isItemPlacedBlockKey, type MiningBlockConfig, type DropTable, type Flammability } from '@mine-me/shared';
 import './BlockDetail.css';
 
 export default function BlockDetail() {
@@ -311,10 +311,19 @@ export default function BlockDetail() {
         </div>
 
         <div className="space-y-8">
-          <BlockTextureUpload
-            block={block}
-            onUploadSuccess={(updated) => setBlock(updated)}
-          />
+          {isItemPlacedBlockKey(block.typeKey) ? (
+            <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm" data-testid="block-art-from-item">
+              <h3 className="text-lg font-bold text-slate-800">Texture</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                This block is placed by an item, so it is drawn with that item&apos;s In-Game Sprite. Change its art on the item&apos;s page.
+              </p>
+            </section>
+          ) : (
+            <BlockTextureUpload
+              block={block}
+              onUploadSuccess={(updated) => setBlock(updated)}
+            />
+          )}
           <BlockSoundEffectUpload
             blockId={block.id}
             soundEffectUrl={block.soundEffectUrl}

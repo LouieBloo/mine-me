@@ -3,7 +3,7 @@ import { useGame } from './GameContext';
 import { useSocket } from './SocketContext';
 import { notificationService } from '../services/notificationService';
 import type { InventoryEntry, GameItem } from '@mine-me/shared';
-import { isTorchItem, isLadderItem, isThrowableItem } from '@mine-me/shared';
+import { isTorchItem, isLadderItem, isBridgeItem, isThrowableItem } from '@mine-me/shared';
 import { QUICK_SLOT_COUNT, slotIndexForKey } from './quickSlots';
 
 interface QuickAccessContextType {
@@ -25,6 +25,9 @@ interface QuickAccessContextType {
   /** Whether ladder placement mode is currently active */
   isPlacingLadder: boolean;
   setIsPlacingLadder: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Whether bridge placement mode is currently active */
+  isPlacingBridge: boolean;
+  setIsPlacingBridge: React.Dispatch<React.SetStateAction<boolean>>;
   /** Currently selected throwable item, if throwing mode is active */
   activeThrowableItem: GameItem | null;
   /** Whether throwable object mode is currently active */
@@ -49,6 +52,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(null);
   const [isPlacingTorch, setIsPlacingTorch] = useState<boolean>(false);
   const [isPlacingLadder, setIsPlacingLadder] = useState<boolean>(false);
+  const [isPlacingBridge, setIsPlacingBridge] = useState<boolean>(false);
   const [isThrowingItem, setIsThrowingItem] = useState<boolean>(false);
   const [activeThrowableItem, setActiveThrowableItem] = useState<GameItem | null>(null);
 
@@ -147,6 +151,16 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         setIsPlacingLadder(false);
       }
     }
+    if (isPlacingBridge) {
+      const bridgeCount = playerState?.inventory?.items
+        ? playerState.inventory.items
+            .filter((inv) => isBridgeItem(inv.item))
+            .reduce((sum, inv) => sum + inv.quantity, 0)
+        : 0;
+      if (bridgeCount === 0) {
+        setIsPlacingBridge(false);
+      }
+    }
     if (isThrowingItem) {
       const throwableCount = playerState?.inventory?.items
         ? playerState.inventory.items
@@ -164,7 +178,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         setActiveThrowableItem(null);
       }
     }
-  }, [playerState?.inventory?.items, isPlacingTorch, isPlacingLadder, isThrowingItem, activeThrowableItem]);
+  }, [playerState?.inventory?.items, isPlacingTorch, isPlacingLadder, isPlacingBridge, isThrowingItem, activeThrowableItem]);
 
   // Derive live inventory entry directly from playerState.inventory.items
   const getSlotEntry = useCallback((slotIndex: number): { entry: InventoryEntry | null; totalQuantity: number } => {
@@ -196,12 +210,14 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (!entry) {
       setIsPlacingTorch(false);
       setIsPlacingLadder(false);
+      setIsPlacingBridge(false);
       return;
     }
 
     const item = entry.item;
     const isTorch = isTorchItem(item);
     const isLadder = isLadderItem(item);
+    const isBridge = isBridgeItem(item);
     const isThrowable = isThrowableItem(item);
 
     if (isThrowable) {
@@ -213,6 +229,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
       }
       setIsPlacingTorch(false);
       setIsPlacingLadder(false);
+      setIsPlacingBridge(false);
       setIsThrowingItem((prev) => {
         const next = !prev;
         setActiveThrowableItem(next ? item : null);
@@ -228,6 +245,7 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         return;
       }
       setIsPlacingLadder(false);
+      setIsPlacingBridge(false);
       setIsThrowingItem(false);
       setActiveThrowableItem(null);
       setIsPlacingTorch(prev => !prev);
@@ -241,15 +259,31 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         return;
       }
       setIsPlacingTorch(false);
+      setIsPlacingBridge(false);
       setIsThrowingItem(false);
       setActiveThrowableItem(null);
       setIsPlacingLadder(prev => !prev);
       return;
     }
 
+    if (isBridge) {
+      if (totalQuantity <= 0) {
+        notificationService.error('No Bridges', 'You do not have any bridges left.');
+        setIsPlacingBridge(false);
+        return;
+      }
+      setIsPlacingTorch(false);
+      setIsPlacingLadder(false);
+      setIsThrowingItem(false);
+      setActiveThrowableItem(null);
+      setIsPlacingBridge(prev => !prev);
+      return;
+    }
+
     // Reset placement and throwing modes if switching to another item
     setIsPlacingTorch(false);
     setIsPlacingLadder(false);
+    setIsPlacingBridge(false);
     setIsThrowingItem(false);
     setActiveThrowableItem(null);
 
@@ -322,6 +356,8 @@ export const QuickAccessProvider: React.FC<{ children: ReactNode }> = ({ childre
         setIsPlacingTorch,
         isPlacingLadder,
         setIsPlacingLadder,
+        isPlacingBridge,
+        setIsPlacingBridge,
         activeThrowableItem,
         isThrowingItem,
         setIsThrowingItem,
