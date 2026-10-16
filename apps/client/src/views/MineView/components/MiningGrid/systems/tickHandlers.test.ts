@@ -5,6 +5,7 @@ import {
   applyEntities,
   applyBurning,
   applyFluidSounds,
+  applyItemPickupSounds,
   applyFireUpdates,
   applyFluidUpdates,
   applyGasUpdates,
@@ -655,5 +656,19 @@ describe('applyFluidSounds', () => {
     sounds.onFireChanges.mockImplementation(() => expect(field.isBurning(2, 2)).toBe(true));
     handleStateTick(payload({ fireCells: [[2, 2, 1]] }), makeCtx(makeWorld({ fluidSoundsRef: ref(sounds), fireFieldRef: ref(field) })));
     expect(sounds.onFireChanges).toHaveBeenCalled();
+  });
+});
+
+describe('applyItemPickupSounds', () => {
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+
+  it('hands pickups to the character sounds, and does nothing without them', () => {
+    const onPickups = vi.fn();
+    const pickups = [{ x: 1, y: 2 }];
+    applyItemPickupSounds(tick({ itemPickups: pickups }), makeCtx(makeWorld({ characterSoundsRef: ref({ onPickups }) })));
+    expect(onPickups).toHaveBeenCalledWith(pickups);
+    applyItemPickupSounds(tick({}), makeCtx(makeWorld({ characterSoundsRef: ref({ onPickups }) })));
+    expect(onPickups).toHaveBeenCalledTimes(1);
+    expect(() => applyItemPickupSounds(tick({ itemPickups: pickups }), makeCtx(makeWorld()))).not.toThrow();
   });
 });

@@ -141,7 +141,10 @@ describe('generated gas pockets in a mining room', () => {
     const grid = room.gasSubsystem.grid;
     const volume = grid.totalVolume();
     expect(volume).toBeGreaterThan(4);
-    expect(new Set(room.gasSubsystem.drainChanges().map((c) => c.gasId)).size).toBe(2);
+    // Only gases that have generation settings are placed (what the admin has set up), so count those
+    const generating = room.dataManager.getGases().filter((g) => g.generation && g.generation.percentage > 0).length;
+    expect(generating).toBeGreaterThan(0);
+    expect(new Set(room.gasSubsystem.drainChanges().map((c) => c.gasId)).size).toBe(generating);
     for (let n = 0; n < 300; n++) (room as any).tick(1 / 30);
     // Sealed and full: nothing escaped, nothing faded, and the pocket cells were never solid
     expect(grid.ventedVolume).toBe(0);

@@ -844,6 +844,7 @@ export class MiningGameEngine {
     const gasEventsToSend = this.gasSubsystem.takeEvents();
     const fireChanges = this.fireSubsystem.takeVisibleChanges();
     const splashesToSend = this.fluidSubsystem.takeSplashes();
+    const pickupsToSend = this.dropSubsystem.takePickups();
 
     for (const session of this.players.values()) {
       if (!session.socket || !session.socket.connected) continue;
@@ -875,6 +876,7 @@ export class MiningGameEngine {
       const explosionsNear = explosionsToSend.filter((e) => isInInterest(center, e.position));
       const gunshotsNear = gunshotsToSend.filter((g) => isInInterest(center, g.position));
       const splashesNear = splashesToSend.filter((s) => isInInterest(center, { x: s.x, y: s.y }));
+      const pickupsNear = pickupsToSend.filter((e) => isInInterest(center, e));
       const gasEventsNear = gasEventsToSend.filter((e) => isInInterest(center, { x: e.x, y: e.y }));
 
       const spawned = collectSpawned(known, {
@@ -919,6 +921,7 @@ export class MiningGameEngine {
         gasEvents: gasEventsNear.length > 0 ? gasEventsNear : undefined,
         fireCells: fireChanges.length > 0 ? fireChanges : undefined,
         fluidSplashes: splashesNear.length > 0 ? splashesNear : undefined,
+        itemPickups: pickupsNear.length > 0 ? pickupsNear : undefined,
         fallingRocks: fallingRockPayloads.length > 0 ? fallingRockPayloads : undefined,
         activeDynamites: dynamitePayloads.length > 0 ? dynamitePayloads : undefined,
         activeProjectiles: projectilePayloads.length > 0 ? projectilePayloads : undefined,

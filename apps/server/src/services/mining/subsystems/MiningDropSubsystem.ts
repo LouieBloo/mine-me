@@ -4,6 +4,7 @@ import {
   MiningTileType,
   rollDropTable,
   type MiningDroppedItem,
+  type MiningItemPickupEvent,
   type RolledDrop,
   type Vector2D,
 } from '@mine-me/shared';
@@ -16,6 +17,7 @@ export class MiningDropSubsystem {
   public droppedItemCounter = 0;
   public droppedItemsDirty: boolean = true;
   private lastLimitWarningAt = -Infinity;
+  private pendingPickups: MiningItemPickupEvent[] = [];
 
   constructor(private readonly world: MiningWorld) {}
 
@@ -128,6 +130,7 @@ export class MiningDropSubsystem {
 
     const remainingItems: MiningDroppedItem[] = [];
     const playerPos = session.playerBody.position;
+    let pickedUp = false;
 
     for (const item of this.droppedItems) {
       const dx = Math.abs(item.position.x - playerPos.x);
@@ -149,6 +152,7 @@ export class MiningDropSubsystem {
         }
         session.backpackDirty = true;
         this.droppedItemsDirty = true;
+        pickedUp = true;
 
         // Clean up rigid body from Planck simulation
         if (item.id) {
@@ -166,5 +170,15 @@ export class MiningDropSubsystem {
     if (remainingItems.length !== this.droppedItems.length) {
       this.droppedItems = remainingItems;
     }
+
+    // One pickup sound per player per tick, however many stacks were collected
+    if (pickedUp) this.pendingPickups.push({ x: playerPos.x, y: playerPos.y });
+  }
+
+  /** The pickups since the last call, then forgets them. */
+  public takePickups(): MiningItemPickupEvent[] {
+    const out = this.pendingPickups;
+    this.pendingPickups = [];
+    return out;
   }
 }

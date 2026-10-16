@@ -33,6 +33,23 @@ describe('CharacterSoundPlayer', () => {
     expect(played()).toEqual(['/assets/sounds/hurt.mp3']);
   });
 
+  describe('pickup', () => {
+    it('plays at each pickup position with the slot volume and a distance falloff', () => {
+      const { player, output } = setup({ pickup: { url: '/assets/sounds/pickup.mp3', volume: 0.4 } });
+      player.onPickups([{ x: 3, y: 4 }, { x: 9, y: 1 }]);
+      expect(output.playSfx).toHaveBeenCalledTimes(2);
+      expect(output.playSfx).toHaveBeenNthCalledWith(1, '/assets/sounds/pickup.mp3', expect.objectContaining({
+        volumeScale: 0.4, position: { x: 3, y: 4 }, spatial: expect.objectContaining({ maxDistance: expect.any(Number) }),
+      }));
+    });
+
+    it('is silent when the slot has no sound', () => {
+      const { player, output } = setup({ hurt: sounds.hurt });
+      player.onPickups([{ x: 1, y: 1 }]);
+      expect(output.playSfx).not.toHaveBeenCalled();
+    });
+  });
+
   it('preloads every configured sound', () => {
     const { output } = setup();
     expect(output.preloadSfx).toHaveBeenCalledWith([

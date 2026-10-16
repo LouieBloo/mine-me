@@ -363,6 +363,12 @@ export function applyFluidSounds(payload: MiningStateTickPayload, ctx: TickHandl
   if (payload.fireCells && payload.fireCells.length > 0) sounds.onFireChanges(payload.fireCells, performance.now());
 }
 
+/** Pickup sounds of players near the local player (including their own). */
+export function applyItemPickupSounds(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  if (!payload.itemPickups || payload.itemPickups.length === 0) return;
+  ctx.world.characterSoundsRef?.current?.onPickups(payload.itemPickups);
+}
+
 /** Who is on fire: the local player, mobs and other players. The burning effect follows each of them. */
 export function applyBurning(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
   const burning = ctx.world.burningBodiesRef?.current;
@@ -454,6 +460,7 @@ export function handleStateTick(payload: MiningStateTickPayload, ctx: TickHandle
   applyGasUpdates(payload, ctx);
   applyFireUpdates(payload, ctx);
   applyFluidSounds(payload, ctx); // after the fluid and fire fields are up to date
+  applyItemPickupSounds(payload, ctx);
   applyGasSounds(payload, ctx);
   applyBurning(payload, ctx);
   miningProfiler.recordExternal('Socket Tick Handler', performance.now() - start);

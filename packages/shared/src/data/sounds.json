@@ -270,5 +270,37 @@
     "isActive": true,
     "createdAt": "2026-10-10T04:45:39.347Z",
     "updatedAt": "2026-10-10T04:45:39.347Z"
+  },
+  {
+    "id": "cmva8v8gg0007542odyl6op2d",
+    "name": "gasBurst",
+    "description": null,
+    "type": "SFX",
+    "category": "GAS",
+    "url": "/assets/sounds/gasBurst.mp3",
+    "fileName": "gasBurst.mp3",
+    "fileSize": 26749,
+    "mimeType": "audio/mpeg",
+    "volume": 1,
+    "loop": false,
+    "isActive": true,
+    "createdAt": "2026-10-16T00:43:38.513Z",
+    "updatedAt": "2026-10-16T00:43:38.513Z"
+  },
+  {
+    "id": "cmva9c3hk00004ynyh7w9qlpj",
+    "name": "itemPickup",
+    "description": null,
+    "type": "SFX",
+    "category": "CHARACTER",
+    "url": "/assets/sounds/itemPickup.mp3",
+    "fileName": "itemPickup.mp3",
+    "fileSize": 50155,
+    "mimeType": "audio/mpeg",
+    "volume": 1,
+    "loop": false,
+    "isActive": true,
+    "createdAt": "2026-10-16T00:56:45.225Z",
+    "updatedAt": "2026-10-16T00:56:45.225Z"
   }
 ]

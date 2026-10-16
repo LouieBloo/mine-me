@@ -72,7 +72,9 @@ describe('gases on the wire', () => {
     engine.grid[31][31].revealed = true;
     const state = MiningSessionManager.getInstance().buildClientState(engine, cid);
     expect(state.gases!.map((g) => g.typeKey)).toEqual(['HYDROGEN', 'NITROGEN']);
-    expect(state.gases![0]).toMatchObject({ id: 1, name: 'Hydrogen', color: '#dff1ff', opacity: 0.35, density: 0.07 });
+    // Compared with the loaded definition, so an admin edit to the gas data does not break this
+    const hydrogen = engine.dataManager.getGas('HYDROGEN')!;
+    expect(state.gases![0]).toMatchObject({ id: 1, name: hydrogen.name, color: hydrogen.color, opacity: hydrogen.opacity, density: hydrogen.density });
     expect(state.gasCells).toEqual([[31, 31, 1, quantizeGasConcentration(0.75)]]);
   });
 

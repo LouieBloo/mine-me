@@ -1,8 +1,15 @@
-import type { CharacterSoundEffectsConfig, CharacterSoundSlot } from '@mine-me/shared';
+import {
+  MINING_SPATIAL_AUDIO_PRESETS,
+  type CharacterSoundEffectsConfig,
+  type CharacterSoundSlot,
+  type MiningItemPickupEvent,
+} from '@mine-me/shared';
+import type { PlaySfxOptions } from '../../../../../services/sound/SoundManager';
+import { withVolume } from '../../../../../services/sound/sfxVolume';
 
 /** The part of the sound manager the character sounds need. */
 export interface CharacterSoundOutput {
-  playSfx(url: string, options?: { volumeScale?: number }): unknown;
+  playSfx(url: string, options?: PlaySfxOptions): unknown;
   preloadSfx?(urls: string[]): unknown;
 }
 
@@ -22,7 +29,7 @@ export interface CharacterMotionFrame {
 export const LAND_SOUND_MIN_IMPACT_SPEED = 6;
 
 /**
- * Plays the player character's sounds (hurt, jump, land, death). The sounds come from the server
+ * Plays the player character's sounds (hurt, jump, land, pickup, death). The sounds come from the server
  * with the run (`characterSounds`), so nothing here knows a file name; a slot with no sound stays
  * silent. Jump and land are worked out from how the body moves each frame.
  */
@@ -49,6 +56,18 @@ export class CharacterSoundPlayer {
     const config = this.sounds[slot];
     if (!config?.url || !this.output) return;
     this.output.playSfx(config.url, config.volume !== undefined ? { volumeScale: config.volume } : undefined);
+  }
+
+  /** Pickup sounds, heard from where each player stood (full volume for the local player, fading with distance for others). */
+  public onPickups(events: readonly MiningItemPickupEvent[]): void {
+    const config = this.sounds.pickup;
+    if (!config?.url || !this.output) return;
+    for (const event of events) {
+      this.output.playSfx(
+        config.url,
+        withVolume(config.volume, { position: { x: event.x, y: event.y }, spatial: MINING_SPATIAL_AUDIO_PRESETS.ITEM_PICKUP })
+      );
+    }
   }
 
   /** The player took damage: the killing blow plays the death sound instead of the hurt sound. */

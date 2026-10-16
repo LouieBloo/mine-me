@@ -29,6 +29,12 @@ export const CHARACTER_SOUND_SLOTS: readonly CharacterSoundSlotDefinition[] = [
     icon: '🦶',
   }),
   new CharacterSoundSlotDefinition({
+    slotKey: 'pickup',
+    label: 'Pick Up Item',
+    description: 'Plays when the character picks up an item from the ground (heard by players nearby)',
+    icon: '🎒',
+  }),
+  new CharacterSoundSlotDefinition({
     slotKey: 'death',
     label: 'Death',
     description: 'Plays when the character dies',

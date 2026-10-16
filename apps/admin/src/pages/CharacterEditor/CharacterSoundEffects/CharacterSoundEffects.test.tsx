@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { CHARACTER_SOUND_SLOTS } from '@mine-me/shared';
 import CharacterSoundEffects from './CharacterSoundEffects';
 import { ToastProvider } from '../../../contexts/ToastContext';
 
@@ -39,7 +40,7 @@ describe('CharacterSoundEffects', () => {
     renderIt();
     expect(screen.getByTestId('character-sounds-loading')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Take Damage sound')).toBeInTheDocument());
-    for (const label of ['Take Damage', 'Jump', 'Land', 'Death']) {
+    for (const label of ['Take Damage', 'Jump', 'Land', 'Pick Up Item', 'Death']) {
       expect(screen.getByLabelText(`${label} sound`)).toBeInTheDocument();
     }
     expect(screen.queryByLabelText('Digging sound')).not.toBeInTheDocument();
@@ -55,7 +56,7 @@ describe('CharacterSoundEffects', () => {
 
   it('assigns a library sound to a slot through the character sounds endpoint', async () => {
     renderIt();
-    await waitFor(() => expect(screen.getAllByRole('option', { name: 'Ouch' }).length).toBe(4), { timeout: 4000 });
+    await waitFor(() => expect(screen.getAllByRole('option', { name: 'Ouch' }).length).toBe(CHARACTER_SOUND_SLOTS.length), { timeout: 4000 });
     mockFetchWithAuth.mockClear();
     mockFetchWithAuth.mockImplementation(routes());
 
@@ -102,7 +103,7 @@ describe('CharacterSoundEffects', () => {
 
   it('surfaces a failed save and keeps the slot empty', async () => {
     renderIt();
-    await waitFor(() => expect(screen.getAllByRole('option', { name: 'Ouch' }).length).toBe(4), { timeout: 4000 });
+    await waitFor(() => expect(screen.getAllByRole('option', { name: 'Ouch' }).length).toBe(CHARACTER_SOUND_SLOTS.length), { timeout: 4000 });
     mockFetchWithAuth.mockImplementation((url: string, opts?: any) =>
       opts?.method === 'PATCH' ? json({ error: 'Sound not found in the library' }, false) : routes()(url, opts)
     );

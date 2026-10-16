@@ -39,6 +39,9 @@ describe('fall damage', () => {
       mapConfig: { mobSpawnCount: 0, ...mapConfig },
     });
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
+    // Generated fluid in the shaft would slow the fall
+    const fluids = engine.fluidSubsystem.grid;
+    for (let y = 0; y < fluids.height; y++) for (let x = 0; x < fluids.width; x++) fluids.setCell(x, y, 0, 0);
   };
 
   beforeEach(() => start());

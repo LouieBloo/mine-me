@@ -26,8 +26,8 @@ export const MINING_CONFIG = {
   ENTRANCE_Y: 0,
 
   /** Default vision range in tiles (cardinally adjacent) */
-  DEFAULT_VISION_RANGE: 6,
-  MAX_VISION_RANGE: 20, // Hard cap on tiles of vision (Manhattan radius); bounds the reveal loop cost
+  DEFAULT_VISION_RANGE: 18,
+  MAX_VISION_RANGE: 40, // Hard cap on tiles of vision (Manhattan radius); bounds the reveal loop cost
 
   /** Stamina cost per block mined */
   MINING_STAMINA_COST: 1,
@@ -746,6 +746,12 @@ export interface MiningFluidSplashEvent {
   y: number;
 }
 
+/** A player picking up items from the ground, at where they stand (for the pickup sound). */
+export interface MiningItemPickupEvent {
+  x: number;
+  y: number;
+}
+
 /** 30 Hz real-time simulation snapshot emitted by server to client. */
 export interface MiningStateTickPayload {
   tick: number;
@@ -801,6 +807,8 @@ export interface MiningStateTickPayload {
   gasEvents?: GasEvent[];
   /** Players and mobs that waded into or climbed out of a fluid this tick, near the receiving player (for splash sounds). */
   fluidSplashes?: MiningFluidSplashEvent[];
+  /** Players that picked up items this tick, near the receiving player (for pickup sounds). */
+  itemPickups?: MiningItemPickupEvent[];
   /** Cells where fire started (1) or stopped (0) this tick, as [x, y, burning]. Only revealed cells are ever sent. */
   fireCells?: [x: number, y: number, burning: 0 | 1][];
   /** Other players in the shared room (dynamic fields only). An empty array means "none". */

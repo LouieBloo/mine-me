@@ -4,7 +4,7 @@
     "typeKey": "HYDROGEN",
     "name": "Hydrogen",
     "description": "A very light, clear gas. It rises fast, pools under ceilings, and explodes when lit.",
-    "color": "#dff1ff",
+    "color": "#bd3900",
     "opacity": 0.35,
     "density": 0.07,
     "diffusionRate": 0.35,
@@ -16,12 +16,14 @@
       "driftAmount": 0.15
     },
     "flammability": {
-      "ignitionChance": 0.9,
-      "spreadChance": 1,
-      "burnDuration": 0.5,
       "heat": 4,
       "burnsInto": null,
-      "flameEffectId": "pe_dynamite_explosion_flash",
+      "explosion": {
+        "damage": 8,
+        "frontSpeed": 3,
+        "blastRadius": 3,
+        "minConcentration": 0.1
+      },
       "flameLight": {
         "type": "POINT",
         "color": "#cfe8ff",
@@ -32,22 +34,26 @@
         "flickerSpeed": 14,
         "flickerAmount": 0.3
       },
-      "explosion": {
-        "blastRadius": 3,
-        "damage": 8,
-        "frontSpeed": 3,
-        "minConcentration": 0.1
-      }
+      "burnDuration": 0.5,
+      "spreadChance": 1,
+      "flameEffectId": "pe_dynamite_explosion_flash",
+      "ignitionChance": 0.9
     },
     "generation": {
-      "minDepth": 3,
-      "maxDepth": null,
-      "percentage": 3,
+      "maxSize": 10,
       "minSize": 2,
-      "maxSize": 4,
+      "maxDepth": null,
+      "minDepth": 3,
+      "percentage": 3,
       "concentration": 1
     },
-    "soundEffects": null
+    "soundEffects": {
+      "explode": {
+        "soundId": "cmva8v8gg0007542odyl6op2d"
+      }
+    },
+    "createdAt": "2026-10-16T00:34:36.724Z",
+    "updatedAt": "2026-10-16T00:46:23.477Z"
   },
   {
     "id": "gas_nitrogen",
@@ -66,14 +72,9 @@
       "driftAmount": 0.12
     },
     "flammability": null,
-    "generation": {
-      "minDepth": 2,
-      "maxDepth": null,
-      "percentage": 3,
-      "minSize": 2,
-      "maxSize": 4,
-      "concentration": 1
-    },
-    "soundEffects": null
+    "generation": null,
+    "soundEffects": null,
+    "createdAt": "2026-10-16T00:34:36.732Z",
+    "updatedAt": "2026-10-16T00:46:34.363Z"
   }
 ]

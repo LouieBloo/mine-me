@@ -77,7 +77,7 @@ export interface MobSoundSlotResolved extends SoundEffectSlotConfig {
 
 export type MobSoundEffectsConfig = Partial<Record<MobSoundSlot, MobSoundSlotResolved>>;
 
-export type CharacterSoundSlot = 'hurt' | 'jump' | 'land' | 'death';
+export type CharacterSoundSlot = 'hurt' | 'jump' | 'land' | 'death' | 'pickup';
 
 /** What the admin stores for one character slot: a library sound by id (the url is resolved at load). */
 export interface CharacterSoundSlotRef {
@@ -172,6 +172,13 @@ export const DEFAULT_SPATIAL_AUDIO_CONFIG: Required<SpatialAudioConfig> = {
 };
 
 export const MINING_SPATIAL_AUDIO_PRESETS = {
+  ITEM_PICKUP: {
+    maxDistance: 14,
+    minDistance: 2,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 10,
+    enablePanning: true,
+  },
   FLUID_SPLASH: {
     maxDistance: 18,
     minDistance: 2,
