@@ -98,11 +98,65 @@ describe('PreviewScene', () => {
     let total = 0;
     for (let y = 0; y < PREVIEW_HEIGHT; y++) {
       for (let x = 0; x < PREVIEW_WIDTH; x++) {
-        if (field.getLevel(x, y) > 0) expect(field.getFluidId(x, y)).toBe(1);
+        if (field.getLevel(x, y) > 0) expect(field.getFluidId(x, y)).toBe(scene.fluidId);
         total += field.getLevel(x, y);
       }
     }
     expect(total).toBeCloseTo(scene.stats().volume, 1);
     expect(total).toBeGreaterThan(0);
+  });
+
+  describe('scenes', () => {
+    it('opens on the tank and falls back to it for a scene it does not know', () => {
+      expect(new PreviewScene(OIL).sceneKey).toBe('tank');
+      expect(new PreviewScene(OIL, 'nope').sceneKey).toBe('tank');
+      expect(new PreviewScene(OIL, 'u-bend').sceneKey).toBe('u-bend');
+    });
+
+    it('takes its size, walls and starting fluid from the scene', () => {
+      const ledge = new PreviewScene(OIL, 'ledge-spill');
+      expect([ledge.width, ledge.height]).toEqual([16, 9]);
+      expect(ledge.stats().volume).toBe(6);
+      expect(ledge.isSolid(0, 0)).toBe(true);
+      expect(ledge.isSolid(3, 2)).toBe(false);
+      expect(ledge.hasSpout).toBe(false);
+      expect(ledge.hasGate).toBe(false);
+    });
+
+    it('runs the edited fluid in the scene\'s water, and the game\'s lava next to it', () => {
+      const scene = new PreviewScene(OIL, 'lava-meets-water');
+      expect(scene.lavaId).toBeDefined();
+      expect(scene.lavaId).not.toBe(scene.fluidId);
+      const field = scene.toField();
+      expect(field.getFluidId(1, 3)).toBe(scene.lavaId);
+      expect(field.getFluidId(8, 3)).toBe(scene.fluidId);
+      expect(new PreviewScene(OIL, 'u-bend').lavaId).toBeDefined();
+    });
+
+    it('ignores Pour in a scene with no spout, and pours in one that has one', () => {
+      const ledge = new PreviewScene(OIL, 'ledge-spill');
+      ledge.setPouring(true);
+      expect(ledge.pouring).toBe(false);
+      const fall = new PreviewScene(OIL, 'waterfall-pool');
+      expect(fall.pouring).toBe(true);
+      fall.setPouring(false);
+      expect(fall.pouring).toBe(false);
+    });
+
+    it('reset puts the scene back to its start', () => {
+      const scene = new PreviewScene(OIL, 'ledge-spill');
+      runSteps(scene, 60);
+      scene.reset();
+      expect(scene.stats()).toEqual({ volume: 6, evaporated: 0, activeCells: expect.any(Number) });
+      expect(scene.pouring).toBe(false);
+    });
+
+    it('opens the tank\'s gate once', () => {
+      const scene = new PreviewScene(OIL);
+      expect(scene.hasGate).toBe(true);
+      scene.openDivider();
+      expect(scene.dividerOpen).toBe(true);
+      expect(scene.isSolid(12, 9)).toBe(false);
+    });
   });
 });

@@ -1,24 +1,32 @@
 import { describe, it, expect } from 'vitest';
-import {
-  FluidDisplay, FluidField, FluidGrid, FluidLayout, FluidRegistry, fallHurry, freeFallShare, quantizeFluidLevel, toFluidWireCell,
-} from '../src/index';
+import { FluidField, FluidGrid, FluidRegistry, quantizeFluidLevel, toFluidWireCell } from '../src/index';
 
-/** What falls is told to clients, and drawn moving (the sandbox report: falling water smeared into thin lines). */
+/** What is falling is told to clients as a flag, so a column of full cells falling is not mistaken for one standing still. */
 const WATER = { typeKey: 'WATER', density: 1, flowRate: 0.6, minLevel: 0.02, flowThreshold: 0.01 };
-const T = 64;
 const q = quantizeFluidLevel;
 
 const sky = () => new FluidGrid(9, 12, new FluidRegistry([WATER]), (x, y) => y >= 11 || x < 0 || x >= 9);
 
-describe('the grid records what fell', () => {
-  it('a cell that fluid fell into reports it as falling; resting fluid reports none', () => {
+describe('the grid knows what is falling', () => {
+  it('fluid with room below it is falling the moment it is placed; resting fluid is not', () => {
     const grid = sky();
     grid.setCell(4, 1, 1, 1);
-    expect(grid.getFalling(4, 1)).toBe(0); // placed, not fallen
-    grid.step();
-    expect(grid.getFalling(4, 2)).toBeCloseTo(1, 6);
-    for (let i = 0; i < 20; i++) grid.step();
-    for (let x = 0; x < 9; x++) expect(grid.getFalling(x, 10)).toBe(0); // landed and spread out
+    expect(grid.isFalling(4, 1)).toBe(true);
+    expect(grid.getFalling(4, 1)).toBe(1);
+    grid.setCell(4, 10, 1, 0.5);
+    expect(grid.isFalling(4, 10)).toBe(false);
+    expect(grid.getFalling(4, 10)).toBe(0);
+  });
+
+  it('a falling column keeps falling on every step, and stops when it lands', () => {
+    const grid = sky();
+    grid.setCell(4, 1, 1, 1);
+    for (let i = 0; i < 8; i++) {
+      grid.step();
+      expect(grid.isFalling(4, 2 + i), `step ${i + 1}`).toBe(true);
+    }
+    for (let i = 0; i < 30; i++) grid.step();
+    for (let x = 0; x < 9; x++) expect(grid.isFalling(x, 10)).toBe(false);
   });
 
   it('tells about a cell whose fluid stops falling even when its level stays the same', () => {
@@ -26,81 +34,53 @@ describe('the grid records what fell', () => {
     const rows = ['###', '#.#', '#.#', '###'];
     const grid = new FluidGrid(3, 4, new FluidRegistry([WATER]), (x, y) => rows[y][x] === '#');
     grid.setCell(1, 1, 1, 1);
-    grid.step();
-    expect(grid.getFalling(1, 2)).toBeCloseTo(1, 6);
     grid.drainChanges();
     grid.step();
-    expect(grid.getLevel(1, 2)).toBeCloseTo(1, 6);
-    expect(grid.getFalling(1, 2)).toBe(0);
-    expect(grid.drainChanges()).toContainEqual({ x: 1, y: 2, fluidId: 1, level: expect.any(Number), falling: 0 });
+    expect(grid.getLevel(1, 2)).toBe(1);
+    expect(grid.isFalling(1, 2)).toBe(false);
+    expect(grid.drainChanges()).toContainEqual({ x: 1, y: 2, fluidId: 1, level: 1, falling: 0 });
+  });
+
+  it('a cell above a full resting cell rests, and starts falling when the support is removed', () => {
+    const rows = ['#.#', '#.#', '#.#', '###'];
+    const solid = rows.map((r) => r.split(''));
+    const grid = new FluidGrid(3, 4, new FluidRegistry([WATER]), (x, y) => solid[y][x] === '#');
+    for (let y = 0; y < 3; y++) grid.setCell(1, y, 1, 1);
+    for (let y = 0; y < 3; y++) expect(grid.isFalling(1, y)).toBe(false);
+    solid[3][1] = '.';
+    grid.onTileChanged(1, 3);
+    expect(grid.isFalling(1, 2)).toBe(true);
   });
 });
 
 describe('falling on the wire', () => {
-  it('a falling cell carries a fifth value; a still one does not', () => {
-    expect(toFluidWireCell(1, 2, 3, 0.5, 0.5)).toEqual([1, 2, 3, q(0.5), q(0.5)]);
+  it('a falling cell carries a fifth value of 1; a still one does not', () => {
+    expect(toFluidWireCell(1, 2, 3, 0.5, 0.5)).toEqual([1, 2, 3, q(0.5), 1]);
     expect(toFluidWireCell(1, 2, 3, 0.5, 0)).toEqual([1, 2, 3, q(0.5)]);
-    expect(toFluidWireCell(1, 2, 3, 0.5, 0.9)).toEqual([1, 2, 3, q(0.5), q(0.5)]); // never more than the level
+    expect(toFluidWireCell(1, 2, 3, 0, 1)).toEqual([1, 2, 0, 0]);
   });
 
   it('the client copy keeps it, and a change in it alone counts as a change', () => {
     const field = new FluidField(4, 4);
-    field.apply([[1, 1, 1, q(0.5), q(0.5)]]);
-    expect(field.getFalling(1, 1)).toBeCloseTo(0.5, 2);
+    field.apply([[1, 1, 1, q(0.5), 1]]);
+    expect(field.isFalling(1, 1)).toBe(true);
+    expect(field.getFalling(1, 1)).toBeCloseTo(0.5, 6);
     expect(field.apply([[1, 1, 1, q(0.5)]])).toHaveLength(1);
+    expect(field.isFalling(1, 1)).toBe(false);
     expect(field.getFalling(1, 1)).toBe(0);
   });
-});
 
-describe('drawing falling fluid', () => {
-  const open = (x: number, y: number) => y >= 11 || x < 0 || x >= 9;
-
-  it('a cell in free fall is hurried; landed fluid and a steady stream are not', () => {
-    const blob = new FluidField(9, 12);
-    blob.apply([[4, 5, 1, q(1), q(1)]]);
-    expect(freeFallShare(blob, 4, 5, open)).toBeCloseTo(1, 2);
-    expect(fallHurry(blob, 4, 5, open)).toBeCloseTo(1, 2); // the cell it left is empty
-    const landed = new FluidField(9, 12);
-    landed.apply([[4, 10, 1, q(1), q(1)]]);
-    expect(freeFallShare(landed, 4, 10, open)).toBe(0); // the ground holds it
-    const stream = new FluidField(9, 12);
-    stream.apply([[4, 4, 1, q(0.5), q(0.5)], [4, 5, 1, q(0.5), q(0.5)]]);
-    expect(fallHurry(stream, 4, 5, open)).toBe(0); // the cell above is as full as before
-  });
-
-  it('a hurried cell eases to its new level almost at once; others ease gently', () => {
-    const d = new FluidDisplay(4, 4);
-    d.setNow(1, 1, 1, 0);
-    d.setNow(2, 1, 1, 0);
-    d.setTarget(1, 1, 1, 1, 1);
-    d.setTarget(2, 1, 1, 1);
-    d.hurry(1, 1, 1);
-    for (let f = 0; f < 3; f++) d.step(1 / 60);
-    expect(d.getLevel(1, 1)).toBeGreaterThan(0.95);
-    expect(d.getLevel(2, 1)).toBeLessThan(0.5);
-  });
-
-  it('a falling blob is drawn sliding down from the cell above over the step, the same size all the way', () => {
+  it('a grid change round-trips through the wire to the same picture', () => {
+    const grid = sky();
+    grid.setCell(4, 1, 1, 1);
+    grid.step();
     const field = new FluidField(9, 12);
-    field.apply([[4, 5, 1, q(1), q(1)]]);
-    const extentAt = (progress: number) => {
-      const layout = new FluidLayout(field, T, open, { fallProgress: progress });
-      const pieces = [4, 5].flatMap((y) => layout.shapesAt(4, y).filter((s) => s.stream));
-      const top = Math.min(...pieces.map((p) => p.top));
-      const bottom = Math.max(...pieces.map((p) => p.bottom));
-      return { top, bottom, size: pieces[0].width * (bottom - top) };
-    };
-    expect(extentAt(0).top).toBeCloseTo(4 * T, 0); // still where it was: the cell above
-    expect(extentAt(1).top).toBeCloseTo(5 * T, 0); // arrived
-    expect(extentAt(0.5).top).toBeCloseTo(4.5 * T, 0);
-    for (const p of [0, 0.25, 0.5, 0.75, 1]) expect(extentAt(p).size).toBeCloseTo(T * T, -1);
-  });
-
-  it('without falling information everything is drawn in its cell, as before', () => {
-    const field = new FluidField(9, 12);
-    field.apply([[4, 5, 1, q(1)]]);
-    const a = new FluidLayout(field, T, open, { fallProgress: 0 }).shapesAt(4, 5);
-    const b = new FluidLayout(field, T, open).shapesAt(4, 5);
-    expect(a).toEqual(b);
+    for (const c of grid.drainChanges()) field.apply([toFluidWireCell(c.x, c.y, c.fluidId, c.level, c.falling)]);
+    for (let y = 0; y < 12; y++) {
+      for (let x = 0; x < 9; x++) {
+        expect(field.getLevel(x, y)).toBe(grid.getLevel(x, y));
+        expect(field.isFalling(x, y)).toBe(grid.isFalling(x, y));
+      }
+    }
   });
 });

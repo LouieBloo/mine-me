@@ -47,10 +47,10 @@ describe('fluid falling through the air', () => {
   it('a heavy pour (more than half a cell a step) still falls as one even column and does not spread in the air', () => {
     const { grid, column, cellsWithFluid } = sky(WATER);
     for (let step = 0; step < 9; step++) {
-      grid.addFluid(6, 0, 1, 0.8);
+      grid.addFluid(6, 0, 1, 0.75);
       grid.step();
     }
-    for (const level of column(6).slice(1, 9)) expect(level).toBeCloseTo(0.8, 6);
+    for (const level of column(6).slice(1, 9)) expect(level).toBeCloseTo(0.75, 6);
     expect(cellsWithFluid().filter(([x, y]) => x !== 6 && y < 10)).toEqual([]);
   });
 

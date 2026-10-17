@@ -75,12 +75,15 @@ describe('FireRenderer', () => {
     expect(t.engines.lights.size).toBe(0);
   });
 
-  it('puts flames on the fluid as it is drawn: packed onto its floor, not hanging at a cell\'s raw level', () => {
-    // Half a cell over half a cell: drawn as one full cell resting on the floor of row 7
+  it('puts flames on the fluid as it is drawn: at the top of the cell\'s drawn fluid', () => {
+    // Half a cell over half a cell: the lower cell is drawn full (fluid is above it); the upper one is half a cell tall
     t.fluids.apply([[5, 6, 1, q(0.5)], [5, 7, 1, q(0.5)]]);
     t.fire.set(5, 6, true);
+    t.fire.set(5, 7, true);
     t.sync();
-    expect(t.engines.particles.addEmitter.mock.calls[0][1]).toEqual({ x: 5.5 * TILE, y: 7 * TILE });
+    const calls = t.engines.particles.addEmitter.mock.calls.map((c: any[]) => c[1]);
+    expect(calls).toContainEqual({ x: 5.5 * TILE, y: 6.5 * TILE });
+    expect(calls).toContainEqual({ x: 5.5 * TILE, y: 7 * TILE });
   });
 
   it('follows the drawn surface while it eases, so flames move with the fluid you see', () => {

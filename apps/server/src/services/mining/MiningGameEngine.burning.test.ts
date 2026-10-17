@@ -210,7 +210,8 @@ describe('burning and heat in a mining room', () => {
       expect(ticks().pop()!.burning).toBe(true);
       expect(ticks().pop()!.mobs!.find((m) => m.id === mob.id)!.burning).toBe(true);
       place(10.5);
-      mob.mobBody.position = { x: 12.5, y: 21 - mob.mobBody.halfHeight };
+      // Well clear of the oil, which spreads thinly along the hall (down to x 12) while it burns
+      mob.mobBody.position = { x: 8.5, y: 21 - mob.mobBody.halfHeight };
       seconds(7);
       const last = ticks().pop()!;
       expect(last.burning).toBeUndefined();

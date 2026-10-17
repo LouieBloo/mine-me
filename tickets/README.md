@@ -84,3 +84,7 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Set `
 | [078](078-water-and-lava-fluids.md) | Water and Lava fluid rows and sandbox | P1 (Done) |
 | [079](079-surface-pooling-generation.md) | Water pooling, deep lava, square/rectangle/vein pockets | P2 (Done) |
 | [080](080-lavarock-sprites.md) | Lavarock art (owner task) | P3 (Done) |
+| [081](081-discrete-fluid-simulation.md) | Discrete fluid levels and stable flow (Terraria-style) | P1 (Done) |
+| [082](082-per-cell-fluid-geometry.md) | Per-cell fluid geometry (Minecraft-style corners) | P1 (Done) |
+| [083](083-fluid-flow-rendering.md) | Fluid rendering: motion by animation, not moving shapes | P1 (Done; judge the look in the game) |
+| [084](084-fluid-scenario-sandbox.md) | Fluid test scenes (repeatable audit cases) | P2 (Done) |

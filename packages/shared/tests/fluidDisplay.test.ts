@@ -63,7 +63,7 @@ describe('FluidDisplay', () => {
   it('a different fluid taking a cell shows at once (it would be wrong to blend two fluids)', () => {
     const d = new FluidDisplay(4, 4);
     d.setNow(1, 1, 1, 0.6);
-    d.setTarget(1, 1, 2, 0.6);
+    expect(d.setTarget(1, 1, 2, 0.6)).toBe(true);
     expect(d.getFluidId(1, 1)).toBe(2);
     expect(d.getLevel(1, 1)).toBe(0.6);
   });
@@ -79,6 +79,34 @@ describe('FluidDisplay', () => {
     }
     const swing = Math.max(...seen) - Math.min(...seen);
     expect(swing).toBeLessThan(0.4 * (0.25 - 0.16));
+  });
+
+  it('falling fluid shows at once, and so does a cell it leaves (a falling cell is a whole column, never faded between cells)', () => {
+    const d = new FluidDisplay(4, 4);
+    d.setNow(1, 1, 1, 1);
+    expect(d.setTarget(1, 2, 1, 1, 1)).toBe(true);
+    expect(d.getLevel(1, 2)).toBe(1);
+    expect(d.isFalling(1, 2)).toBe(true);
+    expect(d.getFalling(1, 2)).toBe(1);
+    d.setTarget(1, 1, 1, 0);
+    // (1, 1) was resting and is draining: it eases away rather than snapping
+    expect(d.getLevel(1, 1)).toBe(1);
+    d.setNow(1, 3, 1, 1, 1);
+    expect(d.setTarget(1, 3, 1, 0, 0)).toBe(true);
+    expect(d.getLevel(1, 3)).toBe(0);
+    expect(d.getFluidId(1, 3)).toBe(0);
+  });
+
+  it('a cell that stops falling is reported as changed even when its level is the same, then eases like any resting cell', () => {
+    const d = new FluidDisplay(4, 4);
+    d.setNow(1, 1, 1, 0.5, 1);
+    expect(d.setTarget(1, 1, 1, 0.5, 0)).toBe(true);
+    expect(d.isFalling(1, 1)).toBe(false);
+    expect(d.getFalling(1, 1)).toBe(0);
+    expect(d.setTarget(1, 1, 1, 0.75, 0)).toBe(false);
+    expect(d.getLevel(1, 1)).toBe(0.5);
+    run(d, 1);
+    expect(d.getLevel(1, 1)).toBe(0.75);
   });
 
   it('ignores cells outside the grid', () => {

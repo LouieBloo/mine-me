@@ -110,6 +110,10 @@ export interface FluidAppearance {
   depthDarkening: number;
   /** How much more opaque the fluid gets with depth, 0 (none) to 1 (fully opaque at full depth). */
   depthOpacity: number;
+  /** How fast the light streaks in falling fluid run down, in cells per second (0 = they stand still). Thick fluids are slow. */
+  flowSpeed: number;
+  /** How visible the streaks in falling fluid are, 0 (none) to 1. */
+  flowStreaks: number;
 }
 
 export const DEFAULT_FLUID_APPEARANCE: Readonly<FluidAppearance> = {
@@ -118,6 +122,8 @@ export const DEFAULT_FLUID_APPEARANCE: Readonly<FluidAppearance> = {
   highlight: 0.5,
   depthDarkening: 0.35,
   depthOpacity: 0.25,
+  flowSpeed: 2.5,
+  flowStreaks: 0.5,
 };
 
 /** The range each appearance setting may take (the admin form and validation share it). */
@@ -127,6 +133,8 @@ export const FLUID_APPEARANCE_LIMITS: Readonly<Record<keyof FluidAppearance, { m
   highlight: { min: 0, max: 1 },
   depthDarkening: { min: 0, max: 1 },
   depthOpacity: { min: 0, max: 1 },
+  flowSpeed: { min: 0, max: 12 },
+  flowStreaks: { min: 0, max: 1 },
 };
 
 /** A stored appearance made whole: missing, wrong-typed or out-of-range fields fall back or clamp. */

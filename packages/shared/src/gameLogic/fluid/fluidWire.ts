@@ -4,13 +4,14 @@ import type { FluidSoundEffectsConfig } from '../../types/sound';
 import type { FluidAppearance } from '../../types/fluid';
 import { NO_FLUID } from './FluidRegistry';
 
-/** Fluid levels travel as whole numbers: this many steps per full cell (1/128 each, so a squeezed cell up to ~2 fits a byte). */
-export const FLUID_LEVEL_STEPS = 128;
+import { FLUID_UNITS } from './FluidGrid';
+
+/** Fluid levels travel as whole units: this many per full cell (the simulation's own units, so nothing is rounded). */
+export const FLUID_LEVEL_STEPS = FLUID_UNITS;
 
 /**
- * One changed cell on the wire: [x, y, fluidId, quantised level, quantised falling?]. fluidId 0 / level 0 means the cell
- * is empty. The fifth value, when present, is how much of it is falling (fell in from the cell above in the last step),
- * on the same scale as the level; absent means none.
+ * One changed cell on the wire: [x, y, fluidId, units, falling?]. fluidId 0 / level 0 means the cell is empty. The
+ * fifth value, when present, is 1: the cell's fluid is falling (the cell below can take more of it); absent means it rests.
  */
 export type FluidWireCell = [x: number, y: number, fluidId: number, level: number, falling?: number];
 
@@ -35,10 +36,10 @@ export interface FluidClientDefinition {
   light?: ItemLightConfig;
 }
 
-/** Level (0 empty, 1 full) to its wire value, 0-255. Anything visible stays at least 1. */
+/** Level (0 empty, 1 full) to its wire value, 0 to `FLUID_LEVEL_STEPS` units. Anything visible stays at least 1. */
 export function quantizeFluidLevel(level: number): number {
   if (!(level > 0)) return 0;
-  return Math.min(255, Math.max(1, Math.round(level * FLUID_LEVEL_STEPS)));
+  return Math.min(FLUID_LEVEL_STEPS, Math.max(1, Math.round(level * FLUID_LEVEL_STEPS)));
 }
 
 /** Wire value back to a level. */
@@ -46,11 +47,10 @@ export function dequantizeFluidLevel(quantised: number): number {
   return quantised / FLUID_LEVEL_STEPS;
 }
 
-/** Builds the wire form of a cell's contents (the falling value is left off when nothing is falling). */
+/** Builds the wire form of a cell's contents (the falling flag is left off when the fluid rests). Any `falling` above 0 means falling. */
 export function toFluidWireCell(x: number, y: number, fluidId: number, level: number, falling = 0): FluidWireCell {
   const q = quantizeFluidLevel(level);
-  const f = q > 0 ? Math.min(q, quantizeFluidLevel(falling)) : 0;
-  return f > 0 ? [x, y, fluidId, q, f] : [x, y, q > 0 ? fluidId : NO_FLUID, q];
+  return q > 0 && falling > 0 ? [x, y, fluidId, q, 1] : [x, y, q > 0 ? fluidId : NO_FLUID, q];
 }
 
 /**
@@ -79,13 +79,13 @@ export class FluidField {
       : -1;
   }
 
-  /** Sets one cell (`quantisedFalling`: how much of it is falling, same scale). Returns whether anything changed. */
+  /** Sets one cell (`quantisedFalling`: any value above 0 means its fluid is falling). Returns whether anything changed. */
   public set(x: number, y: number, fluidId: number, quantised: number, quantisedFalling = 0): boolean {
     const i = this.index(x, y);
     if (i < 0) return false;
     const id = quantised > 0 ? fluidId : NO_FLUID;
-    const level = quantised > 0 ? quantised : 0;
-    const falling = Math.min(level, Math.max(0, quantisedFalling || 0));
+    const level = quantised > 0 ? Math.min(FLUID_LEVEL_STEPS, quantised) : 0;
+    const falling = level > 0 && quantisedFalling > 0 ? 1 : 0;
     if (this.ids[i] === id && this.levels[i] === level && this.falling[i] === falling) return false;
     this.ids[i] = id;
     this.levels[i] = level;
@@ -102,10 +102,16 @@ export class FluidField {
     return changed;
   }
 
-  /** How much of the cell's fluid is falling, on the same scale as its level. */
+  /** The cell's level while its fluid is falling, 0 when it rests. */
   public getFalling(x: number, y: number): number {
     const i = this.index(x, y);
-    return i < 0 ? 0 : dequantizeFluidLevel(this.falling[i]);
+    return i < 0 || this.falling[i] === 0 ? 0 : dequantizeFluidLevel(this.levels[i]);
+  }
+
+  /** Whether the cell's fluid is falling (the cell below can take more of it). */
+  public isFalling(x: number, y: number): boolean {
+    const i = this.index(x, y);
+    return i >= 0 && this.falling[i] === 1 && this.levels[i] > 0;
   }
 
   public getFluidId(x: number, y: number): number {
@@ -113,7 +119,7 @@ export class FluidField {
     return i < 0 ? NO_FLUID : this.ids[i];
   }
 
-  /** Level of the cell, 0 to about 2. */
+  /** Level of the cell, 0 (empty) to 1 (full). */
   public getLevel(x: number, y: number): number {
     const i = this.index(x, y);
     return i < 0 ? 0 : dequantizeFluidLevel(this.levels[i]);

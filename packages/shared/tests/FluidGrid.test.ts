@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FluidGrid, FluidRegistry, NO_FLUID, FLUID_FULL_LEVEL, FLUID_MAX_COMPRESSION } from '../src/index';
+import { FluidGrid, FluidRegistry, NO_FLUID, FLUID_FULL_LEVEL, FLUID_UNITS, FLUID_FILM_EVAPORATE_STEPS } from '../src/index';
 
 const OIL = { typeKey: 'OIL', density: 0.8, flowRate: 0.5, minLevel: 0.05, flowThreshold: 0.02 };
 const WATER = { typeKey: 'WATER', density: 1, flowRate: 0.5, minLevel: 0.01, flowThreshold: 0.01 };
@@ -117,20 +117,15 @@ describe('FluidGrid flow', () => {
     expect(grid.getLevel(5, 1)).toBeGreaterThan(0.1);
   });
 
-  it('levels out through a U-tube when the fluid is thin enough to climb', () => {
-    // Water has a tiny minimum level, so even a small pressure difference can lift it
+  it('fills the low part of a U-bend and stops: there is no pressure to push it up the other arm', () => {
     const { grid } = makeGrid(['#.#.#', '#.#.#', '#.#.#', '#.#.#', '#...#', '#####']);
-    for (let y = 0; y <= 4; y++) grid.addFluid(1, y, water, 1);
-    grid.addFluid(2, 4, water, 1);
-    grid.addFluid(3, 4, water, 1);
+    for (let y = 1; y <= 4; y++) grid.addFluid(1, y, water, 1);
     const before = grid.totalVolume();
-    settle(grid, 20000);
-    const arm = (x: number) => [0, 1, 2, 3, 4].reduce((sum, y) => sum + grid.getLevel(x, y), 0);
-    // Pressure leveling is approximate (compression is small), so the arms end within about two cells
-    expect(arm(3)).toBeGreaterThan(1.9);
-    expect(Math.abs(arm(1) - arm(3))).toBeLessThan(2.5);
+    settle(grid, 5000);
+    // The arm it was poured into stays full to where it was; the bottom row is covered; the far arm stays empty
+    expect(grid.getLevel(3, 4)).toBeGreaterThan(0.5);
+    expect(grid.getLevel(3, 2)).toBe(0);
     expect(grid.totalVolume() + grid.evaporatedVolume).toBeCloseTo(before, 3);
-    expect(grid.evaporatedVolume).toBeLessThan(0.05);
   });
 
   it('shallow pressure cannot lift thick fluid, and nothing leaks trying', () => {
@@ -154,15 +149,51 @@ describe('FluidGrid flow', () => {
     expect(grid.totalVolume() + grid.evaporatedVolume).toBeCloseTo(before, 3);
   });
 
-  it('evaporates a film thinner than the fluid minimum, and keeps the rest', () => {
+  it('never holds more than a full cell, and refuses to add past it', () => {
     const { grid } = makeGrid(['#.#', '###']);
-    grid.addFluid(1, 0, oil, 0.03);
-    grid.step();
-    expect(grid.getLevel(1, 0)).toBe(0);
-    expect(grid.evaporatedVolume).toBeCloseTo(0.03, 5);
-    grid.addFluid(1, 0, oil, 0.2);
-    settle(grid);
-    expect(grid.getLevel(1, 0)).toBeCloseTo(0.2, 5);
+    expect(grid.addFluid(1, 0, oil, 1)).toBe(true);
+    expect(grid.addFluid(1, 0, oil, 0.5)).toBe(false);
+    expect(grid.getUnits(1, 0)).toBe(FLUID_UNITS);
+    grid.addFluid(1, 0, oil, 0);
+    expect(grid.getLevel(1, 0)).toBe(FLUID_FULL_LEVEL);
+  });
+
+  it('stores whole units: an amount rounds to the nearest 1/16 and anything smaller adds nothing', () => {
+    const { grid } = makeGrid(['#.#', '###']);
+    expect(grid.addFluid(1, 0, oil, 0.01)).toBe(false);
+    expect(grid.addFluid(1, 0, oil, 0.3)).toBe(true);
+    expect(grid.getUnits(1, 0)).toBe(5);
+    expect(grid.getLevel(1, 0)).toBeCloseTo(5 / 16, 6);
+  });
+
+  it('evaporates a lone one-unit film after a while, and keeps a film held up by deeper fluid beside it', () => {
+    const { grid } = makeGrid(['#...#', '#####']);
+    grid.addFluid(1, 0, oil, 1 / 16);
+    grid.addFluid(3, 0, oil, 3 / 16);
+    grid.addFluid(2, 0, oil, 2 / 16);
+    // (1,0) has the 2-unit cell beside it, so it is held up; the whole thing settles instead of evaporating
+    for (let n = 0; n < FLUID_FILM_EVAPORATE_STEPS + 5; n++) grid.step();
+    expect(grid.evaporatedVolume).toBe(0);
+
+    const lone = makeGrid(['#.#', '###']).grid;
+    lone.addFluid(1, 0, oil, 1 / 16);
+    for (let n = 0; n < FLUID_FILM_EVAPORATE_STEPS - 2; n++) lone.step();
+    expect(lone.getUnits(1, 0)).toBe(1);
+    expect(lone.filmCount).toBe(1);
+    for (let n = 0; n < 4; n++) lone.step();
+    expect(lone.getUnits(1, 0)).toBe(0);
+    expect(lone.evaporatedVolume).toBeCloseTo(1 / 16, 6);
+    expect(lone.filmCount).toBe(0);
+  });
+
+  it('forgets a film that is added to before it evaporates', () => {
+    const { grid } = makeGrid(['#.#', '###']);
+    grid.addFluid(1, 0, oil, 1 / 16);
+    for (let n = 0; n < FLUID_FILM_EVAPORATE_STEPS - 10; n++) grid.step();
+    grid.addFluid(1, 0, oil, 1 / 16);
+    for (let n = 0; n < FLUID_FILM_EVAPORATE_STEPS + 10; n++) grid.step();
+    expect(grid.getUnits(1, 0)).toBe(2);
+    expect(grid.evaporatedVolume).toBe(0);
   });
 
   it('thin spread stops instead of smearing forever', () => {
@@ -175,14 +206,37 @@ describe('FluidGrid flow', () => {
     for (const l of lit) expect(l).toBeGreaterThanOrEqual(0.05);
   });
 
-  it('does not shuffle fluid between cells that differ by less than the flow threshold', () => {
+  it('does not shuffle fluid between cells that differ by a single unit', () => {
     const { grid } = makeGrid(['#..#', '####']);
-    grid.addFluid(1, 0, oil, 0.30);
-    grid.addFluid(2, 0, oil, 0.29);
+    grid.addFluid(1, 0, oil, 5 / 16);
+    grid.addFluid(2, 0, oil, 4 / 16);
+    grid.step();
+    expect(grid.getUnits(1, 0)).toBe(5);
+    expect(grid.getUnits(2, 0)).toBe(4);
     expect(grid.step()).toBe(0);
-    expect(grid.getLevel(1, 0)).toBeCloseTo(0.3, 5);
-    expect(grid.getLevel(2, 0)).toBeCloseTo(0.29, 5);
     expect(grid.activeCount).toBe(0);
+  });
+
+  it('moves fluid between cells that differ by two units, towards level', () => {
+    const { grid } = makeGrid(['#..#', '####']);
+    grid.addFluid(1, 0, water, 6 / 16);
+    grid.addFluid(2, 0, water, 4 / 16);
+    grid.step();
+    grid.step();
+    expect(grid.getUnits(1, 0)).toBe(5);
+    expect(grid.getUnits(2, 0)).toBe(5);
+  });
+
+  it('a slow fluid still spreads, one unit at a time, and stays awake until it has', () => {
+    const slow = new FluidRegistry([{ typeKey: 'TAR', density: 2, flowRate: 0.06, minLevel: 0.05, flowThreshold: 0.03 }]);
+    const { grid } = makeGrid(['#.....#', '#######'], slow);
+    grid.addFluid(3, 0, 1, 1);
+    for (let n = 0; n < 5; n++) grid.step();
+    expect(grid.activeCount).toBeGreaterThan(0);
+    settle(grid, 5000);
+    expect(grid.activeCount).toBe(0);
+    expect(grid.getUnits(3, 0)).toBeLessThan(FLUID_UNITS);
+    expect(grid.getLevel(1, 0)).toBeGreaterThan(0);
   });
 
   it('a still pool costs nothing', () => {
@@ -215,11 +269,11 @@ describe('FluidGrid flow', () => {
     expect(grid.getLevel(3, 0)).toBe(0);
   });
 
-  it('keeps cells within full level plus the squeeze allowance when settled', () => {
+  it('keeps a full column exactly full when settled (no squeezing)', () => {
     const { grid } = makeGrid(['#.#', '#.#', '#.#', '###']);
     for (let y = 0; y < 3; y++) grid.addFluid(1, y, oil, 1);
     settle(grid, 3000);
-    for (let y = 0; y < 3; y++) expect(grid.getLevel(1, y)).toBeLessThanOrEqual(FLUID_FULL_LEVEL + 3 * FLUID_MAX_COMPRESSION);
+    for (let y = 0; y < 3; y++) expect(grid.getLevel(1, y)).toBe(FLUID_FULL_LEVEL);
   });
 });
 
@@ -248,32 +302,32 @@ describe('FluidGrid densities', () => {
 describe('FluidGrid tile changes', () => {
   it('pushes fluid out of a cell that becomes solid, upwards first', () => {
     const { grid, solid } = makeGrid(['...', '...', '###']);
-    grid.addFluid(1, 1, oil, 0.6);
+    grid.addFluid(1, 1, oil, 0.5);
     solid[1][1] = '#';
     grid.onTileChanged(1, 1);
     expect(grid.getLevel(1, 1)).toBe(0);
-    expect(grid.getLevel(1, 0)).toBeCloseTo(0.6, 5);
+    expect(grid.getLevel(1, 0)).toBeCloseTo(0.5, 5);
     expect(grid.evaporatedVolume).toBe(0);
   });
 
   it('spills what the first neighbour cannot hold into the next', () => {
     const { grid, solid } = makeGrid(['...', '...', '###']);
-    grid.addFluid(1, 0, oil, 0.7);
-    grid.addFluid(1, 1, oil, 0.6);
+    grid.addFluid(1, 0, oil, 0.75);
+    grid.addFluid(1, 1, oil, 0.5);
     solid[1][1] = '#';
     grid.onTileChanged(1, 1);
     expect(grid.getLevel(1, 0)).toBeCloseTo(1, 5);
-    expect(grid.getLevel(0, 1) + grid.getLevel(2, 1)).toBeCloseTo(0.3, 5);
+    expect(grid.getLevel(0, 1) + grid.getLevel(2, 1)).toBeCloseTo(0.25, 5);
     expect(grid.evaporatedVolume).toBe(0);
   });
 
   it('loses what has nowhere to go', () => {
     const { grid, solid } = makeGrid(['#.#', '###']);
-    grid.addFluid(1, 0, oil, 0.9);
+    grid.addFluid(1, 0, oil, 0.75);
     solid[0][1] = '#';
     grid.onTileChanged(1, 0);
     expect(grid.totalVolume()).toBe(0);
-    expect(grid.evaporatedVolume).toBeCloseTo(0.9, 5);
+    expect(grid.evaporatedVolume).toBeCloseTo(0.75, 5);
   });
 
   it('leaves other fluids alone when displacing', () => {
@@ -292,7 +346,7 @@ describe('FluidGrid changes', () => {
   it('reports each changed cell once with its current contents, then forgets', () => {
     const { grid } = makeGrid(['#.#', '#.#', '###']);
     grid.addFluid(1, 0, oil, 1);
-    expect(grid.drainChanges()).toEqual([{ x: 1, y: 0, fluidId: oil, level: 1, falling: 0 }]);
+    expect(grid.drainChanges()).toEqual([{ x: 1, y: 0, fluidId: oil, level: 1, falling: 1 }]);
     expect(grid.drainChanges()).toEqual([]);
     grid.step();
     const changes = grid.drainChanges();
@@ -302,9 +356,9 @@ describe('FluidGrid changes', () => {
 
   it('reports a cell that emptied as fluid id 0', () => {
     const { grid } = makeGrid(['#.#', '###']);
-    grid.addFluid(1, 0, oil, 0.02);
+    grid.addFluid(1, 0, oil, 1 / 16);
     grid.drainChanges();
-    grid.step();
+    grid.drainFluid(1, 0, 1 / 16);
     expect(grid.drainChanges()).toEqual([{ x: 1, y: 0, fluidId: NO_FLUID, level: 0, falling: 0 }]);
   });
 });
@@ -312,16 +366,37 @@ describe('FluidGrid changes', () => {
 describe('FluidGrid draining', () => {
   it('takes fluid out of a cell and reports what it took', () => {
     const { grid } = makeGrid(['#...#', '#####']);
-    grid.addFluid(2, 0, oil, 0.6);
+    grid.addFluid(2, 0, oil, 0.5);
     expect(grid.drainFluid(2, 0, 0.25)).toBeCloseTo(0.25, 5);
-    expect(grid.getLevel(2, 0)).toBeCloseTo(0.35, 5);
+    expect(grid.getLevel(2, 0)).toBeCloseTo(0.25, 5);
     expect(grid.drainedVolume).toBeCloseTo(0.25, 5);
+  });
+
+  it('adds up tiny drains (fire burns in small pieces) until a whole unit is due', () => {
+    const { grid } = makeGrid(['#...#', '#####']);
+    grid.addFluid(2, 0, oil, 1);
+    for (let n = 0; n < 50; n++) grid.drainFluid(2, 0, 0.01);
+    // 50 x 0.01 = half a cell
+    expect(grid.getUnits(2, 0)).toBe(8);
+    for (let n = 0; n < 50; n++) grid.drainFluid(2, 0, 0.01);
+    expect(grid.getUnits(2, 0)).toBe(0);
+    expect(grid.getFluidId(2, 0)).toBe(NO_FLUID);
+    expect(grid.drainedVolume).toBeCloseTo(1, 5);
+  });
+
+  it('forgets a half-drained piece when the cell is emptied and filled again', () => {
+    const { grid } = makeGrid(['#...#', '#####']);
+    grid.addFluid(2, 0, oil, 1);
+    grid.drainFluid(2, 0, 0.04);
+    grid.setCell(2, 0, oil, 1);
+    grid.drainFluid(2, 0, 0.03);
+    expect(grid.getUnits(2, 0)).toBe(FLUID_UNITS);
   });
 
   it('empties the cell when asked for more than is there, taking only what exists', () => {
     const { grid } = makeGrid(['#...#', '#####']);
-    grid.addFluid(2, 0, oil, 0.2);
-    expect(grid.drainFluid(2, 0, 5)).toBeCloseTo(0.2, 5);
+    grid.addFluid(2, 0, oil, 0.25);
+    expect(grid.drainFluid(2, 0, 5)).toBeCloseTo(0.25, 5);
     expect(grid.getFluidId(2, 0)).toBe(NO_FLUID);
     expect(grid.getLevel(2, 0)).toBe(0);
   });

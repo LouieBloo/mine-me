@@ -68,12 +68,11 @@ interface NumberSetting {
   step: number;
 }
 
+/** Minimum level and flow threshold are no longer used (the grid works in whole units); their columns stay for old rows. */
 const PHYSICS: NumberSetting[] = [
   { key: 'density', label: 'Density', hint: 'Heavier fluids sink under lighter ones and decide what floats (water is 1)', min: 0.05, step: 0.05 },
   { key: 'viscosity', label: 'Viscosity', hint: 'Movement speed lost at full submersion, 0 to 1 (0 = none, 1 = cannot move)', min: 0, max: 1, step: 0.05 },
-  { key: 'flowRate', label: 'Flow Rate', hint: 'How quickly it spreads each step, above 0 up to 1 (thick fluids are low)', min: 0.01, max: 1, step: 0.05 },
-  { key: 'minLevel', label: 'Minimum Level', hint: 'A cell holding less than this evaporates. Higher keeps thin films from smearing out; lower lets fluid spread thinner', min: 0, max: 1, step: 0.01 },
-  { key: 'flowThreshold', label: 'Flow Threshold', hint: 'It only spreads sideways when neighbouring cells differ by more than this, which lets a pool settle', min: 0, max: 1, step: 0.01 },
+  { key: 'flowRate', label: 'Flow Rate', hint: 'How fast it spreads sideways, above 0 up to 1. Water is 0.6; thick fluids are low and creep one unit at a time', min: 0.01, max: 1, step: 0.05 },
 ];
 
 interface AppearanceSetting {
@@ -89,6 +88,8 @@ const LOOK: AppearanceSetting[] = [
   { key: 'highlight', label: 'Surface Highlight', hint: 'Strength of the light line and glow along the surface, 0 to 1', step: 0.05 },
   { key: 'depthDarkening', label: 'Depth Darkening', hint: 'How much darker it gets deeper down, 0 to 1', step: 0.05 },
   { key: 'depthOpacity', label: 'Depth Opacity', hint: 'How much more opaque it gets deeper down, 0 to 1', step: 0.05 },
+  { key: 'flowSpeed', label: 'Flow Speed', hint: 'How fast the light streaks run down falling fluid, in blocks per second (0 = still; thick fluids are slow)', step: 0.25 },
+  { key: 'flowStreaks', label: 'Flow Streaks', hint: 'How visible the streaks in falling fluid are, 0 to 1', step: 0.05 },
 ];
 
 const show = (n: number): number | '' => (Number.isFinite(n) ? n : '');

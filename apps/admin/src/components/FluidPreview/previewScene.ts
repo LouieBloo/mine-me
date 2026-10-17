@@ -1,103 +1,112 @@
-import { FluidField, FluidGrid, FluidRegistry, toFluidWireCell, type FluidParams } from '@mine-me/shared';
+import {
+  FLUID_SCENES, FluidSceneRunner, SCENE_FLUIDS, SCENE_POUR_RATE, fluidSceneByKey, type FluidField, type FluidParams, type FluidScene,
+} from '@mine-me/shared';
 
+/** The scene the preview opens with: the tank. */
+export const DEFAULT_PREVIEW_SCENE = 'tank';
+/** The size of the default scene (the tank). Other scenes have their own size: ask the scene. */
 export const PREVIEW_WIDTH = 24;
 export const PREVIEW_HEIGHT = 12;
-
-/** The tank: '#' is solid. A shelf under the spout makes the pour split; the wall between the chambers has a gate low down that can be opened. */
-const LAYOUT = [
-  '########################',
-  '#...........#..........#',
-  '#...........#..........#',
-  '#...........#..........#',
-  '#...........#..........#',
-  '#....#####..#..........#',
-  '#...........#..........#',
-  '#...........#..........#',
-  '#...........#..........#',
-  '#...........#..........#',
-  '#...........#..........#',
-  '########################',
-];
-const DIVIDER_X = 12;
-/** The rows of the wall that open: a gate at the bottom, so fluid already pooled behind it runs through. */
-const DIVIDER_Y = [8, 9, 10];
-const SPOUT = { x: 6, y: 1 };
 /** Fluid added per simulation step while pouring (a fraction of a full cell). */
-export const POUR_RATE = 0.5;
-
-const PREVIEW_KEY = 'PREVIEW';
+export const POUR_RATE = SCENE_POUR_RATE;
 
 /** What the simulation needs from a fluid being edited. */
-export type PreviewFluid = Pick<FluidParams, 'density' | 'flowRate' | 'minLevel' | 'flowThreshold'>;
+export type PreviewFluid = Pick<FluidParams, 'density' | 'flowRate'> & Partial<Pick<FluidParams, 'minLevel' | 'flowThreshold'>>;
+
+/** The scenes the preview can show (see the shared fluid scenes). */
+export const PREVIEW_SCENES: readonly FluidScene[] = FLUID_SCENES;
 
 /**
- * A small tank running the real shared `FluidGrid` with the fluid's settings, so tuning flow rate and
- * minimum level in the admin shows exactly what the game will do. Pure logic with no drawing, so it can
- * be tested without a canvas.
+ * A fluid scene running the real shared `FluidGrid` with the settings of the fluid being edited, so tuning flow rate in
+ * the admin shows exactly what the game will do. The edited fluid is what the scene's water cells and spouts hold; a
+ * scene with lava has the game's lava beside it. Pure logic with no drawing, so it can be tested without a canvas.
  */
 export class PreviewScene {
-  private grid: FluidGrid;
-  private readonly solid: boolean[][];
+  public readonly sceneKey: string;
   private readonly fluid: PreviewFluid;
-  public pouring = false;
-  public dividerOpen = false;
+  private runner: FluidSceneRunner;
 
-  constructor(fluid: PreviewFluid) {
+  constructor(fluid: PreviewFluid, sceneKey: string = DEFAULT_PREVIEW_SCENE) {
     this.fluid = fluid;
-    this.solid = LAYOUT.map((row) => row.split('').map((c) => c === '#'));
-    this.grid = this.buildGrid();
+    this.sceneKey = fluidSceneByKey(sceneKey) ? sceneKey : DEFAULT_PREVIEW_SCENE;
+    this.runner = this.build();
   }
 
-  private buildGrid(): FluidGrid {
-    const registry = new FluidRegistry([{ typeKey: PREVIEW_KEY, ...this.fluid }]);
-    return new FluidGrid(PREVIEW_WIDTH, PREVIEW_HEIGHT, registry, (x, y) => this.solid[y][x]);
+  private build(): FluidSceneRunner {
+    const lava = SCENE_FLUIDS.filter((f) => f.typeKey !== 'WATER');
+    return new FluidSceneRunner(fluidSceneByKey(this.sceneKey)!, [{ typeKey: 'WATER', ...this.fluid }, ...lava]);
+  }
+
+  public get scene(): FluidScene {
+    return this.runner.scene;
+  }
+
+  public get width(): number {
+    return this.runner.width;
+  }
+
+  public get height(): number {
+    return this.runner.height;
+  }
+
+  /** The id of the fluid being edited in this scene's grid, and of the game's lava (when the scene has any). */
+  public get fluidId(): number {
+    return this.runner.registry.idOf('WATER') ?? 1;
+  }
+
+  public get lavaId(): number | undefined {
+    return this.runner.registry.idOf('LAVA');
+  }
+
+  public get oilId(): number | undefined {
+    return this.runner.registry.idOf('OIL');
+  }
+
+  public get pouring(): boolean {
+    return this.runner.pouring;
+  }
+
+  public get dividerOpen(): boolean {
+    return this.runner.gateOpen;
+  }
+
+  public get hasSpout(): boolean {
+    return this.runner.hasSpout;
+  }
+
+  public get hasGate(): boolean {
+    return this.runner.hasGate;
   }
 
   public isSolid(x: number, y: number): boolean {
-    return this.solid[y]?.[x] ?? true;
+    return this.runner.isSolid(x, y);
   }
 
   /** One simulation step (what the game does every few ticks). */
   public step(): void {
-    if (this.pouring) this.grid.addFluid(SPOUT.x, SPOUT.y, 1, POUR_RATE);
-    this.grid.step();
+    this.runner.step();
   }
 
   public setPouring(pouring: boolean): void {
-    this.pouring = pouring;
+    this.runner.pouring = pouring && this.runner.hasSpout;
   }
 
-  /** Takes out the divider wall, the way mining a block would, so the fluid beside it can flow. */
+  /** Takes out the scene's gate, the way mining a block would, so the fluid beside it can flow. */
   public openDivider(): void {
-    if (this.dividerOpen) return;
-    this.dividerOpen = true;
-    for (const y of DIVIDER_Y) {
-      this.solid[y][DIVIDER_X] = false;
-      this.grid.onTileChanged(DIVIDER_X, y);
-    }
+    this.runner.openGate();
   }
 
-  /** Back to an empty tank with the divider in place. */
+  /** Back to the scene's start. */
   public reset(): void {
-    this.pouring = false;
-    this.dividerOpen = false;
-    for (const y of DIVIDER_Y) this.solid[y][DIVIDER_X] = true;
-    this.grid = this.buildGrid();
+    this.runner = this.build();
   }
 
   /** The fluid as a client would receive it, so the preview draws through the same code as the game. */
   public toField(): FluidField {
-    const field = new FluidField(PREVIEW_WIDTH, PREVIEW_HEIGHT);
-    for (let y = 0; y < PREVIEW_HEIGHT; y++) {
-      for (let x = 0; x < PREVIEW_WIDTH; x++) {
-        const id = this.grid.getFluidId(x, y);
-        if (id !== 0) field.apply([toFluidWireCell(x, y, id, this.grid.getLevel(x, y), this.grid.getFalling(x, y))]);
-      }
-    }
-    return field;
+    return this.runner.toField();
   }
 
   public stats(): { volume: number; evaporated: number; activeCells: number } {
-    return { volume: this.grid.totalVolume(), evaporated: this.grid.evaporatedVolume, activeCells: this.grid.activeCount };
+    return { volume: this.runner.grid.totalVolume(), evaporated: this.runner.grid.evaporatedVolume, activeCells: this.runner.grid.activeCount };
   }
 }

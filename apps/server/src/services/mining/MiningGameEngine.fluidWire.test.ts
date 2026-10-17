@@ -49,7 +49,8 @@ describe('fluids on the wire', () => {
     engine.fluidSubsystem.placeFluid(32, 30, 'OIL');
     tick(1);
     const t = lastTick();
-    expect(t.fluidCells).toEqual([[32, 30, oilId(), quantizeFluidLevel(1)]]);
+    // The oil has open cells under it, so it is falling (the fifth value)
+    expect(t.fluidCells).toEqual([[32, 30, oilId(), quantizeFluidLevel(1), 1]]);
   });
 
   it('sends nothing on ticks where the fluid did not change', () => {
@@ -67,7 +68,7 @@ describe('fluids on the wire', () => {
     (engine as any).revealAndTrackTiles({ x: 32.5, y: 30.5 }, 2);
     tick(1);
     const entry = lastTick().revealedTiles!.find((r) => r.x === 32 && r.y === 30)!;
-    expect(entry.fluid).toEqual([oilId(), quantizeFluidLevel(0.5)]);
+    expect(entry.fluid).toEqual([oilId(), quantizeFluidLevel(0.5), 1]);
     expect(lastTick().revealedTiles!.find((r) => r.x === 31 && r.y === 30)!.fluid).toBeUndefined();
   });
 
@@ -80,7 +81,7 @@ describe('fluids on the wire', () => {
       { id: oilId(), typeKey: 'OIL', name: 'Oil', color: '#0b0b0d', opacity: 0.9, viscosity: 0.6, density: 0.8 },
     );
     expect(state.fluids!.map((f) => f.typeKey).sort()).toEqual(['LAVA', 'OIL', 'WATER']);
-    expect(state.fluidCells).toEqual([[31, 31, oilId(), quantizeFluidLevel(0.75)]]);
+    expect(state.fluidCells).toEqual([[31, 31, oilId(), quantizeFluidLevel(0.75), 1]]);
   });
 
   it('sends how the fluid looks, with whatever the admin left out filled in', () => {
@@ -104,12 +105,13 @@ describe('fluids on the wire', () => {
 
   it('reports oil that drained away as an empty cell', () => {
     for (let y = 30; y <= 32; y++) for (let x = 30; x <= 34; x++) engine.grid[y][x].revealed = true;
-    engine.fluidSubsystem.placeFluid(32, 30, 'OIL', 0.04); // thinner than the oil minimum: evaporates
+    engine.fluidSubsystem.placeFluid(32, 32, 'OIL', 0.5); // resting on the floor of the pocket
+    tick(6);
+    engine.fluidSubsystem.grid.drainFluid(32, 32, 5);
     tick(6);
     const last = new Map<string, Array<number | undefined>>();
     for (const c of ticks().flatMap((t) => t.fluidCells ?? [])) last.set(`${c[0]},${c[1]}`, c);
-    expect(last.size).toBeGreaterThan(0);
-    for (const c of last.values()) expect(c).toEqual([c[0], c[1], 0, 0]);
+    expect(last.get('32,32')).toEqual([32, 32, 0, 0]);
   });
 
   describe('how a burning fluid looks', () => {

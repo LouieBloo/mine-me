@@ -1,16 +1,12 @@
 import { Container, Graphics } from 'pixi.js';
 import {
-  DEFAULT_FLUID_APPEARANCE, FluidDisplay, FluidField, FluidLayout, MINING_CONFIG, fallHurry, darkenColor, lightenColor, parseHexColor, bandBelowLine, fluidBodyBands, fluidDepthShade, fluidSurfaceWave,
+  DEFAULT_FLUID_APPEARANCE, FluidDisplay, FluidField, FluidLayout, darkenColor, lightenColor, parseHexColor, bandBelowLine, fluidBodyBands, fluidDepthShade, fluidFlowStreaks, fluidSurfaceWave,
   type FluidAppearance, type FluidClientDefinition, type FluidEnvironment, type ItemLightConfig, type FluidShape, type FluidSoundEffectsConfig, type FluidWireCell,
-  type SolidSampler,
 } from '@mine-me/shared';
 
 /** What a burning cell of a fluid looks like: its flames and its light (either may be missing). */
 export type FlameLook = NonNullable<FluidClientDefinition['flame']>;
 import { TILE_SIZE } from './MiningTileRenderer';
-
-/** Seconds between fluid simulation steps on the server: how long falling fluid takes to slide down one cell. */
-export const FLUID_STEP_SECONDS = MINING_CONFIG.FLUID_STEP_TICKS / MINING_CONFIG.SERVER_TICK_RATE;
 
 /** Cells per chunk side. Only chunks whose cells changed are redrawn. */
 export const FLUID_CHUNK_SIZE = 8;
@@ -21,6 +17,8 @@ const GLOW_BANDS = 3;
 const GLOW_BAND_TILE = 1 / 32;
 /** Opacity each glow band adds, at full highlight. They stack, so the glow is strongest at the surface. */
 const GLOW_BAND_ALPHA = 0.1;
+/** How bright the streaks running down a fall are, at full strength (a fraction of the fluid's opacity). */
+const FLOW_STREAK_ALPHA = 0.7;
 
 export { parseHexColor, lightenColor, darkenColor };
 
@@ -32,14 +30,17 @@ interface FluidLook {
   appearance: FluidAppearance;
 }
 
-/** One chunk: the fluid body (redrawn when cells change) and its surfaces (redrawn every frame while they wave). */
+/** One chunk: the fluid body (redrawn when cells change), its surfaces (redrawn every frame while they wave) and the streaks running down falls (redrawn every frame while anything falls). */
 interface ChunkView {
   root: Container;
   body: Graphics;
+  flow: Graphics;
   surfaces: Graphics;
   shapes: FluidShape[];
   /** True when some surface has waves, so the surfaces must be redrawn as time passes. */
   animated: boolean;
+  /** True when some fluid in the chunk is falling with streaks, so they must be redrawn as time passes. */
+  flowing: boolean;
 }
 
 /** The longest time step the easing takes in one go (a frame after a stall should not jump everything). */
@@ -47,8 +48,9 @@ const MAX_EASE_STEP_SECONDS = 0.1;
 
 /**
  * Draws the fluid the server has revealed. Holds the client's copy of the fluid grid (`field`, exact: bodies,
- * sounds and fire read it), applies the server's changed cells to it, and draws an eased copy (`display`) so the
- * fluid flows between the server's steps instead of jumping. Only the chunks whose drawing changed are redrawn.
+ * sounds and fire read it), applies the server's changed cells to it, and draws an eased copy (`display`) so resting
+ * fluid settles between the server's steps instead of jumping. Falling fluid is drawn as it is told (a full-width
+ * column) with light streaks running down it. Only the chunks whose drawing changed are redrawn.
  */
 export class FluidRenderer {
   public readonly field: FluidField;
@@ -66,15 +68,9 @@ export class FluidRenderer {
   private readonly chunksAcross: number;
   private readonly container: Container;
   private readonly tileSize: number;
-  private solid: SolidSampler | undefined;
   private time = 0;
   private lastUpdate: number | null = null;
-  /** When the current step's falling fluid started sliding down (renderer time), or null before any fell. */
-  private slideStart: number | null = null;
-  private slideStartPending = false;
-  /** Cells (as y * width + x) fluid fell into in the last step: redrawn every frame while it slides. */
-  private readonly sliding = new Set<number>();
-  /** The layout of what is drawn, kept until the drawn fluid or the terrain changes (drawing and fire share it). */
+  /** The layout of what is drawn, kept until the drawn fluid changes (drawing and fire share it). */
   private layout: FluidLayout | null = null;
 
   constructor(
@@ -116,13 +112,6 @@ export class FluidRenderer {
     for (const key of this.chunks.keys()) this.dirty.add(key);
   }
 
-  /** Tells the renderer which cells are solid terrain, so it can tell falling fluid (drawn as a stream) from fluid in a shaft. */
-  public setSolidSampler(solid: SolidSampler | undefined): void {
-    this.solid = solid;
-    this.layout = null;
-    for (const key of this.chunks.keys()) this.dirty.add(key);
-  }
-
   private chunkKey(cx: number, cy: number): number {
     return Math.floor(cy / FLUID_CHUNK_SIZE) * this.chunksAcross + Math.floor(cx / FLUID_CHUNK_SIZE);
   }
@@ -148,69 +137,39 @@ export class FluidRenderer {
   }
 
   /**
-   * Applies changed cells to the exact copy. With `smooth` the drawing eases to them over the next frames (the
-   * fluid flowing); without, it shows them at once (the first snapshot, or fluid that just came into view).
+   * Applies changed cells to the exact copy. With `smooth` the drawing eases to them over the next frames (resting
+   * fluid settling); without, it shows them at once (the first snapshot, or fluid that just came into view). Falling
+   * fluid is always shown at once.
    */
   public apply(cells: readonly FluidWireCell[], smooth = false): void {
-    const fellInto: Array<[number, number]> = [];
     const changed = this.field.apply(cells);
     for (const [x, y] of changed) {
       const fluidId = this.field.getFluidId(x, y);
       const level = this.field.getLevel(x, y);
       const falling = this.field.getFalling(x, y);
-      if (smooth) {
-        this.display.setTarget(x, y, fluidId, level, falling);
-        if (falling > 0) fellInto.push([x, y]);
-      } else if (this.display.setNow(x, y, fluidId, level, falling)) {
-        this.markAround(x, y);
-      }
-    }
-    if (!smooth || changed.length === 0) return;
-    // Fluid in free fall is drawn sliding down from the cell above over the next step, not faded out of one cell and into
-    // the next (that smears it over both): both cells ease to where it is now almost at once, and the slide starts over
-    this.sliding.clear();
-    for (const [x, y] of fellInto) {
-      const quick = fallHurry(this.field, x, y, this.solid);
-      if (quick <= 0) continue;
-      this.display.hurry(x, y, quick);
-      this.display.hurry(x, y - 1, quick);
-      this.sliding.add(y * this.field.width + x);
-    }
-    this.slideStartPending = true;
-  }
-
-  /** How far through the current step falling fluid has slid, 0 (just arrived) to 1 (in its cell). */
-  public get fallProgress(): number {
-    if (this.slideStart === null) return 1;
-    return Math.min(1, Math.max(0, (this.time - this.slideStart) / FLUID_STEP_SECONDS));
-  }
-
-  /** Redraws what is sliding (the cells fluid fell into, and the cells it came from), while the slide lasts. */
-  private markSliding(): void {
-    for (const i of this.sliding) {
-      const x = i % this.field.width;
-      const y = Math.floor(i / this.field.width);
-      this.markAround(x, y);
-      if (y > 0) this.markAround(x, y - 1);
+      const shown = smooth ? this.display.setTarget(x, y, fluidId, level, falling) : this.display.setNow(x, y, fluidId, level, falling);
+      if (shown) this.markAround(x, y);
     }
   }
 
   /**
-   * Marks for redraw everything a drawn cell's change can affect. A column's fluid is drawn as bodies packed onto
-   * their floor, so the whole run of fluid it is part of moves; the columns beside it join its surface and decide
-   * whether it is a stream.
+   * Marks for redraw everything a drawn cell's change can affect: the cell and its neighbours (their corners meet at
+   * its edges), the cells below it in its column (what is above them decides how tall and how deep they are), and the
+   * fluid stacked above it (it rests on this cell's surface, so it moves with it).
    */
   private markAround(x: number, y: number): void {
     this.layout = null;
-    const has = (yy: number) => this.display.getFluidId(x, yy) !== 0;
-    // A fall is laid out as one jet down its column and steps over one-cell gaps (the beats it falls in), so the
-    // redraw follows the fluid across such a gap too
-    let top = y - 1;
-    while (top > 0 && (has(top) || has(top - 1))) top--;
     let bottom = y + 1;
-    while (bottom < this.field.height - 1 && (has(bottom) || has(bottom + 1))) bottom++;
+    while (bottom < this.field.height - 1 && this.display.getFluidId(x, bottom) !== 0) bottom++;
+    // Only a different fluid above rests on this cell's surface (and is moved by it); the same fluid above is part of it
+    let top = y - 1;
+    const here = this.display.getFluidId(x, y);
+    const above = y > 0 ? this.display.getFluidId(x, y - 1) : 0;
+    if (above !== 0 && above !== here) while (top > 0 && this.display.getFluidId(x, top) !== 0) top--;
     for (let cx = Math.max(0, x - 1); cx <= Math.min(this.field.width - 1, x + 1); cx++) {
-      for (let cy = Math.max(0, top); cy <= Math.min(this.field.height - 1, bottom); cy++) this.dirty.add(this.chunkKey(cx, cy));
+      const first = cx === x ? top : y - 1;
+      const last = cx === x ? bottom : y + 1;
+      for (let cy = Math.max(0, first); cy <= Math.min(this.field.height - 1, last); cy++) this.dirty.add(this.chunkKey(cx, cy));
     }
   }
 
@@ -225,7 +184,7 @@ export class FluidRenderer {
   }
 
   private currentLayout(): FluidLayout {
-    this.layout ??= new FluidLayout(this.display, this.tileSize, this.solid, { fallProgress: this.fallProgress });
+    this.layout ??= new FluidLayout(this.display, this.tileSize);
     return this.layout;
   }
 
@@ -252,24 +211,22 @@ export class FluidRenderer {
   }
 
   /**
-   * Once per frame: eases the drawn fluid towards the server's levels (redrawing what moved) and moves the waves on
-   * to `timeSec`. Chunks whose fluid is still are not redrawn; their surfaces are, only while they wave.
+   * Once per frame: eases the drawn fluid towards the server's levels (redrawing what moved) and moves the waves and
+   * the streaks down the falls on to `timeSec`. Chunks whose fluid is still are not redrawn; their surfaces and
+   * streaks are, only while they wave or fall.
    */
   public update(timeSec: number): void {
     const dt = this.lastUpdate === null ? 0 : Math.min(MAX_EASE_STEP_SECONDS, Math.max(0, timeSec - this.lastUpdate));
     this.lastUpdate = timeSec;
-    const progressBefore = this.fallProgress;
     this.time = timeSec;
-    if (this.slideStartPending) {
-      this.slideStart = timeSec;
-      this.slideStartPending = false;
-    }
-    // Falling fluid moves every frame until it has slid into its cell (one last redraw puts it exactly there)
-    if (this.sliding.size > 0 && (this.fallProgress < 1 || progressBefore < 1)) this.markSliding();
     for (const [x, y] of this.display.step(dt)) this.markAround(x, y);
     const redrawn = new Set(this.dirty);
     this.render();
-    for (const [key, chunk] of this.chunks) if (chunk.animated && !redrawn.has(key)) this.drawSurfaces(chunk);
+    for (const [key, chunk] of this.chunks) {
+      if (redrawn.has(key)) continue;
+      if (chunk.animated) this.drawSurfaces(chunk);
+      if (chunk.flowing) this.drawFlow(chunk);
+    }
   }
 
   private viewOf(key: number): ChunkView {
@@ -277,10 +234,11 @@ export class FluidRenderer {
     if (!chunk) {
       const root = new Container();
       const body = new Graphics();
+      const flow = new Graphics();
       const surfaces = new Graphics();
-      root.addChild(body, surfaces);
+      root.addChild(body, flow, surfaces);
       this.container.addChild(root);
-      chunk = { root, body, surfaces, shapes: [], animated: false };
+      chunk = { root, body, flow, surfaces, shapes: [], animated: false, flowing: false };
       this.chunks.set(key, chunk);
     }
     return chunk;
@@ -293,6 +251,7 @@ export class FluidRenderer {
     chunk.body.clear();
     chunk.shapes = [];
     chunk.animated = false;
+    chunk.flowing = false;
     for (let cy = chunkY; cy < Math.min(chunkY + FLUID_CHUNK_SIZE, this.field.height); cy++) {
       for (let cx = chunkX; cx < Math.min(chunkX + FLUID_CHUNK_SIZE, this.field.width); cx++) {
         for (const shape of layout.shapesAt(cx, cy)) {
@@ -301,32 +260,38 @@ export class FluidRenderer {
           this.drawBody(chunk.body, shape, look);
           chunk.shapes.push(shape);
           if (shape.surface && look.appearance.waveAmplitude > 0 && look.appearance.waveSpeed > 0) chunk.animated = true;
+          if (shape.falling && look.appearance.flowSpeed > 0 && look.appearance.flowStreaks > 0) chunk.flowing = true;
         }
       }
     }
+    this.drawFlow(chunk);
     this.drawSurfaces(chunk);
     chunk.root.visible = chunk.shapes.length > 0;
   }
 
-  /** The fluid below its surface: shaded slices, darker and more opaque the deeper they are. */
+  /** The fluid below its surface: shaded slices, darker and more opaque the deeper they are (a thin fall is fainter). */
   private drawBody(graphics: Graphics, shape: FluidShape, look: FluidLook): void {
     for (const band of fluidBodyBands(shape, this.tileSize, look.appearance)) {
       const shade = fluidDepthShade(look.opacity, look.appearance, band.depth);
-      graphics.poly(band.points).fill({ color: darkenColor(look.color, shade.darken), alpha: shade.opacity });
+      graphics.poly(band.points).fill({ color: darkenColor(look.color, shade.darken), alpha: shade.opacity * shape.strength });
     }
-    if (shape.spillEdge && look.appearance.highlight > 0) {
-      // The pool's surface line carries on over the lip and down into the fall
-      graphics.poly(shape.spillEdge, false).stroke({
-        width: Math.max(1, SURFACE_LINE_TILE * this.tileSize),
-        color: look.surface,
-        alpha: look.opacity * Math.min(1, look.appearance.highlight * 1.2),
-      });
+  }
+
+  /** The light streaks running down the falls in a chunk. They are the only thing that moves in a fall: its shape stands still. */
+  private drawFlow(chunk: ChunkView): void {
+    const graphics = chunk.flow;
+    graphics.clear();
+    for (const shape of chunk.shapes) {
+      if (!shape.falling) continue;
+      const look = this.definitions.get(shape.fluidId);
+      if (!look) continue;
+      const alpha = look.opacity * look.appearance.flowStreaks * shape.strength * FLOW_STREAK_ALPHA;
+      for (const streak of fluidFlowStreaks(shape.cx, shape.cy, this.tileSize, this.time, look.appearance, shape.surface ? shape.topMid : shape.top)) {
+        graphics.rect(streak.x, streak.y, streak.width, streak.height);
+      }
+      graphics.fill({ color: look.surface, alpha });
     }
-    if (shape.stream) {
-      // A sheen down one side of the stream, so it reads as a rounded jet and not a flat bar
-      graphics.rect(shape.x + shape.width * 0.15, shape.top, shape.width * 0.2, shape.bottom - shape.top);
-      graphics.fill({ color: look.surface, alpha: look.opacity * look.appearance.highlight * 0.5 });
-    }
+    graphics.visible = chunk.flowing;
   }
 
   /** The tops of the pools: the waving fill, a soft glow below the surface line, and the line itself. */
@@ -341,20 +306,20 @@ export class FluidRenderer {
       if (!wave) continue;
       const shade = fluidDepthShade(look.opacity, look.appearance, shape.depth + 0.125);
       if (wave.fill.length > 0) {
-        graphics.poly(wave.fill).fill({ color: darkenColor(look.color, shade.darken), alpha: shade.opacity });
+        graphics.poly(wave.fill).fill({ color: darkenColor(look.color, shade.darken), alpha: shade.opacity * shape.strength });
       }
       const strength = look.appearance.highlight;
       if (strength <= 0) continue;
       for (let band = GLOW_BANDS; band >= 1; band--) {
         graphics.poly(bandBelowLine(wave.line, band * GLOW_BAND_TILE * this.tileSize, shape.bodyBottom)).fill({
           color: look.surface,
-          alpha: look.opacity * strength * GLOW_BAND_ALPHA,
+          alpha: look.opacity * strength * GLOW_BAND_ALPHA * shape.strength,
         });
       }
       graphics.poly(wave.line, false).stroke({
         width: Math.max(1, SURFACE_LINE_TILE * this.tileSize),
         color: look.surface,
-        alpha: look.opacity * Math.min(1, strength * 1.2),
+        alpha: look.opacity * Math.min(1, strength * 1.2) * shape.strength,
       });
     }
     graphics.visible = chunk.shapes.length > 0;

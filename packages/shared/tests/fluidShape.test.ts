@@ -1,515 +1,289 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DEFAULT_FLUID_APPEARANCE, FLUID_DEPTH_CAP, FLUID_SHADE_STRIPS, FLUID_WAVE_SEGMENTS, FluidField, FluidLayout, STREAM_MAX_WIDTH, STREAM_MIN_WIDTH, bandBelowLine,
-  fluidBodyBands, fluidDepthShade, fluidSurfaceWave, fluidWaveHeight, quantizeFluidLevel, resolveFluidAppearance, validateFluid,
-  validateFluidAppearance, parseHexColor, lightenColor, darkenColor, colorToCss, type FluidAppearance, type FluidShape, type SolidSampler,
+  FALL_MIN_STRENGTH, FLUID_UNITS, FluidField, FluidLayout, fallStrength, fluidBodyBands, fluidSurfaceWave, isFluidCovered, layoutFluidShapes,
 } from '../src/index';
 
 const T = 64;
-const q = quantizeFluidLevel;
-const still: FluidAppearance = { ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0 };
-const wavy: FluidAppearance = { ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0.1 };
+const U = (units: number) => units; // readability: levels below are in units of 1/16
 
-function fieldWith(cells: [number, number, number][], id = 1): FluidField {
-  const field = new FluidField(10, 12);
-  for (const [x, y, level] of cells) field.set(x, y, id, q(level));
-  return field;
+/** A field from rows of cells: '.' empty, a digit/letter 1-g is that many units (g = 16), a trailing '^' marks the cell falling. */
+function field(rows: string[], id = 1): FluidField {
+  const f = new FluidField(rows[0].replace(/\^/g, '').length, rows.length);
+  rows.forEach((row, y) => {
+    let x = 0;
+    for (let i = 0; i < row.length; i++) {
+      const c = row[i];
+      if (c === '^') continue;
+      const falling = row[i + 1] === '^';
+      if (c !== '.') f.set(x, y, id, parseInt(c, 17), falling ? 1 : 0);
+      x++;
+    }
+  });
+  return f;
 }
 
-/** Terrain as rows of text: '#' solid, anything else open. Out of bounds is solid. */
-function terrain(rows: string[]): SolidSampler {
-  return (x, y) => (rows[y]?.[x] ?? '#') === '#';
-}
+const shapeOf = (f: FluidField, x: number, y: number) => new FluidLayout(f, T).shapesAt(x, y)[0];
+/** Where a cell of `units` units has its own surface (a row `row` down): filled from the bottom of its cell. */
+const own = (units: number, row = 0) => (row + 1) * T - (units / FLUID_UNITS) * T;
 
-/** The highest point of a polygon at x (where a vertical line through x first meets it), or NaN if it misses. */
-function topAt(points: number[], x: number): number {
-  let best = NaN;
-  for (let i = 0; i < points.length; i += 2) {
-    const j = (i + 2) % points.length;
-    const [ax, ay, bx, by] = [points[i], points[i + 1], points[j], points[j + 1]];
-    if (x < Math.min(ax, bx) || x > Math.max(ax, bx) || ax === bx) continue;
-    const y = ay + ((by - ay) * (x - ax)) / (bx - ax);
-    if (Number.isNaN(best) || y < best) best = y;
-  }
-  return best;
-}
+describe('the cover rule', () => {
+  it('a cell is covered when the same fluid is directly above it', () => {
+    const f = field(['8', '8', '.']);
+    expect(isFluidCovered(f, 0, 0)).toBe(false);
+    expect(isFluidCovered(f, 0, 1)).toBe(true);
+    expect(isFluidCovered(f, 0, 2)).toBe(false);
+    const other = new FluidField(1, 2);
+    other.set(0, 0, 1, 8);
+    other.set(0, 1, 2, 8);
+    expect(isFluidCovered(other, 0, 1)).toBe(false);
+  });
+});
 
-const shapesAt = (field: FluidField, x: number, y: number, solid?: SolidSampler) => new FluidLayout(field, T, solid).shapesAt(x, y);
-const body = (field: FluidField, x: number, y: number, solid?: SolidSampler): FluidShape | undefined => shapesAt(field, x, y, solid).find((s) => !s.stream);
-const stream = (field: FluidField, x: number, y: number, solid?: SolidSampler): FluidShape | undefined => shapesAt(field, x, y, solid).find((s) => s.stream);
-const surfacesIn = (field: FluidField, x: number, solid?: SolidSampler) => {
-  const layout = new FluidLayout(field, T, solid);
-  const rows: number[] = [];
-  for (let y = 0; y < field.height; y++) if (layout.shapesAt(x, y).some((s) => s.surface)) rows.push(y);
-  return rows;
-};
-
-describe('FluidLayout: bodies', () => {
-  it('draws nothing in an empty cell', () => {
-    expect(shapesAt(fieldWith([]), 2, 2)).toEqual([]);
+describe('FluidLayout: one shape per cell', () => {
+  it('draws nothing for an empty cell or one outside the grid', () => {
+    const f = field(['.8.']);
+    const layout = new FluidLayout(f, T);
+    expect(layout.shapesAt(0, 0)).toEqual([]);
+    expect(layout.shapesAt(9, 0)).toEqual([]);
+    expect(layout.surfaceAt(0, 0)).toBeNull();
   });
 
-  it('a lone partial cell fills from the bottom with level edges (nothing to join)', () => {
-    const s = body(fieldWith([[2, 2, 0.5]]), 2, 2)!;
-    expect(s).toMatchObject({ x: 128, width: 64, top: 128, bottom: 192, topLeft: 160, topRight: 160, surface: true, waveLeft: 0, waveRight: 0, stream: false });
+  it('fills a lone cell from the bottom to its level, edge to edge, with a flat top', () => {
+    const f = field(['.8.']);
+    const s = shapeOf(f, 1, 0);
+    expect(s.x).toBe(T);
+    expect(s.width).toBe(T);
+    expect(s.top).toBe(0);
+    expect(s.bottom).toBe(T);
+    expect(s.topLeft).toBe(T / 2);
+    expect(s.topRight).toBe(T / 2);
+    expect(s.topMid).toBe(T / 2);
+    expect(s.surface).toBe(true);
+    expect(s.falling).toBe(false);
+    expect(s.strength).toBe(1);
   });
 
-  it('a full cell with fluid above it does not draw a second surface line (one body, one surface)', () => {
-    const field = fieldWith([[1, 2, 0.5], [1, 3, 1]]);
-    expect(surfacesIn(field, 1)).toEqual([2]);
-    expect(body(field, 1, 3)!.surface).toBe(false);
-    expect(body(field, 1, 2)!.surfaceY).toBe(4 * T - 1.5 * T);
+  it('a flat pool has equal corners everywhere', () => {
+    const f = field(['888']);
+    for (let x = 0; x < 3; x++) {
+      const s = shapeOf(f, x, 0);
+      expect(s.topLeft).toBe(T / 2);
+      expect(s.topRight).toBe(T / 2);
+    }
   });
 
-  it('never draws two surfaces on top of each other, whatever the levels in the column', () => {
-    for (const upper of [0.05, 0.2, 0.5, 0.9, 1]) {
-      for (const lower of [0.3, 0.6, 0.9, 1]) {
-        expect(surfacesIn(fieldWith([[1, 1, upper], [1, 2, upper], [1, 3, lower]]), 1)).toHaveLength(1);
+  it('neighbours at different levels meet at one height: a slope with no seam', () => {
+    const f = field(['4g8c2']);
+    const shapes = [0, 1, 2, 3, 4].map((x) => shapeOf(f, x, 0));
+    for (let x = 0; x < 4; x++) expect(shapes[x].topRight).toBe(shapes[x + 1].topLeft);
+    // The meeting height is between the two surfaces
+    expect(shapes[0].topRight).toBeCloseTo((own(16) + own(4)) / 2, 9);
+    expect(shapes[2].topRight).toBeCloseTo((own(8) + own(12)) / 2, 9);
+    // And across the cell the surface is a straight line from corner to corner
+    for (const s of shapes) expect(s.topMid).toBeCloseTo((s.topLeft + s.topRight) / 2, 9);
+  });
+
+  it('property: on any row of fluid, every pair of neighbours share the corner they meet at', () => {
+    let seed = 7;
+    const rand = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    for (let trial = 0; trial < 40; trial++) {
+      const f = new FluidField(12, 6);
+      for (let y = 0; y < 6; y++) for (let x = 0; x < 12; x++) if (rand() < 0.6) f.set(x, y, rand() < 0.8 ? 1 : 2, 1 + Math.floor(rand() * 16), rand() < 0.2 ? 1 : 0);
+      const layout = new FluidLayout(f, T);
+      for (let y = 0; y < 6; y++) {
+        for (let x = 0; x < 11; x++) {
+          const a = layout.shapesAt(x, y)[0];
+          const b = layout.shapesAt(x + 1, y)[0];
+          if (!a || !b || a.fluidId !== b.fluidId) continue;
+          // Covered cells are a full cell tall (nothing to meet); everything else shares its corner
+          if (a.surface && b.surface) expect(a.topRight).toBe(b.topLeft);
+        }
       }
     }
   });
 
-  it('packs a column\'s fluid down onto its floor, wherever the simulation has it', () => {
-    // Half a cell above half a cell: one full cell of fluid, resting on the floor
-    const field = fieldWith([[1, 2, 0.5], [1, 3, 0.5]]);
-    expect(body(field, 1, 3)).toMatchObject({ surface: true, surfaceY: 3 * T });
-    expect(body(field, 1, 2)).toBeUndefined();
+  it('a pool beside a wall or open air is flat at that edge', () => {
+    const f = field(['8']);
+    const s = shapeOf(f, 0, 0);
+    expect(s.topLeft).toBe(s.topMid);
+    expect(s.topRight).toBe(s.topMid);
   });
 
-  it('a thin film coming and going above a pool moves its surface only by the film\'s own amount (it used to snap to full)', () => {
-    const bare = body(fieldWith([[1, 3, 0.4]]), 1, 3)!;
-    const filmed = new FluidLayout(fieldWith([[1, 2, 0.05], [1, 3, 0.4]]), T).shapesAt(1, 3).find((s) => !s.stream)!;
-    expect(bare.surfaceY - filmed.surfaceY).toBeCloseTo(0.05 * T, 0);
+  it('another fluid beside it is like a wall: the surfaces do not meet', () => {
+    const f = new FluidField(2, 1);
+    f.set(0, 0, 1, 8);
+    f.set(1, 0, 2, 16);
+    const layout = new FluidLayout(f, T);
+    expect(layout.shapesAt(0, 0)[0].topRight).toBe(T / 2);
+    expect(layout.shapesAt(1, 0)[0].topLeft).toBe(0);
   });
 
-  it('the surface moves smoothly as the fluid above a pool grows: never a jump', () => {
-    let last = body(fieldWith([[1, 3, 0.4]]), 1, 3)!.surfaceY;
-    for (let above = 0.01; above <= 1; above += 0.01) {
-      const field = fieldWith([[1, 2, above], [1, 3, 0.4]]);
-      const layout = new FluidLayout(field, T);
-      const y = [...layout.shapesAt(1, 2), ...layout.shapesAt(1, 3)].find((s) => !s.stream)!.surfaceY;
-      expect(Math.abs(y - last)).toBeLessThanOrEqual(0.011 * T + 1);
-      last = y;
-    }
-  });
-
-  it('says where a cell\'s fluid is seen: its body\'s surface, even when that is packed into a cell below', () => {
-    const field = fieldWith([[1, 2, 0.5], [1, 3, 0.5]]);
-    const layout = new FluidLayout(field, T);
-    expect(layout.surfaceAt(1, 2)).toBe(3 * T);
-    expect(layout.surfaceAt(1, 3)).toBe(3 * T);
-    expect(layout.surfaceAt(4, 4)).toBeNull();
-    expect(layout.surfaceAt(-1, 0)).toBeNull();
-    // Falling on its own: the top of its stream
-    const box = terrain(['#####', '#...#', '#...#', '#...#', '#####']);
-    const air = new FluidField(5, 5);
-    air.set(2, 1, 1, q(0.3));
-    const falling = new FluidLayout(air, T, box);
-    expect(falling.surfaceAt(2, 1)).toBe(falling.shapesAt(2, 1)[0].top);
-  });
-
-  it('measures depth from the body\'s surface', () => {
-    const field = fieldWith([[1, 1, 1], [1, 2, 1], [1, 3, 1]]);
-    expect(body(field, 1, 3)!.depth).toBeCloseTo(2);
-    expect(body(field, 1, 1)!.depth).toBe(0);
+  it('a pool beside a waterfall rises to meet it', () => {
+    // Column 2 is a waterfall: cells of 8 units falling, with the same fluid above them (so each is drawn a full cell tall)
+    const f = field(['..8^', '..8^', '888^']);
+    const pool = shapeOf(f, 1, 2);
+    const fall = shapeOf(f, 2, 2);
+    expect(fall.surface).toBe(false);
+    expect(fall.topLeft).toBe(2 * T);
+    expect(pool.topRight).toBeLessThan(own(8, 2));
+    expect(pool.topRight).toBe((own(8, 2) + 2 * T) / 2);
   });
 });
 
-describe('FluidLayout: joining neighbours', () => {
-  it('neighbours at the same level share their edge exactly, and waves carry across', () => {
-    const field = fieldWith([[1, 3, 0.5], [2, 3, 0.5], [3, 3, 0.5]]);
-    const mid = body(field, 2, 3)!;
-    expect(body(field, 1, 3)!.topRight).toBe(mid.topLeft);
-    expect(mid).toMatchObject({ waveLeft: 1, waveRight: 1 });
-    expect(body(field, 1, 3)!.waveLeft).toBe(0); // nothing to its left
+describe('FluidLayout: stacks and falls', () => {
+  it('fluid under fluid is a full cell tall, whatever its level, with no gap between cells', () => {
+    const f = field(['4', '2', '1']);
+    const top = shapeOf(f, 0, 0);
+    const mid = shapeOf(f, 0, 1);
+    const low = shapeOf(f, 0, 2);
+    expect(mid.topLeft).toBe(T);
+    expect(mid.topRight).toBe(T);
+    expect(low.topLeft).toBe(2 * T);
+    expect(top.topLeft).toBe(T - 4 * (T / FLUID_UNITS));
   });
 
-  it('touching neighbours at different levels meet at one height, so a heap slopes with no riser at the cell edge', () => {
-    const lean = (lower: number) => {
-      const field = fieldWith([[1, 3, 0.8], [2, 3, lower]]);
-      const a = body(field, 1, 3)!;
-      return { gap: Math.abs(body(field, 2, 3)!.topLeft - a.topRight), k: a.waveRight, slope: a.topRight - a.topLeft };
-    };
-    for (const lower of [0.7, 0.5, 0.3, 0.15]) {
-      const { gap, k, slope } = lean(lower);
-      expect(gap, `lower ${lower}`).toBeLessThan(0.5); // continuous: both sides agree at the shared edge
-      expect(k).toBeGreaterThan(0.95);
-      expect(slope).toBeGreaterThan(0); // slopes down towards the lower one
+  it('marks the surface on exactly the top cell of each column of fluid', () => {
+    const f = field(['g.g', 'g.4', 'g.g', '...', 'g..']);
+    const layout = new FluidLayout(f, T);
+    const surfaces: string[] = [];
+    for (let y = 0; y < 5; y++) for (let x = 0; x < 3; x++) if (layout.shapesAt(x, y)[0]?.surface) surfaces.push(`${x},${y}`);
+    expect(surfaces).toEqual(['0,0', '2,0', '0,4']);
+  });
+
+  it('measures depth from the top of the column', () => {
+    const f = field(['8', 'g', 'g']);
+    const top = shapeOf(f, 0, 0);
+    expect(top.depth).toBe(0);
+    expect(shapeOf(f, 0, 1).depth).toBeCloseTo((T - top.surfaceY) / T, 9);
+    expect(shapeOf(f, 0, 2).surfaceY).toBe(top.surfaceY);
+    expect(shapeOf(f, 0, 2).depth).toBeCloseTo((2 * T - top.surfaceY) / T, 9);
+  });
+
+  it('a falling cell is the full width of its cell, and is marked', () => {
+    const f = field(['g^', 'g^', 'g^']);
+    for (let y = 0; y < 3; y++) {
+      const s = shapeOf(f, 0, y);
+      expect(s.falling).toBe(true);
+      expect(s.width).toBe(T);
+      expect(s.x).toBe(0);
     }
   });
 
-  it('a heap more than a tile higher than its neighbour still slopes into it (no vertical riser)', () => {
-    const heap = fieldWith([[1, 3, 1], [1, 2, 0.5], [2, 3, 0.4]]);
-    const high = body(heap, 1, 3)!;
-    const low = body(heap, 2, 3)!;
-    expect(Math.abs(low.topLeft - high.topRight)).toBeLessThan(0.5);
-    expect(low.waveLeft).toBeGreaterThan(0.99);
+  it('a thin fall is fainter, not narrower', () => {
+    const thin = shapeOf(field(['1^']), 0, 0);
+    const half = shapeOf(field(['8^']), 0, 0);
+    const full = shapeOf(field(['g^']), 0, 0);
+    expect(thin.width).toBe(T);
+    expect(thin.strength).toBeCloseTo(FALL_MIN_STRENGTH, 9);
+    expect(half.strength).toBe(1);
+    expect(full.strength).toBe(1);
+    expect(fallStrength(4)).toBeGreaterThan(fallStrength(2));
+    expect(shapeOf(field(['1']), 0, 0).strength).toBe(1);
   });
 
-  it('a long run of steps draws as one continuous slope: every boundary has the same height on both sides', () => {
-    const cells: [number, number, number][] = [];
-    const heights = [0.4, 1, 1.6, 2.2, 2.8, 2.2, 1.6, 1, 0.4];
-    heights.forEach((h, i) => {
-      for (let r = 0; r < Math.ceil(h); r++) cells.push([i + 1, 8 - r, Math.min(1, h - r)]);
-    });
-    const field = fieldWith(cells);
-    const layout = new FluidLayout(field, T);
-    const edge = (x: number) => {
-      const col = [8, 7, 6, 5, 4].map((y) => layout.shapesAt(x, y).find((s) => !s.stream && s.topLeft < (y + 1) * T)).find(Boolean)!;
-      return col;
-    };
-    for (let x = 1; x < 9; x++) expect(Math.abs(edge(x).topRight - edge(x + 1).topLeft), `edge ${x}|${x + 1}`).toBeLessThan(0.5);
+  it('at the lip of a fall, the top of the falling cell is never above the pool beside it', () => {
+    // A pool of 6 units on a ledge, and 3 units pouring off its edge: the falling cell starts level with the pool, not at its cell top
+    const f = field(['63^', '...']);
+    const pool = shapeOf(f, 0, 0);
+    const lip = shapeOf(f, 1, 0);
+    expect(lip.falling).toBe(true);
+    expect(lip.surface).toBe(true);
+    expect(lip.topLeft).toBe(pool.topRight);
+    expect(lip.topLeft).toBeGreaterThanOrEqual(Math.min(own(6), own(3)));
+    expect(lip.topLeft).toBeGreaterThan(0);
+    expect(lip.topRight).toBe(own(3));
   });
 
-  it('does not join a different fluid, or fluid on a ledge above a pool, or across a wall', () => {
-    const mixed = fieldWith([[1, 3, 0.5]]);
-    mixed.set(2, 3, 2, q(0.5));
-    expect(body(mixed, 1, 3)!.waveRight).toBe(0);
-    // Column 2's fluid sits on a ledge at row 3; column 1's pool stops just below the top of the ledge
-    const ledge = terrain(['#####', '#...#', '#...#', '#.#.#', '#...#', '#####']);
-    const field = new FluidField(5, 6);
-    field.set(1, 3, 1, q(0.9));
-    field.set(1, 4, 1, q(1));
-    field.set(2, 2, 1, q(0.1));
-    expect(new FluidLayout(field, T, ledge).shapesAt(2, 2).find((s) => !s.stream)!.waveLeft).toBe(0);
-    // A wall between two pools keeps them apart even at the same height
-    const walled = terrain(['#####', '#.#.#', '#.#.#', '#####']);
-    const pools = new FluidField(5, 4);
-    pools.set(1, 2, 1, q(0.5));
-    pools.set(3, 2, 1, q(0.5));
-    expect(new FluidLayout(pools, T, walled).shapesAt(1, 2).find((s) => !s.stream)!.waveRight).toBe(0);
+  it('a ladder shaft behaves like open air: nothing about terrain changes the picture', () => {
+    // The same fluid with or without anything beside it is drawn the same; the layout takes no terrain at all
+    const f = field(['g^', 'g^']);
+    expect(shapeOf(f, 0, 1).topLeft).toBe(T);
+    expect(layoutFluidShapes(f, 0, 1, T)).toHaveLength(1);
   });
 });
 
-describe('FluidLayout: streams', () => {
-  const box = terrain(['#####', '#...#', '#...#', '#...#', '#####']);
-  const make = (cells: [number, number, number][]) => {
-    const field = new FluidField(5, 5);
-    for (const [x, y, level] of cells) field.set(x, y, 1, q(level));
-    return field;
+describe('FluidLayout: surfaceAt', () => {
+  it('is where the fluid is seen: the average of the corners, or the cell top under fluid', () => {
+    const f = field(['4g', 'g.']);
+    const layout = new FluidLayout(f, T);
+    const a = layout.shapesAt(0, 0)[0];
+    expect(layout.surfaceAt(0, 0)).toBe((a.topLeft + a.topRight) / 2);
+    expect(layout.surfaceAt(0, 1)).toBe(T);
+    expect(layout.surfaceAt(1, 1)).toBeNull();
+  });
+});
+
+describe('FluidLayout: one fluid resting on another', () => {
+  const two = (rows: Array<Array<[number, number]>>) => {
+    // rows of [fluidId, units] per cell, one column each; [0, 0] is empty
+    const f = new FluidField(rows[0].length, rows.length);
+    rows.forEach((row, y) => row.forEach(([id, u], x) => u > 0 && f.set(x, y, id, u)));
+    return f;
   };
 
-  it('one cell of fluid falling through open air is one compact blob of its own size, centred, and none of it is a body', () => {
-    const field = make([[2, 1, 0.3]]);
-    const s = stream(field, 2, 1, box)!;
-    const level = field.getLevel(2, 1);
-    expect(s.width * (s.bottom - s.top)).toBeCloseTo(level * T * T, 0); // drawn the size of the water it is
-    expect(s.width).toBeCloseTo(Math.sqrt(level) * T, 0); // a square lump, not a thin bar
-    expect(s.x).toBeCloseTo(2 * T + (T - s.width) / 2);
-    expect(body(field, 2, 1, box)).toBeUndefined();
+  it('oil on a thin layer of water sits right on the water, with no gap of air between them', () => {
+    const f = two([[[2, 3]], [[1, 5]]]); // 3 units of oil above 5 units of water
+    const oil = shapeOf(f, 0, 0);
+    const water = shapeOf(f, 0, 1);
+    expect(water.topLeft).toBe(own(5, 1));
+    expect(oil.bottom).toBeCloseTo(own(5, 1), 9);
+    expect(oil.topLeft).toBeCloseTo(own(5, 1) - (3 / FLUID_UNITS) * T, 9);
+    // The oil is pushed down into the water's cell; its own thickness is still 3 units
+    expect(oil.bottom - oil.topLeft).toBeCloseTo((3 / FLUID_UNITS) * T, 9);
   });
 
-  it('a falling blob handed from one cell to the next keeps its size and moves smoothly between them', () => {
-    // The client eases a falling cell's level out of one cell and into the next
-    const sizes: number[] = [];
-    const centres: number[] = [];
-    for (let t = 0; t <= 1.0001; t += 0.25) {
-      const field = make([[2, 1, 1 - t], [2, 2, t]].filter(([, , l]) => l > 0) as [number, number, number][]);
-      const pieces = [1, 2].flatMap((y) => new FluidLayout(field, T, box).shapesAt(2, y).filter((sh) => sh.stream));
-      const top = Math.min(...pieces.map((p) => p.top));
-      const bottom = Math.max(...pieces.map((p) => p.bottom));
-      sizes.push(pieces[0].width * (bottom - top));
-      centres.push((top + bottom) / 2);
-    }
-    for (const size of sizes) expect(size).toBeCloseTo(T * T, -1);
-    for (let i = 1; i < centres.length; i++) expect(centres[i] - centres[i - 1]).toBeCloseTo(0.25 * T, 0);
+  it('a whole stack of oil is pushed down together, and water that is full pushes nothing', () => {
+    const stack = two([[[2, 16]], [[2, 4]], [[1, 8]]]);
+    expect(shapeOf(stack, 0, 1).bottom).toBeCloseTo(own(8, 2), 9);
+    expect(shapeOf(stack, 0, 0).bottom).toBeCloseTo(shapeOf(stack, 0, 1).top, 9);
+    const full = two([[[2, 4]], [[1, 16]]]);
+    expect(shapeOf(full, 0, 0).bottom).toBe(T);
+    expect(shapeOf(full, 0, 0).topLeft).toBe(own(4));
   });
 
-  it('a stream widens with more fluid (to a limit) and thins to nothing as it runs out', () => {
-    const width = (level: number) => stream(make([[2, 1, level]]), 2, 1, box)?.width ?? 0;
-    expect(width(1)).toBeCloseTo(STREAM_MAX_WIDTH * T, 0);
-    expect(width(0.2)).toBeGreaterThan(width(0.1));
-    // A trickle is still clearly visible; only the last drops thin away to nothing
-    expect(width(0.03)).toBeGreaterThanOrEqual(STREAM_MIN_WIDTH * T - 1e-6);
-    expect(width(0.006)).toBeLessThan(0.05 * T);
+  it('is not pushed down by the same fluid, by rock or by nothing below it', () => {
+    expect(shapeOf(field(['8', '8']), 0, 0).bottom).toBe(T);
+    expect(shapeOf(field(['8', '.']), 0, 0).bottom).toBe(T);
+    expect(shapeOf(field(['8']), 0, 0).bottom).toBe(T);
   });
 
-  it('nothing is a stream without a terrain sampler', () => {
-    expect(stream(make([[2, 1, 0.3]]), 2, 1)).toBeUndefined();
-  });
-
-  it('fluid falling down a one-wide shaft (walls both sides) is a stream, centred, so it can be seen all the way down', () => {
-    const shaft = terrain(['###', '#.#', '#.#', '###']);
-    const field = new FluidField(3, 4);
-    field.set(1, 1, 1, q(0.5));
-    const s = stream(field, 1, 1, shaft)!;
-    expect(s).toBeDefined();
-    expect(s.x).toBeCloseTo(T + (T - s.width) / 2);
-  });
-
-  it('a column of thin water falling through a shaft is drawn in every cell it is in, not squashed onto the bottom', () => {
-    const rows = ['#.#', '#.#', '#.#', '#.#', '#.#', '#.#', '###'];
-    const shaft = terrain(rows);
-    const field = new FluidField(3, 7);
-    for (let y = 0; y <= 4; y++) field.set(1, y, 1, q(0.4));
-    const layout = new FluidLayout(field, T, shaft);
-    for (let y = 0; y <= 4; y++) expect(layout.shapesAt(1, y).some((sh) => sh.stream), `row ${y}`).toBe(true);
-  });
-
-  it('a shaft that has filled up is a body again: full cells rest on the floor and are not streams', () => {
-    const shaft = terrain(['###', '#.#', '#.#', '#.#', '###']);
-    const field = new FluidField(3, 5);
-    for (let y = 1; y <= 3; y++) field.set(1, y, 1, q(1));
-    for (let y = 1; y <= 3; y++) expect(stream(field, 1, y, shaft)).toBeUndefined();
-    expect(body(field, 1, 3, shaft)).toBeDefined();
-  });
-
-  it('fluid resting on the floor is a puddle', () => {
-    const field = make([[2, 3, 0.2]]);
-    expect(stream(field, 2, 3, box)).toBeUndefined();
-    expect(body(field, 2, 3, box)!.surface).toBe(true);
-  });
-
-  it('fluid at the lip of a ledge turns smoothly into a spill as the pool beside it fills: nothing appears or vanishes in one go', () => {
-    // A ledge under the left cell (the pool's floor), a drop under the lip cell
-    const lip = terrain(['#####', '#...#', '##..#', '#...#', '#####']);
-    const area = (points: number[]) => {
-      let sum = 0;
-      for (let i = 0; i < points.length; i += 2) {
-        const j = (i + 2) % points.length;
-        sum += points[i] * points[j + 1] - points[j] * points[i + 1];
-      }
-      return Math.abs(sum) / 2;
-    };
-    const drawnIn = (field: FluidField) => new FluidLayout(field, T, lip).shapesAt(2, 1)
-      .reduce((sum, sh) => sum + (sh.spill ? area(sh.spill) : sh.stream ? (sh.bottom - sh.top) * sh.width : 0), 0) / T;
-    let last: number | null = null;
-    let spills = 0;
-    for (let beside = 0; beside <= 0.3; beside += 0.02) {
-      const field = make([[2, 1, 0.3], ...(beside > 0 ? ([[1, 1, beside]] as [number, number, number][]) : [])]);
-      const now = drawnIn(field);
-      if (last !== null) expect(Math.abs(now - last), `beside ${beside.toFixed(2)}`).toBeLessThan(0.15 * T);
-      if (new FluidLayout(field, T, lip).shapesAt(2, 1).some((sh) => sh.spill)) spills++;
-      last = now;
-    }
-    expect(spills).toBeGreaterThan(5); // it does become a spill
-  });
-
-  it('fluid beside a column of fluid with no ground under it (the side of a heap) is not a spill', () => {
-    const field = make([[1, 1, 1], [1, 2, 1], [1, 3, 1], [2, 1, 0.3]]);
-    expect(new FluidLayout(field, T, box).shapesAt(2, 1).some((sh) => sh.spill)).toBe(false);
-  });
-
-  it('presses to the wall it runs down', () => {
-    const wall = terrain(['##..', '#...', '#...', '####']);
-    const field = new FluidField(4, 4);
-    field.set(1, 1, 1, q(0.4));
-    expect(stream(field, 1, 1, wall)!.x).toBe(T);
-  });
-
-  it('runs on into the pool it lands in, and the pool shows only the fluid resting in it', () => {
-    const field = make([[2, 2, 0.3], [2, 3, 0.4]]);
-    const pool = body(field, 2, 3, box)!;
-    expect(pool.surfaceY).toBeCloseTo(4 * T - 0.4 * T, 0);
-    const pieces = [...shapesAt(field, 2, 2, box), ...shapesAt(field, 2, 3, box)].filter((s) => s.stream);
-    expect(Math.max(...pieces.map((s) => s.bottom))).toBeCloseTo(pool.surfaceY, 0);
-    expect(Math.min(...pieces.map((s) => s.top))).toBeLessThan(3 * T);
+  it('neighbouring oil cells still share their corners when only one rests on water', () => {
+    const f = two([[[2, 6], [2, 6]], [[1, 4], [0, 0]]]);
+    const a = shapeOf(f, 0, 0);
+    const b = shapeOf(f, 1, 0);
+    expect(a.topRight).toBe(b.topLeft);
   });
 });
 
-describe('fluidBodyBands', () => {
-  it('splits a full cell into shaded strips that tile it exactly', () => {
-    const field = fieldWith([[1, 1, 1], [1, 2, 1]]);
-    const bands = fluidBodyBands(body(field, 1, 2)!, T, still);
-    expect(bands).toHaveLength(FLUID_SHADE_STRIPS);
-    const topOf = (b: { points: number[] }) => Math.min(...b.points.filter((_, i) => i % 2 === 1));
-    const bottomOf = (b: { points: number[] }) => Math.max(...b.points.filter((_, i) => i % 2 === 1));
-    for (let i = 1; i < bands.length; i++) expect(topOf(bands[i])).toBe(bottomOf(bands[i - 1]));
-    expect(topOf(bands[0])).toBe(2 * T);
-    expect(bottomOf(bands[bands.length - 1])).toBe(3 * T);
-    expect(bands[0].depth).toBeLessThan(bands[1].depth);
+describe('waves and bands read the shape', () => {
+  it('a surface wave stops where the surface meets a falling cell or the end of the pool', () => {
+    const f = field(['88g^']);
+    const pool = shapeOf(f, 1, 0);
+    expect(pool.waveLeft).toBe(1);
+    expect(pool.waveRight).toBe(0);
+    expect(shapeOf(f, 0, 0).waveLeft).toBe(0);
+    const appearance = { waveAmplitude: 0.1, waveSpeed: 1, highlight: 0.5, depthDarkening: 0.2, depthOpacity: 0.2 };
+    const wave = fluidSurfaceWave(pool, T, 0.3, appearance as any)!;
+    // The right edge of the wave is the shape's own corner, unmoved
+    expect(wave.line[wave.line.length - 1]).toBeCloseTo(pool.topRight, 9);
   });
 
-  it('clips to a sloped surface', () => {
-    const field = fieldWith([[1, 2, 0.4], [2, 2, 0.7]]);
-    const shape = body(field, 1, 2)!;
-    const bands = fluidBodyBands(shape, T, still);
-    const surface = (x: number) => Math.min(...bands.map((b) => topAt(b.points, x)).filter((y) => !Number.isNaN(y)));
-    // lower on the left, rising to the deeper neighbour
-    expect(surface(shape.x + 1)).toBeGreaterThan(surface(shape.x + shape.width - 1));
-  });
-
-  it('follows a steep surface exactly through every strip: the bands fill the area under it with no wedge cut out', () => {
-    const area = (points: number[]) => {
-      let sum = 0;
-      for (let i = 0; i < points.length; i += 2) {
-        const j = (i + 2) % points.length;
-        sum += points[i] * points[j + 1] - points[j] * points[i + 1];
-      }
-      return Math.abs(sum) / 2;
-    };
-    // A surface falling 40 px across one cell crosses two strip boundaries part way across
-    const shape: FluidShape = {
-      cx: 1, cy: 2, fluidId: 1, x: T, width: T, top: 2 * T, bottom: 3 * T, topLeft: 2 * T + 6, topRight: 2 * T + 46, topMid: 2 * T + 26,
-      surface: false, waveLeft: 0, waveRight: 0, surfaceY: 2 * T + 26, bodyBottom: 3 * T, depth: 0, stream: false,
-    };
-    const bands = fluidBodyBands(shape, T, still);
-    const drawn = bands.reduce((sum, band) => sum + area(band.points), 0);
-    const expected = T * (3 * T - (shape.topLeft + shape.topRight) / 2); // a trapezoid under the line
-    expect(drawn).toBeCloseTo(expected, 0);
-    // No band runs along its own bottom edge and back (a zero-area sliver that draws as a hairline)
-    for (const band of bands) {
-      const ys = band.points.filter((_, i) => i % 2 === 1);
-      const bottom = Math.max(...ys);
-      expect(ys.filter((y) => y >= bottom).length, JSON.stringify(band.points)).toBeLessThanOrEqual(2);
-    }
-    // Where it is matters, not just how much: each strip's top edge is the surface line held inside the strip
-    const line = (x: number) => shape.topLeft + ((shape.topRight - shape.topLeft) * (x - shape.x)) / shape.width;
-    for (const band of bands) {
-      const ys = band.points.filter((_, i) => i % 2 === 1);
-      const s1 = Math.max(...ys);
-      const s0 = s1 - T / 4;
-      for (let x = shape.x + 1; x < shape.x + shape.width; x += 3) {
-        const expectedTop = line(x) >= s1 ? NaN : Math.max(s0, line(x));
-        const drawnTop = topAt(band.points, x);
-        if (Number.isNaN(expectedTop)) expect(Number.isNaN(drawnTop) || drawnTop >= s1 - 0.5, `x ${x}`).toBe(true);
-        else expect(drawnTop, `x ${x}`).toBeCloseTo(expectedTop, 0);
-      }
-    }
-  });
-
-  it('cuts the body short of the surface by the wave room, only where the surface carries on', () => {
-    const shape = body(fieldWith([[1, 2, 0.5], [2, 2, 0.5]]), 1, 2)!;
-    const surfaceAt = (a: FluidAppearance, x: number) => Math.min(...fluidBodyBands(shape, T, a).map((b) => topAt(b.points, x)).filter((y) => !Number.isNaN(y)));
-    const left = shape.x + 0.01;
-    const right = shape.x + shape.width - 0.01;
-    expect(surfaceAt(wavy, left)).toBeCloseTo(surfaceAt(still, left), 1); // the free left edge
-    expect(surfaceAt(wavy, right) - surfaceAt(still, right)).toBeCloseTo(0.1 * T, 1);
-  });
-});
-
-describe('fluidSurfaceWave', () => {
-  const field = fieldWith([[1, 2, 0.5], [2, 2, 0.5], [3, 2, 0.5]]);
-  const middle = body(field, 2, 2)!;
-  const edge = body(field, 1, 2)!;
-
-  it('only the surface cell of a body has a wave, and streams have none', () => {
-    const stacked = fieldWith([[1, 1, 1], [1, 2, 1]]);
-    expect(fluidSurfaceWave(body(stacked, 1, 2)!, T, 0, wavy)).toBeNull();
-    const box = terrain(['#####', '#...#', '#...#', '#####']);
-    const falling = new FluidField(5, 4);
-    falling.set(2, 1, 1, q(0.3));
-    expect(fluidSurfaceWave(stream(falling, 2, 1, box)!, T, 0, wavy)).toBeNull();
-  });
-
-  it('is a flat line with nothing to fill when the fluid is still', () => {
-    const wave = fluidSurfaceWave(middle, T, 1.3, still)!;
+  it('a falling cell has no waves and does not draw a surface wave line room', () => {
+    const s = shapeOf(field(['g^']), 0, 0);
+    const wave = fluidSurfaceWave(s, T, 0.3, { waveAmplitude: 0.1, waveSpeed: 1, highlight: 0.5, depthDarkening: 0.2, depthOpacity: 0.2 } as any)!;
     expect(wave.fill).toEqual([]);
-    expect(new Set(wave.line.filter((_, i) => i % 2 === 1)).size).toBe(1);
-    expect(wave.line).toHaveLength((FLUID_WAVE_SEGMENTS + 1) * 2);
   });
 
-  it('moves with time and stays within the wave room', () => {
-    const ys = new Set<number>();
-    for (let t = 0; t < 3; t += 0.1) {
-      const line = fluidSurfaceWave(middle, T, t, wavy)!.line;
-      for (let i = 1; i < line.length; i += 2) {
-        expect(Math.abs(line[i] - middle.topLeft)).toBeLessThanOrEqual(0.1 * T + 1e-6);
-        ys.add(Math.round(line[i] * 100));
-      }
+  it('bands cover the cell below its surface and stay inside it', () => {
+    const f = field(['8']);
+    const s = shapeOf(f, 0, 0);
+    const bands = fluidBodyBands(s, T);
+    expect(bands.length).toBeGreaterThan(0);
+    for (const band of bands) for (let i = 0; i < band.points.length; i += 2) {
+      expect(band.points[i]).toBeGreaterThanOrEqual(0);
+      expect(band.points[i]).toBeLessThanOrEqual(T);
+      expect(band.points[i + 1]).toBeGreaterThanOrEqual(s.topMid - 1e-6);
+      expect(band.points[i + 1]).toBeLessThanOrEqual(T);
     }
-    expect(ys.size).toBeGreaterThan(5);
-  });
-
-  it('does not wave at an edge with nothing to continue into (no gap can open)', () => {
-    for (let t = 0; t < 3; t += 0.2) expect(fluidSurfaceWave(edge, T, t, wavy)!.line[1]).toBe(edge.topLeft);
-  });
-
-  it('agrees with its neighbour where they meet', () => {
-    const a = fluidSurfaceWave(edge, T, 0.7, wavy)!.line;
-    const b = fluidSurfaceWave(middle, T, 0.7, wavy)!.line;
-    expect(a[a.length - 2]).toBe(b[0]);
-    expect(a[a.length - 1]).toBeCloseTo(b[1]);
-  });
-
-  it('the fill closes the gap between the wave line and the body', () => {
-    const wave = fluidSurfaceWave(middle, T, 0.4, wavy)!;
-    const top = fluidBodyBands(middle, T, wavy)[0].points;
-    const back = wave.fill.slice((FLUID_WAVE_SEGMENTS + 1) * 2);
-    expect(back.slice(0, 2)).toEqual([middle.x + middle.width, expect.closeTo(top[3])]);
-    expect(back.slice(-2)).toEqual([middle.x, expect.closeTo(top[1])]);
-  });
-
-  it('keeps waves inside shallow fluid', () => {
-    const shallow = body(fieldWith([[1, 2, 0.06], [2, 2, 0.06]]), 1, 2)!;
-    for (let t = 0; t < 2; t += 0.1) {
-      const line = fluidSurfaceWave(shallow, T, t, { ...wavy, waveAmplitude: 0.3 })!.line;
-      for (let i = 1; i < line.length; i += 2) expect(line[i]).toBeLessThanOrEqual(shallow.bodyBottom);
-    }
-  });
-});
-
-describe('wave and depth helpers', () => {
-  it('wave height stays within -1..1 and depends on x and time', () => {
-    let min = 1, max = -1;
-    for (let x = 0; x < 400; x += 7) for (let t = 0; t < 4; t += 0.3) {
-      const h = fluidWaveHeight(x, t, DEFAULT_FLUID_APPEARANCE, T);
-      min = Math.min(min, h); max = Math.max(max, h);
-    }
-    expect(min).toBeGreaterThanOrEqual(-1);
-    expect(max).toBeLessThanOrEqual(1);
-    expect(max - min).toBeGreaterThan(1);
-    expect(fluidWaveHeight(10, 0, DEFAULT_FLUID_APPEARANCE, T)).not.toBe(fluidWaveHeight(10, 1.1, DEFAULT_FLUID_APPEARANCE, T));
-  });
-
-  it('a stopped wave stays put', () => {
-    const a: FluidAppearance = { ...wavy, waveSpeed: 0 };
-    expect(fluidWaveHeight(33, 0, a, T)).toBe(fluidWaveHeight(33, 9, a, T));
-  });
-
-  it('depth shading darkens and thickens with depth, up to the cap, by the fluid\'s own strengths', () => {
-    const a: FluidAppearance = { ...DEFAULT_FLUID_APPEARANCE, depthDarkening: 0.5, depthOpacity: 0.5 };
-    expect(fluidDepthShade(0.6, a, 0)).toEqual({ darken: 0, opacity: 0.6 });
-    const deep = fluidDepthShade(0.6, a, FLUID_DEPTH_CAP);
-    expect(deep.darken).toBeCloseTo(0.5);
-    expect(deep.opacity).toBeCloseTo(0.8);
-    expect(fluidDepthShade(0.6, a, FLUID_DEPTH_CAP * 3)).toEqual(deep);
-    expect(fluidDepthShade(0.6, { ...a, depthDarkening: 0, depthOpacity: 0 }, 5)).toEqual({ darken: 0, opacity: 0.6 });
-  });
-
-  it('bandBelowLine hangs a strip under a line without passing the bottom', () => {
-    expect(bandBelowLine([0, 10, 10, 12], 5, 100)).toEqual([0, 10, 10, 12, 10, 17, 0, 15]);
-    expect(bandBelowLine([0, 10, 10, 12], 5, 14)).toEqual([0, 10, 10, 12, 10, 14, 0, 14]);
-  });
-});
-
-describe('FluidAppearance data', () => {
-  it('fills in whatever is missing or unusable with the defaults, and clamps', () => {
-    expect(resolveFluidAppearance(null)).toEqual(DEFAULT_FLUID_APPEARANCE);
-    expect(resolveFluidAppearance({ waveAmplitude: 0.1, highlight: 'x', waveSpeed: 99 })).toEqual({ ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0.1, waveSpeed: 4 });
-    expect(resolveFluidAppearance([1, 2])).toEqual(DEFAULT_FLUID_APPEARANCE);
-  });
-
-  it('validates ranges and shape', () => {
-    expect(validateFluidAppearance(null)).toEqual([]);
-    expect(validateFluidAppearance({ waveAmplitude: 0.1 })).toEqual([]);
-    expect(validateFluidAppearance({ waveAmplitude: 0.9 })).toHaveLength(1);
-    expect(validateFluidAppearance({ highlight: -1, depthOpacity: 2 })).toHaveLength(2);
-    expect(validateFluidAppearance('x')).toHaveLength(1);
-  });
-
-  it('is part of validating a fluid', () => {
-    const base = { typeKey: 'OIL', name: 'Oil', color: '#000000', opacity: 0.9, density: 1, viscosity: 0.5, flowRate: 0.5, minLevel: 0.05, flowThreshold: 0.02 };
-    expect(validateFluid(base)).toEqual([]);
-    expect(validateFluid({ ...base, appearance: { waveSpeed: 10 } })).toHaveLength(1);
-  });
-});
-
-describe('fluid colour helpers', () => {
-  it('parses #rrggbb and falls back to black', () => {
-    expect(parseHexColor('#ff8800')).toBe(0xff8800);
-    expect(parseHexColor('orange')).toBe(0);
-    expect(parseHexColor('#fff')).toBe(0);
-  });
-
-  it('lightens towards white and darkens towards black', () => {
-    expect(lightenColor(0x102030, 0.5)).toBe(0x889098);
-    expect(lightenColor(0x000000, 1)).toBe(0xffffff);
-    expect(darkenColor(0x806040, 0.5)).toBe(0x403020);
-    expect(darkenColor(0x806040, 7)).toBe(0x000000);
-  });
-
-  it('writes a CSS colour', () => {
-    expect(colorToCss(0xff8040, 0.5)).toBe('rgba(255, 128, 64, 0.5)');
   });
 });

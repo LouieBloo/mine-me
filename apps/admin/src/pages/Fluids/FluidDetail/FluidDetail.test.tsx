@@ -113,7 +113,7 @@ describe('FluidDetail editing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Fluid' }));
     expect(await screen.findByText('Fluid saved!')).toBeInTheDocument();
     expect(JSON.parse(lastCall('PUT')![1].body).appearance).toEqual({
-      waveAmplitude: 0.02, waveSpeed: 0.3, highlight: 0.5, depthDarkening: 0.35, depthOpacity: 0.25,
+      waveAmplitude: 0.02, waveSpeed: 0.3, highlight: 0.5, depthDarkening: 0.35, depthOpacity: 0.25, flowSpeed: 2.5, flowStreaks: 0.5,
     });
   });
 

@@ -10,19 +10,21 @@ describe('fluid level quantisation', () => {
     expect(quantizeFluidLevel(0.001)).toBe(1);
   });
 
-  it('fits a byte for squeezed cells and clamps beyond that', () => {
-    expect(quantizeFluidLevel(1.05)).toBeLessThanOrEqual(255);
-    expect(quantizeFluidLevel(50)).toBe(255);
+  it('is whole units, 16 to a cell, and never more than a full cell', () => {
+    expect(FLUID_LEVEL_STEPS).toBe(16);
+    expect(quantizeFluidLevel(0.5)).toBe(8);
+    expect(quantizeFluidLevel(1.05)).toBe(16);
+    expect(quantizeFluidLevel(50)).toBe(16);
   });
 
   it('round-trips to within one step', () => {
-    for (const level of [0.05, 0.3, 0.5, 0.77, 1, 1.04]) {
+    for (const level of [0.05, 0.3, 0.5, 0.77, 1]) {
       expect(Math.abs(dequantizeFluidLevel(quantizeFluidLevel(level)) - level)).toBeLessThanOrEqual(1 / FLUID_LEVEL_STEPS);
     }
   });
 
   it('builds wire cells, turning an invisible level into an empty cell', () => {
-    expect(toFluidWireCell(3, 4, 2, 0.5)).toEqual([3, 4, 2, 64]);
+    expect(toFluidWireCell(3, 4, 2, 0.5)).toEqual([3, 4, 2, 8]);
     expect(toFluidWireCell(3, 4, 2, 0)).toEqual([3, 4, 0, 0]);
   });
 });
@@ -32,20 +34,20 @@ describe('FluidField', () => {
     const field = new FluidField(5, 4);
     expect(field.getFluidId(1, 1)).toBe(0);
     expect(field.getLevel(1, 1)).toBe(0);
-    field.apply([[1, 1, 2, 64]]);
+    field.apply([[1, 1, 2, 8]]);
     expect(field.getFluidId(1, 1)).toBe(2);
     expect(field.getLevel(1, 1)).toBeCloseTo(0.5, 5);
   });
 
   it('reports only the cells that really changed', () => {
     const field = new FluidField(5, 4);
-    expect(field.apply([[1, 1, 1, 10], [2, 2, 1, 20]])).toHaveLength(2);
-    expect(field.apply([[1, 1, 1, 10], [2, 2, 1, 21]])).toEqual([[2, 2, 1, 21]]);
+    expect(field.apply([[1, 1, 1, 4], [2, 2, 1, 8]])).toHaveLength(2);
+    expect(field.apply([[1, 1, 1, 4], [2, 2, 1, 9]])).toEqual([[2, 2, 1, 9]]);
   });
 
   it('empties a cell when told level 0, whatever fluid id comes with it', () => {
     const field = new FluidField(3, 3);
-    field.apply([[1, 1, 1, 50]]);
+    field.apply([[1, 1, 1, 12]]);
     field.apply([[1, 1, 1, 0]]);
     expect(field.getFluidId(1, 1)).toBe(0);
     expect(field.getLevel(1, 1)).toBe(0);

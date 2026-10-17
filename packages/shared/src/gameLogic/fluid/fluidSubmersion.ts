@@ -1,3 +1,5 @@
+import { isFluidCovered } from './fluidCover';
+
 /** Anything that can say what fluid is in a cell: the server's `FluidGrid` and the client's `FluidField`. */
 export interface FluidSampler {
   getFluidId(x: number, y: number): number;
@@ -54,7 +56,7 @@ export function sampleFluidContact(
     for (let y = firstRow; y <= lastRow; y++) {
       const fluidId = sampler.getFluidId(x, y);
       if (fluidId === 0) continue;
-      const full = sampler.getFluidId(x, y - 1) === fluidId;
+      const full = isFluidCovered(sampler, x, y);
       const fill = full ? 1 : Math.min(1, sampler.getLevel(x, y));
       const fluidTop = y + 1 - fill;
       const overlap = Math.min(bottom, y + 1) - Math.max(top, fluidTop);

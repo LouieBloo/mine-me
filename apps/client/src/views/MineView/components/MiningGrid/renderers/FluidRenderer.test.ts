@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
-import { quantizeFluidLevel, type FluidClientDefinition } from '@mine-me/shared';
-import { FLUID_CHUNK_SIZE, FLUID_STEP_SECONDS, FluidRenderer, darkenColor, lightenColor, parseHexColor } from './FluidRenderer';
+import { DEFAULT_FLUID_APPEARANCE, quantizeFluidLevel, type FluidClientDefinition } from '@mine-me/shared';
+import { FLUID_CHUNK_SIZE, FluidRenderer, darkenColor, lightenColor, parseHexColor } from './FluidRenderer';
 
 const OIL: FluidClientDefinition = { id: 1, typeKey: 'OIL', name: 'Oil', color: '#0b0b0d', opacity: 0.9, viscosity: 0.6, density: 0.8 };
 const q = quantizeFluidLevel;
@@ -136,73 +136,101 @@ describe('FluidRenderer', () => {
     expect(renderer.render()).toBe(2);
   });
 
-  it('redraws a fall across a one-cell gap: the jet is laid out down the whole column, so the part past the gap changes too', () => {
+  it('redraws the fluid stacked below a changed top cell, and not the cells above a changed bottom cell', () => {
     const { renderer } = make();
-    const x = 2;
-    // Falling water, an empty beat two rows above a chunk edge, and more of the fall running on into the chunk below
-    renderer.apply([[x, FLUID_CHUNK_SIZE - 4, 1, q(0.06)], [x, FLUID_CHUNK_SIZE - 3, 1, q(0.06)], [x, FLUID_CHUNK_SIZE - 1, 1, q(0.06)], [x, FLUID_CHUNK_SIZE, 1, q(0.06)]]);
+    const column: [number, number, number, number][] = [];
+    for (let y = 2; y < FLUID_CHUNK_SIZE * 2 + 2; y++) column.push([2, y, 1, q(1)]);
+    renderer.apply(column);
     renderer.render();
-    renderer.apply([[x, FLUID_CHUNK_SIZE - 4, 1, q(0.3)]]);
-    expect(renderer.render()).toBe(2); // its own chunk and the one past the gap
+    renderer.apply([[2, FLUID_CHUNK_SIZE * 2 + 1, 1, q(0.5)]]);
+    expect(renderer.render()).toBe(1); // only the bottom cell's own chunk: nothing above it depends on it
+    renderer.apply([[2, 2, 1, q(0.5)]]);
+    expect(renderer.render()).toBe(3); // the top of the column moved, so all three chunks it runs through are deeper or shallower
   });
 
-  it('draws the highlight over the lip where a pool spills into a drop', () => {
-    const container = new Container();
-    const renderer = new FluidRenderer(container, 10, 10, [{ ...OIL, appearance: { waveAmplitude: 0, waveSpeed: 0, highlight: 0.6, depthDarkening: 0.3, depthOpacity: 0.2 } }], 64);
-    // Ground at row 4 except a one-wide shaft at x 5; a pool on the left spilling into it
-    renderer.setSolidSampler((x, y) => x < 0 || x >= 10 || y >= 9 || (y >= 4 && x !== 5));
-    renderer.apply([[2, 3, 1, q(0.6)], [3, 3, 1, q(0.6)], [4, 3, 1, q(0.6)], [5, 3, 1, q(0.1)], [5, 4, 1, q(0.06)], [5, 5, 1, q(0.06)], [5, 6, 1, q(0.06)]]);
-    const stroke = vi.spyOn(Graphics.prototype, 'stroke');
-    const poly = vi.spyOn(Graphics.prototype, 'poly');
+  it('redraws the fluid stacked above a changed cell, because it rests on that cell\'s surface', () => {
+    const { renderer } = make();
+    renderer.setDefinitions([OIL, { ...OIL, id: 2, typeKey: 'WATER' }]);
+    const stack: Array<[number, number, number, number]> = [];
+    for (let y = 2; y < FLUID_CHUNK_SIZE + 2; y++) stack.push([2, y, 1, q(1)]);
+    stack.push([2, FLUID_CHUNK_SIZE + 2, 2, q(0.25)]);
+    renderer.apply(stack);
     renderer.render();
-    // An open polyline (the spill's edge) starting at the lip's left side, stroked
-    const edgeCall = poly.mock.calls.find(([points, closed]) => closed === false && (points as number[])[0] === 5 * 64);
-    expect(edgeCall).toBeDefined();
-    expect(stroke).toHaveBeenCalled();
+    renderer.apply([[2, FLUID_CHUNK_SIZE + 2, 2, q(0.5)]]);
+    expect(renderer.render()).toBe(2); // the water's chunk and the chunk holding the top of the stack resting on it
   });
 
-  it('draws fluid in free fall sliding down from the cell above over one step, redrawing it every frame until it arrives', () => {
-    const { renderer } = make();
-    renderer.setSolidSampler((x, y) => y >= 39 || x < 0 || x >= 40);
-    renderer.apply([[5, 5, 1, q(1)]]); // a cell of fluid in the air
-    renderer.update(0);
-    renderer.render();
-    // The next step: it fell one cell
-    renderer.apply([[5, 5, 0, 0], [5, 6, 1, q(1), q(1)]], true);
-    renderer.update(0.001);
-    expect(renderer.fallProgress).toBeLessThan(0.1);
-    let frames = 0;
-    for (let t = 0.001; t < FLUID_STEP_SECONDS; t += 1 / 60) {
-      renderer.update(t);
-      frames++;
-    }
-    expect(frames).toBeGreaterThan(3);
-    renderer.update(FLUID_STEP_SECONDS + 0.02);
-    expect(renderer.fallProgress).toBe(1);
-    // Once it has arrived nothing more is redrawn
-    renderer.update(FLUID_STEP_SECONDS + 0.1);
-    expect(renderer.render()).toBe(0);
-  });
+  describe('falling fluid', () => {
+    afterEach(() => vi.restoreAllMocks());
+    const look = (extra: object = {}) => ({ ...OIL, appearance: { ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0, waveSpeed: 0, ...extra } });
+    const fall = (def: FluidClientDefinition) => {
+      const renderer = new FluidRenderer(new Container(), 40, 40, [def], 64);
+      renderer.apply([[5, 5, 1, q(1), 1], [5, 6, 1, q(1), 1]], true);
+      renderer.render();
+      return renderer;
+    };
 
-  it('the redraws while sliding come from the slide: a frame mid-slide redraws the falling cell', () => {
-    const { renderer } = make();
-    renderer.setSolidSampler((x, y) => y >= 39 || x < 0 || x >= 40);
-    renderer.apply([[5, 5, 1, q(1)]]);
-    renderer.update(0);
-    renderer.render();
-    renderer.apply([[5, 5, 0, 0], [5, 6, 1, q(1), q(1)]], true);
-    // Let the (hurried) easing settle while the slide is still under way
-    for (let t = 0.001; t < 0.09; t += 1 / 240) renderer.update(t);
-    renderer.render();
-    expect(renderer.fallProgress).toBeLessThan(1);
-    const spy = vi.spyOn(renderer as any, 'drawChunk');
-    renderer.update(0.095); // only the slide moves it now
-    expect(spy).toHaveBeenCalled();
+    it('shows at once, never eased between cells', () => {
+      const renderer = fall(look());
+      expect(renderer.display.getLevel(5, 5)).toBe(1);
+      expect(renderer.display.isFalling(5, 5)).toBe(true);
+      renderer.apply([[5, 5, 0, 0], [5, 6, 0, 0], [5, 7, 1, q(1), 1], [5, 8, 1, q(1), 1]], true);
+      expect(renderer.display.getLevel(5, 5)).toBe(0);
+      expect(renderer.display.getLevel(5, 7)).toBe(1);
+    });
+
+    it('redraws only the streaks as time passes (the shape of a fall stands still)', () => {
+      const renderer = fall(look());
+      const clear = vi.spyOn(Graphics.prototype, 'clear');
+      const rect = vi.spyOn(Graphics.prototype, 'rect');
+      renderer.update(1);
+      renderer.update(1.1);
+      expect(clear).toHaveBeenCalledTimes(2);
+      expect(rect).toHaveBeenCalled();
+    });
+
+    it('is not redrawn when the fluid does not flow or has no streaks', () => {
+      for (const extra of [{ flowSpeed: 0 }, { flowStreaks: 0 }]) {
+        const renderer = fall(look(extra));
+        const clear = vi.spyOn(Graphics.prototype, 'clear');
+        renderer.update(1);
+        renderer.update(1.1);
+        expect(clear).not.toHaveBeenCalled();
+        vi.restoreAllMocks();
+      }
+    });
+
+    it('stops redrawing once the fluid lands and rests', () => {
+      const renderer = fall(look());
+      renderer.apply([[5, 5, 0, 0], [5, 6, 1, q(1)]], true);
+      renderer.render();
+      const clear = vi.spyOn(Graphics.prototype, 'clear');
+      renderer.update(2);
+      renderer.update(2.1);
+      expect(clear).not.toHaveBeenCalled();
+    });
+
+    it('draws the streaks the shared maths gives, clipped to the cells that are falling', () => {
+      const renderer = fall(look());
+      const rects: number[][] = [];
+      vi.spyOn(Graphics.prototype, 'rect').mockImplementation(function (this: any, ...args: number[]) {
+        rects.push(args);
+        return this;
+      });
+      renderer.update(1.5);
+      expect(rects.length).toBeGreaterThan(0);
+      for (const [x, y, w, h] of rects) {
+        expect(x).toBeGreaterThanOrEqual(5 * 64);
+        expect(x + w).toBeLessThanOrEqual(6 * 64);
+        expect(y).toBeGreaterThanOrEqual(5 * 64 - 1e-6);
+        expect(y + h).toBeLessThanOrEqual(7 * 64 + 1e-6);
+      }
+    });
   });
 
   describe('waves', () => {
     afterEach(() => vi.restoreAllMocks());
-    const still = { ...OIL, appearance: { waveAmplitude: 0, waveSpeed: 0.6, highlight: 0.5, depthDarkening: 0.3, depthOpacity: 0.2 } };
+    const still = { ...OIL, appearance: { ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0, waveSpeed: 0.6, highlight: 0.5, depthDarkening: 0.3, depthOpacity: 0.2 } };
     const puddle = (def: FluidClientDefinition) => {
       const container = new Container();
       const renderer = new FluidRenderer(container, 40, 40, [def], 64);
@@ -241,18 +269,6 @@ describe('FluidRenderer', () => {
     });
   });
 
-  describe('streams', () => {
-    const open = (x: number, y: number) => x < 0 || y < 0 || x >= 5 || y >= 5;
-
-    it('draws falling fluid when it knows what is solid, and redraws when told', () => {
-      const { renderer } = make(5, 5);
-      renderer.apply([[2, 1, 1, q(0.5)]]);
-      renderer.render();
-      renderer.setSolidSampler(open);
-      expect(renderer.render()).toBe(1);
-    });
-  });
-
   it('shows nothing of a fluid that has no definition even if it has waves elsewhere', () => {
     const { container, renderer } = make();
     renderer.apply([[1, 1, 9, q(1)]]);
@@ -262,7 +278,7 @@ describe('FluidRenderer', () => {
 
   describe('easing what it draws', () => {
     afterEach(() => vi.restoreAllMocks());
-    const still = { ...OIL, appearance: { waveAmplitude: 0, waveSpeed: 0, highlight: 0.5, depthDarkening: 0.3, depthOpacity: 0.2 } };
+    const still = { ...OIL, appearance: { ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0, waveSpeed: 0, highlight: 0.5, depthDarkening: 0.3, depthOpacity: 0.2 } };
     const make = () => new FluidRenderer(new Container(), 40, 40, [still], 64);
 
     it('shows a snapshot (or fluid coming into view) at once', () => {
@@ -273,26 +289,26 @@ describe('FluidRenderer', () => {
 
     it('eases a tick\'s changes in over the next frames, while bodies feel the exact level straight away', () => {
       const renderer = make();
-      renderer.apply([[3, 3, 1, q(0.2)]]);
+      renderer.apply([[3, 3, 1, q(0.25)]]);
       renderer.render();
-      renderer.apply([[3, 3, 1, q(0.8)]], true);
-      expect(renderer.field.getLevel(3, 3)).toBeCloseTo(0.8, 2);
-      expect(renderer.environment.sampler.getLevel(3, 3)).toBeCloseTo(0.8, 2);
-      expect(renderer.display.getLevel(3, 3)).toBeCloseTo(0.2, 2);
+      renderer.apply([[3, 3, 1, q(0.75)]], true);
+      expect(renderer.field.getLevel(3, 3)).toBeCloseTo(0.75, 2);
+      expect(renderer.environment.sampler.getLevel(3, 3)).toBeCloseTo(0.75, 2);
+      expect(renderer.display.getLevel(3, 3)).toBeCloseTo(0.25, 2);
       renderer.update(10);
       renderer.update(10.05);
       const halfway = renderer.display.getLevel(3, 3);
-      expect(halfway).toBeGreaterThan(0.25);
-      expect(halfway).toBeLessThan(0.75);
+      expect(halfway).toBeGreaterThan(0.3);
+      expect(halfway).toBeLessThan(0.7);
       for (let t = 10.05; t < 12; t += 1 / 60) renderer.update(t);
-      expect(renderer.display.getLevel(3, 3)).toBeCloseTo(0.8, 2);
+      expect(renderer.display.getLevel(3, 3)).toBeCloseTo(0.75, 2);
     });
 
     it('redraws while the fluid eases and stops once it has settled', () => {
       const renderer = make();
-      renderer.apply([[3, 3, 1, q(0.2)]]);
+      renderer.apply([[3, 3, 1, q(0.25)]]);
       renderer.render();
-      renderer.apply([[3, 3, 1, q(0.8)]], true);
+      renderer.apply([[3, 3, 1, q(0.75)]], true);
       renderer.update(0);
       const clear = vi.spyOn(Graphics.prototype, 'clear');
       renderer.update(1 / 60);
@@ -306,21 +322,11 @@ describe('FluidRenderer', () => {
 
     it('a stalled frame does not jump the whole way', () => {
       const renderer = make();
-      renderer.apply([[3, 3, 1, q(0.2)]]);
-      renderer.apply([[3, 3, 1, q(0.8)]], true);
+      renderer.apply([[3, 3, 1, q(0.25)]]);
+      renderer.apply([[3, 3, 1, q(0.75)]], true);
       renderer.update(0);
       renderer.update(30);
-      expect(renderer.display.getLevel(3, 3)).toBeLessThan(0.8 - 0.05);
-    });
-
-    it('redraws the whole run of fluid a changed cell sits in (it is drawn as one body packed onto its floor)', () => {
-      const renderer = make();
-      const column: [number, number, number, number][] = [];
-      for (let y = 2; y < FLUID_CHUNK_SIZE * 2 + 2; y++) column.push([2, y, 1, q(1)]);
-      renderer.apply(column);
-      renderer.render();
-      renderer.apply([[2, FLUID_CHUNK_SIZE * 2 + 1, 1, q(0.5)]]);
-      expect(renderer.render()).toBe(3); // all three chunks the column runs through
+      expect(renderer.display.getLevel(3, 3)).toBeLessThan(0.75 - 0.05);
     });
   });
 
@@ -340,6 +346,9 @@ describe('FluidRenderer', () => {
       expect(renderer.drawnSurfaceY(2, 3)).toBe(4 * 64 - 32);
       renderer.apply([[2, 3, 1, q(0.25)]]);
       expect(renderer.drawnSurfaceY(2, 3)).toBe(4 * 64 - 16);
+      // Fluid with fluid above it is drawn a full cell tall, so its surface is the top of its cell
+      renderer.apply([[2, 2, 1, q(0.5)]]);
+      expect(renderer.drawnSurfaceY(2, 3)).toBe(3 * 64);
       expect(renderer.drawnSurfaceY(9, 9)).toBeNull();
     });
   });
