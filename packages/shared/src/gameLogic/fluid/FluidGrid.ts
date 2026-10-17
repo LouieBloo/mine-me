@@ -15,6 +15,24 @@ export interface FluidCellChange {
   level: number;
 }
 
+/** A cell of fluid that has just been used up by a reaction and must now become a block. */
+export interface FluidReactionResult {
+  x: number;
+  y: number;
+  /** typeKey of the block the cell becomes. */
+  becomes: string;
+}
+
+/** A reaction with its fluids as the small ids the grid stores. */
+interface ReactionRule {
+  withId: number;
+  becomes: string;
+  costPerLevel: number;
+}
+
+/** Reacting fluid left in a hardening cell below this is not worth keeping (the cell becomes the block). */
+const REACTION_RESIDUE = 1e-3;
+
 /** Amount to keep in the lower of two stacked cells holding `total` between them. */
 function stableBottom(total: number): number {
   if (total <= FLUID_FULL_LEVEL) return FLUID_FULL_LEVEL;
@@ -47,6 +65,9 @@ export class FluidGrid {
 
   private readonly registry: FluidRegistry;
   private readonly isBlocked: (x: number, y: number) => boolean;
+  /** Reactions by the id of the fluid that holds them (e.g. lava's: touched by water, becomes lavarock). */
+  private readonly reactionRules = new Map<number, ReactionRule[]>();
+  private pendingReactions: FluidReactionResult[] = [];
 
   /** `isBlocked` says whether a cell cannot hold fluid (solid terrain). Out-of-bounds is always blocked. */
   constructor(width: number, height: number, registry: FluidRegistry, isBlocked: (x: number, y: number) => boolean) {
@@ -56,6 +77,71 @@ export class FluidGrid {
     this.isBlocked = isBlocked;
     this.levels = new Float32Array(width * height);
     this.ids = new Uint8Array(width * height);
+    for (let id = 1; id <= registry.size; id++) {
+      const reactions = registry.paramsOf(id)?.reactions;
+      if (!reactions) continue;
+      const rules: ReactionRule[] = [];
+      for (const r of reactions) {
+        const withId = registry.idOf(r.with);
+        if (withId !== undefined && r.costPerLevel > 0) rules.push({ withId, becomes: r.becomes, costPerLevel: r.costPerLevel });
+      }
+      if (rules.length > 0) this.reactionRules.set(id, rules);
+    }
+  }
+
+  /** Cells that reacted since the last call, then forgets them. The caller turns each into its block. */
+  public takeReactions(): FluidReactionResult[] {
+    const out = this.pendingReactions;
+    this.pendingReactions = [];
+    return out;
+  }
+
+  /**
+   * Fluids that react (lava next to water) use each other up: for every level of the reacting fluid hardened,
+   * `costPerLevel` levels of the other are spent. When the reacting fluid in a cell is used up (or what is left is
+   * too thin to keep), the cell is emptied and reported through `takeReactions` so it can become a block. When the
+   * other fluid runs out first, the reacting fluid is only reduced, so a trickle slowly eats a pool.
+   */
+  private react(cells: Iterable<number>): void {
+    if (this.reactionRules.size === 0) return;
+    const w = this.width;
+    for (const i of cells) {
+      const level = this.levels[i];
+      if (level <= 0) continue;
+      const rules = this.reactionRules.get(this.ids[i]);
+      if (!rules) continue;
+      const x = i % w;
+      const y = Math.floor(i / w);
+      for (const rule of rules) {
+        for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (!this.inBounds(nx, ny)) continue;
+          const ni = ny * w + nx;
+          const other = this.levels[ni];
+          if (other <= 0 || this.ids[ni] !== rule.withId || this.levels[i] <= 0) continue;
+          const hardened = Math.min(this.levels[i], other / rule.costPerLevel);
+          this.levels[i] -= hardened;
+          this.levels[ni] -= hardened * rule.costPerLevel;
+          if (this.levels[ni] <= REACTION_RESIDUE) {
+            this.levels[ni] = 0;
+            this.ids[ni] = NO_FLUID;
+          }
+          this.changed.add(ni);
+          this.changed.add(i);
+          this.wakeIndex(ni, nx, ny);
+          const minLevel = this.registry.paramsOf(this.ids[i])?.minLevel ?? 0;
+          if (this.levels[i] <= Math.max(REACTION_RESIDUE, minLevel)) {
+            this.levels[i] = 0;
+            this.ids[i] = NO_FLUID;
+            this.pendingReactions.push({ x, y, becomes: rule.becomes });
+            this.wakeIndex(i, x, y);
+            break;
+          }
+        }
+        if (this.levels[i] <= 0) break;
+      }
+    }
   }
 
   public inBounds(x: number, y: number): boolean {
@@ -72,6 +158,13 @@ export class FluidGrid {
 
   public getLevel(x: number, y: number): number {
     return this.inBounds(x, y) ? this.levels[y * this.width + x] : 0;
+  }
+
+  /** Calls `visit` for every cell currently holding this fluid. */
+  public forEachCellOf(fluidId: number, visit: (x: number, y: number, level: number) => void): void {
+    for (let i = 0; i < this.levels.length; i++) {
+      if (this.levels[i] > 0 && this.ids[i] === fluidId) visit(i % this.width, Math.floor(i / this.width), this.levels[i]);
+    }
   }
 
   /** Cells currently awake. A settled grid has none. */
@@ -320,6 +413,8 @@ export class FluidGrid {
       if (i >= w) nextActive.add(i - w);
       if (i + w < this.levels.length) nextActive.add(i + w);
     }
+    // Fluids that react do so where they now touch
+    this.react(new Set([...order, ...nextActive]));
     this.active = nextActive;
     return changedCount;
   }

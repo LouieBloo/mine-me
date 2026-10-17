@@ -49,9 +49,9 @@ describe('pourFluid', () => {
 
 describe('pouring in the sky', () => {
   it('lets fluid poured high above the ground fall and land on it', () => {
-    expect(tools().pourFluid(5, 0, 'OIL')).toEqual({ ok: true }); // the very top row of the map
+    expect(tools().pourFluid(20, 0, 'OIL')).toEqual({ ok: true }); // the very top row of the map
     tick(400);
-    expect(fluidAt(5, 0)).toBe(0); // it has left the top
+    expect(fluidAt(20, 0)).toBe(0); // it has left the top
     // ...and rests on the ground (the row just above the surface), spreading along it
     let onGround = 0;
     for (let x = 0; x < 90; x++) onGround += fluidAt(x, SKY - 1);

@@ -1,4 +1,4 @@
-import { bodyTouchesCell, distanceToCell, heatDamageRate, type BodyBox, type FireDamageRule } from '@mine-me/shared';
+import { bodyTouchesCell, distanceToCell, heatDamageRate, sampleFluidContact, type BodyBox, type FireDamageRule, type FluidDefinition } from '@mine-me/shared';
 import { fireDamageRule } from '../environmentalDamage';
 import type { MiningWorld } from '../MiningWorld';
 
@@ -16,6 +16,8 @@ interface BurnState {
   sinceHit: number;
   /** Damage earned since the last hit that has not been dealt yet. */
   pending: number;
+  /** Name of the fluid that hurt the body since the last hit (the hit is named after it), or null for fire. */
+  fluidSource: string | null;
 }
 
 /**
@@ -25,6 +27,8 @@ interface BurnState {
  *     goes out by itself.
  *   - **Heat:** within `heatRadius` of a fire it hurts by that fire's heat, fading with distance (the hottest
  *     fire in reach counts, so a big blaze doesn't add up to instant death).
+ *   - **Fluids:** a fluid's `contact` data (lava: damage per second and ignites; water: extinguishes) acts on a
+ *     body in it, scaled by how submerged it is. Damage joins the same pending total, so it is dealt in the same hits.
  * The damage is dealt twice a second as one whole-number hit through the damage pipeline, ignoring a player's
  * hit protection (like fall damage) and never stunning a mob. Players and mobs are treated the same.
  */
@@ -52,7 +56,7 @@ export class MiningBurningSubsystem {
   private state(key: string): BurnState {
     let state = this.states.get(key);
     if (!state) {
-      state = { remaining: 0, sinceHit: 0, pending: 0 };
+      state = { remaining: 0, sinceHit: 0, pending: 0, fluidSource: null };
       this.states.set(key, state);
     }
     return state;
@@ -96,20 +100,32 @@ export class MiningBurningSubsystem {
     const hasFire = fire.burningCount > 0;
     let state = this.states.get(key);
 
-    if (hasFire && rule.burnSeconds > 0 && this.touchesFire(box)) {
-      state = this.state(key);
-      state.remaining = rule.burnSeconds;
+    const wet = this.fluidContactOf(box);
+    const effects = wet?.definition.contact ?? null;
+    const extinguished = effects?.extinguishes === true;
+    const fluidDamage = (effects?.damagePerSecond ?? 0) * (wet?.submerged ?? 0);
+
+    if (extinguished) {
+      // Water puts a burning body out, and nothing can set it alight while it is in the water
+      if (state) state.remaining = 0;
+    } else if (rule.burnSeconds > 0) {
+      const lit = (hasFire && this.touchesFire(box)) || ((effects?.ignites ?? 0) > 0 && (wet?.submerged ?? 0) > 0);
+      if (lit) {
+        state = this.state(key);
+        state.remaining = rule.burnSeconds;
+      }
     }
 
     const burning = (state?.remaining ?? 0) > 0;
     const heat = hasFire ? this.heatRateAt(box, rule) : 0;
-    if (!burning && heat <= 0 && (state?.pending ?? 0) <= 0) {
+    if (!burning && heat <= 0 && fluidDamage <= 0 && (state?.pending ?? 0) <= 0) {
       if (state) this.states.delete(key);
       return false;
     }
 
     state = this.state(key);
-    state.pending += ((burning ? rule.burnDamagePerSecond : 0) + heat) * dt;
+    state.pending += ((burning ? rule.burnDamagePerSecond : 0) + heat + fluidDamage) * dt;
+    if (fluidDamage > 0 && wet) state.fluidSource = wet.definition.name;
     state.sinceHit += dt;
     // (a hair under, because a half second of 1/30 s ticks adds up to just short of 0.5)
     if (state.sinceHit >= BURN_TICK_SECONDS - 1e-6) {
@@ -117,8 +133,9 @@ export class MiningBurningSubsystem {
       const amount = Math.floor(state.pending);
       if (amount >= 1) {
         state.pending -= amount;
-        this.hurt(kind, id, amount);
+        this.hurt(kind, id, amount, state.fluidSource ?? 'Fire');
       }
+      state.fluidSource = null;
     }
 
     if (burning) {
@@ -127,6 +144,16 @@ export class MiningBurningSubsystem {
       state.remaining = Math.max(0, state.remaining - dt);
     }
     return state.remaining > 0;
+  }
+
+  /** The fluid a body is standing in (the deepest one) with its definition, or null when dry. */
+  private fluidContactOf(box: BodyBox): { definition: FluidDefinition; submerged: number } | null {
+    const fluids = this.world.fluids;
+    const contact = sampleFluidContact(fluids.grid, box.x, box.y, box.halfWidth, box.halfHeight);
+    if (!contact) return null;
+    const key = fluids.registry.keyOf(contact.fluidId);
+    const definition = key ? this.world.data.getFluid(key) : undefined;
+    return definition ? { definition, submerged: contact.submerged } : null;
   }
 
   private touchesFire(box: BodyBox): boolean {
@@ -159,10 +186,10 @@ export class MiningBurningSubsystem {
     return best;
   }
 
-  private hurt(kind: EntityKind, id: string, amount: number): void {
+  private hurt(kind: EntityKind, id: string, amount: number, sourceName: string): void {
     this.world.damage.applyDamage(
       { kind, id },
-      { amount, type: 'environmental', source: { kind: 'environment', name: 'Fire' }, ignoreInvulnerability: true, noStun: true }
+      { amount, type: 'environmental', source: { kind: 'environment', name: sourceName }, ignoreInvulnerability: true, noStun: true }
     );
   }
 }

@@ -7,7 +7,7 @@ import { syncJson } from '../../services/admin.service';
 /** The columns an admin may set. `typeKey` is only set when a fluid is created. */
 const EDITABLE_FIELDS = [
   'name', 'description', 'color', 'opacity', 'density', 'viscosity', 'flowRate', 'minLevel', 'flowThreshold',
-  'appearance', 'flammability', 'generation',
+  'appearance', 'flammability', 'generation', 'contact', 'light', 'reactions',
 ] as const;
 
 const NUMERIC_FIELDS = ['opacity', 'density', 'viscosity', 'flowRate', 'minLevel', 'flowThreshold'] as const;
@@ -32,6 +32,16 @@ function readBody(body: Record<string, unknown>): Partial<FluidDefinition> {
     if (typeof value === 'string' && value.trim() !== '') out[field] = Number(value);
   }
   return out as Partial<FluidDefinition>;
+}
+
+/** Problems with the fluids and blocks a reactions list names: each must exist (shape is checked by `validateFluid`). */
+async function reactionReferenceProblems(reactions: FluidDefinition['reactions']): Promise<string[]> {
+  const problems: string[] = [];
+  for (const [i, r] of (reactions ?? []).entries()) {
+    if (!(await prisma.fluid.findUnique({ where: { typeKey: r.with } }))) problems.push(`reactions[${i}].with: there is no fluid ${r.with}`);
+    if (!(await prisma.miningBlock.findUnique({ where: { typeKey: r.becomes } }))) problems.push(`reactions[${i}].becomes: there is no block ${r.becomes}`);
+  }
+  return problems;
 }
 
 const findFluid = (id: string) => prisma.fluid.findFirst({ where: { OR: [{ id }, { typeKey: id.toUpperCase() }] } });
@@ -65,6 +75,11 @@ export const createFluid = async (req: Request, res: Response) => {
       res.status(400).json({ error: errors.join('; '), errors });
       return;
     }
+    const referenceProblems = await reactionReferenceProblems(input.reactions);
+    if (referenceProblems.length > 0) {
+      res.status(400).json({ error: referenceProblems.join('; '), errors: referenceProblems });
+      return;
+    }
     if (await prisma.fluid.findUnique({ where: { typeKey: input.typeKey! } })) {
       res.status(409).json({ error: `A fluid with the key ${input.typeKey} already exists` });
       return;
@@ -84,6 +99,9 @@ export const createFluid = async (req: Request, res: Response) => {
         appearance: jsonOrNull(input.appearance),
         flammability: jsonOrNull(input.flammability),
         generation: jsonOrNull(input.generation),
+        contact: jsonOrNull(input.contact),
+        light: jsonOrNull(input.light),
+        reactions: jsonOrNull(input.reactions),
       },
     });
     await mirrorToJson();
@@ -112,6 +130,13 @@ export const updateFluid = async (req: Request, res: Response) => {
       res.status(400).json({ error: errors.join('; '), errors });
       return;
     }
+    if (input.reactions !== undefined) {
+      const referenceProblems = await reactionReferenceProblems(input.reactions);
+      if (referenceProblems.length > 0) {
+        res.status(400).json({ error: referenceProblems.join('; '), errors: referenceProblems });
+        return;
+      }
+    }
     const data: Prisma.FluidUpdateInput = {};
     if (input.name !== undefined) data.name = input.name.trim();
     if (input.description !== undefined) data.description = input.description;
@@ -121,6 +146,9 @@ export const updateFluid = async (req: Request, res: Response) => {
     if (input.appearance !== undefined) data.appearance = jsonOrNull(input.appearance);
     if (input.flammability !== undefined) data.flammability = jsonOrNull(input.flammability);
     if (input.generation !== undefined) data.generation = jsonOrNull(input.generation);
+    if (input.contact !== undefined) data.contact = jsonOrNull(input.contact);
+    if (input.light !== undefined) data.light = jsonOrNull(input.light);
+    if (input.reactions !== undefined) data.reactions = jsonOrNull(input.reactions);
 
     const fluid = await prisma.fluid.update({ where: { id: existing.id }, data });
     await mirrorToJson();
@@ -131,14 +159,20 @@ export const updateFluid = async (req: Request, res: Response) => {
 };
 
 /**
- * Deletes a fluid. Nothing else references a fluid yet (generation settings live on the fluid itself);
- * when something does, refuse here while it is in use.
+ * Deletes a fluid, unless another fluid's reaction names it.
  */
 export const deleteFluid = async (req: Request, res: Response) => {
   try {
     const existing = await findFluid(req.params.id);
     if (!existing) {
       res.status(404).json({ error: 'Fluid not found' });
+      return;
+    }
+    // Another fluid's reaction may name this one
+    const others = await prisma.fluid.findMany({ where: { NOT: { id: existing.id } } });
+    const reactingWithIt = others.filter((f) => Array.isArray(f.reactions) && (f.reactions as unknown as Array<{ with?: string }>).some((r) => r.with === existing.typeKey));
+    if (reactingWithIt.length > 0) {
+      res.status(409).json({ error: `${existing.name} is used by the reactions of ${reactingWithIt.map((f) => f.name).join(', ')}; remove those first` });
       return;
     }
     await prisma.fluid.delete({ where: { id: existing.id } });

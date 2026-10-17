@@ -77,3 +77,10 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Set `
 | [071](071-admin-gases-page.md) | Admin: Gases page | P1 (Done; judge the preview by hand) |
 | [072](072-gas-sandbox-support.md) | Gases in sandbox mode | P2 (Done; try it by hand) |
 | [073](073-gas-effects-and-sounds.md) | Gas visuals and sounds | P2 (Done; needs audio files assigned in the admin) |
+| [074](074-fluid-contact-damage-and-ignition.md) | Fluid contact damage, ignition and extinguishing | P1 (Done) |
+| [075](075-fluid-light.md) | Fluid glow (always-on fluid light) | P1 (Done) |
+| [076](076-fluid-reactions.md) | Fluid reactions (water hardens lava, 2:1) | P1 (Done) |
+| [077](077-lavarock-block.md) | Lavarock block | P1 (Done) |
+| [078](078-water-and-lava-fluids.md) | Water and Lava fluid rows and sandbox | P1 (Done) |
+| [079](079-surface-pooling-generation.md) | Water pooling, deep lava, square/rectangle/vein pockets | P2 (Done) |
+| [080](080-lavarock-sprites.md) | Lavarock art (owner task) | P3 (Open: yours) |

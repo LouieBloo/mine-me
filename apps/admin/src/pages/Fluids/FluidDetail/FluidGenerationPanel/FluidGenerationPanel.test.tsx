@@ -51,4 +51,23 @@ describe('FluidGenerationPanel', () => {
     fireEvent.change(screen.getByLabelText('Smallest Pocket'), { target: { value: '' } });
     expect(onChange.mock.calls[0][0].minSize).toBeNaN();
   });
+
+  it('switches between pockets and pools, and relabels the size for pools', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<FluidGenerationPanel value={GEN} onChange={onChange} />);
+    expect(screen.getByLabelText('Where It Appears')).toHaveValue('POCKET');
+    expect(screen.getByLabelText('Squares weight')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Where It Appears'), { target: { value: 'POOL' } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...GEN, mode: 'POOL' });
+    rerender(<FluidGenerationPanel value={{ ...GEN, mode: 'POOL' }} onChange={onChange} />);
+    expect(screen.getByLabelText('Narrowest Pool')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Squares weight')).not.toBeInTheDocument();
+  });
+
+  it('edits the pocket shape weights', () => {
+    const onChange = vi.fn();
+    render(<FluidGenerationPanel value={GEN} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText('Veins weight'), { target: { value: '4' } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...GEN, shapes: { SQUARE: 1, RECTANGLE: 1, VEIN: 4 } });
+  });
 });

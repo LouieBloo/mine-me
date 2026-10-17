@@ -108,6 +108,14 @@ export class MiningFluidSubsystem {
   /** One flow step, whatever the tick (the sandbox drives this itself to pause, step and change speed). */
   public step(): void {
     this.grid.step();
+    this.applyReactions();
+  }
+
+  /** Cells the fluid reactions just used up become their block (water cools lava into lavarock). */
+  private applyReactions(): void {
+    for (const { x, y, becomes } of this.grid.takeReactions()) {
+      this.world.blocks.placeBlockFromReaction(x, y, becomes);
+    }
   }
 
   /** A tile changed (broken, placed, cracked...). Fluid inside a newly solid tile is pushed out; neighbours wake. */
@@ -196,6 +204,7 @@ export class MiningFluidSubsystem {
         density: def.density,
         appearance: resolveFluidAppearance(def.appearance),
         ...(effect || light ? { flame: { effect, light } } : {}),
+        ...(def.light && def.light.enabled !== false ? { light: def.light } : {}),
         ...(def.sounds && Object.keys(def.sounds).length > 0 ? { sounds: def.sounds } : {}),
       });
     }

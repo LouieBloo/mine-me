@@ -302,5 +302,21 @@
       ]
     },
     "requiredPickPower": 0
+  },
+  {
+    "id": "block_lavarock",
+    "typeKey": "LAVAROCK",
+    "name": "Lavarock",
+    "description": "Lava cooled solid by water. Hard, dark and slow to dig through.",
+    "textureUrl": "/assets/mining/block_rock-block.jpg",
+    "soundEffectUrl": null,
+    "health": 500,
+    "staminaCost": 2,
+    "idleParticleEffectId": null,
+    "createdAt": "2026-10-16T00:00:00.000Z",
+    "updatedAt": "2026-10-16T00:00:00.000Z",
+    "idleParticleEffect": null,
+    "dropTable": null,
+    "requiredPickPower": 0
   }
 ]

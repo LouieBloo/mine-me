@@ -44,20 +44,54 @@ export interface Flammability {
   explosion?: ExplosionSettings | null;
 }
 
+/** The outlines a generated pocket can take. All are one connected region of cells. */
+export type PocketShape = 'SQUARE' | 'RECTANGLE' | 'VEIN';
+
+/** Every pocket shape, in the order the admin lists them. */
+export const POCKET_SHAPES: readonly PocketShape[] = ['SQUARE', 'RECTANGLE', 'VEIN'];
+
 /**
- * Where a fluid appears when a mine is generated: sealed square pockets of full cells inside plain
- * dirt. Null/absent on a fluid means it never generates (it only arrives by other means).
+ * How likely each shape is, as weights (not percentages): a shape missing from the list has weight 1 when the list is
+ * absent altogether, and 0 when other shapes are listed. Absent: all shapes equally likely.
+ */
+export type PocketShapeWeights = Partial<Record<PocketShape, number>>;
+
+/** The weight of each shape after defaults: absent means every shape counts the same. */
+export function resolveShapeWeights(shapes: PocketShapeWeights | null | undefined): Record<PocketShape, number> {
+  const out = { SQUARE: 1, RECTANGLE: 1, VEIN: 1 } as Record<PocketShape, number>;
+  if (!shapes || typeof shapes !== 'object') return out;
+  for (const shape of POCKET_SHAPES) {
+    const w = shapes[shape];
+    out[shape] = typeof w === 'number' && Number.isFinite(w) && w >= 0 ? w : 0;
+  }
+  return out.SQUARE + out.RECTANGLE + out.VEIN > 0 ? out : { SQUARE: 1, RECTANGLE: 1, VEIN: 1 };
+}
+
+/**
+ * Where a fluid appears when a mine is generated. Two modes:
+ *  - `POCKET` (the default): sealed pockets of full cells inside plain dirt, each a square, a rectangle or a winding vein
+ *    (see `shapes`), always one connected region.
+ *  - `POOL`: shallow puddles lying on the floors of caves and tunnels at any depth in range; `minSize`/`maxSize` is the
+ *    width in tiles and `percentage` the share of eligible floor that is pooled.
+ * Null/absent on a fluid means it never generates (it only arrives by other means).
  */
 export interface FluidGeneration {
+  /** `POCKET` (absent: pocket) or `POOL`. */
+  mode?: 'POCKET' | 'POOL';
   /** First row (0 = surface) pockets may start on. */
   minDepth: number;
   /** Last row a pocket may reach (null: down to the bottom of the map). */
   maxDepth?: number | null;
-  /** Share of the diggable tiles in the depth range that become pocket, in percent (0-100). */
+  /** Share of the diggable tiles (pockets) or floor tiles (pools) in the depth range that are filled, in percent (0-100). */
   percentage: number;
-  /** Smallest and largest pocket side, in tiles. Pockets are squares. */
+  /**
+   * Smallest and largest side in tiles of a square or rectangle pocket, and of a vein's equivalent area (side x side);
+   * for pools, the width.
+   */
   minSize: number;
   maxSize: number;
+  /** Pockets only: the weight of each shape. Absent: square, rectangle and vein equally likely. */
+  shapes?: PocketShapeWeights | null;
 }
 
 /**
@@ -121,6 +155,33 @@ export function validateFluidAppearance(value: unknown): string[] {
   return errors;
 }
 
+/**
+ * What touching a fluid does to a player or mob standing in it. All data, so a harmful fluid (lava, acid) or a
+ * cleansing one (water) is a row, never code. Each part is optional; absent means "does nothing".
+ */
+export interface FluidContactEffects {
+  /** Damage per second at full submersion (scaled by how submerged the body is). 0 or absent: harmless. */
+  damagePerSecond?: number;
+  /** Strength in percent (like the `Ignites` effect): above 0 the fluid sets bodies in it burning and lights what it touches. */
+  ignites?: number;
+  /** Entering it puts out burning, and a body in it cannot catch fire. */
+  extinguishes?: boolean;
+}
+
+/**
+ * A reaction between this fluid and another: where a cell of this fluid touches a cell of `with`, the two are
+ * used up and the cell becomes the block `becomes` (water on lava leaves lavarock). Defined on one of the two
+ * fluids (the reacting one, e.g. lava), the other just has to exist.
+ */
+export interface FluidReaction {
+  /** typeKey of the fluid that sets the reaction off. */
+  with: string;
+  /** typeKey of the block left behind. */
+  becomes: string;
+  /** Levels of `with` used up for each level of this fluid hardened (2 = twice as much water as lava). */
+  costPerLevel: number;
+}
+
 /** A fluid as stored in the database and sent to the game. */
 export interface FluidDefinition {
   id: string;
@@ -148,6 +209,12 @@ export interface FluidDefinition {
   flammability?: Flammability | null;
   /** Null (or absent): the fluid is not placed in generated mines. */
   generation?: FluidGeneration | null;
+  /** Null (or absent): touching the fluid does nothing special. */
+  contact?: FluidContactEffects | null;
+  /** The glow the fluid gives off all the time. Null (or absent): none. */
+  light?: ItemLightConfig | null;
+  /** Reactions with other fluids. Null (or absent): none. */
+  reactions?: FluidReaction[] | null;
   /** Sound slots as stored: library sounds by id (see `resolveFluidSounds`). */
   soundEffects?: FluidSoundSlotRefs | null;
   /** The same slots resolved to playable urls. Filled in when definitions load; never stored. */
@@ -205,6 +272,21 @@ export function validateExplosion(value: unknown): string[] {
   return errors;
 }
 
+/** Problems with a shape weights value, one message each (empty when it is valid). */
+export function validatePocketShapes(value: unknown): string[] {
+  if (value === null || value === undefined) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return ['generation.shapes must be an object or null'];
+  const errors: string[] = [];
+  let total = 0;
+  for (const [key, weight] of Object.entries(value as Record<string, unknown>)) {
+    if (!(POCKET_SHAPES as readonly string[]).includes(key)) errors.push(`generation.shapes.${key} is not a shape`);
+    else if (!isNumber(weight) || weight < 0) errors.push(`generation.shapes.${key} must be 0 or more`);
+    else total += weight;
+  }
+  if (errors.length === 0 && total <= 0 && Object.keys(value as object).length > 0) errors.push('generation.shapes needs at least one shape above 0');
+  return errors;
+}
+
 /** Problems with a generation value, one message each (empty when it is valid). */
 export function validateFluidGeneration(value: unknown): string[] {
   if (value === null || value === undefined) return [];
@@ -221,6 +303,51 @@ export function validateFluidGeneration(value: unknown): string[] {
   if (!isInt(g.minSize) || g.minSize < 1) errors.push('generation.minSize must be a whole number of 1 or more');
   if (!isInt(g.maxSize)) errors.push('generation.maxSize must be a whole number');
   else if (isInt(g.minSize) && g.maxSize < g.minSize) errors.push('generation.maxSize must not be below minSize');
+  if (g.mode !== undefined && g.mode !== null && g.mode !== 'POCKET' && g.mode !== 'POOL') errors.push('generation.mode must be POCKET or POOL');
+  errors.push(...validatePocketShapes(g.shapes));
+  return errors;
+}
+
+/** Problems with a contact value, one message each (empty when it is valid). */
+export function validateFluidContact(value: unknown): string[] {
+  if (value === null || value === undefined) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return ['contact must be an object or null'];
+  const c = value as Record<string, unknown>;
+  const errors: string[] = [];
+  if (c.damagePerSecond !== undefined && (!isNumber(c.damagePerSecond) || c.damagePerSecond < 0)) errors.push('contact.damagePerSecond must be 0 or more');
+  if (c.ignites !== undefined && !inRange(c.ignites, 0, 1000)) errors.push('contact.ignites must be between 0 and 1000');
+  if (c.extinguishes !== undefined && typeof c.extinguishes !== 'boolean') errors.push('contact.extinguishes must be true or false');
+  if (c.extinguishes === true && isNumber(c.ignites) && c.ignites > 0) errors.push('contact cannot both ignite and extinguish');
+  return errors;
+}
+
+/** Problems with a fluid's glow, one message each (empty when it is valid). */
+export function validateFluidLight(value: unknown): string[] {
+  if (value === null || value === undefined) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return ['light must be a light config or null'];
+  const light = value as Record<string, unknown>;
+  if (!isNumber(light.radius) || light.radius <= 0 || !isNumber(light.intensity) || light.intensity <= 0) {
+    return ['light needs a radius and intensity above 0'];
+  }
+  return [];
+}
+
+/** Problems with a reactions list, one message each (empty when it is valid). Whether the keys exist is checked where the data is. */
+export function validateFluidReactions(value: unknown, ownKey?: string): string[] {
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value)) return ['reactions must be a list or null'];
+  const errors: string[] = [];
+  value.forEach((r, i) => {
+    const reaction = r as Record<string, unknown> | null;
+    if (!reaction || typeof reaction !== 'object') {
+      errors.push(`reactions[${i}] must be an object`);
+      return;
+    }
+    if (typeof reaction.with !== 'string' || !FLUID_KEY.test(reaction.with)) errors.push(`reactions[${i}].with must be a fluid key`);
+    else if (reaction.with === ownKey) errors.push(`reactions[${i}].with cannot be the fluid itself`);
+    if (typeof reaction.becomes !== 'string' || reaction.becomes === '') errors.push(`reactions[${i}].becomes must be a block key`);
+    if (!isNumber(reaction.costPerLevel) || reaction.costPerLevel <= 0) errors.push(`reactions[${i}].costPerLevel must be greater than 0`);
+  });
   return errors;
 }
 
@@ -245,5 +372,8 @@ export function validateFluid(fluid: Partial<FluidDefinition>): string[] {
   errors.push(...validateFluidAppearance(fluid.appearance));
   errors.push(...validateFlammability(fluid.flammability));
   errors.push(...validateFluidGeneration(fluid.generation));
+  errors.push(...validateFluidContact(fluid.contact));
+  errors.push(...validateFluidLight(fluid.light));
+  errors.push(...validateFluidReactions(fluid.reactions, fluid.typeKey));
   return errors;
 }

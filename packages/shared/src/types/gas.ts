@@ -1,4 +1,4 @@
-import type { Flammability } from './fluid';
+import type { Flammability, PocketShapeWeights } from './fluid';
 import { validateFlammability, validateFluidGeneration } from './fluid';
 import type { GasSoundEffectsConfig, GasSoundSlotRefs } from './sound';
 
@@ -19,6 +19,8 @@ export interface GasGeneration {
   maxSize: number;
   /** How full a new pocket cell is, 0 (exclusive) to 1 (absent: 1). */
   concentration?: number;
+  /** The weight of each pocket shape (square, rectangle, vein). Absent: all equally likely. */
+  shapes?: PocketShapeWeights | null;
 }
 
 /**
@@ -116,6 +118,7 @@ export function validateGasAppearance(value: unknown): string[] {
 export function validateGasGeneration(value: unknown): string[] {
   const errors = validateFluidGeneration(value);
   if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if ((value as Record<string, unknown>).mode === 'POOL') errors.push('generation.mode POOL is for fluids; gases only generate as pockets');
     const c = (value as Record<string, unknown>).concentration;
     if (c !== undefined && c !== null && (!isNumber(c) || c <= 0 || c > 1)) {
       errors.push('generation.concentration must be above 0 and at most 1');

@@ -25,6 +25,7 @@ describe('gases on the wire', () => {
     const grid = engine.gasSubsystem.grid;
     for (let y = 0; y < grid.height; y++) for (let x = 0; x < grid.width; x++) grid.setCell(x, y, 0, 0);
     engine.gasSubsystem.drainChanges();
+    { const fg = engine.fluidSubsystem.grid; for (let y = 0; y < fg.height; y++) for (let x = 0; x < fg.width; x++) fg.setCell(x, y, 0, 0); }
     for (let y = 28; y <= 34; y++) {
       for (let x = 28; x <= 36; x++) {
         const open = x >= 30 && x <= 34 && y >= 30 && y <= 32;

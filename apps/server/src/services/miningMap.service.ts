@@ -5,6 +5,8 @@ import {
   getTileMineTime,
   getTileMaxHealth,
   isTileSolid,
+  generatePocketOutline,
+  pickPocketShape,
   DEFAULT_MINING_MAP_CONFIG,
   type FluidDefinition,
   type GasDefinition,
@@ -164,20 +166,23 @@ export class MiningMapGenerator {
   }
 
   /**
-   * Carves sealed square pockets inside plain dirt and fills them with each fluid that has generation
-   * settings. Runs before ores, rocks and chests so there is room to fit them: a pocket's walls (a one tile
-   * margin) are solid dirt, and the later steps leave pocket cells alone (a rock cannot sit on an open
-   * cell, ores only replace dirt, chests skip `pocketCellKeys`). Uses its own random stream.
+   * Places each fluid that has generation settings: sealed pockets inside plain dirt (a square, a rectangle or a
+   * winding vein, always one connected region) or, in `POOL` mode, shallow puddles on cave floors. Runs before ores,
+   * rocks and chests so there is room to fit them: a pocket's walls (a one tile margin) are solid, and the later steps
+   * leave pocket cells alone (a rock cannot sit on an open cell, ores only replace dirt, chests skip `pocketCellKeys`).
+   * Uses its own random stream.
    */
   private placeFluidPockets(): void {
     this.fluidCells = [];
     this.pocketCellKeys = new Set();
     for (const fluid of byTypeKey(this.fluids)) {
-      this.carvePockets(fluid.generation, this.fluidRng, (x, y) => this.fluidCells.push({ x, y, typeKey: fluid.typeKey, level: 1 }));
+      const add = (x: number, y: number) => this.fluidCells.push({ x, y, typeKey: fluid.typeKey, level: 1 });
+      if (fluid.generation?.mode === 'POOL') this.placePools(fluid.generation, this.fluidRng, add);
+      else this.carvePockets(fluid.generation, this.fluidRng, add);
     }
   }
 
-  /** Like the fluid pockets, for gases: sealed square pockets, placed after the fluids with a random stream of their own. */
+  /** Like the fluid pockets, for gases: sealed pockets of the same shapes, placed after the fluids with a random stream of their own. */
   private placeGasPockets(): void {
     this.gasCells = [];
     for (const gas of byTypeKey(this.gases)) {
@@ -187,8 +192,9 @@ export class MiningMapGenerator {
   }
 
   /**
-   * Carves sealed square pockets of open cells for one generating definition, calling `onCell` for each cell
-   * of each pocket. Only plain dirt with a solid ring around it is used, so a pocket is always sealed.
+   * Carves sealed pockets of open cells for one generating definition, calling `onCell` for each cell of each pocket.
+   * Each pocket is a randomly chosen shape (by the definition's weights) and is one connected region. Only plain dirt
+   * with a solid ring around it is used, so a pocket is always sealed.
    */
   private carvePockets(gen: FluidGeneration | null | undefined, rng: () => number, onCell: (x: number, y: number) => void): void {
     if (!gen || gen.percentage <= 0) return;
@@ -204,37 +210,74 @@ export class MiningMapGenerator {
     const target = Math.round((diggable * gen.percentage) / 100 / (averageSide * averageSide));
     let placed = 0;
     for (let attempt = 0; attempt < target * 30 && placed < target; attempt++) {
-      const size = gen.minSize + Math.floor(rng() * (gen.maxSize - gen.minSize + 1));
-      const x = 1 + Math.floor(rng() * Math.max(1, this.width - 2 - size));
-      const y = first + Math.floor(rng() * Math.max(1, last - first + 2 - size));
-      if (y + size - 1 > last) continue;
-      if (!this.canHoldPocket(x, y, size)) continue;
-      for (let py = y; py < y + size; py++) {
-        for (let px = x; px < x + size; px++) {
-          this.grid[py][px] = { type: MiningTileType.EMPTY, revealed: false };
-          onCell(px, py);
-          this.pocketCellKeys.add(py * this.width + px);
-        }
+      const outline = generatePocketOutline(pickPocketShape(gen.shapes, rng), gen.minSize, gen.maxSize, rng);
+      const x = 1 + Math.floor(rng() * Math.max(1, this.width - 2 - outline.width));
+      const y = first + Math.floor(rng() * Math.max(1, last - first + 2 - outline.height));
+      if (y + outline.height - 1 > last) continue;
+      const cells = outline.cells.map((c) => ({ x: x + c.x, y: y + c.y }));
+      if (!this.canHoldPocket(cells)) continue;
+      for (const { x: px, y: py } of cells) {
+        this.grid[py][px] = { type: MiningTileType.EMPTY, revealed: false };
+        onCell(px, py);
+        this.pocketCellKeys.add(py * this.width + px);
       }
       placed++;
     }
   }
 
-  /** A pocket fits when its square is all plain dirt and the ring around it is solid, so it is sealed. */
-  private canHoldPocket(x: number, y: number, size: number): boolean {
-    if (x < 1 || y < 1 || x + size > this.width - 1 || y + size > this.height - 1) return false;
-    for (let py = y - 1; py <= y + size; py++) {
-      for (let px = x - 1; px <= x + size; px++) {
-        const type = this.grid[py][px].type;
-        const inside = px >= x && px < x + size && py >= y && py < y + size;
-        if (inside) {
-          if (type !== MiningTileType.DIRT) return false;
-        } else if (!isTileSolid(type)) {
-          return false;
+  /** A pocket fits when all its cells are plain dirt and every cell touching it (corners too) is solid, so it is sealed. */
+  private canHoldPocket(cells: ReadonlyArray<{ x: number; y: number }>): boolean {
+    const inside = new Set(cells.map((c) => c.y * this.width + c.x));
+    for (const { x, y } of cells) {
+      if (x < 1 || y < 1 || x >= this.width - 1 || y >= this.height - 1) return false;
+      if (this.grid[y][x].type !== MiningTileType.DIRT) return false;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (inside.has((y + dy) * this.width + (x + dx))) continue;
+          if (!isTileSolid(this.grid[y + dy][x + dx].type)) return false;
         }
       }
     }
     return true;
+  }
+
+  /**
+   * Lays shallow pools on cave floors: runs of open tiles that each have solid ground below. `minSize`..`maxSize` is the
+   * run's width and `percentage` the share of eligible floor tiles that ends up pooled. A pool is one row of full cells
+   * which the fluid simulation then spreads out. Pocket cells and spots already pooled are left alone.
+   */
+  private placePools(gen: FluidGeneration, rng: () => number, onCell: (x: number, y: number) => void): void {
+    if (gen.percentage <= 0) return;
+    const first = Math.max(1, gen.minDepth);
+    const last = Math.min(this.height - 2, gen.maxDepth ?? this.height - 2);
+    if (last < first) return;
+
+    const isFloor = (x: number, y: number): boolean =>
+      x >= 1 && x < this.width - 1 && y < this.height - 1 &&
+      this.grid[y][x].type === MiningTileType.EMPTY &&
+      isTileSolid(this.grid[y + 1][x].type) &&
+      !this.pocketCellKeys.has(y * this.width + x);
+
+    const floor: Array<{ x: number; y: number }> = [];
+    for (let y = first; y <= last; y++) for (let x = 1; x < this.width - 1; x++) if (isFloor(x, y)) floor.push({ x, y });
+    if (floor.length === 0) return;
+
+    const averageWidth = (gen.minSize + gen.maxSize) / 2;
+    const target = Math.round((floor.length * gen.percentage) / 100 / averageWidth);
+    let placed = 0;
+    for (let attempt = 0; attempt < target * 10 && placed < target; attempt++) {
+      const start = floor[Math.floor(rng() * floor.length)];
+      const width = gen.minSize + Math.floor(rng() * (gen.maxSize - gen.minSize + 1));
+      let x = start.x;
+      while (x < start.x + width && isFloor(x, start.y)) x++;
+      const run = x - start.x;
+      if (run < Math.min(width, 2)) continue;
+      for (let px = start.x; px < start.x + run; px++) {
+        onCell(px, start.y);
+        this.pocketCellKeys.add(start.y * this.width + px);
+      }
+      placed++;
+    }
   }
 
   private initializeSolidGrid(): void {

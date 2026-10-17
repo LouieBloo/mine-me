@@ -77,6 +77,16 @@ export class MiningTileRenderer {
       case MiningTileType.BRIDGE:
         MiningTileRenderer.drawBridge(graphics, tileSize);
         break;
+      case MiningTileType.LAVAROCK:
+        // Cooled lava: near-black basalt with dull orange cracks (stands in until a texture is uploaded)
+        graphics.rect(0, 0, tileSize, tileSize);
+        graphics.fill(0x1c1917);
+        graphics.moveTo(6, 18);
+        graphics.lineTo(24, 28);
+        graphics.lineTo(34, 22);
+        graphics.lineTo(58, 40);
+        graphics.stroke({ width: 1.5, color: 0xc2410c, alpha: 0.8 });
+        break;
       case MiningTileType.COPPERIUM:
         // Dark shale with warm copper nuggets and cyan energy flecks
         graphics.rect(0, 0, tileSize, tileSize);

@@ -27,6 +27,8 @@ export interface FluidClientDefinition {
   flame?: { effect: ParticleEffectConfig | null; light: ItemLightConfig | null };
   /** The fluid's playable sounds (enter, exit, ignite, burn). Absent: silent. */
   sounds?: FluidSoundEffectsConfig;
+  /** The glow the fluid always gives off (lava). Absent: none. */
+  light?: ItemLightConfig;
 }
 
 /** Level (0 empty, 1 full) to its wire value, 0-255. Anything visible stays at least 1. */

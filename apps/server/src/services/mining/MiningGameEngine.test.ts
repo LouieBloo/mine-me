@@ -1038,6 +1038,7 @@ describe('MiningGameEngine', () => {
         seed: 12345,
         socket: mockSocket,
       });
+      { const fg = engine.fluidSubsystem.grid; for (let y = 0; y < fg.height; y++) for (let x = 0; x < fg.width; x++) fg.setCell(x, y, 0, 0); }
 
       vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue(testBlockConfig({
         id: 'block_chest',
@@ -1083,6 +1084,7 @@ describe('MiningGameEngine', () => {
         seed: 12345,
         socket: mockSocket,
       });
+      { const fg = engine.fluidSubsystem.grid; for (let y = 0; y < fg.height; y++) for (let x = 0; x < fg.width; x++) fg.setCell(x, y, 0, 0); }
 
       vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue(testBlockConfig({
         id: 'block_rock',

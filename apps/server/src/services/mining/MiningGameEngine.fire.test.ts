@@ -89,9 +89,10 @@ describe('fire in a mining room', () => {
 
   it('a thin film burns off faster than a deep pool', () => {
     const grid = engine.fluidSubsystem.grid;
+    const oil = engine.fluidSubsystem.registry.idOf('OIL')!;
     for (let x = 10; x <= 20; x++) grid.setCell(x, 22, 0, 0);
-    grid.setCell(10, 22, 1, 0.3);
-    for (let y = 20; y <= 22; y++) grid.addFluid(20, y, 1, 1);
+    grid.setCell(10, 22, oil, 0.3);
+    for (let y = 20; y <= 22; y++) grid.addFluid(20, y, oil, 1);
     light(10, 22);
     light(20, 22);
     seconds(1.5);

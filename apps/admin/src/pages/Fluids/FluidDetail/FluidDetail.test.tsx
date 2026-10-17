@@ -69,6 +69,40 @@ describe('FluidDetail editing', () => {
     expect(JSON.parse(opts.body)).toMatchObject({ name: 'Crude Oil', flowRate: 0.2, typeKey: 'OIL', flammability: OIL.flammability, generation: OIL.generation });
   });
 
+  it('loads and saves contact effects, and keeps them across a save', async () => {
+    mockFetchWithAuth.mockImplementation((url: string, opts?: any) => {
+      if (opts?.method === 'PUT') return ok({ ...OIL, ...JSON.parse(opts.body) });
+      if (url === '/api/admin/fluids/fluid_oil') return ok({ ...OIL, contact: { damagePerSecond: 25, ignites: 100 } });
+      return ok([]);
+    });
+    renderAt('/fluids/fluid_oil');
+    await screen.findByDisplayValue('Oil');
+    expect(screen.getByLabelText('Damage Per Second')).toHaveValue(25);
+    fireEvent.change(screen.getByLabelText('Damage Per Second'), { target: { value: '40' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Fluid' }));
+    expect(await screen.findByText('Fluid saved!')).toBeInTheDocument();
+    expect(JSON.parse(lastCall('PUT')![1].body).contact).toEqual({ damagePerSecond: 40, ignites: 100 });
+  });
+
+  it('loads a fluid\'s reactions and offers the other fluids and the blocks to choose from', async () => {
+    mockFetchWithAuth.mockImplementation((url: string, opts?: any) => {
+      if (opts?.method === 'PUT') return ok({ ...OIL, ...JSON.parse(opts.body) });
+      if (url === '/api/admin/fluids/fluid_oil') return ok({ ...OIL, reactions: [{ with: 'WATER', becomes: 'LAVAROCK', costPerLevel: 2 }] });
+      if (url === '/api/admin/fluids') return ok([{ typeKey: 'OIL', name: 'Oil' }, { typeKey: 'WATER', name: 'Water' }]);
+      if (url === '/api/admin/blocks') return ok([{ typeKey: 'LAVAROCK', name: 'Lavarock' }]);
+      return ok([]);
+    });
+    renderAt('/fluids/fluid_oil');
+    await screen.findByDisplayValue('Oil');
+    expect(await screen.findByLabelText('Cost Per Level')).toHaveValue(2);
+    const touchedBy = screen.getByLabelText('Touched By') as HTMLSelectElement;
+    expect(touchedBy.value).toBe('WATER');
+    expect([...touchedBy.options].map((o) => o.value)).not.toContain('OIL'); // a fluid cannot react with itself
+    fireEvent.click(screen.getByRole('button', { name: 'Save Fluid' }));
+    expect(await screen.findByText('Fluid saved!')).toBeInTheDocument();
+    expect(JSON.parse(lastCall('PUT')![1].body).reactions).toEqual([{ with: 'WATER', becomes: 'LAVAROCK', costPerLevel: 2 }]);
+  });
+
   it('shows the look settings (the defaults when none are stored), saves them, and feeds the preview', async () => {
     renderAt('/fluids/fluid_oil');
     await screen.findByDisplayValue('Oil');
@@ -252,8 +286,8 @@ describe('FluidDetail creating', () => {
     expect(screen.getByLabelText('Key')).toHaveValue('');
     expect(screen.getByLabelText('Can burn')).not.toBeChecked();
     expect(screen.getByLabelText('Appears in generated mines')).not.toBeChecked();
-    // Only the particle library is fetched; there is no fluid to load
-    expect(mockFetchWithAuth.mock.calls.every(([url]) => url === '/api/admin/particle-effects')).toBe(true);
+    // Only the particle library and the fluid and block lists are fetched; there is no fluid to load
+    expect(mockFetchWithAuth.mock.calls.every(([url]) => ['/api/admin/particle-effects', '/api/admin/fluids', '/api/admin/blocks'].includes(url))).toBe(true);
   });
 
   it('upper-cases the key, rejects an empty name, then creates with POST and opens the new fluid', async () => {

@@ -1,5 +1,57 @@
 [
   {
+    "id": "fluid_lava",
+    "typeKey": "LAVA",
+    "name": "Lava",
+    "description": "Molten rock. Creeps slowly, glows, burns anything in it, and sets hard when water reaches it.",
+    "color": "#ff5a14",
+    "opacity": 0.95,
+    "density": 3,
+    "viscosity": 0.85,
+    "flowRate": 0.06,
+    "minLevel": 0.05,
+    "flowThreshold": 0.03,
+    "appearance": {
+      "highlight": 0.8,
+      "waveSpeed": 0.3,
+      "depthOpacity": 0.2,
+      "waveAmplitude": 0.03,
+      "depthDarkening": 0.25
+    },
+    "flammability": null,
+    "generation": {
+      "maxSize": 4,
+      "minSize": 2,
+      "maxDepth": null,
+      "minDepth": 15,
+      "percentage": 3
+    },
+    "soundEffects": null,
+    "contact": {
+      "ignites": 100,
+      "damagePerSecond": 25
+    },
+    "light": {
+      "type": "POINT",
+      "color": "#ff6a1a",
+      "effect": "FLICKER",
+      "radius": 5,
+      "enabled": true,
+      "intensity": 0.9,
+      "flickerSpeed": 6,
+      "flickerAmount": 0.15
+    },
+    "reactions": [
+      {
+        "with": "WATER",
+        "becomes": "LAVAROCK",
+        "costPerLevel": 2
+      }
+    ],
+    "createdAt": "2026-10-17T03:07:19.752Z",
+    "updatedAt": "2026-10-17T03:07:19.752Z"
+  },
+  {
     "id": "fluid_oil",
     "typeKey": "OIL",
     "name": "Oil",
@@ -44,7 +96,47 @@
       "percentage": 10
     },
     "soundEffects": null,
+    "contact": null,
+    "light": null,
+    "reactions": null,
     "createdAt": "2026-10-13T22:58:35.715Z",
     "updatedAt": "2026-10-14T02:43:16.389Z"
+  },
+  {
+    "id": "fluid_water",
+    "typeKey": "WATER",
+    "name": "Water",
+    "description": "Clear, thin water. Flows fast, puts out fires and cools lava into stone.",
+    "color": "#3b82f6",
+    "opacity": 0.6,
+    "density": 1,
+    "viscosity": 0.25,
+    "flowRate": 0.6,
+    "minLevel": 0.02,
+    "flowThreshold": 0.01,
+    "appearance": {
+      "highlight": 0.6,
+      "waveSpeed": 1.2,
+      "depthOpacity": 0.3,
+      "waveAmplitude": 0.08,
+      "depthDarkening": 0.4
+    },
+    "flammability": null,
+    "generation": {
+      "mode": "POOL",
+      "maxSize": 6,
+      "minSize": 3,
+      "maxDepth": null,
+      "minDepth": 2,
+      "percentage": 6
+    },
+    "soundEffects": null,
+    "contact": {
+      "extinguishes": true
+    },
+    "light": null,
+    "reactions": null,
+    "createdAt": "2026-10-17T03:07:19.747Z",
+    "updatedAt": "2026-10-17T03:19:52.375Z"
   }
 ]

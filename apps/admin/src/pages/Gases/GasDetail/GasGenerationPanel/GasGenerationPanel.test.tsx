@@ -60,4 +60,12 @@ describe('GasGenerationPanel', () => {
     fireEvent.change(screen.getByLabelText('Smallest Pocket'), { target: { value: '' } });
     expect(onChange.mock.calls[0][0].minSize).toBeNaN();
   });
+
+  it('edits the pocket shape weights, and has no pool mode', () => {
+    const onChange = vi.fn();
+    render(<GasGenerationPanel value={GEN} onChange={onChange} />);
+    expect(screen.queryByLabelText('Where It Appears')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Veins weight'), { target: { value: '5' } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...GEN, shapes: { SQUARE: 1, RECTANGLE: 1, VEIN: 5 } });
+  });
 });

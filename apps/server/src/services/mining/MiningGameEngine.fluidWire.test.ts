@@ -10,6 +10,8 @@ describe('fluids on the wire', () => {
   let socket: { connected: boolean; emit: ReturnType<typeof vi.fn> };
   const tick = (n = 1) => { for (let i = 0; i < n; i++) (engine as any).tick(1 / 30); };
   const ticks = (): MiningStateTickPayload[] => socket.emit.mock.calls.filter((c) => c[0] === 'mining_state_tick').map((c) => c[1]);
+  const oilId = () => engine.fluidSubsystem.registry.idOf('OIL')!;
+  const oilDefinition = () => engine.fluidSubsystem.clientDefinitions().find((d) => d.typeKey === 'OIL')!;
   const lastTick = () => ticks()[ticks().length - 1];
   const setTile = (x: number, y: number, type: number, revealed = true) => {
     engine.grid[y][x] = { type: type as MiningTileType, revealed };
@@ -47,7 +49,7 @@ describe('fluids on the wire', () => {
     engine.fluidSubsystem.placeFluid(32, 30, 'OIL');
     tick(1);
     const t = lastTick();
-    expect(t.fluidCells).toEqual([[32, 30, 1, quantizeFluidLevel(1)]]);
+    expect(t.fluidCells).toEqual([[32, 30, oilId(), quantizeFluidLevel(1)]]);
   });
 
   it('sends nothing on ticks where the fluid did not change', () => {
@@ -65,7 +67,7 @@ describe('fluids on the wire', () => {
     (engine as any).revealAndTrackTiles({ x: 32.5, y: 30.5 }, 2);
     tick(1);
     const entry = lastTick().revealedTiles!.find((r) => r.x === 32 && r.y === 30)!;
-    expect(entry.fluid).toEqual([1, quantizeFluidLevel(0.5)]);
+    expect(entry.fluid).toEqual([oilId(), quantizeFluidLevel(0.5)]);
     expect(lastTick().revealedTiles!.find((r) => r.x === 31 && r.y === 30)!.fluid).toBeUndefined();
   });
 
@@ -74,16 +76,17 @@ describe('fluids on the wire', () => {
     engine.fluidSubsystem.placeFluid(33, 31, 'OIL', 0.25);
     engine.grid[31][31].revealed = true;
     const state = MiningSessionManager.getInstance().buildClientState(engine, cid);
-    expect(state.fluids).toMatchObject([
-      { id: 1, typeKey: 'OIL', name: 'Oil', color: '#0b0b0d', opacity: 0.9, viscosity: 0.6, density: 0.8, appearance: DEFAULT_FLUID_APPEARANCE },
-    ]);
-    expect(state.fluidCells).toEqual([[31, 31, 1, quantizeFluidLevel(0.75)]]);
+    expect(state.fluids!.find((f) => f.typeKey === 'OIL')).toMatchObject(
+      { id: oilId(), typeKey: 'OIL', name: 'Oil', color: '#0b0b0d', opacity: 0.9, viscosity: 0.6, density: 0.8 },
+    );
+    expect(state.fluids!.map((f) => f.typeKey).sort()).toEqual(['LAVA', 'OIL', 'WATER']);
+    expect(state.fluidCells).toEqual([[31, 31, oilId(), quantizeFluidLevel(0.75)]]);
   });
 
   it('sends how the fluid looks, with whatever the admin left out filled in', () => {
     engine.dataManager.getFluid('OIL')!.appearance = { waveAmplitude: 0.02, highlight: 9 };
     const state = MiningSessionManager.getInstance().buildClientState(engine, cid);
-    expect(state.fluids![0].appearance).toEqual({ ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0.02, highlight: 1 });
+    expect(state.fluids!.find((f) => f.typeKey === 'OIL')!.appearance).toEqual({ ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0.02, highlight: 1 });
   });
 
   it('reports oil that drained away as an empty cell', () => {
@@ -104,31 +107,41 @@ describe('fluids on the wire', () => {
     it('carries the flame effect and light the fluid names, resolved from the particle library', () => {
       engine.dataManager.getFluid('OIL')!.flammability = burns({ flameEffectId: 'pe_flame', flameLight: LIGHT });
       vi.spyOn(engine.dataManager, 'getParticleEffect').mockImplementation((id) => (id === 'pe_flame' ? ({ id, config: FLAME } as any) : undefined));
-      const [oil] = engine.fluidSubsystem.clientDefinitions();
+      const oil = oilDefinition();
       expect(oil.flame).toEqual({ effect: FLAME, light: LIGHT });
     });
 
     it('sends no flame when the fluid names none, or the effect is not in the library', () => {
       engine.dataManager.getFluid('OIL')!.flammability = burns({});
-      expect(engine.fluidSubsystem.clientDefinitions()[0].flame).toBeUndefined();
+      expect(oilDefinition().flame).toBeUndefined();
       engine.dataManager.getFluid('OIL')!.flammability = burns({ flameEffectId: 'missing' });
-      expect(engine.fluidSubsystem.clientDefinitions()[0].flame).toBeUndefined();
+      expect(oilDefinition().flame).toBeUndefined();
     });
 
     it('sends the light alone when only a light is set, and leaves out a disabled one', () => {
       engine.dataManager.getFluid('OIL')!.flammability = burns({ flameLight: LIGHT });
-      expect(engine.fluidSubsystem.clientDefinitions()[0].flame).toEqual({ effect: null, light: LIGHT });
+      expect(oilDefinition().flame).toEqual({ effect: null, light: LIGHT });
       engine.dataManager.getFluid('OIL')!.flammability = burns({ flameLight: { ...LIGHT, enabled: false } });
-      expect(engine.fluidSubsystem.clientDefinitions()[0].flame).toBeUndefined();
+      expect(oilDefinition().flame).toBeUndefined();
+    });
+
+    it('carries the fluid\'s always-on glow, and leaves out a disabled or missing one', () => {
+      const oil = engine.dataManager.getFluid('OIL')!;
+      oil.light = LIGHT;
+      expect(oilDefinition().light).toEqual(LIGHT);
+      oil.light = { ...LIGHT, enabled: false };
+      expect(oilDefinition().light).toBeUndefined();
+      oil.light = null;
+      expect(oilDefinition().light).toBeUndefined();
     });
 
     it('carries the fluid\'s playable sounds, and none when it has none', () => {
-      expect(engine.fluidSubsystem.clientDefinitions()[0].sounds).toBeUndefined();
+      expect(oilDefinition().sounds).toBeUndefined();
       const sounds = { enter: { soundId: 's1', url: '/assets/sounds/splash.mp3', volume: 0.5, loop: false } };
       engine.dataManager.getFluid('OIL')!.sounds = sounds;
-      expect(engine.fluidSubsystem.clientDefinitions()[0].sounds).toEqual(sounds);
+      expect(oilDefinition().sounds).toEqual(sounds);
       engine.dataManager.getFluid('OIL')!.sounds = {};
-      expect(engine.fluidSubsystem.clientDefinitions()[0].sounds).toBeUndefined();
+      expect(oilDefinition().sounds).toBeUndefined();
     });
 
     it('a joining client also gets the effect drawn on burning bodies, from the map config', () => {

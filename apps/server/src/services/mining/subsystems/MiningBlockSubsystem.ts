@@ -347,6 +347,29 @@ export class MiningBlockSubsystem {
   }
 
   /**
+   * A fluid reaction hardened the cell at (x, y) into the block `typeKey` (water cooling lava into lavarock). Whatever
+   * non-solid tile was there (empty, a ladder, a torch) is replaced; a solid tile is never overwritten. Clients are only
+   * told when the player could have seen the cell. Returns whether the block was placed.
+   */
+  public placeBlockFromReaction(x: number, y: number, typeKey: string): boolean {
+    const { grid, rigidWorld } = this.world;
+    const tile = grid[y]?.[x];
+    const into = MiningTileType[typeKey as keyof typeof MiningTileType];
+    if (!tile || into === undefined || into === MiningTileType.EMPTY || isTileSolid(tile.type)) return false;
+    grid[y][x] = { type: into, revealed: tile.revealed };
+    rigidWorld.removeTileCollider(x, y);
+    if (isTileSolid(into)) rigidWorld.addTileCollider(x, y);
+    if (tile.revealed) {
+      this.world.pushTileUpdate({ x, y, type: into, damageStage: 0 });
+    } else {
+      // Not on any client's map yet, so nothing is sent, but fluid and gas still have to learn the cell is solid now
+      this.world.fluids.onTileChanged(x, y);
+      this.world.gases.onTileChanged(x, y);
+    }
+    return true;
+  }
+
+  /**
    * The single path for a block being mined through (players, projectiles, mobs, explosions' leftovers).
    * Removes the collider, tells clients, optionally drops loot, may start rocks falling, and stops
    * everyone who was mining it (`miners` when known, otherwise whoever targets that tile).

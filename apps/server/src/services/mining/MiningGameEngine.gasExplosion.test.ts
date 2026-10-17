@@ -27,6 +27,8 @@ describe('explosive gas going off', () => {
       characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0 }, socket: socket as any,
     });
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
+    // Forget the generated fluid while its cells are still open (a cell that is solid cannot be emptied)
+    { const fg = engine.fluidSubsystem.grid; for (let y = 0; y < fg.height; y++) for (let x = 0; x < fg.width; x++) fg.setCell(x, y, 0, 0); }
     for (let y = 18; y <= 24; y++) {
       for (let x = 18; x <= 33; x++) {
         const open = x >= 20 && x <= 31 && y >= 20 && y <= 22;

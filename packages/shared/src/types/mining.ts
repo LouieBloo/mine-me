@@ -173,11 +173,12 @@ export const MiningTileType = {
   COPPERIUM: 8,
   SILVERIUM: 9,
   BRIDGE: 10,
+  LAVAROCK: 11,
 } as const;
 
 export type MiningTileType = (typeof MiningTileType)[keyof typeof MiningTileType];
 
-export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE' | 'COPPERIUM' | 'SILVERIUM' | 'BRIDGE';
+export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE' | 'COPPERIUM' | 'SILVERIUM' | 'BRIDGE' | 'LAVAROCK';
 
 export interface MiningBlockConfig {
   id: string;
@@ -338,6 +339,18 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     isTransparent: false,
     health: 20,
     defaultMineTimeMs: 200,
+  },
+  // Lava that water cooled (ticket 076): solid, hard and slow to mine, tougher than any ore
+  [MiningTileType.LAVAROCK]: {
+    type: MiningTileType.LAVAROCK,
+    name: 'Lavarock',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    health: 500,
+    defaultMineTimeMs: 2500,
   },
 };
 

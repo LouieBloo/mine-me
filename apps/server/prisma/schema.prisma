@@ -289,6 +289,12 @@ model Fluid {
   generation      Json?
   // Sound slots (enter, exit, ignite, burn): library sounds by id, each with its own volume
   soundEffects    Json?
+  // What touching it does to a body: damage per second, ignites, extinguishes (shared FluidContactEffects shape; null = nothing)
+  contact         Json?
+  // Light the fluid gives off all the time (shared ItemLightConfig shape; null = no glow)
+  light           Json?
+  // How it reacts with other fluids, e.g. water hardens lava into a block (shared FluidReaction list; null = none)
+  reactions       Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

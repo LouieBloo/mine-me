@@ -19,8 +19,8 @@ export type SandboxZone =
   | { kind: 'tiles'; tile: MiningTileType; at: ReadonlyArray<{ x: number; y: number }> }
   /** One tile of each type, left to right, `spacing` apart. */
   | { kind: 'blockRow'; y: number; startX: number; spacing: number; tiles: readonly MiningTileType[] }
-  /** Carves the rectangle open and fills it with the fluid in `fluidSlot` (the loaded fluids in key order); a slot with no fluid stays dry. */
-  | { kind: 'pool'; rect: TileRect; fluidSlot: number; fillFromY?: number }
+  /** Carves the rectangle open and fills it with the fluid whose typeKey is `fluid`; a fluid that is not loaded leaves the pool dry. */
+  | { kind: 'pool'; rect: TileRect; fluid: string; fillFromY?: number }
   /** Carves the rectangle open and fills it with `concentration` (default 1) of the gas in `gasSlot` (the loaded gases in key order); a slot with no gas stays empty. Leave solid ground around it and it is a sealed pocket. */
   | { kind: 'chamber'; rect: TileRect; gasSlot: number; concentration?: number };
 
@@ -56,8 +56,9 @@ const { EMPTY, DIRT, ROCK, MINERAL, CHEST, LADDER, COPPERIUM, SILVERIUM } = Mini
 
 /**
  * The standard sandbox, 90 wide by 30 deep, under {@link SANDBOX_SKY_ROWS} rows of open sky. Left to right on the surface: spawn (x 22), two target dummies, the
- * ladder shaft into the hall (x 12-14), and two pools side by side (x 32-43 and 45-56) that open onto
- * the surface so you can jump straight in, then two sealed gas chambers under the ground (x 60-67 hydrogen, x 70-77 nitrogen). Underground: a long open hall with one of every block and a
+ * ladder shaft into the hall (x 12-14), and oil and water pools side by side (x 32-43 and 45-56) that open onto
+ * the surface so you can jump straight in, a lava pool at the far left (x 1-4), and
+ *  two sealed gas chambers under the ground (x 60-67 hydrogen, x 70-77 nitrogen). Underground: a long open hall with one of every block and a
  * rock tower, and a bed of ore and chests to dig through.
  *
  * `blockTiles` is every block type in the game, so a new block shows up in the gallery by itself.
@@ -85,9 +86,11 @@ export function createDefaultSandboxLayout(blockTiles: readonly MiningTileType[]
       { kind: 'tiles', tile: MINERAL, at: [{ x: 14, y: 19 }, { x: 65, y: 18 }, { x: 70, y: 21 }] },
       { kind: 'tiles', tile: CHEST, at: [{ x: 25, y: 20 }, { x: 55, y: 19 }, { x: 85, y: 21 }] },
 
-      // Two surface pools side by side (floor on row 8). Break the shared wall to mix them.
-      { kind: 'pool', rect: rect(32, 0, 43, 7), fluidSlot: 0, fillFromY: 1 },
-      { kind: 'pool', rect: rect(45, 0, 56, 7), fluidSlot: 1, fillFromY: 1 },
+      // Oil and water pools side by side (floor on row 8), and a lava pool off on its own at the far left. Break the
+      // shared wall to mix oil and water; pour water into the lava to cool it into lavarock.
+      { kind: 'pool', rect: rect(32, 0, 43, 7), fluid: 'OIL', fillFromY: 1 },
+      { kind: 'pool', rect: rect(45, 0, 56, 7), fluid: 'WATER', fillFromY: 1 },
+      { kind: 'pool', rect: rect(1, 0, 4, 7), fluid: 'LAVA', fillFromY: 1 },
       // Two sealed gas chambers in the ground (hydrogen, then nitrogen: the first two gases in key order) under a
       // two-block roof of dirt. Mine down through the roof to let one out and watch it rise or sink.
       { kind: 'chamber', rect: rect(60, 2, 67, 7), gasSlot: 0 },

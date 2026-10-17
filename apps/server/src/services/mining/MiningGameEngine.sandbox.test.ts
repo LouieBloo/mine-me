@@ -48,7 +48,7 @@ describe('a sandbox room', () => {
     const e = start();
     for (let i = 0; i < 600; i++) (e as any).tick(1 / 30);
     for (let x = 0; x < 90; x++) {
-      if (x >= 32 && x <= 56 && x !== 44) continue;
+      if ((x >= 32 && x <= 56 && x !== 44) || (x >= 1 && x <= 4)) continue;
       expect(e.fluidSubsystem.contentsAt(x, SKY)).toBeUndefined();
     }
   });

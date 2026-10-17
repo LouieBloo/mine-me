@@ -3,7 +3,7 @@ import { CellIdRegistry } from '../CellIdRegistry';
 
 /** The parts of a fluid definition the simulation reads. */
 export type FluidParams = Pick<FluidDefinition, 'typeKey' | 'density' | 'flowRate' | 'minLevel' | 'flowThreshold'> &
-  Partial<Pick<FluidDefinition, 'viscosity'>>;
+  Partial<Pick<FluidDefinition, 'viscosity' | 'reactions'>>;
 
 /** Id stored in a grid cell that holds no fluid. */
 export const NO_FLUID = 0;

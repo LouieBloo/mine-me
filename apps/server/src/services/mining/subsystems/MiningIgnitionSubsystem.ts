@@ -14,6 +14,8 @@ export interface IgnitedCell {
 const HIT_IGNITION_RADIUS = 1.01;
 
 /** Radius (tiles) a placed torch reaches: the cell it is in and the ones touching it. */
+/** How far an igniting fluid's sparks reach from the middle of a cell of it (its neighbours, diagonals too). */
+export const FLUID_IGNITION_RADIUS = 1.5;
 const TORCH_IGNITION_RADIUS = 1.01;
 /** Radius (tiles) around a player's centre that a carried item reaches: the cells their body is in. */
 const HELD_IGNITION_RADIUS = 0.9;
@@ -169,6 +171,25 @@ export class MiningIgnitionSubsystem {
       if (session.isDead || !session.equippedWeaponId) continue;
       const strength = getIgnitionStrength(this.world.data.getItemData(session.equippedWeaponId));
       if (strength > 0) caught += this.emit(session.playerBody.position.x, session.playerBody.position.y, HELD_IGNITION_RADIUS, strength);
+    }
+    caught += this.emitFromFluids();
+    return caught;
+  }
+
+  /**
+   * Fluids that ignite (lava: `contact.ignites`) are sparks themselves: every cell of one sets alight what is next to
+   * it, at that strength. This is how lava lights oil it touches, or a flammable block that falls into it.
+   */
+  private emitFromFluids(): number {
+    const fluids = this.world.fluids;
+    let caught = 0;
+    for (const definition of this.world.data.getFluids()) {
+      const strength = (definition.contact?.ignites ?? 0) / 100;
+      const id = fluids.registry.idOf(definition.typeKey);
+      if (!(strength > 0) || id === undefined) continue;
+      fluids.grid.forEachCellOf(id, (x, y) => {
+        caught += this.emit(x + 0.5, y + 0.5, FLUID_IGNITION_RADIUS, strength);
+      });
     }
     return caught;
   }

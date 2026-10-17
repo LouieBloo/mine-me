@@ -18,6 +18,7 @@ describe('falling rock damage', () => {
       for (let y = 3; y <= 40; y++) {
         const solid = y === 40 || x === 19 || x === 25;
         engine.grid[y][x] = { type: solid ? MiningTileType.DIRT : MiningTileType.EMPTY, revealed: true };
+        engine.fluidSubsystem.grid.setCell(x, y, 0, 0); // a generated pocket of lava or oil may have been here
         if (solid) engine.rigidWorld.addTileCollider(x, y);
         else engine.rigidWorld.removeTileCollider(x, y);
       }

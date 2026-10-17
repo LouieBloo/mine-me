@@ -24,6 +24,7 @@ import type { FireField } from '@mine-me/shared';
 import type { FluidRenderer } from '../renderers/FluidRenderer';
 import type { GasRenderer } from '../renderers/GasRenderer';
 import type { FireRenderer } from '../renderers/FireRenderer';
+import type { FluidGlow } from '../renderers/FluidGlow';
 import type { BurningBodies } from '../renderers/BurningBodies';
 import type { FluidSounds } from '../renderers/FluidSounds';
 import type { GasSounds } from '../renderers/GasSounds';
@@ -86,6 +87,8 @@ export interface MiningSceneRefs {
   fireFieldRef: NullableRef<FireField>;
   /** Flames and lights on the burning cells. */
   fireRendererRef: NullableRef<FireRenderer>;
+  /** The light fluids give off all the time (lava). */
+  fluidGlowRef?: NullableRef<FluidGlow>;
   /** The effect on burning players and mobs. */
   burningBodiesRef: NullableRef<BurningBodies>;
   /** Splashes, fire catching and the crackle loops. */

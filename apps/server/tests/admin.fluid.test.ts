@@ -15,9 +15,11 @@ vi.mock('../src/services/admin.service', async () => {
 });
 
 let rows: any[] = [];
+let blocks: string[] = ['LAVAROCK'];
 
 vi.mock('../src/index', () => ({
   prisma: {
+    miningBlock: { findUnique: vi.fn().mockImplementation(({ where }) => Promise.resolve(blocks.includes(where.typeKey) ? { typeKey: where.typeKey } : null)) },
     fluid: {
       findMany: vi.fn().mockImplementation(() => Promise.resolve([...rows].sort((a, b) => a.typeKey.localeCompare(b.typeKey)))),
       findFirst: vi.fn().mockImplementation(({ where }) =>
@@ -116,6 +118,46 @@ describe('admin fluids', () => {
     expect(rows[0].appearance).toEqual({ waveAmplitude: 0.02, waveSpeed: 0.3 });
     await request(app).put('/admin/fluids/fluid_oil').send({ appearance: null });
     expect(rows[0].appearance).toBe(Prisma.JsonNull);
+  });
+
+  it('saves contact effects and a glow, and clears them with null', async () => {
+    const light = { enabled: true, type: 'POINT', color: '#ff7a1c', radius: 4, intensity: 0.8 };
+    const res = await request(app).put('/admin/fluids/fluid_oil').send({ contact: { damagePerSecond: 20, ignites: 100 }, light });
+    expect(res.status).toBe(200);
+    expect(rows[0].contact).toEqual({ damagePerSecond: 20, ignites: 100 });
+    expect(rows[0].light).toEqual(light);
+    await request(app).put('/admin/fluids/fluid_oil').send({ contact: null, light: null });
+    expect(rows[0].contact).toBe(Prisma.JsonNull);
+    expect(rows[0].light).toBe(Prisma.JsonNull);
+  });
+
+  it('refuses bad contact effects and a bad glow', async () => {
+    const res = await request(app).put('/admin/fluids/fluid_oil').send({ contact: { damagePerSecond: -5 }, light: { radius: 0 } });
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toContain('contact.damagePerSecond must be 0 or more');
+    expect(res.body.errors).toContain('light needs a radius and intensity above 0');
+  });
+
+  it('saves reactions that name an existing fluid and block, and refuses ones that do not', async () => {
+    rows.push({ ...OIL, id: 'fluid_water', typeKey: 'WATER', name: 'Water' });
+    const good = [{ with: 'WATER', becomes: 'LAVAROCK', costPerLevel: 2 }];
+    expect((await request(app).put('/admin/fluids/fluid_oil').send({ reactions: good })).status).toBe(200);
+    expect(rows[0].reactions).toEqual(good);
+    const noFluid = await request(app).put('/admin/fluids/fluid_oil').send({ reactions: [{ with: 'ACID', becomes: 'LAVAROCK', costPerLevel: 1 }] });
+    expect(noFluid.status).toBe(400);
+    expect(noFluid.body.errors).toContain('reactions[0].with: there is no fluid ACID');
+    const noBlock = await request(app).put('/admin/fluids/fluid_oil').send({ reactions: [{ with: 'WATER', becomes: 'NOPE', costPerLevel: 1 }] });
+    expect(noBlock.body.errors).toContain('reactions[0].becomes: there is no block NOPE');
+    expect(rows[0].reactions).toEqual(good);
+  });
+
+  it('refuses to delete a fluid that another fluid reacts with', async () => {
+    rows.push({ ...OIL, id: 'fluid_water', typeKey: 'WATER', name: 'Water' });
+    rows[0].reactions = [{ with: 'WATER', becomes: 'LAVAROCK', costPerLevel: 2 }];
+    const res = await request(app).delete('/admin/fluids/fluid_water');
+    expect(res.status).toBe(409);
+    expect(rows).toHaveLength(2);
+    expect((await request(app).delete('/admin/fluids/fluid_oil')).status).toBe(200);
   });
 
   it('refuses a look setting out of range', async () => {

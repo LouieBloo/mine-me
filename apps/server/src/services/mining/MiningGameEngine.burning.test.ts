@@ -103,6 +103,7 @@ describe('burning and heat in a mining room', () => {
         characterId: cid, cityId: 'c', seed: 5, maxHealth: 1000, socket: socket as any,
         mapConfig: { mobSpawnCount: 0, burnDamagePerSecond: 0, burnSeconds: 1, heatDamagePerSecond: 0 },
       });
+      { const fg = engine.fluidSubsystem.grid; for (let y = 0; y < fg.height; y++) for (let x = 0; x < fg.width; x++) fg.setCell(x, y, 0, 0); }
       for (let x = 8; x <= 30; x++) {
         for (let y = 17; y <= 20; y++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
         engine.grid[21][x] = { type: MiningTileType.DIRT, revealed: true };

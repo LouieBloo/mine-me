@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   DEFAULT_FLUID_APPEARANCE, FLUID_APPEARANCE_LIMITS, resolveFluidAppearance, validateFluid,
-  type FluidAppearance, type FluidDefinition, type FluidGeneration, type Flammability,
+  type FluidAppearance, type FluidDefinition, type FluidGeneration, type Flammability, type FluidContactEffects, type FluidReaction, type ItemLightConfig,
 } from '@mine-me/shared';
 import { useApi } from '../../../hooks/useApi';
 import { useToast } from '../../../contexts/ToastContext';
@@ -10,6 +10,9 @@ import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
 import { Modal } from '../../../components/Modal/Modal';
 import FlammabilityPanel from '../../../components/FlammabilityPanel/FlammabilityPanel';
 import FluidPreview from '../../../components/FluidPreview/FluidPreview';
+import ItemLightEffectConfig from '../../../components/ItemLightEffectConfig/ItemLightEffectConfig';
+import FluidReactionsPanel from './FluidReactionsPanel/FluidReactionsPanel';
+import FluidContactPanel from './FluidContactPanel/FluidContactPanel';
 import FluidGenerationPanel from './FluidGenerationPanel/FluidGenerationPanel';
 import FluidSoundEffects from './FluidSoundEffects/FluidSoundEffects';
 import './FluidDetail.css';
@@ -28,6 +31,9 @@ interface FluidForm {
   appearance: FluidAppearance;
   flammability: Flammability | null;
   generation: FluidGeneration | null;
+  contact: FluidContactEffects | null;
+  light: ItemLightConfig | null;
+  reactions: FluidReaction[] | null;
 }
 
 /** What a brand new fluid starts as: a plain, slightly thick liquid that does not burn. */
@@ -45,6 +51,9 @@ export const NEW_FLUID: FluidForm = {
   appearance: { ...DEFAULT_FLUID_APPEARANCE },
   flammability: null,
   generation: null,
+  contact: null,
+  light: null,
+  reactions: null,
 };
 
 const inputClass = 'w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-800';
@@ -100,6 +109,8 @@ export default function FluidDetail() {
   const [form, setForm] = useState<FluidForm>(NEW_FLUID);
   const [problems, setProblems] = useState<string[]>([]);
   const [particleEffects, setParticleEffects] = useState<Array<{ id: string; name: string }>>([]);
+  const [otherFluids, setOtherFluids] = useState<Array<{ typeKey: string; name: string }>>([]);
+  const [blockOptions, setBlockOptions] = useState<Array<{ typeKey: string; name: string }>>([]);
 
   // The particle library the flame effect is picked from; the fluid can be edited without it
   useEffect(() => {
@@ -107,6 +118,20 @@ export default function FluidDetail() {
       .then((res) => (res.ok ? res.json() : []))
       .then((list) => setParticleEffects(Array.isArray(list) ? list : []))
       .catch(() => setParticleEffects([]));
+  }, []);
+
+  // The fluids and blocks a reaction can name
+  useEffect(() => {
+    const load = (url: string, set: (list: Array<{ typeKey: string; name: string }>) => void, what: string) =>
+      fetchWithAuth(url)
+        .then((res) => {
+          if (!res.ok) throw new Error(`Failed to load ${what}`);
+          return res.json();
+        })
+        .then((list) => set(Array.isArray(list) ? list.map((x: any) => ({ typeKey: x.typeKey, name: x.name })) : []))
+        .catch((err) => toast.error(err.message));
+    load('/api/admin/fluids', setOtherFluids, 'fluids');
+    load('/api/admin/blocks', setBlockOptions, 'blocks');
   }, []);
 
   useEffect(() => {
@@ -135,6 +160,9 @@ export default function FluidDetail() {
           appearance: resolveFluidAppearance(data.appearance),
           flammability: data.flammability ?? null,
           generation: data.generation ?? null,
+          contact: data.contact ?? null,
+          light: data.light ?? null,
+          reactions: data.reactions ?? null,
         });
       })
       .catch((err) => toast.error(err.message))
@@ -359,6 +387,19 @@ export default function FluidDetail() {
             </section>
 
             <FlammabilityPanel value={form.flammability} onChange={(v) => set('flammability', v)} particleEffects={particleEffects} />
+            <FluidContactPanel value={form.contact} onChange={(v) => set('contact', v)} />
+            <ItemLightEffectConfig
+              lightConfig={form.light}
+              onChange={(v) => set('light', v)}
+              title="Fluid Glow"
+              description="Light the fluid gives off all the time, such as lava lighting up a cavern"
+            />
+            <FluidReactionsPanel
+              value={form.reactions}
+              onChange={(v) => set('reactions', v)}
+              fluids={otherFluids.filter((f) => f.typeKey !== form.typeKey)}
+              blocks={blockOptions}
+            />
             <FluidGenerationPanel value={form.generation} onChange={(v) => set('generation', v)} />
 
             {problems.length > 0 && (

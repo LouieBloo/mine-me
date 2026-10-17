@@ -28,7 +28,6 @@ export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDef
   const fluidCells: GeneratedFluidCell[] = [];
   const gasCells: GeneratedGasCell[] = [];
   const byKey = <T extends { typeKey: string }>(list: readonly T[]) => [...list].sort((a, b) => (a.typeKey < b.typeKey ? -1 : a.typeKey > b.typeKey ? 1 : 0));
-  const bySlot = byKey(fluids);
   const gasBySlot = byKey(gases);
 
   // Layout coordinates are relative to the ground surface; `check` validates them, `row` converts to the grid
@@ -68,7 +67,7 @@ export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDef
         break;
       }
       case 'pool': {
-        const fluid = bySlot[zone.fluidSlot];
+        const fluid = fluids.find((f) => f.typeKey === zone.fluid);
         const fillFrom = zone.fillFromY ?? zone.rect.y0;
         eachInRect(zone.rect, 'pool', (x, y) => {
           set(x, y, MiningTileType.EMPTY, 'pool');

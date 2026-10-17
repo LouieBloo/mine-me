@@ -1,5 +1,6 @@
 import React from 'react';
 import type { GasGeneration } from '@mine-me/shared';
+import PocketShapeWeights from '../../../../components/PocketShapeWeights/PocketShapeWeights';
 import './GasGenerationPanel.css';
 
 interface GasGenerationPanelProps {
@@ -24,7 +25,7 @@ const labelClass = 'block text-xs font-black uppercase text-slate-600 tracking-w
 const readNumber = (raw: string): number => (raw === '' ? NaN : Number(raw));
 const show = (n: number | null | undefined): number | '' => (typeof n === 'number' && Number.isFinite(n) ? n : '');
 
-/** Where the gas appears when a mine is generated: sealed square pockets in the dirt. */
+/** Where the gas appears when a mine is generated: sealed pockets in the dirt. */
 export const GasGenerationPanel: React.FC<GasGenerationPanelProps> = ({ value, onChange }) => {
   const enabled = Boolean(value);
   const update = (patch: Partial<GasGeneration>) => onChange({ ...DEFAULT_GENERATION, ...value, ...patch });
@@ -34,7 +35,7 @@ export const GasGenerationPanel: React.FC<GasGenerationPanelProps> = ({ value, o
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h4 className="text-sm font-black uppercase tracking-wider text-slate-800">Map Generation</h4>
-          <p className="text-xs text-slate-500 font-medium">Sealed square pockets of this gas carved into the dirt when a mine is generated; digging into one lets it out</p>
+          <p className="text-xs text-slate-500 font-medium">Sealed pockets of this gas carved into the dirt when a mine is generated; digging into one lets it out</p>
         </div>
         <label className="flex items-center gap-3 cursor-pointer self-start sm:self-auto bg-white hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl transition-colors">
           <input
@@ -83,7 +84,7 @@ export const GasGenerationPanel: React.FC<GasGenerationPanelProps> = ({ value, o
               <label htmlFor="gen-maxSize" className={labelClass}>Largest Pocket</label>
               <input id="gen-maxSize" type="number" min={1} step={1} className={inputClass} value={show(value.maxSize)} onChange={(e) => update({ maxSize: readNumber(e.target.value) })} />
             </div>
-            <span className="col-span-2 text-[11px] text-slate-400 font-medium">Pockets are squares; the side is between these, in tiles</span>
+            <span className="col-span-2 text-[11px] text-slate-400 font-medium">Squares and rectangles have sides between these, in tiles; a vein has as many cells as a square of that side</span>
           </div>
           <div className="space-y-1">
             <label htmlFor="gen-concentration" className={labelClass}>Starting Concentration</label>
@@ -99,6 +100,7 @@ export const GasGenerationPanel: React.FC<GasGenerationPanelProps> = ({ value, o
             />
             <span className="text-[11px] text-slate-400 font-medium">How full each pocket cell starts, above 0 up to 1 (1 is a full cell)</span>
           </div>
+          <PocketShapeWeights value={value.shapes} onChange={(shapes) => update({ shapes })} />
         </div>
       )}
     </div>

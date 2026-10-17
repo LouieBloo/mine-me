@@ -28,6 +28,7 @@ import { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager'
 import { FluidRenderer } from '../renderers/FluidRenderer';
 import { GasRenderer } from '../renderers/GasRenderer';
 import { FireRenderer } from '../renderers/FireRenderer';
+import { FluidGlow } from '../renderers/FluidGlow';
 import { BurningBodies } from '../renderers/BurningBodies';
 import { ProjectileTextureCache } from '../systems/ProjectileTextureCache';
 import {
@@ -76,6 +77,7 @@ export function useMiningScene({
   const gasRendererRef = useRef<GasRenderer | null>(null);
   const fireFieldRef = useRef<FireField | null>(null);
   const fireRendererRef = useRef<FireRenderer | null>(null);
+  const fluidGlowRef = useRef<FluidGlow | null>(null);
   const burningBodiesRef = useRef<BurningBodies | null>(null);
   const fallingRocksContainerRef = useRef<Container | null>(null);
   const droppedItemsContainerRef = useRef<Container | null>(null);
@@ -309,6 +311,9 @@ export function useMiningScene({
     gasRenderer.setEngines(particleEngine, lightingEngine);
     fireRenderer.setBlockFlames(initialSessionState.blockFlames ?? []);
     fireRendererRef.current = fireRenderer;
+    const fluidGlow = new FluidGlow(fluidRenderer);
+    fluidGlow.setEngine(lightingEngine);
+    fluidGlowRef.current = fluidGlow;
     const burningBodies = new BurningBodies();
     burningBodies.setup(particleEngine, initialSessionState.burningEffect);
     burningBodiesRef.current = burningBodies;
@@ -605,6 +610,8 @@ export function useMiningScene({
       }
       fireRenderer.destroy();
       fireRendererRef.current = null;
+      fluidGlow.destroy();
+      fluidGlowRef.current = null;
       burningBodies.destroy();
       burningBodiesRef.current = null;
       fluidRenderer.destroy();
@@ -640,6 +647,7 @@ export function useMiningScene({
     gasRendererRef,
     fireFieldRef,
     fireRendererRef,
+    fluidGlowRef,
     burningBodiesRef,
     particlesContainerRef,
     fallingRocksContainerRef,

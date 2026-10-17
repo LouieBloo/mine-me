@@ -1,7 +1,7 @@
 import { Container, Graphics } from 'pixi.js';
 import {
   DEFAULT_FLUID_APPEARANCE, FluidDisplay, FluidField, FluidLayout, darkenColor, lightenColor, parseHexColor, bandBelowLine, fluidBodyBands, fluidDepthShade, fluidSurfaceWave,
-  type FluidAppearance, type FluidClientDefinition, type FluidEnvironment, type FluidShape, type FluidSoundEffectsConfig, type FluidWireCell,
+  type FluidAppearance, type FluidClientDefinition, type FluidEnvironment, type ItemLightConfig, type FluidShape, type FluidSoundEffectsConfig, type FluidWireCell,
   type SolidSampler,
 } from '@mine-me/shared';
 
@@ -56,6 +56,7 @@ export class FluidRenderer {
   private readonly definitions = new Map<number, FluidLook>();
   private readonly properties = new Map<number, { viscosity: number; density: number }>();
   private readonly flames = new Map<number, FlameLook>();
+  private readonly glows = new Map<number, ItemLightConfig>();
   private readonly sounds = new Map<number, FluidSoundEffectsConfig>();
   private readonly chunks = new Map<number, ChunkView>();
   private readonly dirty = new Set<number>();
@@ -89,10 +90,12 @@ export class FluidRenderer {
     this.definitions.clear();
     this.properties.clear();
     this.flames.clear();
+    this.glows.clear();
     this.sounds.clear();
     for (const def of definitions) {
       this.properties.set(def.id, { viscosity: def.viscosity, density: def.density });
       if (def.flame) this.flames.set(def.id, def.flame);
+      if (def.light) this.glows.set(def.id, def.light);
       if (def.sounds) this.sounds.set(def.id, def.sounds);
       const color = parseHexColor(def.color);
       this.definitions.set(def.id, {
@@ -119,6 +122,16 @@ export class FluidRenderer {
   /** The fluid's playable sounds, or undefined if it is silent. */
   public soundsOf(fluidId: number): FluidSoundEffectsConfig | undefined {
     return this.sounds.get(fluidId);
+  }
+
+  /** The light this fluid always gives off, or undefined if it does not glow. */
+  public glowOf(fluidId: number): ItemLightConfig | undefined {
+    return this.glows.get(fluidId);
+  }
+
+  /** Whether any fluid in this run glows (lets the glow skip its scan when none does). */
+  public get hasGlow(): boolean {
+    return this.glows.size > 0;
   }
 
   /** How a burning cell of this fluid looks, or undefined if it draws nothing. */

@@ -266,6 +266,7 @@ export function useMiningTicker({
       // 4.5 Fire: flames and lights follow the fire, and the burning effect follows the local player
       miningProfiler.startSection('Fire');
       world.fireRendererRef?.current?.sync(nowMs, currentPos);
+      world.fluidGlowRef?.current?.sync(nowMs, currentPos);
       world.burningBodiesRef?.current?.move('self', currentPos.x, currentPos.y);
       world.fluidSoundsRef?.current?.syncLoops(nowMs, currentPos);
       world.fluidRendererRef?.current?.update(nowMs / 1000);

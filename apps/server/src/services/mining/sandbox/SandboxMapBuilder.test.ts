@@ -7,7 +7,7 @@ import { BLOCK_TILE_TYPES } from '../subsystems/MiningDataManager';
 const SKY = SANDBOX_SKY_ROWS;
 const fluid = (typeKey: string) => ({ typeKey }) as FluidDefinition;
 const gas = (typeKey: string) => ({ typeKey }) as GasDefinition;
-const build = (fluids: FluidDefinition[] = [fluid('OIL'), fluid('WATER')], gases: GasDefinition[] = [gas('HYDROGEN'), gas('NITROGEN')]) =>
+const build = (fluids: FluidDefinition[] = [fluid('LAVA'), fluid('OIL'), fluid('WATER')], gases: GasDefinition[] = [gas('HYDROGEN'), gas('NITROGEN')]) =>
   buildSandboxMap(createDefaultSandboxLayout(BLOCK_TILE_TYPES), fluids, gases);
 /** A tile by surface-relative coordinates (y = 0 is the ground; negative is sky). */
 const at = (grid: ReturnType<typeof build>['grid'], x: number, y: number) => grid[y + SKY][x];
@@ -41,14 +41,15 @@ describe('the default sandbox map', () => {
     }
   });
 
-  it('opens the pools onto the surface, filled with the first two fluids in key order', () => {
-    const { grid, fluidCells } = build([fluid('WATER'), fluid('OIL')]);
+  it('opens the pools onto the surface, filled with oil and water', () => {
+    const { grid, fluidCells } = build([fluid('WATER'), fluid('OIL'), fluid('LAVA')]);
     // the ground is open above each pool, solid dirt next to it
     expect(at(grid, 38, 0).type).toBe(MiningTileType.EMPTY);
     expect(at(grid, 50, 0).type).toBe(MiningTileType.EMPTY);
     expect(isTileSolid(at(grid, 30, 0).type)).toBe(true);
     expect(fluidCells.find((c) => c.x === 38 && c.y === 5 + SKY)?.typeKey).toBe('OIL');
     expect(fluidCells.find((c) => c.x === 50 && c.y === 5 + SKY)?.typeKey).toBe('WATER');
+    expect(fluidCells.find((c) => c.x === 3 && c.y === 5 + SKY)?.typeKey).toBe('LAVA');
     // fluid starts one tile below the lip, so the ground level and the sky are open air
     expect(fluidCells.some((c) => c.y <= SKY)).toBe(false);
     expect(fluidCells.every((c) => grid[c.y][c.x].type === MiningTileType.EMPTY)).toBe(true);
@@ -69,7 +70,8 @@ describe('the default sandbox map', () => {
   it('leaves a pool dry when there is no fluid for it', () => {
     const { fluidCells } = build([fluid('OIL')]);
     expect(fluidCells.length).toBeGreaterThan(0);
-    expect(fluidCells.every((c) => c.x <= 43)).toBe(true);
+    expect(fluidCells.every((c) => c.x >= 32 && c.x <= 43)).toBe(true);
+    expect(build([fluid('LAVA')]).fluidCells.every((c) => c.x >= 1 && c.x <= 4)).toBe(true);
     expect(build([]).fluidCells).toEqual([]);
   });
 
@@ -169,6 +171,6 @@ describe('the sandbox gas chambers', () => {
   });
 
   it('does not touch the pools', () => {
-    expect(build().fluidCells).toEqual(build([fluid('OIL'), fluid('WATER')], []).fluidCells);
+    expect(build().fluidCells).toEqual(build(undefined, []).fluidCells);
   });
 });

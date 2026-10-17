@@ -106,3 +106,34 @@ describe('validateFluidGeneration', () => {
     expect(validateFluid({ ...valid, generation: { ...ok, percentage: 500 } }).join()).toContain('generation.percentage');
   });
 });
+
+describe('validateFluid contact, light and reactions', () => {
+  const base = (extra: Partial<FluidDefinition>): Partial<FluidDefinition> => ({
+    typeKey: 'LAVA', name: 'Lava', color: '#ff5500', opacity: 0.9, density: 3, viscosity: 0.8, flowRate: 0.1, minLevel: 0.05, flowThreshold: 0.02, ...extra,
+  });
+
+  it('accepts a sensible contact, light and reaction', () => {
+    expect(validateFluid(base({
+      contact: { damagePerSecond: 20, ignites: 100 },
+      light: { type: 'POINT', color: '#ff7a1c', radius: 4, intensity: 0.8, enabled: true } as any,
+      reactions: [{ with: 'WATER', becomes: 'LAVAROCK', costPerLevel: 2 }],
+    }))).toEqual([]);
+  });
+
+  it('rejects bad contact values', () => {
+    expect(validateFluid(base({ contact: { damagePerSecond: -1 } }))).toContain('contact.damagePerSecond must be 0 or more');
+    expect(validateFluid(base({ contact: { ignites: 5000 } })).length).toBe(1);
+    expect(validateFluid(base({ contact: { ignites: 50, extinguishes: true } }))).toContain('contact cannot both ignite and extinguish');
+  });
+
+  it('rejects a light without radius or intensity', () => {
+    expect(validateFluid(base({ light: { radius: 0, intensity: 1 } as any }))).toContain('light needs a radius and intensity above 0');
+  });
+
+  it('rejects bad reactions', () => {
+    expect(validateFluid(base({ reactions: [{ with: 'LAVA', becomes: 'X', costPerLevel: 1 }] }))).toContain('reactions[0].with cannot be the fluid itself');
+    expect(validateFluid(base({ reactions: [{ with: 'WATER', becomes: '', costPerLevel: 1 }] }))).toContain('reactions[0].becomes must be a block key');
+    expect(validateFluid(base({ reactions: [{ with: 'WATER', becomes: 'X', costPerLevel: 0 }] }))).toContain('reactions[0].costPerLevel must be greater than 0');
+    expect(validateFluid(base({ reactions: {} as any }))).toContain('reactions must be a list or null');
+  });
+});

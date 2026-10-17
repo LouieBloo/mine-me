@@ -28,7 +28,7 @@ describe('fluids in a mining room', () => {
   });
 
   it('knows the fluids from the definitions', () => {
-    expect(engine.fluidSubsystem.registry.idOf('OIL')).toBe(1);
+    expect(engine.fluidSubsystem.registry.idOf('OIL')).toBeGreaterThan(0);
     expect(engine.fluidSubsystem.placeFluid(12, 20, 'OIL')).toBe(true);
     expect(engine.fluidSubsystem.placeFluid(12, 20, 'NOPE')).toBe(false);
     expect(engine.fluidSubsystem.placeFluid(9, 20, 'OIL')).toBe(false); // solid dirt
@@ -88,12 +88,13 @@ describe('fluids in a mining room', () => {
       socket: { connected: true, emit: () => {} } as any,
     });
     const grid = big.fluidSubsystem.grid;
-    const volume = grid.totalVolume();
+    // Water lies in open pools that spread and thin out; oil and lava are sealed pockets
+    const pocketVolume = () => ['OIL', 'LAVA'].reduce((sum, key) => sum + grid.totalVolume(big.fluidSubsystem.registry.idOf(key)!), 0);
+    const volume = pocketVolume();
     expect(volume).toBeGreaterThan(4);
     for (let n = 0; n < 300; n++) (big as any).tick(1 / 30);
-    // Sealed: nothing evaporated or moved out, and the pocket cells were never solid
-    expect(grid.evaporatedVolume).toBeLessThan(0.5);
-    expect(grid.totalVolume()).toBeGreaterThan(volume - 0.5);
+    // Sealed: none of it evaporated or moved out, and the pocket cells were never solid
+    expect(pocketVolume()).toBeGreaterThan(volume - 0.5);
     for (let y = 0; y < 80; y++) {
       for (let x = 0; x < 80; x++) {
         if (grid.getLevel(x, y) > 0) expect(big.grid[y][x].type).toBe(MiningTileType.EMPTY);
