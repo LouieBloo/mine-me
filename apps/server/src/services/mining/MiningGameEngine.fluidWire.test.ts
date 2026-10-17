@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { DEFAULT_FLUID_APPEARANCE, MiningTileType, quantizeFluidLevel, type MiningStateTickPayload } from '@mine-me/shared';
+import { DEFAULT_FLUID_APPEARANCE, MINING_CONFIG, MiningTileType, quantizeFluidLevel, type MiningStateTickPayload } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MiningSessionManager } from './MiningSessionManager';
 
@@ -89,11 +89,24 @@ describe('fluids on the wire', () => {
     expect(state.fluids!.find((f) => f.typeKey === 'OIL')!.appearance).toEqual({ ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0.02, highlight: 1 });
   });
 
+  it('tells clients which fluid is falling: in tick changes, the join snapshot and newly revealed tiles', () => {
+    // A cell of oil in the open air of the pocket, falling
+    for (let y = 30; y <= 32; y++) for (let x = 30; x <= 34; x++) engine.grid[y][x].revealed = true;
+    engine.fluidSubsystem.placeFluid(32, 30, 'OIL', 1);
+    tick(MINING_CONFIG.FLUID_STEP_TICKS);
+    const fell = ticks().flatMap((t) => t.fluidCells ?? []).find((c) => c[0] === 32 && c[1] === 31);
+    expect(fell).toBeDefined();
+    expect(fell![4]).toBeGreaterThan(0);
+    expect(engine.fluidSubsystem.contentsAt(32, 31)).toHaveLength(3);
+    const state = MiningSessionManager.getInstance().buildClientState(engine, cid);
+    expect(state.fluidCells!.find((c) => c[0] === 32 && c[1] === 31)![4]).toBeGreaterThan(0);
+  });
+
   it('reports oil that drained away as an empty cell', () => {
     for (let y = 30; y <= 32; y++) for (let x = 30; x <= 34; x++) engine.grid[y][x].revealed = true;
     engine.fluidSubsystem.placeFluid(32, 30, 'OIL', 0.04); // thinner than the oil minimum: evaporates
     tick(6);
-    const last = new Map<string, number[]>();
+    const last = new Map<string, Array<number | undefined>>();
     for (const c of ticks().flatMap((t) => t.fluidCells ?? [])) last.set(`${c[0]},${c[1]}`, c);
     expect(last.size).toBeGreaterThan(0);
     for (const c of last.values()) expect(c).toEqual([c[0], c[1], 0, 0]);

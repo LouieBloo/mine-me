@@ -33,6 +33,16 @@ describe('pourFluid', () => {
     expect(tools().pourFluid(35, SKY - 3, 'OIL')).toEqual({ ok: true }); // in the open sky
     expect(fluidAt(35, SKY - 3)).toBeGreaterThan(0);
   });
+
+  it('fills a tile up to one full cell and never past it, however often it is used', () => {
+    expect(tools().setSim({ paused: true }).ok).toBe(true);
+    for (let i = 0; i < 5; i++) expect(tools().pourFluid(35, SKY - 3, 'OIL')).toEqual({ ok: true });
+    expect(fluidAt(35, SKY - 3)).toBeCloseTo(1, 6);
+    engine.fluidSubsystem.grid.setCell(35, SKY - 3, engine.fluidSubsystem.registry.idOf('OIL')!, 0.4);
+    tools().pourFluid(35, SKY - 3, 'OIL');
+    expect(fluidAt(35, SKY - 3)).toBeCloseTo(1, 6); // topped up, not 1.4
+    tools().setSim({ paused: false });
+  });
   it.each([
     ['a solid tile', [10, SKY + 5, 'OIL'], /cannot hold/],
     ['an unknown fluid', [35, SKY, 'LAVA9'], /Unknown fluid/],

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  DEFAULT_FLUID_APPEARANCE, FluidDisplay, FluidLayout, MINING_CONFIG, bandBelowLine, colorToCss, darkenColor, fluidBodyBands, fluidDepthShade,
+  DEFAULT_FLUID_APPEARANCE, FluidDisplay, FluidLayout, MINING_CONFIG, fallHurry, bandBelowLine, colorToCss, darkenColor, fluidBodyBands, fluidDepthShade,
   fluidSurfaceWave, lightenColor, parseHexColor, type FluidAppearance, type FluidLevels,
 } from '@mine-me/shared';
 import { PREVIEW_HEIGHT, PREVIEW_WIDTH, PreviewScene } from './previewScene';
@@ -50,7 +50,9 @@ export function drawPreview(
   look: Pick<FluidPreviewSettings, 'color' | 'opacity' | 'appearance'>,
   tile: number = TILE_PX,
   timeSec = 0,
-  levels: FluidLevels = scene.toField()
+  levels: FluidLevels = scene.toField(),
+  /** How far falling fluid has slid down into the cell it fell into this step (see `FluidLayout`). */
+  fallProgress = 1
 ): void {
   const appearance = look.appearance ?? DEFAULT_FLUID_APPEARANCE;
   const color = parseHexColor(look.color);
@@ -67,13 +69,21 @@ export function drawPreview(
       }
     }
   }
-  const layout = new FluidLayout(levels, tile, (x, y) => scene.isSolid(x, y));
+  const layout = new FluidLayout(levels, tile, (x, y) => scene.isSolid(x, y), { fallProgress });
   for (let y = 0; y < PREVIEW_HEIGHT; y++) {
     for (let x = 0; x < PREVIEW_WIDTH; x++) {
       for (const shape of layout.shapesAt(x, y)) {
         for (const band of fluidBodyBands(shape, tile, appearance)) {
           const shade = fluidDepthShade(look.opacity, appearance, band.depth);
           fillPolygon(ctx, band.points, colorToCss(darkenColor(color, shade.darken), shade.opacity));
+        }
+        if (shape.spillEdge && appearance.highlight > 0) {
+          ctx.beginPath();
+          ctx.moveTo(shape.spillEdge[0], shape.spillEdge[1]);
+          for (let i = 2; i < shape.spillEdge.length; i += 2) ctx.lineTo(shape.spillEdge[i], shape.spillEdge[i + 1]);
+          ctx.strokeStyle = colorToCss(highlight, look.opacity * Math.min(1, appearance.highlight * 1.2));
+          ctx.lineWidth = Math.max(1, tile / 32);
+          ctx.stroke();
         }
         if (shape.stream) {
           ctx.fillStyle = colorToCss(highlight, look.opacity * appearance.highlight * 0.5);
@@ -118,14 +128,26 @@ export const FluidPreview: React.FC<{ fluid: FluidPreviewSettings }> = ({ fluid 
   const [stats, setStats] = useState(scene.stats());
   // What is drawn: the tank's levels eased between steps, exactly as the game draws them
   const display = useMemo(() => new FluidDisplay(PREVIEW_WIDTH, PREVIEW_HEIGHT), [scene]);
+  // When the last step's falling fluid started sliding down into the cells it fell into (as the game draws it)
+  const slideStart = useRef(0);
   const syncDisplay = (now: boolean) => {
     const field = scene.toField();
+    const fell: Array<[number, number]> = [];
     for (let y = 0; y < PREVIEW_HEIGHT; y++) {
       for (let x = 0; x < PREVIEW_WIDTH; x++) {
-        if (now) display.setNow(x, y, field.getFluidId(x, y), field.getLevel(x, y));
-        else display.setTarget(x, y, field.getFluidId(x, y), field.getLevel(x, y));
+        const falling = field.getFalling(x, y);
+        if (now) display.setNow(x, y, field.getFluidId(x, y), field.getLevel(x, y), falling);
+        else display.setTarget(x, y, field.getFluidId(x, y), field.getLevel(x, y), falling);
+        if (falling > 0) fell.push([x, y]);
       }
     }
+    if (now) return;
+    for (const [x, y] of fell) {
+      const quick = fallHurry(field, x, y, (cx, cy) => scene.isSolid(cx, cy));
+      display.hurry(x, y, quick);
+      display.hurry(x, y - 1, quick);
+    }
+    slideStart.current = Date.now();
   };
 
   useEffect(() => {
@@ -135,7 +157,8 @@ export const FluidPreview: React.FC<{ fluid: FluidPreviewSettings }> = ({ fluid 
 
   const draw = () => {
     const ctx = canvasRef.current?.getContext('2d');
-    if (ctx) drawPreview(ctx, scene, look.current, TILE_PX, (Date.now() - startedAt.current) / 1000, display);
+    const fallProgress = Math.min(1, (Date.now() - slideStart.current) / PREVIEW_STEP_MS);
+    if (ctx) drawPreview(ctx, scene, look.current, TILE_PX, (Date.now() - startedAt.current) / 1000, display, fallProgress);
   };
 
   useEffect(() => {

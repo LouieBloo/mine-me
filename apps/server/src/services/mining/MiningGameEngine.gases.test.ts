@@ -116,6 +116,8 @@ describe('gases in a mining room', () => {
   it('never lets gas into a cell that holds fluid, and fluid flowing into gas pushes it out', () => {
     engine.fluidSubsystem.placeFluid(12, 22, 'OIL', 1);
     expect(engine.gasSubsystem.placeGas(12, 22, 'NITROGEN')).toBe(false);
+    // A full floor of oil under it, so the oil poured in rests there instead of running off the sides
+    for (const x of [10, 11, 13, 14]) engine.fluidSubsystem.placeFluid(x, 22, 'OIL', 1);
     engine.gasSubsystem.placeGas(12, 21, 'NITROGEN', 1);
     engine.fluidSubsystem.placeFluid(12, 21, 'OIL', 1);
     tick(MINING_CONFIG.GAS_STEP_TICKS * 2);

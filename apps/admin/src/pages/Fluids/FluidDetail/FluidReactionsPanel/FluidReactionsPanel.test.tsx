@@ -44,4 +44,20 @@ describe('FluidReactionsPanel', () => {
     expect(screen.getByLabelText('Touched By')).toHaveValue('ACID');
     expect(screen.getByLabelText('Turns Into')).toHaveValue('GONE');
   });
+
+  it('sets how fast it hardens, and an emptied field goes back to the default', () => {
+    const onChange = vi.fn();
+    render(<FluidReactionsPanel value={[REACTION]} onChange={onChange} fluids={fluids} blocks={blocks} />);
+    expect(screen.getByLabelText('Speed Per Step')).toHaveValue(null);
+    fireEvent.change(screen.getByLabelText('Speed Per Step'), { target: { value: '0.5' } });
+    expect(onChange).toHaveBeenLastCalledWith([{ ...REACTION, ratePerStep: 0.5 }]);
+  });
+
+  it('shows a rate that was set, and clearing it removes it', () => {
+    const onChange = vi.fn();
+    render(<FluidReactionsPanel value={[{ ...REACTION, ratePerStep: 0.5 }]} onChange={onChange} fluids={fluids} blocks={blocks} />);
+    expect(screen.getByLabelText('Speed Per Step')).toHaveValue(0.5);
+    fireEvent.change(screen.getByLabelText('Speed Per Step'), { target: { value: '' } });
+    expect(onChange.mock.calls.at(-1)![0][0].ratePerStep).toBeUndefined();
+  });
 });

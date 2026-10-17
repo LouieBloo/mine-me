@@ -307,7 +307,7 @@ export function applyFluidUpdates(payload: MiningStateTickPayload, ctx: TickHand
   // Fluid that just came into view shows at once; fluid that moved eases there (the renderer's per-frame update)
   const revealed: FluidWireCell[] = [];
   for (const tile of payload.revealedTiles ?? []) {
-    if (tile.fluid) revealed.push([tile.x, tile.y, tile.fluid[0], tile.fluid[1]]);
+    if (tile.fluid) revealed.push(tile.fluid[2] ? [tile.x, tile.y, tile.fluid[0], tile.fluid[1], tile.fluid[2]] : [tile.x, tile.y, tile.fluid[0], tile.fluid[1]]);
     // A mined or placed tile changes whether the fluid beside it rests or falls (the grid is already updated)
     renderer.onTileChanged(tile.x, tile.y);
   }

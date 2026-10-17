@@ -180,6 +180,11 @@ export interface FluidReaction {
   becomes: string;
   /** Levels of `with` used up for each level of this fluid hardened (2 = twice as much water as lava). */
   costPerLevel: number;
+  /**
+   * Most levels of this fluid one cell hardens per simulation step (absent: 0.25, so a full cell takes four steps). It
+   * is what lets the water be seen reaching the lava and sitting against it while it cools.
+   */
+  ratePerStep?: number;
 }
 
 /** A fluid as stored in the database and sent to the game. */
@@ -347,6 +352,9 @@ export function validateFluidReactions(value: unknown, ownKey?: string): string[
     else if (reaction.with === ownKey) errors.push(`reactions[${i}].with cannot be the fluid itself`);
     if (typeof reaction.becomes !== 'string' || reaction.becomes === '') errors.push(`reactions[${i}].becomes must be a block key`);
     if (!isNumber(reaction.costPerLevel) || reaction.costPerLevel <= 0) errors.push(`reactions[${i}].costPerLevel must be greater than 0`);
+    if (reaction.ratePerStep !== undefined && reaction.ratePerStep !== null && !inRange(reaction.ratePerStep, 0.01, 1)) {
+      errors.push(`reactions[${i}].ratePerStep must be between 0.01 and 1`);
+    }
   });
   return errors;
 }

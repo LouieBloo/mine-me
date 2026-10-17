@@ -616,7 +616,7 @@ export interface MiningSessionClientState {
   /** How to draw each fluid in the mine, sent once. Missing means the mine has no fluids. */
   fluids?: { id: number; typeKey: string; name: string; color: string; opacity: number; viscosity: number; density: number; appearance?: FluidAppearance; flame?: { effect: ParticleEffectConfig | null; light: ItemLightConfig | null }; sounds?: FluidSoundEffectsConfig }[];
   /** Fluid in the cells already revealed, as [x, y, fluidId, level]; later changes arrive in each tick's `fluidCells`. */
-  fluidCells?: [x: number, y: number, fluidId: number, level: number][];
+  fluidCells?: [x: number, y: number, fluidId: number, level: number, falling?: number][];
   /** How to draw each gas in the mine, sent once. Missing means the mine has no gases. */
   gases?: GasClientDefinition[];
   /** Gas in the cells already revealed, as [x, y, gasId, concentration]; later changes arrive in each tick's `gasCells`. */
@@ -832,12 +832,12 @@ export interface MiningStateTickPayload {
   explosions?: MiningExplosionEvent[];
   /** Block damage hit events (e.g. tool swing hits dealing damage) triggered during this tick. */
   blockHits?: MiningBlockHitEvent[];
-  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; fluid?: [fluidId: number, level: number]; gas?: [gasId: number, concentration: number]; fire?: 1 }[];
+  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; fluid?: [fluidId: number, level: number, falling?: number]; gas?: [gasId: number, concentration: number]; fire?: 1 }[];
   /**
    * Fluid cells that changed this tick, as [x, y, fluidId, level]. Only cells the fog of war has revealed
    * are ever sent (a newly revealed tile carries its fluid in `revealedTiles`).
    */
-  fluidCells?: [x: number, y: number, fluidId: number, level: number][];
+  fluidCells?: [x: number, y: number, fluidId: number, level: number, falling?: number][];
   /**
    * Gas cells that changed this tick, as [x, y, gasId, concentration]. Only cells the fog of war has revealed
    * are ever sent (a newly revealed tile carries its gas in `revealedTiles`).

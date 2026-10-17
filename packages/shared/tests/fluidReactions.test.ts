@@ -22,7 +22,7 @@ describe('fluid reactions', () => {
     grid.setCell(1, 1, LAVA, 0.5);
     grid.setCell(2, 1, WATER, 1);
     const water0 = grid.totalVolume(WATER);
-    grid.step();
+    run(grid, 4);
     const reactions = grid.takeReactions();
     expect(reactions).toEqual([{ x: 1, y: 1, becomes: 'LAVAROCK' }]);
     expect(grid.getFluidId(1, 1)).toBe(0);
@@ -34,10 +34,10 @@ describe('fluid reactions', () => {
     const grid = makeGrid(['####', '#..#', '####']);
     grid.setCell(1, 1, LAVA, 1);
     grid.setCell(2, 1, WATER, 0.5);
-    grid.step();
+    run(grid, 4);
     expect(grid.takeReactions()).toEqual([]);
     expect(grid.getFluidId(1, 1)).toBe(LAVA);
-    expect(grid.getLevel(1, 1)).toBeCloseTo(0.75, 1); // 0.5 water hardens 0.25 lava
+    expect(grid.totalVolume(LAVA)).toBeCloseTo(0.75, 1); // 0.5 water hardens 0.25 lava (what is left may spread into the emptied cell)
     expect(grid.totalVolume(WATER)).toBeLessThan(0.01);
   });
 
@@ -96,5 +96,56 @@ describe('fluid reactions', () => {
     expect(grid.takeReactions().length).toBe(1);
     run(grid, 10);
     expect(grid.takeReactions().length).toBe(0);
+  });
+
+  it('does nothing in the step water first arrives next to lava: it is there for one step before anything is used up', () => {
+    const grid = makeGrid(['#####', '#...#', '#####']);
+    grid.setCell(1, 1, LAVA, 1);
+    grid.setCell(3, 1, WATER, 1);
+    grid.step(); // the water spreads into the gap and now touches the lava
+    expect(grid.getFluidId(2, 1)).toBe(WATER);
+    expect(grid.totalVolume(LAVA)).toBeCloseTo(1, 5);
+    grid.step();
+    expect(grid.totalVolume(LAVA)).toBeLessThan(1);
+  });
+
+  it('hardens at most ratePerStep per step, so a full cell takes several steps and the water is seen sitting against it', () => {
+    const grid = makeGrid(['####', '#..#', '####']);
+    grid.setCell(1, 1, LAVA, 0.8);
+    grid.setCell(2, 1, WATER, 1);
+    const totals: number[] = [grid.totalVolume(LAVA)];
+    for (let n = 0; n < 5; n++) {
+      grid.step();
+      totals.push(grid.totalVolume(LAVA));
+    }
+    for (let n = 1; n < totals.length; n++) expect(totals[n - 1] - totals[n]).toBeLessThanOrEqual(0.25 + 1e-6);
+    expect(totals[2]).toBeGreaterThan(0.3); // still lava two steps in
+  });
+
+  it('a reaction can name its own rate', () => {
+    const quick = new FluidRegistry([{ ...lava, reactions: [{ with: 'WATER', becomes: 'LAVAROCK', costPerLevel: 1, ratePerStep: 1 }] }, water]);
+    const rows = ['####', '#..#', '####'];
+    const grid = new FluidGrid(4, 3, quick, (x, y) => rows[y][x] === '#');
+    grid.setCell(1, 1, quick.idOf('LAVA')!, 1);
+    grid.setCell(2, 1, quick.idOf('WATER')!, 1);
+    grid.step();
+    grid.step();
+    expect(grid.takeReactions()).toEqual([{ x: 1, y: 1, becomes: 'LAVAROCK' }]);
+  });
+
+  it('water falling onto lava is seen next to it before the lava is touched (never used up in the step it arrives)', () => {
+    const rows: string[] = [];
+    for (let y = 0; y < 14; y++) rows.push(y >= 13 ? '#######' : '#.....#');
+    const grid = new FluidGrid(7, 14, registry, (x, y) => rows[y][x] === '#');
+    for (let x = 1; x <= 5; x++) grid.setCell(x, 12, LAVA, 1);
+    let adjacentBefore = false;
+    for (let n = 0; n < 16; n++) {
+      if (n < 6) grid.addFluid(3, 1, WATER, 0.5);
+      const lavaBefore = grid.totalVolume(LAVA);
+      grid.step();
+      if (grid.totalVolume(LAVA) < lavaBefore - 1e-6) expect(adjacentBefore, `lava used at step ${n} with no water beside it the step before`).toBe(true);
+      adjacentBefore = [1, 2, 3, 4, 5].some((x) => grid.getFluidId(x, 11) === WATER);
+    }
+    expect(grid.totalVolume(LAVA)).toBeLessThan(5);
   });
 });

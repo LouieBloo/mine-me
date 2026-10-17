@@ -35,10 +35,18 @@ export class SandboxTools {
   }
 
   /** Adds a full cell of a fluid to an open cell (or tops one up if it holds the same fluid). */
+  /** Fills an open tile with the fluid, up to a full cell (holding the tool keeps it topped up). */
   public pourFluid(x: unknown, y: unknown, fluidKey: unknown): SandboxResult {
     if (typeof x !== 'number' || typeof y !== 'number' || !this.inGrid(x, y)) return fail('Pick a tile inside the map.');
     if (typeof fluidKey !== 'string' || !this.engine.dataManager.getFluid(fluidKey)) return fail('Unknown fluid.');
-    if (!this.engine.fluidSubsystem.placeFluid(x, y, fluidKey, 1)) return fail('That tile cannot hold that fluid.');
+    // Tops the tile up to full and no further. Adding a whole cell every time (the tool repeats while held) left the
+    // tile holding more than a cell, which the simulation pushed out sideways in mid-air.
+    const fluids = this.engine.fluidSubsystem;
+    const id = fluids.registry.idOf(fluidKey);
+    const here = fluids.grid.getFluidId(x, y);
+    const room = here === 0 || here === id ? 1 - fluids.grid.getLevel(x, y) : 1;
+    if (room <= 0.001 && here === id) return { ok: true };
+    if (!fluids.placeFluid(x, y, fluidKey, room)) return fail('That tile cannot hold that fluid.');
     return { ok: true };
   }
 

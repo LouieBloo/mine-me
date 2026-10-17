@@ -292,7 +292,7 @@ describe('FluidGrid changes', () => {
   it('reports each changed cell once with its current contents, then forgets', () => {
     const { grid } = makeGrid(['#.#', '#.#', '###']);
     grid.addFluid(1, 0, oil, 1);
-    expect(grid.drainChanges()).toEqual([{ x: 1, y: 0, fluidId: oil, level: 1 }]);
+    expect(grid.drainChanges()).toEqual([{ x: 1, y: 0, fluidId: oil, level: 1, falling: 0 }]);
     expect(grid.drainChanges()).toEqual([]);
     grid.step();
     const changes = grid.drainChanges();
@@ -305,7 +305,7 @@ describe('FluidGrid changes', () => {
     grid.addFluid(1, 0, oil, 0.02);
     grid.drainChanges();
     grid.step();
-    expect(grid.drainChanges()).toEqual([{ x: 1, y: 0, fluidId: NO_FLUID, level: 0 }]);
+    expect(grid.drainChanges()).toEqual([{ x: 1, y: 0, fluidId: NO_FLUID, level: 0, falling: 0 }]);
   });
 });
 
@@ -343,7 +343,7 @@ describe('FluidGrid draining', () => {
     settle(grid);
     grid.drainChanges();
     grid.drainFluid(2, 0, 0.1);
-    expect(grid.drainChanges()).toEqual([{ x: 2, y: 0, fluidId: oil, level: expect.any(Number) }]);
+    expect(grid.drainChanges()).toEqual([{ x: 2, y: 0, fluidId: oil, level: expect.any(Number), falling: 0 }]);
     expect(grid.activeCount).toBeGreaterThan(0);
   });
 });

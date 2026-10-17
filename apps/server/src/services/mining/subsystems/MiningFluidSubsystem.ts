@@ -6,7 +6,6 @@ import {
   crossFluidSurface,
   sampleFluidContact,
   isTileSolid,
-  quantizeFluidLevel,
   toFluidWireCell,
   type FluidCellChange,
   type FluidClientDefinition,
@@ -146,17 +145,21 @@ export class MiningFluidSubsystem {
   public takeVisibleChanges(): FluidWireCell[] {
     const out: FluidWireCell[] = [];
     for (const change of this.grid.drainChanges()) {
-      if (this.isRevealed(change.x, change.y)) out.push(toFluidWireCell(change.x, change.y, change.fluidId, change.level));
+      if (this.isRevealed(change.x, change.y)) out.push(toFluidWireCell(change.x, change.y, change.fluidId, change.level, change.falling));
     }
     return out;
   }
 
-  /** The fluid in one cell as [fluidId, quantised level], or undefined when it is empty. */
-  public contentsAt(x: number, y: number): [number, number] | undefined {
+  /**
+   * The fluid in one cell as [fluidId, quantised level], plus how much of it is falling when some is (same scale), or
+   * undefined when it is empty. A client that first sees a cell mid-stream learns that it is falling from this.
+   */
+  public contentsAt(x: number, y: number): [number, number] | [number, number, number] | undefined {
     const id = this.grid.getFluidId(x, y);
     if (id === 0) return undefined;
-    const q = quantizeFluidLevel(this.grid.getLevel(x, y));
-    return q > 0 ? [id, q] : undefined;
+    const cell = toFluidWireCell(x, y, id, this.grid.getLevel(x, y), this.grid.getFalling(x, y));
+    if (cell[3] <= 0) return undefined;
+    return cell[4] !== undefined ? [id, cell[3], cell[4]] : [id, cell[3]];
   }
 
   /** All fluid in revealed cells, for a client joining the room. */
@@ -166,7 +169,7 @@ export class MiningFluidSubsystem {
       for (let x = 0; x < this.grid.width; x++) {
         if (!this.isRevealed(x, y)) continue;
         const contents = this.contentsAt(x, y);
-        if (contents) out.push([x, y, contents[0], contents[1]]);
+        if (contents) out.push([x, y, ...contents]);
       }
     }
     return out;

@@ -83,4 +83,4 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Set `
 | [077](077-lavarock-block.md) | Lavarock block | P1 (Done) |
 | [078](078-water-and-lava-fluids.md) | Water and Lava fluid rows and sandbox | P1 (Done) |
 | [079](079-surface-pooling-generation.md) | Water pooling, deep lava, square/rectangle/vein pockets | P2 (Done) |
-| [080](080-lavarock-sprites.md) | Lavarock art (owner task) | P3 (Open: yours) |
+| [080](080-lavarock-sprites.md) | Lavarock art (owner task) | P3 (Done) |

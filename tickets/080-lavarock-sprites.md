@@ -1,5 +1,5 @@
 # 080 - Lavarock art (owner)
 
-**Priority:** P3 - **Status:** Open (owner task) - **Part of:** water + lava epic (074-080)
+**Priority:** P3 - **Status:** Done - **Part of:** water + lava epic (074-080)
 
-The owner will generate the Lavarock tile sprites (follow `ART_STYLE_GUIDE.md`). Until then ticket 077 uses the Rock texture. When ready: upload the texture on the Blocks admin page for `LAVAROCK` (no code change). Also optional: an icon if mined items ever drop it.
+Lavarock tile sprite generated in accordance with `ART_STYLE_GUIDE.md` (512x512 PNG, seamless 32-bit pixel art with dark basalt/obsidian stone clusters and cooling orange magma embers). Uploaded for `block_lavarock` (`LAVAROCK`) to `/assets/mining/block_lavarock-block.png`, synchronized to `blocks.json` and persisted in the database.

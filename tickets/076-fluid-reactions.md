@@ -26,3 +26,8 @@ Water on lava makes the block and removes both in the 2:1 ratio, partial cells, 
 - **Admin:** `FluidReactionsPanel` (touched by / turns into / cost per level).
 - **Tests:** 8 grid tests, 6 room tests, 2 controller tests, panel tests. Mutation-checked: the 2:1 cost and the "both used up" rule, and always telling clients.
 - **Deviation:** a lava cell with no water around it never reacts on its own (as designed); fully hardening a full lava cell needs 2 full cells of water.
+
+## Fix (2026-10-16, owner report: lava turned to rock before water touched it)
+- **Cause:** the reaction ran at the end of a step, right after the flow, so water that arrived next to lava was used up in the same step. Clients were never sent a snapshot with the water beside the lava, so the lava seemed to harden from a distance.
+- **Fix:** the reaction now runs at the **start** of a step, on the state clients were last shown, and a cell hardens at most `ratePerStep` per step (new optional field on a reaction, default 0.25: a full cell takes four steps, so the water is seen sitting against it). The admin reactions panel has a "Speed Per Step" field.
+- **Tests:** grid tests for "nothing happens the step water first arrives", the rate cap, a custom rate, and a pour onto lava (lava is only used when water was beside it the step before). Mutation-checked: moving the reaction back to the end of the step fails two of them.

@@ -1,4 +1,5 @@
 import { FluidRegistry, NO_FLUID } from './FluidRegistry';
+import { quantizeFluidLevel } from './fluidWire';
 
 /** A full cell. A cell can hold slightly more when it is squeezed (pressure). */
 export const FLUID_FULL_LEVEL = 1;
@@ -13,6 +14,8 @@ export interface FluidCellChange {
   y: number;
   fluidId: number;
   level: number;
+  /** How much of the cell's fluid fell into it from the cell above in the last step (it is falling), 0 to `level`. */
+  falling: number;
 }
 
 /** A cell of fluid that has just been used up by a reaction and must now become a block. */
@@ -28,10 +31,16 @@ interface ReactionRule {
   withId: number;
   becomes: string;
   costPerLevel: number;
+  ratePerStep: number;
 }
+
+/** Levels of the reacting fluid one cell hardens per step when a reaction does not say (a full cell takes 4 steps). */
+export const DEFAULT_REACTION_RATE_PER_STEP = 0.25;
 
 /** Reacting fluid left in a hardening cell below this is not worth keeping (the cell becomes the block). */
 const REACTION_RESIDUE = 1e-3;
+
+const clampUnit = (v: number) => Math.min(1, Math.max(0, v));
 
 /** Amount to keep in the lower of two stacked cells holding `total` between them. */
 function stableBottom(total: number): number {
@@ -55,6 +64,13 @@ export class FluidGrid {
   public readonly height: number;
   private readonly levels: Float32Array;
   private readonly ids: Uint8Array;
+  /**
+   * How much fluid fell into each cell from the cell above in the last step: the fluid that is falling. Clients are
+   * told it with the level, so they can draw falling fluid moving down instead of guessing from levels alone (a column
+   * of full cells falling looks exactly like one standing still).
+   */
+  private readonly fallen: Float32Array;
+  private readonly fallenCells = new Set<number>();
   private active = new Set<number>();
   private readonly changed = new Set<number>();
   private stepCount = 0;
@@ -68,6 +84,8 @@ export class FluidGrid {
   /** Reactions by the id of the fluid that holds them (e.g. lava's: touched by water, becomes lavarock). */
   private readonly reactionRules = new Map<number, ReactionRule[]>();
   private pendingReactions: FluidReactionResult[] = [];
+  /** Cells whose reaction is under way, kept awake so it carries on over the next steps. */
+  private readonly reacting = new Set<number>();
 
   /** `isBlocked` says whether a cell cannot hold fluid (solid terrain). Out-of-bounds is always blocked. */
   constructor(width: number, height: number, registry: FluidRegistry, isBlocked: (x: number, y: number) => boolean) {
@@ -77,13 +95,16 @@ export class FluidGrid {
     this.isBlocked = isBlocked;
     this.levels = new Float32Array(width * height);
     this.ids = new Uint8Array(width * height);
+    this.fallen = new Float32Array(width * height);
     for (let id = 1; id <= registry.size; id++) {
       const reactions = registry.paramsOf(id)?.reactions;
       if (!reactions) continue;
       const rules: ReactionRule[] = [];
       for (const r of reactions) {
         const withId = registry.idOf(r.with);
-        if (withId !== undefined && r.costPerLevel > 0) rules.push({ withId, becomes: r.becomes, costPerLevel: r.costPerLevel });
+        if (withId !== undefined && r.costPerLevel > 0) {
+          rules.push({ withId, becomes: r.becomes, costPerLevel: r.costPerLevel, ratePerStep: r.ratePerStep && r.ratePerStep > 0 ? r.ratePerStep : DEFAULT_REACTION_RATE_PER_STEP });
+        }
       }
       if (rules.length > 0) this.reactionRules.set(id, rules);
     }
@@ -98,7 +119,10 @@ export class FluidGrid {
 
   /**
    * Fluids that react (lava next to water) use each other up: for every level of the reacting fluid hardened,
-   * `costPerLevel` levels of the other are spent. When the reacting fluid in a cell is used up (or what is left is
+   * `costPerLevel` levels of the other are spent, and a cell hardens at most `ratePerStep` per step. It runs at the
+   * START of a step, on the fluid as the last step left it (which is what clients were last shown), so water is seen
+   * to reach the lava, and sits against it while it cools, before anything is used up.
+   * When the reacting fluid in a cell is used up (or what is left is
    * too thin to keep), the cell is emptied and reported through `takeReactions` so it can become a block. When the
    * other fluid runs out first, the reacting fluid is only reduced, so a trickle slowly eats a pool.
    */
@@ -120,7 +144,7 @@ export class FluidGrid {
           const ni = ny * w + nx;
           const other = this.levels[ni];
           if (other <= 0 || this.ids[ni] !== rule.withId || this.levels[i] <= 0) continue;
-          const hardened = Math.min(this.levels[i], other / rule.costPerLevel);
+          const hardened = Math.min(this.levels[i], other / rule.costPerLevel, rule.ratePerStep);
           this.levels[i] -= hardened;
           this.levels[ni] -= hardened * rule.costPerLevel;
           if (this.levels[ni] <= REACTION_RESIDUE) {
@@ -129,6 +153,8 @@ export class FluidGrid {
           }
           this.changed.add(ni);
           this.changed.add(i);
+          this.reacting.add(ni);
+          this.reacting.add(i);
           this.wakeIndex(ni, nx, ny);
           const minLevel = this.registry.paramsOf(this.ids[i])?.minLevel ?? 0;
           if (this.levels[i] <= Math.max(REACTION_RESIDUE, minLevel)) {
@@ -202,6 +228,7 @@ export class FluidGrid {
     const i = y * this.width + x;
     this.levels[i] = level > 0 ? level : 0;
     this.ids[i] = level > 0 ? fluidId : NO_FLUID;
+    this.clearFalling(i);
     this.changed.add(i);
     this.wakeIndex(i, x, y);
     return true;
@@ -266,12 +293,28 @@ export class FluidGrid {
     this.wakeIndex(i, x, y);
   }
 
+  /** How much of a cell's fluid fell into it from above in the last step (0 when it is not falling). */
+  public getFalling(x: number, y: number): number {
+    return this.inBounds(x, y) ? Math.min(this.fallen[y * this.width + x], this.levels[y * this.width + x]) : 0;
+  }
+
+  /** Forgets that a cell's fluid is falling (it was set or emptied from outside the simulation). */
+  private clearFalling(i: number): void {
+    if (this.fallen[i] === 0) return;
+    this.fallen[i] = 0;
+    this.fallenCells.delete(i);
+    this.changed.add(i);
+  }
+
   /** Cells that changed since the last call (their current contents), then forgets them. */
   public drainChanges(): FluidCellChange[] {
     const out: FluidCellChange[] = [];
     for (const i of this.changed) {
       const level = this.levels[i];
-      out.push({ x: i % this.width, y: Math.floor(i / this.width), fluidId: level > 0 ? this.ids[i] : NO_FLUID, level });
+      out.push({
+        x: i % this.width, y: Math.floor(i / this.width), fluidId: level > 0 ? this.ids[i] : NO_FLUID, level,
+        falling: level > 0 ? Math.min(level, this.fallen[i]) : 0,
+      });
     }
     this.changed.clear();
     return out;
@@ -280,7 +323,12 @@ export class FluidGrid {
   /** Runs one simulation step. Returns how many cells changed. */
   public step(): number {
     this.stepCount++;
-    if (this.active.size === 0) return 0;
+    // Fluids that react do so where they touched at the end of the last step
+    this.react([...this.active]);
+    if (this.active.size === 0) {
+      for (const i of [...this.fallenCells]) this.clearFalling(i);
+      return 0;
+    }
     const w = this.width;
     const leftFirst = this.stepCount % 2 === 0;
 
@@ -312,6 +360,11 @@ export class FluidGrid {
 
     const delta = new Map<number, number>();
     const claim = new Map<number, number>();
+    // Every cell fluid moved out of or into this step, even if its level ends up the same (a cell in a steady stream
+    // passes on exactly what it receives): it is still flowing, so it must stay awake
+    const flowed = new Set<number>();
+    // Fluid that fell into each cell from the cell above this step
+    const fellIn = new Map<number, number>();
     const add = (i: number, amount: number) => delta.set(i, (delta.get(i) ?? 0) + amount);
 
     for (const i of order) {
@@ -335,35 +388,65 @@ export class FluidGrid {
       const send = (ni: number, amount: number) => {
         add(i, -amount);
         add(ni, amount);
+        flowed.add(i);
+        flowed.add(ni);
         if (this.levels[ni] <= 0) claim.set(ni, fluidId);
         remaining -= amount;
       };
 
-      // 1. Down
+      // 1. Down. Falling into room below is gravity, not flow: everything that fits drops at once, whatever the
+      // fluid's flow rate (which only slows spreading). Scaling the fall by it left part of a falling cell behind each
+      // step to spread sideways in mid-air, so one poured cell fanned out into thin separate columns. Only squeezing
+      // a full cell below past full (pressure) goes at the flow rate.
+      // Rows are done bottom first, so the cell below has already moved this step: fall into the room it has now
+      // (its level after its own flows), not the room it had, or a falling column jams up behind itself.
       if (canEnter(x, y + 1)) {
         const ni = i + w;
-        const flow = (stableBottom(remaining + this.levels[ni]) - this.levels[ni]) * params.flowRate;
-        if (flow > FLUID_MIN_FLOW) send(ni, Math.min(flow, remaining));
+        const below = Math.max(0, this.levels[ni] + (delta.get(ni) ?? 0));
+        const target = stableBottom(remaining + below) - below;
+        const fall = Math.min(target, Math.max(0, FLUID_FULL_LEVEL - below));
+        const flow = fall + Math.max(0, target - fall) * params.flowRate;
+        if (flow > FLUID_MIN_FLOW) {
+          const amount = Math.min(flow, remaining);
+          send(ni, amount);
+          // Only a real fall counts as falling, not pressure squeezing a full cell into the full cell below it
+          if (fall > FLUID_MIN_FLOW) fellIn.set(ni, (fellIn.get(ni) ?? 0) + Math.min(amount, fall));
+        }
       }
 
-      // 2. Sideways, towards the lower neighbour
-      const sides = leftFirst ? [-1, 1] : [1, -1];
-      for (const dx of sides) {
-        if (remaining <= 0 || !canEnter(x + dx, y)) continue;
+      // 2. Sideways, towards the lower neighbours. Both sides are worked out from the same amount (worked out one after
+      // the other, the side going first took the bigger share; with the side alternating every step, a cell beside a
+      // drop got a big helping every other step and its fall pulsed).
+      const base = remaining;
+      const lower: Array<{ ni: number; diff: number; roomUnder: number }> = [];
+      for (const dx of [-1, 1]) {
+        if (base <= 0 || !canEnter(x + dx, y)) continue;
         const ni = i + dx;
-        const diff = remaining - this.levels[ni];
+        const diff = base - this.levels[ni];
         if (diff <= params.flowThreshold) continue;
-        let flow = (diff / 2) * params.flowRate;
+        const roomUnder = this.blocked(x + dx, y + 1) ? 0 : clampUnit(FLUID_FULL_LEVEL - (this.levels[ni + w] + (delta.get(ni + w) ?? 0)));
+        lower.push({ ni, diff, roomUnder });
+      }
+      const wants: Array<[number, number]> = [];
+      for (const { ni, diff, roomUnder } of lower) {
+        // Levelling out with its neighbours, a cell hands each its share of the difference (so the cells end level). Towards
+        // a neighbour with room under it, fluid is not levelling but pouring off an edge (it falls on from there), so all
+        // of the difference moves at the flow rate; levelling there let landing fluid pile into a heap faster than it ran
+        // off. A ramp on how much room is under the neighbour.
+        const levelShare = 1 / (lower.length + 1);
+        let flow = diff * (levelShare + (1 - levelShare) * roomUnder) * params.flowRate;
         // Never hand a neighbour less than the minimum: it would evaporate on arrival and a spreading
         // pool would leak away at its edge. Give it the minimum instead, if that still leaves the donor
         // at least as deep as the receiver; otherwise hold back.
-        const receiverAfter = this.levels[ni] + flow;
-        if (receiverAfter < params.minLevel) {
+        if (this.levels[ni] + flow < params.minLevel) {
           flow = params.minLevel - this.levels[ni];
-          if (remaining - flow < this.levels[ni] + flow) continue;
+          if (base - flow < this.levels[ni] + flow) continue;
         }
-        if (flow > FLUID_MIN_FLOW) send(ni, Math.min(flow, remaining));
+        if (flow > FLUID_MIN_FLOW) wants.push([ni, flow]);
       }
+      const asked = wants.reduce((sum, [, flow]) => sum + flow, 0);
+      const scale = asked > base ? base / asked : 1;
+      for (const [ni, flow] of wants) send(ni, flow * scale);
 
       // 3. Up, only when squeezed past full
       if (remaining > FLUID_FULL_LEVEL && canEnter(x, y - 1)) {
@@ -387,6 +470,8 @@ export class FluidGrid {
       if (Math.abs(change) > 0) {
         changedCount++;
         this.changed.add(i);
+      }
+      if (Math.abs(change) > 0 || flowed.has(i)) {
         const x = i % w;
         const y = Math.floor(i / w);
         nextActive.add(i);
@@ -413,8 +498,17 @@ export class FluidGrid {
       if (i >= w) nextActive.add(i - w);
       if (i + w < this.levels.length) nextActive.add(i + w);
     }
-    // Fluids that react do so where they now touch
-    this.react(new Set([...order, ...nextActive]));
+    // What is falling now: what fell into each cell this step (a cell that stopped falling is told as well)
+    for (const i of new Set([...this.fallenCells, ...fellIn.keys()])) {
+      const value = Math.min(this.levels[i], fellIn.get(i) ?? 0);
+      if (quantizeFluidLevel(value) !== quantizeFluidLevel(this.fallen[i])) this.changed.add(i);
+      this.fallen[i] = value;
+      if (value > 0) this.fallenCells.add(i);
+      else this.fallenCells.delete(i);
+    }
+    // A reaction under way carries on next step
+    for (const i of this.reacting) nextActive.add(i);
+    this.reacting.clear();
     this.active = nextActive;
     return changedCount;
   }

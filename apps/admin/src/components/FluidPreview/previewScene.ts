@@ -91,7 +91,7 @@ export class PreviewScene {
     for (let y = 0; y < PREVIEW_HEIGHT; y++) {
       for (let x = 0; x < PREVIEW_WIDTH; x++) {
         const id = this.grid.getFluidId(x, y);
-        if (id !== 0) field.apply([toFluidWireCell(x, y, id, this.grid.getLevel(x, y))]);
+        if (id !== 0) field.apply([toFluidWireCell(x, y, id, this.grid.getLevel(x, y), this.grid.getFalling(x, y))]);
       }
     }
     return field;

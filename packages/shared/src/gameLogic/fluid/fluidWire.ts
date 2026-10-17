@@ -7,8 +7,12 @@ import { NO_FLUID } from './FluidRegistry';
 /** Fluid levels travel as whole numbers: this many steps per full cell (1/128 each, so a squeezed cell up to ~2 fits a byte). */
 export const FLUID_LEVEL_STEPS = 128;
 
-/** One changed cell on the wire: [x, y, fluidId, quantised level]. fluidId 0 / level 0 means the cell is empty. */
-export type FluidWireCell = [x: number, y: number, fluidId: number, level: number];
+/**
+ * One changed cell on the wire: [x, y, fluidId, quantised level, quantised falling?]. fluidId 0 / level 0 means the cell
+ * is empty. The fifth value, when present, is how much of it is falling (fell in from the cell above in the last step),
+ * on the same scale as the level; absent means none.
+ */
+export type FluidWireCell = [x: number, y: number, fluidId: number, level: number, falling?: number];
 
 /** What a client needs to know about a fluid to draw it (sent once per run, with the session state). */
 export interface FluidClientDefinition {
@@ -42,10 +46,11 @@ export function dequantizeFluidLevel(quantised: number): number {
   return quantised / FLUID_LEVEL_STEPS;
 }
 
-/** Builds the wire form of a cell's contents. */
-export function toFluidWireCell(x: number, y: number, fluidId: number, level: number): FluidWireCell {
+/** Builds the wire form of a cell's contents (the falling value is left off when nothing is falling). */
+export function toFluidWireCell(x: number, y: number, fluidId: number, level: number, falling = 0): FluidWireCell {
   const q = quantizeFluidLevel(level);
-  return [x, y, q > 0 ? fluidId : NO_FLUID, q];
+  const f = q > 0 ? Math.min(q, quantizeFluidLevel(falling)) : 0;
+  return f > 0 ? [x, y, fluidId, q, f] : [x, y, q > 0 ? fluidId : NO_FLUID, q];
 }
 
 /**
@@ -55,6 +60,7 @@ export function toFluidWireCell(x: number, y: number, fluidId: number, level: nu
 export class FluidField {
   private readonly ids: Uint8Array;
   private readonly levels: Uint8Array;
+  private readonly falling: Uint8Array;
 
   public readonly width: number;
   public readonly height: number;
@@ -64,6 +70,7 @@ export class FluidField {
     this.height = height;
     this.ids = new Uint8Array(width * height);
     this.levels = new Uint8Array(width * height);
+    this.falling = new Uint8Array(width * height);
   }
 
   private index(x: number, y: number): number {
@@ -72,15 +79,17 @@ export class FluidField {
       : -1;
   }
 
-  /** Sets one cell. Returns whether anything changed. */
-  public set(x: number, y: number, fluidId: number, quantised: number): boolean {
+  /** Sets one cell (`quantisedFalling`: how much of it is falling, same scale). Returns whether anything changed. */
+  public set(x: number, y: number, fluidId: number, quantised: number, quantisedFalling = 0): boolean {
     const i = this.index(x, y);
     if (i < 0) return false;
     const id = quantised > 0 ? fluidId : NO_FLUID;
     const level = quantised > 0 ? quantised : 0;
-    if (this.ids[i] === id && this.levels[i] === level) return false;
+    const falling = Math.min(level, Math.max(0, quantisedFalling || 0));
+    if (this.ids[i] === id && this.levels[i] === level && this.falling[i] === falling) return false;
     this.ids[i] = id;
     this.levels[i] = level;
+    this.falling[i] = falling;
     return true;
   }
 
@@ -88,9 +97,15 @@ export class FluidField {
   public apply(cells: readonly FluidWireCell[]): FluidWireCell[] {
     const changed: FluidWireCell[] = [];
     for (const cell of cells) {
-      if (this.set(cell[0], cell[1], cell[2], cell[3])) changed.push(cell);
+      if (this.set(cell[0], cell[1], cell[2], cell[3], cell[4] ?? 0)) changed.push(cell);
     }
     return changed;
+  }
+
+  /** How much of the cell's fluid is falling, on the same scale as its level. */
+  public getFalling(x: number, y: number): number {
+    const i = this.index(x, y);
+    return i < 0 ? 0 : dequantizeFluidLevel(this.falling[i]);
   }
 
   public getFluidId(x: number, y: number): number {

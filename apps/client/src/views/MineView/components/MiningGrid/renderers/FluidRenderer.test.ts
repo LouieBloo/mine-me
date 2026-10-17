@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import { quantizeFluidLevel, type FluidClientDefinition } from '@mine-me/shared';
-import { FLUID_CHUNK_SIZE, FluidRenderer, darkenColor, lightenColor, parseHexColor } from './FluidRenderer';
+import { FLUID_CHUNK_SIZE, FLUID_STEP_SECONDS, FluidRenderer, darkenColor, lightenColor, parseHexColor } from './FluidRenderer';
 
 const OIL: FluidClientDefinition = { id: 1, typeKey: 'OIL', name: 'Oil', color: '#0b0b0d', opacity: 0.9, viscosity: 0.6, density: 0.8 };
 const q = quantizeFluidLevel;
@@ -134,6 +134,70 @@ describe('FluidRenderer', () => {
     renderer.render();
     renderer.apply([[2, FLUID_CHUNK_SIZE - 3, 1, q(1)]]);
     expect(renderer.render()).toBe(2);
+  });
+
+  it('redraws a fall across a one-cell gap: the jet is laid out down the whole column, so the part past the gap changes too', () => {
+    const { renderer } = make();
+    const x = 2;
+    // Falling water, an empty beat two rows above a chunk edge, and more of the fall running on into the chunk below
+    renderer.apply([[x, FLUID_CHUNK_SIZE - 4, 1, q(0.06)], [x, FLUID_CHUNK_SIZE - 3, 1, q(0.06)], [x, FLUID_CHUNK_SIZE - 1, 1, q(0.06)], [x, FLUID_CHUNK_SIZE, 1, q(0.06)]]);
+    renderer.render();
+    renderer.apply([[x, FLUID_CHUNK_SIZE - 4, 1, q(0.3)]]);
+    expect(renderer.render()).toBe(2); // its own chunk and the one past the gap
+  });
+
+  it('draws the highlight over the lip where a pool spills into a drop', () => {
+    const container = new Container();
+    const renderer = new FluidRenderer(container, 10, 10, [{ ...OIL, appearance: { waveAmplitude: 0, waveSpeed: 0, highlight: 0.6, depthDarkening: 0.3, depthOpacity: 0.2 } }], 64);
+    // Ground at row 4 except a one-wide shaft at x 5; a pool on the left spilling into it
+    renderer.setSolidSampler((x, y) => x < 0 || x >= 10 || y >= 9 || (y >= 4 && x !== 5));
+    renderer.apply([[2, 3, 1, q(0.6)], [3, 3, 1, q(0.6)], [4, 3, 1, q(0.6)], [5, 3, 1, q(0.1)], [5, 4, 1, q(0.06)], [5, 5, 1, q(0.06)], [5, 6, 1, q(0.06)]]);
+    const stroke = vi.spyOn(Graphics.prototype, 'stroke');
+    const poly = vi.spyOn(Graphics.prototype, 'poly');
+    renderer.render();
+    // An open polyline (the spill's edge) starting at the lip's left side, stroked
+    const edgeCall = poly.mock.calls.find(([points, closed]) => closed === false && (points as number[])[0] === 5 * 64);
+    expect(edgeCall).toBeDefined();
+    expect(stroke).toHaveBeenCalled();
+  });
+
+  it('draws fluid in free fall sliding down from the cell above over one step, redrawing it every frame until it arrives', () => {
+    const { renderer } = make();
+    renderer.setSolidSampler((x, y) => y >= 39 || x < 0 || x >= 40);
+    renderer.apply([[5, 5, 1, q(1)]]); // a cell of fluid in the air
+    renderer.update(0);
+    renderer.render();
+    // The next step: it fell one cell
+    renderer.apply([[5, 5, 0, 0], [5, 6, 1, q(1), q(1)]], true);
+    renderer.update(0.001);
+    expect(renderer.fallProgress).toBeLessThan(0.1);
+    let frames = 0;
+    for (let t = 0.001; t < FLUID_STEP_SECONDS; t += 1 / 60) {
+      renderer.update(t);
+      frames++;
+    }
+    expect(frames).toBeGreaterThan(3);
+    renderer.update(FLUID_STEP_SECONDS + 0.02);
+    expect(renderer.fallProgress).toBe(1);
+    // Once it has arrived nothing more is redrawn
+    renderer.update(FLUID_STEP_SECONDS + 0.1);
+    expect(renderer.render()).toBe(0);
+  });
+
+  it('the redraws while sliding come from the slide: a frame mid-slide redraws the falling cell', () => {
+    const { renderer } = make();
+    renderer.setSolidSampler((x, y) => y >= 39 || x < 0 || x >= 40);
+    renderer.apply([[5, 5, 1, q(1)]]);
+    renderer.update(0);
+    renderer.render();
+    renderer.apply([[5, 5, 0, 0], [5, 6, 1, q(1), q(1)]], true);
+    // Let the (hurried) easing settle while the slide is still under way
+    for (let t = 0.001; t < 0.09; t += 1 / 240) renderer.update(t);
+    renderer.render();
+    expect(renderer.fallProgress).toBeLessThan(1);
+    const spy = vi.spyOn(renderer as any, 'drawChunk');
+    renderer.update(0.095); // only the slide moves it now
+    expect(spy).toHaveBeenCalled();
   });
 
   describe('waves', () => {

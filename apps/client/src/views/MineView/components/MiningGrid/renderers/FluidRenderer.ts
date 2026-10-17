@@ -1,6 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
 import {
-  DEFAULT_FLUID_APPEARANCE, FluidDisplay, FluidField, FluidLayout, darkenColor, lightenColor, parseHexColor, bandBelowLine, fluidBodyBands, fluidDepthShade, fluidSurfaceWave,
+  DEFAULT_FLUID_APPEARANCE, FluidDisplay, FluidField, FluidLayout, MINING_CONFIG, fallHurry, darkenColor, lightenColor, parseHexColor, bandBelowLine, fluidBodyBands, fluidDepthShade, fluidSurfaceWave,
   type FluidAppearance, type FluidClientDefinition, type FluidEnvironment, type ItemLightConfig, type FluidShape, type FluidSoundEffectsConfig, type FluidWireCell,
   type SolidSampler,
 } from '@mine-me/shared';
@@ -8,6 +8,9 @@ import {
 /** What a burning cell of a fluid looks like: its flames and its light (either may be missing). */
 export type FlameLook = NonNullable<FluidClientDefinition['flame']>;
 import { TILE_SIZE } from './MiningTileRenderer';
+
+/** Seconds between fluid simulation steps on the server: how long falling fluid takes to slide down one cell. */
+export const FLUID_STEP_SECONDS = MINING_CONFIG.FLUID_STEP_TICKS / MINING_CONFIG.SERVER_TICK_RATE;
 
 /** Cells per chunk side. Only chunks whose cells changed are redrawn. */
 export const FLUID_CHUNK_SIZE = 8;
@@ -66,6 +69,11 @@ export class FluidRenderer {
   private solid: SolidSampler | undefined;
   private time = 0;
   private lastUpdate: number | null = null;
+  /** When the current step's falling fluid started sliding down (renderer time), or null before any fell. */
+  private slideStart: number | null = null;
+  private slideStartPending = false;
+  /** Cells (as y * width + x) fluid fell into in the last step: redrawn every frame while it slides. */
+  private readonly sliding = new Set<number>();
   /** The layout of what is drawn, kept until the drawn fluid or the terrain changes (drawing and fire share it). */
   private layout: FluidLayout | null = null;
 
@@ -144,11 +152,46 @@ export class FluidRenderer {
    * fluid flowing); without, it shows them at once (the first snapshot, or fluid that just came into view).
    */
   public apply(cells: readonly FluidWireCell[], smooth = false): void {
-    for (const [x, y] of this.field.apply(cells)) {
+    const fellInto: Array<[number, number]> = [];
+    const changed = this.field.apply(cells);
+    for (const [x, y] of changed) {
       const fluidId = this.field.getFluidId(x, y);
       const level = this.field.getLevel(x, y);
-      if (smooth) this.display.setTarget(x, y, fluidId, level);
-      else if (this.display.setNow(x, y, fluidId, level)) this.markAround(x, y);
+      const falling = this.field.getFalling(x, y);
+      if (smooth) {
+        this.display.setTarget(x, y, fluidId, level, falling);
+        if (falling > 0) fellInto.push([x, y]);
+      } else if (this.display.setNow(x, y, fluidId, level, falling)) {
+        this.markAround(x, y);
+      }
+    }
+    if (!smooth || changed.length === 0) return;
+    // Fluid in free fall is drawn sliding down from the cell above over the next step, not faded out of one cell and into
+    // the next (that smears it over both): both cells ease to where it is now almost at once, and the slide starts over
+    this.sliding.clear();
+    for (const [x, y] of fellInto) {
+      const quick = fallHurry(this.field, x, y, this.solid);
+      if (quick <= 0) continue;
+      this.display.hurry(x, y, quick);
+      this.display.hurry(x, y - 1, quick);
+      this.sliding.add(y * this.field.width + x);
+    }
+    this.slideStartPending = true;
+  }
+
+  /** How far through the current step falling fluid has slid, 0 (just arrived) to 1 (in its cell). */
+  public get fallProgress(): number {
+    if (this.slideStart === null) return 1;
+    return Math.min(1, Math.max(0, (this.time - this.slideStart) / FLUID_STEP_SECONDS));
+  }
+
+  /** Redraws what is sliding (the cells fluid fell into, and the cells it came from), while the slide lasts. */
+  private markSliding(): void {
+    for (const i of this.sliding) {
+      const x = i % this.field.width;
+      const y = Math.floor(i / this.field.width);
+      this.markAround(x, y);
+      if (y > 0) this.markAround(x, y - 1);
     }
   }
 
@@ -160,10 +203,12 @@ export class FluidRenderer {
   private markAround(x: number, y: number): void {
     this.layout = null;
     const has = (yy: number) => this.display.getFluidId(x, yy) !== 0;
+    // A fall is laid out as one jet down its column and steps over one-cell gaps (the beats it falls in), so the
+    // redraw follows the fluid across such a gap too
     let top = y - 1;
-    while (top > 0 && has(top)) top--;
+    while (top > 0 && (has(top) || has(top - 1))) top--;
     let bottom = y + 1;
-    while (bottom < this.field.height - 1 && has(bottom)) bottom++;
+    while (bottom < this.field.height - 1 && (has(bottom) || has(bottom + 1))) bottom++;
     for (let cx = Math.max(0, x - 1); cx <= Math.min(this.field.width - 1, x + 1); cx++) {
       for (let cy = Math.max(0, top); cy <= Math.min(this.field.height - 1, bottom); cy++) this.dirty.add(this.chunkKey(cx, cy));
     }
@@ -180,7 +225,7 @@ export class FluidRenderer {
   }
 
   private currentLayout(): FluidLayout {
-    this.layout ??= new FluidLayout(this.display, this.tileSize, this.solid);
+    this.layout ??= new FluidLayout(this.display, this.tileSize, this.solid, { fallProgress: this.fallProgress });
     return this.layout;
   }
 
@@ -213,7 +258,14 @@ export class FluidRenderer {
   public update(timeSec: number): void {
     const dt = this.lastUpdate === null ? 0 : Math.min(MAX_EASE_STEP_SECONDS, Math.max(0, timeSec - this.lastUpdate));
     this.lastUpdate = timeSec;
+    const progressBefore = this.fallProgress;
     this.time = timeSec;
+    if (this.slideStartPending) {
+      this.slideStart = timeSec;
+      this.slideStartPending = false;
+    }
+    // Falling fluid moves every frame until it has slid into its cell (one last redraw puts it exactly there)
+    if (this.sliding.size > 0 && (this.fallProgress < 1 || progressBefore < 1)) this.markSliding();
     for (const [x, y] of this.display.step(dt)) this.markAround(x, y);
     const redrawn = new Set(this.dirty);
     this.render();
@@ -261,6 +313,14 @@ export class FluidRenderer {
     for (const band of fluidBodyBands(shape, this.tileSize, look.appearance)) {
       const shade = fluidDepthShade(look.opacity, look.appearance, band.depth);
       graphics.poly(band.points).fill({ color: darkenColor(look.color, shade.darken), alpha: shade.opacity });
+    }
+    if (shape.spillEdge && look.appearance.highlight > 0) {
+      // The pool's surface line carries on over the lip and down into the fall
+      graphics.poly(shape.spillEdge, false).stroke({
+        width: Math.max(1, SURFACE_LINE_TILE * this.tileSize),
+        color: look.surface,
+        alpha: look.opacity * Math.min(1, look.appearance.highlight * 1.2),
+      });
     }
     if (shape.stream) {
       // A sheen down one side of the stream, so it reads as a rounded jet and not a flat bar

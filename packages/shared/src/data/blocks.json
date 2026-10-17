@@ -1,19 +1,61 @@
 [
   {
+    "id": "block_bridge",
+    "typeKey": "BRIDGE",
+    "name": "Bridge",
+    "description": "A placed bridge. Solid from every side.",
+    "textureUrl": null,
+    "soundEffectUrl": null,
+    "soundEffectVolume": 1,
+    "health": 20,
+    "requiredPickPower": 0,
+    "staminaCost": 1,
+    "idleParticleEffectId": null,
+    "flammability": null,
+    "createdAt": "2026-10-16T01:32:19.352Z",
+    "updatedAt": "2026-10-16T01:32:19.352Z",
+    "idleParticleEffect": null,
+    "dropTable": {
+      "id": "cmvaalu710001gn7uhliyni9m",
+      "solMin": 0,
+      "solMax": 0,
+      "experience": 0,
+      "mobId": null,
+      "characterLevelId": null,
+      "miningBlockId": "block_bridge",
+      "createdAt": "2026-10-16T01:32:19.358Z",
+      "updatedAt": "2026-10-16T01:32:19.358Z",
+      "items": [
+        {
+          "id": "cmvaalu710003gn7udrb0vhks",
+          "dropTableId": "cmvaalu710001gn7uhliyni9m",
+          "itemId": "item_bridge",
+          "chance": 100,
+          "minQuantity": 1,
+          "maxQuantity": 1,
+          "createdAt": "2026-10-16T01:32:19.358Z",
+          "updatedAt": "2026-10-16T01:32:19.358Z"
+        }
+      ]
+    }
+  },
+  {
     "id": "block_chest",
     "typeKey": "CHEST",
     "name": "Treasure Chest",
     "description": "Ancient subterranean chest containing rare spoils.",
     "textureUrl": null,
     "soundEffectUrl": null,
+    "soundEffectVolume": 1,
     "health": 200,
+    "requiredPickPower": 0,
     "staminaCost": 1,
     "idleParticleEffectId": null,
+    "flammability": null,
     "createdAt": "2026-08-17T03:27:35.321Z",
-    "updatedAt": "2026-09-29T03:06:06.491Z",
+    "updatedAt": "2026-10-08T01:04:34.514Z",
     "idleParticleEffect": null,
-    "dropTable": null,
-    "requiredPickPower": 0
+    "dropTable": null
   },
   {
     "id": "block_copperium",
@@ -22,11 +64,14 @@
     "description": "Dense rock embedded with warm copper deposits and energetic fissures.",
     "textureUrl": "/assets/mining/block_copperium-block.png",
     "soundEffectUrl": "/assets/sounds/blocks/block_copperium_sfx.mp3",
+    "soundEffectVolume": 1,
     "health": 240,
+    "requiredPickPower": 0,
     "staminaCost": 1,
     "idleParticleEffectId": "pe_fairy_sparkle",
+    "flammability": null,
     "createdAt": "2026-09-13T00:55:27.153Z",
-    "updatedAt": "2026-09-29T03:06:06.497Z",
+    "updatedAt": "2026-10-08T01:04:34.520Z",
     "idleParticleEffect": {
       "id": "pe_fairy_sparkle",
       "name": "Fairy Sparkles",
@@ -70,7 +115,7 @@
         "spawnRadius": 30
       },
       "createdAt": "2026-09-13T01:34:00.471Z",
-      "updatedAt": "2026-09-29T03:06:06.247Z"
+      "updatedAt": "2026-10-08T01:04:34.209Z"
     },
     "dropTable": {
       "id": "cmugev18g0000qhftn66corzq",
@@ -94,8 +139,7 @@
           "updatedAt": "2026-09-25T03:38:21.568Z"
         }
       ]
-    },
-    "requiredPickPower": 0
+    }
   },
   {
     "id": "block_dirt",
@@ -104,11 +148,14 @@
     "description": "Standard earthen ground. Easy to mine.",
     "textureUrl": "/assets/mining/block_dirt-block.jpg",
     "soundEffectUrl": "/assets/sounds/blocks/block_dirt_sfx.mp3",
+    "soundEffectVolume": 1,
     "health": 100,
+    "requiredPickPower": 0,
     "staminaCost": 1,
     "idleParticleEffectId": null,
+    "flammability": null,
     "createdAt": "2026-08-17T03:27:35.305Z",
-    "updatedAt": "2026-09-30T01:12:33.169Z",
+    "updatedAt": "2026-10-08T01:04:34.524Z",
     "idleParticleEffect": null,
     "dropTable": {
       "id": "cmundelw90000bumvlrgt1wha",
@@ -132,8 +179,7 @@
           "updatedAt": "2026-09-30T01:12:33.169Z"
         }
       ]
-    },
-    "requiredPickPower": 0
+    }
   },
   {
     "id": "block_entrance",
@@ -142,14 +188,34 @@
     "description": "The ladder leading back to the surface.",
     "textureUrl": "/assets/mining/block_entrance-block.png",
     "soundEffectUrl": null,
+    "soundEffectVolume": 1,
     "health": 0,
+    "requiredPickPower": 0,
     "staminaCost": 0,
     "idleParticleEffectId": null,
+    "flammability": null,
     "createdAt": "2026-08-17T03:27:35.325Z",
-    "updatedAt": "2026-09-29T03:06:06.504Z",
+    "updatedAt": "2026-10-08T01:04:34.527Z",
     "idleParticleEffect": null,
-    "dropTable": null,
-    "requiredPickPower": 0
+    "dropTable": null
+  },
+  {
+    "id": "block_lavarock",
+    "typeKey": "LAVAROCK",
+    "name": "Lavarock",
+    "description": "Lava cooled solid by water. Hard, dark and slow to dig through.",
+    "textureUrl": "/assets/mining/block_lavarock-block.png",
+    "soundEffectUrl": null,
+    "soundEffectVolume": 1,
+    "health": 500,
+    "requiredPickPower": 0,
+    "staminaCost": 2,
+    "idleParticleEffectId": null,
+    "flammability": null,
+    "createdAt": "2026-10-17T03:05:14.373Z",
+    "updatedAt": "2026-10-17T03:39:02.134Z",
+    "idleParticleEffect": null,
+    "dropTable": null
   },
   {
     "id": "block_mineral",
@@ -158,14 +224,16 @@
     "description": "Rock embedding valuable ore and crystals.",
     "textureUrl": "/assets/mining/block_mineral-block.png",
     "soundEffectUrl": null,
+    "soundEffectVolume": 1,
     "health": 300,
+    "requiredPickPower": 0,
     "staminaCost": 1,
     "idleParticleEffectId": null,
+    "flammability": null,
     "createdAt": "2026-08-17T03:27:35.316Z",
-    "updatedAt": "2026-09-29T03:06:06.507Z",
+    "updatedAt": "2026-10-08T01:04:34.531Z",
     "idleParticleEffect": null,
-    "dropTable": null,
-    "requiredPickPower": 0
+    "dropTable": null
   },
   {
     "id": "block_rock",
@@ -174,14 +242,16 @@
     "description": "Dense, solid rock. Can fall when unsupported.",
     "textureUrl": "/assets/mining/block_rock-block.jpg",
     "soundEffectUrl": null,
+    "soundEffectVolume": 1,
     "health": 0,
+    "requiredPickPower": 0,
     "staminaCost": 0,
     "idleParticleEffectId": null,
+    "flammability": null,
     "createdAt": "2026-08-17T03:27:35.310Z",
-    "updatedAt": "2026-09-29T03:06:06.511Z",
+    "updatedAt": "2026-10-08T01:04:34.535Z",
     "idleParticleEffect": null,
-    "dropTable": null,
-    "requiredPickPower": 0
+    "dropTable": null
   },
   {
     "id": "block_silverium",
@@ -190,11 +260,14 @@
     "description": "Lustrous silver ore veins glowing with concentrated subterranean energy.",
     "textureUrl": "/assets/mining/block_silverium-block.png",
     "soundEffectUrl": null,
+    "soundEffectVolume": 1,
     "health": 400,
+    "requiredPickPower": 0,
     "staminaCost": 2,
     "idleParticleEffectId": "pe_fairy_sparkle",
+    "flammability": null,
     "createdAt": "2026-09-13T00:55:27.158Z",
-    "updatedAt": "2026-09-29T03:06:06.515Z",
+    "updatedAt": "2026-10-08T01:04:34.539Z",
     "idleParticleEffect": {
       "id": "pe_fairy_sparkle",
       "name": "Fairy Sparkles",
@@ -238,7 +311,7 @@
         "spawnRadius": 30
       },
       "createdAt": "2026-09-13T01:34:00.471Z",
-      "updatedAt": "2026-09-29T03:06:06.247Z"
+      "updatedAt": "2026-10-08T01:04:34.209Z"
     },
     "dropTable": {
       "id": "cmugeyzrs0005qhftfmwj727y",
@@ -262,61 +335,6 @@
           "updatedAt": "2026-09-25T03:41:51.932Z"
         }
       ]
-    },
-    "requiredPickPower": 0
-  },
-  {
-    "id": "block_bridge",
-    "typeKey": "BRIDGE",
-    "name": "Bridge",
-    "description": "A placed bridge. Solid from every side.",
-    "textureUrl": null,
-    "soundEffectUrl": null,
-    "health": 20,
-    "staminaCost": 1,
-    "idleParticleEffectId": null,
-    "createdAt": "2026-10-15T00:00:00.000Z",
-    "updatedAt": "2026-10-15T00:00:00.000Z",
-    "idleParticleEffect": null,
-    "dropTable": {
-      "id": "droptable_bridge",
-      "solMin": 0,
-      "solMax": 0,
-      "experience": 0,
-      "mobId": null,
-      "characterLevelId": null,
-      "miningBlockId": "block_bridge",
-      "createdAt": "2026-10-15T00:00:00.000Z",
-      "updatedAt": "2026-10-15T00:00:00.000Z",
-      "items": [
-        {
-          "id": "dropitem_bridge",
-          "dropTableId": "droptable_bridge",
-          "itemId": "item_bridge",
-          "chance": 100,
-          "minQuantity": 1,
-          "maxQuantity": 1,
-          "createdAt": "2026-10-15T00:00:00.000Z",
-          "updatedAt": "2026-10-15T00:00:00.000Z"
-        }
-      ]
-    },
-    "requiredPickPower": 0
-  },
-  {
-    "id": "block_lavarock",
-    "typeKey": "LAVAROCK",
-    "name": "Lavarock",
-    "description": "Lava cooled solid by water. Hard, dark and slow to dig through.",
-    "textureUrl": "/assets/mining/block_rock-block.jpg",
-    "soundEffectUrl": null,
-    "health": 500,
-    "staminaCost": 2,
-    "idleParticleEffectId": null,
-    "createdAt": "2026-10-16T00:00:00.000Z",
-    "updatedAt": "2026-10-16T00:00:00.000Z",
-    "idleParticleEffect": null,
-    "dropTable": null,
-    "requiredPickPower": 0
+    }
   }
 ]

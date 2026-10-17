@@ -48,7 +48,7 @@ export const FluidReactionsPanel: React.FC<FluidReactionsPanelProps> = ({ value,
       {list.length === 0 && <p className="text-xs text-slate-400 font-medium">No reactions</p>}
 
       {list.map((reaction, i) => (
-        <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_8rem_auto] gap-3 items-end bg-white border border-slate-200 rounded-xl p-4">
+        <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_7rem_7rem_auto] gap-3 items-end bg-white border border-slate-200 rounded-xl p-4">
           <div className="space-y-1">
             <label htmlFor={`reaction-with-${i}`} className={labelClass}>Touched By</label>
             <select id={`reaction-with-${i}`} className={selectClass} value={reaction.with} onChange={(e) => patch(i, { with: e.target.value })}>
@@ -79,6 +79,23 @@ export const FluidReactionsPanel: React.FC<FluidReactionsPanelProps> = ({ value,
               onChange={(e) => patch(i, { costPerLevel: e.target.value === '' ? NaN : Number(e.target.value) })}
             />
           </div>
+          <div className="space-y-1">
+            <label htmlFor={`reaction-rate-${i}`} className={labelClass}>Speed Per Step</label>
+            <input
+              id={`reaction-rate-${i}`}
+              type="number"
+              min={0.01}
+              max={1}
+              step={0.05}
+              placeholder="0.25"
+              className={inputClass}
+              value={reaction.ratePerStep ?? ''}
+              onChange={(e) => {
+                const { ratePerStep: _old, ...rest } = reaction;
+                patch(i, e.target.value === '' ? { ...rest, ratePerStep: undefined } : { ratePerStep: Number(e.target.value) });
+              }}
+            />
+          </div>
           <button
             type="button"
             aria-label={`Remove reaction ${i + 1}`}
@@ -87,8 +104,8 @@ export const FluidReactionsPanel: React.FC<FluidReactionsPanelProps> = ({ value,
           >
             Remove
           </button>
-          <span className="sm:col-span-4 text-[11px] text-slate-400 font-medium">
-            Each level of this fluid hardened uses up {Number.isFinite(reaction.costPerLevel) ? reaction.costPerLevel : '?'} level(s) of the other fluid
+          <span className="sm:col-span-5 text-[11px] text-slate-400 font-medium">
+            Each level of this fluid hardened uses up {Number.isFinite(reaction.costPerLevel) ? reaction.costPerLevel : '?'} level(s) of the other fluid. A cell hardens at most {reaction.ratePerStep ?? 0.25} per step (10 steps a second), so the water is seen against it while it cools
           </span>
         </div>
       ))}
