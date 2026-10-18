@@ -448,6 +448,14 @@ export function getTileParticleEffect(
   return getTileDefinition(type).particleEffect;
 }
 
+/**
+ * Whether a block whose middle is (dx, dy) from the player's centre is within mining reach. Reach is a circle, the same
+ * one the debug overlay draws, so a block on the diagonal is no further away than one straight ahead.
+ */
+export function isWithinMiningReach(dx: number, dy: number, reach: number = MINING_CONFIG.PLAYER_MINING_REACH): boolean {
+  return Math.hypot(dx, dy) <= reach;
+}
+
 /** Buildables (ladders, torches, bridges) can only go into empty space, never over a block, ore, chest, ladder or entrance. */
 export function canPlaceBuildable(_buildableType: MiningTileType, targetType: MiningTileType): boolean {
   return targetType === MiningTileType.EMPTY;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BLOCK_SCALE, MINING_CONFIG, MiningTileType } from '../types/mining';
+import { BLOCK_SCALE, MINING_CONFIG, MiningTileType, isWithinMiningReach } from '../types/mining';
 import { MINING_QUEUE_LENGTH, selectMiningTargets, type TargetableTile } from './miningTargeting';
 
 const S = BLOCK_SCALE;
@@ -146,5 +146,60 @@ describe('selectMiningTargets (precise, Ctrl)', () => {
     expect(selectMiningTargets(grid, player, { x: 39, y: 20 }, { precise: true })).toEqual([]);
     grid[20][23] = { type: MiningTileType.ROCK, revealed: true };
     expect(selectMiningTargets(grid, player, { x: 23, y: 20 }, { precise: true })).toEqual([]);
+  });
+});
+
+describe('selectMiningTargets (auto): breadth first', () => {
+  /** Mines the head of the queue over and over, as holding the button does, and lists the order. */
+  const mineSequence = (grid: TargetableTile[][], from: { x: number; y: number }, cursor: { x: number; y: number }, blocks: number) => {
+    const order: string[] = [];
+    for (let i = 0; i < blocks; i++) {
+      const head = selectMiningTargets(grid, from, cursor)[0];
+      if (!head) break;
+      order.push(`${head.x},${head.y}`);
+      grid[head.y][head.x] = { type: MiningTileType.EMPTY, revealed: true };
+    }
+    return order;
+  };
+
+  it('with a far cursor in a thick wall, clears each face before boring deeper, not a one-block tunnel', () => {
+    const grid = room(60, (x, y) => x >= 22 && x <= 40 && y >= 10 && y <= 30);
+    const order = mineSequence(grid, player, { x: 55, y: 20 }, 9);
+    const columns = order.map((k) => Number(k.split(',')[0]));
+    // Every block of the first face, then the next face: the columns never go back and never jump two ahead
+    expect(columns.slice(0, 3)).toEqual([22, 22, 22]);
+    for (let i = 1; i < columns.length; i++) {
+      expect(columns[i]).toBeGreaterThanOrEqual(columns[i - 1]);
+      expect(columns[i] - columns[0]).toBeLessThanOrEqual(Math.ceil(i / 3));
+    }
+  });
+
+  it('a tunnel already dug is widened from its mouth before it is dug further', () => {
+    const grid = room(60, (x, y) => x >= 22 && x <= 40 && y >= 10 && y <= 30 && !(y === 20 && x <= 25));
+    const first = selectMiningTargets(grid, player, { x: 55, y: 20 }).map((c) => `${c.x},${c.y}`);
+    expect(first.slice(0, 2).sort()).toEqual(['22,19', '22,21']);
+    expect(first).not.toContain('26,20');
+  });
+
+  it('still starts with the block under the cursor when it is in the nearest layer', () => {
+    const grid = room(40, (x) => x >= 22 && x <= 24);
+    expect(keys(selectMiningTargets(grid, player, { x: 22, y: 19 }))[0]).toBe('22,19');
+  });
+});
+
+describe('mining reach is a circle', () => {
+  it('a block on the diagonal is no further than one straight ahead', () => {
+    const edge = REACH - 0.01;
+    expect(isWithinMiningReach(edge, 0)).toBe(true);
+    expect(isWithinMiningReach(edge, edge)).toBe(false);
+    expect(isWithinMiningReach(0, -edge)).toBe(true);
+    expect(isWithinMiningReach(REACH * 0.7, REACH * 0.7)).toBe(true);
+    expect(isWithinMiningReach(REACH * 0.75, REACH * 0.75)).toBe(false);
+  });
+
+  it('picks nothing on a diagonal that is out of reach even when each axis is within it', () => {
+    const grid = room(60, (x, y) => x - 20 >= 5 && y - 20 >= 5);
+    // The block at (+5, +5) is 5.5 away on each axis (within the square) but about 7.8 along the diagonal
+    expect(selectMiningTargets(grid, player, { x: 40, y: 40 })).toEqual([]);
   });
 });

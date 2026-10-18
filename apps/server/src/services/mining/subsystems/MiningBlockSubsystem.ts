@@ -6,6 +6,7 @@ import {
   canPlaceBuildable,
   isTileMineable,
   isTileSolid,
+  isWithinMiningReach,
   findPieceAnchor,
   selectMiningTargets,
   getTileFootprint,
@@ -76,7 +77,7 @@ export class MiningBlockSubsystem {
     const tileCenterY = target.y + 0.5;
     const dx = Math.abs(tileCenterX - session.playerBody.position.x);
     const dy = Math.abs(tileCenterY - session.playerBody.position.y);
-    if (dx > MINING_CONFIG.PLAYER_MINING_REACH || dy > MINING_CONFIG.PLAYER_MINING_REACH) {
+    if (!isWithinMiningReach(dx, dy)) {
       return false;
     }
 
@@ -283,8 +284,7 @@ export class MiningBlockSubsystem {
         const tileCenterY = session.miningTarget.y + 0.5;
         const dx = Math.abs(tileCenterX - session.playerBody.position.x);
         const dy = Math.abs(tileCenterY - session.playerBody.position.y);
-        const inReach =
-          dx <= MINING_CONFIG.PLAYER_MINING_REACH && dy <= MINING_CONFIG.PLAYER_MINING_REACH;
+        const inReach = isWithinMiningReach(dx, dy);
 
         if (!isTargeting || !isSameTarget || !canMineStance || !inReach) {
           this.stopMining(session);

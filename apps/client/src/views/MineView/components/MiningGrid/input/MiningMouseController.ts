@@ -1,8 +1,8 @@
 import {
-  MINING_CONFIG,
   MiningTileType,
   MouseActionTriggerMode,
   isTileMineable,
+  isWithinMiningReach,
   selectMiningTargets,
   type MiningClientTile,
   type MiningPosition,
@@ -211,7 +211,7 @@ export class MiningMouseController {
     const tileCenterY = target.y + 0.5;
     const dx = Math.abs(tileCenterX - this.playerPos.x);
     const dy = Math.abs(tileCenterY - this.playerPos.y);
-    return dx <= MINING_CONFIG.PLAYER_MINING_REACH && dy <= MINING_CONFIG.PLAYER_MINING_REACH;
+    return isWithinMiningReach(dx, dy);
   }
 
   /**

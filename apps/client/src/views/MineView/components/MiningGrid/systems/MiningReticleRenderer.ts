@@ -4,6 +4,12 @@ import type { MiningPosition } from '@mine-me/shared';
 import type { MiningMouseController } from '../input/MiningMouseController';
 import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
 
+/**
+ * Whether the pickaxe's whole queue of lined-up blocks is highlighted. Off for now: only the block under the
+ * cursor is. The queue is still worked out and kept on the reticle style, so turning this on is all it takes.
+ */
+export const SHOW_MINING_QUEUE_PREVIEW = false;
+
 export interface MiningReticleContext {
   reticleGraphics: Graphics | null;
   mouseController: MiningMouseController | null;
@@ -98,7 +104,7 @@ export class MiningReticleRenderer {
       reticleGraphics.beginPath();
       reticleGraphics.circle(rx, ry, 2);
       reticleGraphics.fill({ color: aimColor, alpha: aimAlpha });
-    } else if (reticleState.style.miningQueue) {
+    } else if (SHOW_MINING_QUEUE_PREVIEW && reticleState.style.miningQueue) {
       // A pickaxe's reticle: every block lined up, the one being mined first and brightest
       const queue = reticleState.style.miningQueue;
       queue.forEach((cell, index) => {

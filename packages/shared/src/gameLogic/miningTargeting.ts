@@ -1,4 +1,4 @@
-import { BLOCK_SCALE, MINING_CONFIG, isTileMineable, isTileSolid, type MiningPosition, type MiningTileType, type Vector2D } from '../types/mining';
+import { BLOCK_SCALE, MINING_CONFIG, isTileMineable, isTileSolid, isWithinMiningReach, type MiningPosition, type MiningTileType, type Vector2D } from '../types/mining';
 
 /** How many blocks a pickaxe lines up at once: one original block's worth, so a character-sized tunnel opens in one sweep. */
 export const MINING_QUEUE_LENGTH = BLOCK_SCALE;
@@ -21,7 +21,7 @@ export interface MiningTargetOptions {
 }
 
 const inReach = (cell: MiningPosition, from: Vector2D, reach: number) =>
-  Math.abs(cell.x + 0.5 - from.x) <= reach && Math.abs(cell.y + 0.5 - from.y) <= reach;
+  isWithinMiningReach(cell.x + 0.5 - from.x, cell.y + 0.5 - from.y, reach);
 
 const tileAt = (grid: TargetableTile[][], x: number, y: number): TargetableTile | undefined => grid[y]?.[x];
 
@@ -29,8 +29,8 @@ const tileAt = (grid: TargetableTile[][], x: number, y: number): TargetableTile 
 const SIDE_REACH = 1.6;
 /** A block this close to the player (along the aim) is beside them, not in front. */
 const MIN_AHEAD = 0.5;
-/** A small lean toward blocks nearer the player when two are about equally near the cursor. */
-const DEPTH_WEIGHT = 0.25;
+/** Blocks whose distance along the aim differs by less than this are one layer of the face (they are mined nearest the cursor first). */
+const LAYER_DEPTH = 0.75;
 
 /** Points inside a block, as offsets from its middle, that count as seeing it: the middle and four spots toward its corners. */
 const SIGHT_POINTS: readonly [number, number][] = [[0, 0], [-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3]];
@@ -108,8 +108,8 @@ export function selectMiningTargets(
 
   const dirX = (targetX - from.x) / length;
   const dirY = (targetY - from.y) / length;
-  // How far along the aim the reach square extends, and the point standing in for the cursor when it is further
-  const aimEnd = reach / Math.max(Math.abs(dirX), Math.abs(dirY));
+  // How far along the aim reach extends, and the point standing in for the cursor when it is further
+  const aimEnd = reach;
   const refDistance = Math.min(length, aimEnd);
   const refX = from.x + dirX * refDistance;
   const refY = from.y + dirY * refDistance;
@@ -120,7 +120,7 @@ export function selectMiningTargets(
   const y0 = Math.floor(from.y) - span;
   const y1 = Math.floor(from.y) + span;
 
-  const candidates: { cell: MiningPosition; score: number; toPlayer: number }[] = [];
+  const candidates: { cell: MiningPosition; ahead: number; toCursor: number; toPlayer: number }[] = [];
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
       const tile = tileAt(grid, x, y);
@@ -133,17 +133,25 @@ export function selectMiningTargets(
       const side = Math.abs(relX * dirY - relY * dirX);
       if (ahead < MIN_AHEAD || ahead > aimEnd + 1 || side > SIDE_REACH) continue;
       if (!isExposed(grid, from, cell)) continue;
-      candidates.push({
-        cell,
-        score: Math.hypot(x + 0.5 - refX, y + 0.5 - refY) + DEPTH_WEIGHT * ahead,
-        toPlayer: Math.hypot(relX, relY),
-      });
+      candidates.push({ cell, ahead, toCursor: Math.hypot(x + 0.5 - refX, y + 0.5 - refY), toPlayer: Math.hypot(relX, relY) });
     }
   }
 
-  // Ties go to the upper then the left block, so a wall mines middle, top, bottom and a ceiling middle, left, right
-  candidates.sort((a, b) => a.score - b.score || a.toPlayer - b.toPlayer || a.cell.y - b.cell.y || a.cell.x - b.cell.x);
-  const chosen = candidates.slice(0, count).map((c) => c.cell);
+  // Breadth first: the blocks nearest the player go before any further out, so a far cursor widens the tunnel
+  // face by face instead of boring a one-block hole toward it. Within a layer the block nearest the cursor
+  // goes first; ties go to the upper then the left block, so a wall mines middle, top, bottom.
+  const byDepth = [...candidates].sort((a, b) => a.ahead - b.ahead);
+  const ordered: MiningPosition[] = [];
+  while (byDepth.length > 0 && ordered.length < count) {
+    const layerEnd = byDepth[0].ahead + LAYER_DEPTH;
+    const layer = byDepth.filter((c) => c.ahead <= layerEnd);
+    layer.sort((a, b) => a.toCursor - b.toCursor || a.toPlayer - b.toPlayer || a.cell.y - b.cell.y || a.cell.x - b.cell.x);
+    for (const c of layer) {
+      ordered.push(c.cell);
+      byDepth.splice(byDepth.indexOf(c), 1);
+    }
+  }
+  const chosen = ordered.slice(0, count);
   const keep = options.keep;
   if (keep) {
     const at = chosen.findIndex((c) => c.x === keep.x && c.y === keep.y);
