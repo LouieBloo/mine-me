@@ -20,7 +20,7 @@ describe('mob death state', () => {
   const spawn = (extra: any = {}) => {
     // Clear a platform so the mob stands on dirt at row 21
     for (let x = 18; x <= 27; x++) {
-      for (let y = 18; y <= 20; y++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+      for (let y = 14; y <= 20; y++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
       engine.grid[21][x] = { type: MiningTileType.DIRT, revealed: true };
     }
     // Mobs are only sent to players near them

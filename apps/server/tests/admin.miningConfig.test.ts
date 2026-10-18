@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { adminRouter } from '../src/routes/admin';
-import { DEFAULT_MINING_MAP_CONFIG } from '@mine-me/shared';
+import { DEFAULT_MINING_MAP_CONFIG, MINING_CONFIG } from '@mine-me/shared';
 
 export const mockSyncJson = vi.fn();
 vi.mock('../src/services/admin.service', () => ({
@@ -193,8 +193,8 @@ describe('Admin Mining Config API Routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.seed).toBe(12345);
     expect(res.body.tiles).toBeDefined();
-    expect(res.body.tiles.length).toBe(45);
-    expect(res.body.tiles[0].length).toBe(45);
+    expect(res.body.tiles.length).toBe(MINING_CONFIG.GRID_HEIGHT);
+    expect(res.body.tiles[0].length).toBe(MINING_CONFIG.GRID_WIDTH);
     expect(res.body.stats).toBeDefined();
     expect(res.body.stats.voidPercentage).toBeGreaterThanOrEqual(0);
     expect(res.body.stats.solidPercentage).toBeGreaterThan(0);

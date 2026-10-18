@@ -10,8 +10,8 @@
     "aiType": "CHASE_AND_MINE",
     "aiConfig": null,
     "abilities": null,
-    "moveSpeed": 3,
-    "jumpForce": 6.5,
+    "moveSpeed": 9,
+    "jumpForce": 19.5,
     "hitStunMs": 250,
     "stunImmunityMs": 500,
     "animations": {
@@ -150,8 +150,8 @@
     "aiType": "CHASE_AND_MINE",
     "aiConfig": null,
     "abilities": null,
-    "moveSpeed": 3,
-    "jumpForce": 6.5,
+    "moveSpeed": 9,
+    "jumpForce": 19.5,
     "hitStunMs": 250,
     "stunImmunityMs": 500,
     "animations": {
@@ -397,9 +397,9 @@
     "aiType": "STATIONARY",
     "aiConfig": {
       "spriteUrl": "/assets/sprites/mobs/target_dummy.png",
-      "colliderWidth": 0.8,
+      "colliderWidth": 2.4,
       "showHealthBar": false,
-      "colliderHeight": 1.25
+      "colliderHeight": 3.75
     },
     "abilities": [],
     "moveSpeed": 0,
@@ -425,15 +425,15 @@
     "defendPercentage": 20,
     "aiType": "CHASE_AND_MINE",
     "aiConfig": {
-      "mineRange": 1.1,
-      "aggroRange": 12,
-      "attackRange": 1.1,
+      "mineRange": 3.3,
+      "aggroRange": 36,
+      "attackRange": 3.3,
       "jumpCooldownMs": 600,
       "mineCooldownMs": 400
     },
     "abilities": [],
-    "moveSpeed": 1,
-    "jumpForce": 6.5,
+    "moveSpeed": 3,
+    "jumpForce": 19.5,
     "hitStunMs": 250,
     "stunImmunityMs": 500,
     "animations": {

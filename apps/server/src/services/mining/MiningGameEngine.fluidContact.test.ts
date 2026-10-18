@@ -31,6 +31,7 @@ describe('fluid contact effects in a mining room', () => {
     // Test fluids defined here so the tests do not depend on the dev data
     const data = engine.dataManager;
     data.getFluid('OIL')!.contact = null;
+    vi.spyOn(engine.fluidSubsystem, 'update').mockImplementation(() => {}); // the oil stays where the test puts it
     place(10.5);
     me().health = me().maxHealth;
   });
@@ -39,7 +40,8 @@ describe('fluid contact effects in a mining room', () => {
 
   const withContact = (contact: any) => { engine.dataManager.getFluid('OIL')!.contact = contact; };
 
-  const fillColumn = (x: number, rows: number[]) => { for (const y of rows) engine.fluidSubsystem.placeFluid(x, y, 'OIL', 1); };
+  // The player is 1.25 tiles wide, so it spans the column it stands in and a sliver of each neighbour: fill all three
+  const fillColumn = (x: number, rows: number[]) => { for (const cx of [x - 1, x, x + 1]) for (const y of rows) engine.fluidSubsystem.placeFluid(cx, y, 'OIL', 1); };
   const lostIn = (rows: number[]) => {
     withContact({ damagePerSecond: 20 });
     fillColumn(20, rows);
@@ -60,7 +62,7 @@ describe('fluid contact effects in a mining room', () => {
   it('hurts less when only wading than when fully under', () => {
     const wading = lostIn([20]);
     expect(wading).toBeGreaterThan(0);
-    engine.fluidSubsystem.grid.setCell(20, 20, 0, 0);
+    for (const cx of [19, 20, 21]) engine.fluidSubsystem.grid.setCell(cx, 20, 0, 0);
     expect(wading).toBeLessThan(lostIn([20, 19, 18, 17]) * 0.7);
   });
 

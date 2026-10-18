@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
+import { BLOCK_SCALE, MINING_CONFIG, MiningTileType } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 import { mobEffects } from './testHelpers';
 
@@ -24,7 +24,9 @@ describe('mob attack wind-up and mob collision', () => {
     me().playerBody.isGrounded = true;
   });
 
-  const biter = (gap = 0.9, extra: Record<string, unknown> = {}) =>
+  // The bodies just touch, so the soft collision does not shove the mob before it attacks
+  const TOUCHING = MINING_CONFIG.PLAYER_COLLIDER_WIDTH_TILES + 0.05;
+  const biter = (gap = TOUCHING, extra: Record<string, unknown> = {}) =>
     engine.spawnMob(
       { id: 'b', name: 'B', mobEffects: mobEffects({ weaponDamage: 10 }), ...extra },
       { x: 16.5 + gap, y: 21 }
@@ -47,12 +49,12 @@ describe('mob attack wind-up and mob collision', () => {
     });
 
     it('the wind-up length is configurable per mob, and 0 means instant', () => {
-      const slow = biter(0.9, { aiConfig: { attackWindupMs: 600 } });
+      const slow = biter(TOUCHING, { aiConfig: { attackWindupMs: 600 } });
       expect(slow.attackWindupSeconds).toBeCloseTo(0.6);
-      expect(biter(0.9).attackWindupSeconds).toBe(MINING_CONFIG.MOB_ATTACK_WINDUP_SECONDS);
+      expect(biter(TOUCHING).attackWindupSeconds).toBe(MINING_CONFIG.MOB_ATTACK_WINDUP_SECONDS);
       for (const m of Array.from(engine.activeMobs.values())) engine.activeMobs.delete(m.id);
 
-      biter(0.9, { aiConfig: { attackWindupMs: 0 } });
+      biter(TOUCHING, { aiConfig: { attackWindupMs: 0 } });
       tick(1);
       expect(me().health).toBe(me().maxHealth - 10);
     });
@@ -61,17 +63,17 @@ describe('mob attack wind-up and mob collision', () => {
       const mob = biter();
       tick(2);
       expect(mob.attackWindupRemaining).toBeGreaterThan(0);
-      me().playerBody.position = { x: mob.mobBody.position.x - 4, y: me().playerBody.position.y };
+      me().playerBody.position = { x: mob.mobBody.position.x - 4 * BLOCK_SCALE, y: me().playerBody.position.y };
       tick(12);
       expect(me().health).toBe(me().maxHealth);
       expect(mob.attackWindupRemaining).toBe(0);
     });
 
     it('a solid wall raised during the wind-up blocks the hit', () => {
-      const mob = biter(1.9, { aiConfig: { attackRange: 3 } });
+      const mob = biter(3.5, { aiConfig: { attackRange: 5 } });
       tick(2);
       expect(mob.attackWindupRemaining).toBeGreaterThan(0);
-      for (let y = 17; y <= 20; y++) engine.grid[y][17] = { type: MiningTileType.ROCK, revealed: true };
+      for (let y = 17; y <= 20; y++) engine.grid[y][18] = { type: MiningTileType.ROCK, revealed: true };
       tick(12);
       expect(me().health).toBe(me().maxHealth);
     });
@@ -88,7 +90,7 @@ describe('mob attack wind-up and mob collision', () => {
     });
 
     it('does not slow a fast swinger: the telegraph is shorter than one swing', () => {
-      const mob = biter(0.9, { mobEffects: mobEffects({ weaponDamage: 0, miningSpeed: 50 }) }); // 4 swings/s; no damage so the player isn't knocked out of reach
+      const mob = biter(TOUCHING, { mobEffects: mobEffects({ weaponDamage: 0, miningSpeed: 50 }) }); // 4 swings/s; no damage so the player isn't knocked out of reach
       let swings = 0;
       for (let i = 0; i < 90; i++) { tick(1); if (mob.swungThisTick) swings++; }
       expect(swings).toBe(12);

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MiningTileType, DEFAULT_PARTICLE_EFFECTS, FireField, type MiningStateTickPayload } from '@mine-me/shared';
+import { miningProfiler } from '../utils/MiningProfiler';
+import { MiningTileType, DEFAULT_PARTICLE_EFFECTS, FireField, getTileFootprint, pieceCells, pieceCentreCell, type MiningStateTickPayload } from '@mine-me/shared';
 import {
   applyEffects,
   applyEntities,
@@ -346,6 +347,23 @@ describe('applyTileUpdates', () => {
     expect(emitter.destroy).toHaveBeenCalled();
   });
 
+  it('a torch piece lights the cavern once, from its middle cell, and goes out when the piece is cleared', () => {
+    const world = makeWorld();
+    const ctx = makeCtx(world);
+    const { width, height } = getTileFootprint(MiningTileType.TORCH);
+    // The client keeps its own grid; the piece's cells arrive as separate tile updates
+    const cells = pieceCells({ x: 2, y: 2 }, { width, height });
+    applyTileUpdates(payload({ revealedTiles: cells.map((c) => reveal({ x: c.x, y: c.y, type: MiningTileType.TORCH, piece: c.offset })) }), ctx);
+    const lights = world.lightingEngineRef.current.lights;
+    const centre = pieceCentreCell({ x: 2, y: 2 }, { width, height });
+    expect([...lights.keys()].filter((k: string) => k.startsWith('torch_'))).toEqual([`torch_${centre.x}_${centre.y}`]);
+    expect(world.torchEmittersRef.current.size).toBe(1);
+
+    applyTileUpdates(payload({ revealedTiles: cells.map((c) => reveal({ x: c.x, y: c.y, type: MiningTileType.EMPTY })) }), ctx);
+    expect([...lights.keys()].filter((k: string) => k.startsWith('torch_'))).toEqual([]);
+    expect(world.torchEmittersRef.current.size).toBe(0);
+  });
+
   it('starts an ambient emitter for blocks with a particle config, and stops it when they go', () => {
     const world = makeWorld();
     world.blockParticleConfigsRef.current.set(MiningTileType.MINERAL, { sparkle: true });
@@ -397,6 +415,26 @@ describe('handleStateTick', () => {
     expect(order).toEqual(['explosion', 'tiles']);
     // the blast also kept the broken block from getting its own crumble
     expect(world.particleEngineRef.current.spawnBurst).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleStateTick profiling', () => {
+  const perf = { windowTicks: 60, budgetMs: 33, tickMs: { avg: 5, p95: 6, max: 7 }, loadPercent: 15, loopGapMs: { avg: 33, max: 40 }, steps: [], droppedTicks: 0, counts: {}, payloadBytes: 1 };
+
+  it('times each tick, how far apart they arrive, and keeps the server\'s own summary', () => {
+    miningProfiler.setEnabled(true);
+    miningProfiler.reset();
+    try {
+      const ctx = makeCtx(makeWorld());
+      handleStateTick(payload(), ctx);
+      handleStateTick(payload({ perf }), ctx);
+      const stats = miningProfiler.getStats();
+      expect(stats.events.find((e) => e.name === 'Server Tick Handling')?.count).toBe(2);
+      expect(stats.events.find((e) => e.name === 'Server Tick Interval')?.count).toBeGreaterThanOrEqual(1);
+      expect(stats.server).toEqual(perf);
+    } finally {
+      miningProfiler.setEnabled(false);
+    }
   });
 });
 

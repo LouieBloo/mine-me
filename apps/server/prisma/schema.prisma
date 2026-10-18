@@ -173,8 +173,8 @@ model Mob {
   aiType           String     @default("CHASE_AND_MINE")
   aiConfig         Json?
   abilities        Json?
-  moveSpeed        Float      @default(3.0)
-  jumpForce        Float      @default(6.5)
+  moveSpeed        Float      @default(9.0)
+  jumpForce        Float      @default(19.5)
   hitStunMs        Int        @default(250)
   stunImmunityMs   Int        @default(500)
   animations       Json?
@@ -332,57 +332,65 @@ model Gas {
 model MiningMapConfig {
   id                String   @id @default(cuid())
   name              String   @default("Default")
-  gridWidth         Int      @default(45)
-  gridHeight        Int      @default(45)
+  gridWidth         Int      @default(135)
+  gridHeight        Int      @default(135)
   cavernDensity     Int      @default(42)
   cavernIterations  Int      @default(3)
-  cavernMinDepth    Int      @default(4)
+  cavernMinDepth    Int      @default(12)
   tunnelCount       Int      @default(5)
-  tunnelMinLength   Int      @default(15)
-  tunnelMaxLength   Int      @default(30)
-  tunnelWidth       Int      @default(1)
-  tunnelMinDepth    Int      @default(2)
+  tunnelMinLength   Int      @default(45)
+  tunnelMaxLength   Int      @default(90)
+  tunnelWidth       Int      @default(3)
+  tunnelMinDepth    Int      @default(6)
   rockPercentage      Int      @default(12)
   mineralPercentage   Int      @default(10)
   chestCount          Int      @default(4)
   copperiumPercentage Int      @default(4)
   silveriumPercentage Int      @default(2)
-  silveriumMinDepth   Int      @default(12)
+  silveriumMinDepth   Int      @default(36)
   oreClusterChance    Int      @default(65)
   // Physics & RigidBody Settings
   gravityEnabled      Boolean  @default(true)
-  gravity             Float    @default(28.0)
+  gravity             Float    @default(84.0)
   dynamiteBounciness  Float    @default(0.45)
   dynamiteFriction    Float    @default(0.4)
-  dynamiteThrowPower  Float    @default(14.0)
+  dynamiteThrowPower  Float    @default(42.0)
   dynamiteFuseSeconds Float    @default(4.0)
   rockGravityScale    Float    @default(1.2)
   rockRestitution     Float    @default(0.1)
   // Fall damage (players): (impactSpeed - minSpeed) * perSpeed, capped at max (0 = no cap)
-  fallDamageMinSpeed  Float    @default(11)
-  fallDamagePerSpeed  Float    @default(6)
+  fallDamageMinSpeed  Float    @default(33)
+  fallDamagePerSpeed  Float    @default(2)
   fallDamageMax       Float    @default(80)
   // Falling rock damage (players): (rockSpeed - minSpeed) * perSpeed, capped at max (0 = no cap)
-  rockDamageMinSpeed  Float    @default(6)
-  rockDamagePerSpeed  Float    @default(5)
+  rockDamageMinSpeed  Float    @default(18)
+  rockDamagePerSpeed  Float    @default(1.666667)
   rockDamageMax       Float    @default(80)
   // Fire (players and mobs): burning does burnDamagePerSecond for burnSeconds after the last touch of fire;
-  // standing within heatRadius tiles of a fire hurts by heatDamagePerSecond x the fire's heat, fading with distance
+  // standing within heatRadius tiles (blocks are half the size they once were) of a fire hurts by heatDamagePerSecond x the fire's heat, fading with distance
   burnDamagePerSecond Float    @default(6)
   burnSeconds         Float    @default(5)
-  heatRadius          Float    @default(2.5)
+  heatRadius          Float    @default(7.5)
   heatDamagePerSecond Float    @default(1.5)
   // ParticleEffect drawn on a burning player or mob (null = none)
   burningEffectId     String?
   // Hostile NPC / Mob Spawning Settings
   mobSpawnCount       Int      @default(3)
-  mobSpawnMinDepth    Int      @default(5)
+  mobSpawnMinDepth    Int      @default(15)
   allowedMobIds       Json?
   // Mob that stands on the surface as a target dummy; null means none
   surfaceDummyMobId   String?  @default("mob_target_dummy")
   isActive            Boolean  @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+}
+
+/// A ledger of one-off data migrations that have been applied (see prisma/migrate-half-size-blocks.ts), so a script
+/// can refuse to run twice. Not game data.
+model DataMigration {
+  key       String   @id
+  appliedAt DateTime @default(now())
+  summary   String?
 }
 
 model ParticleEffect {

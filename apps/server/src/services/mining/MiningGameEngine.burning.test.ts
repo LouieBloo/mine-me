@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MiningTileType, type MiningStateTickPayload } from '@mine-me/shared';
+import { MINING_CONFIG, MiningTileType, type MiningStateTickPayload } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 import { BURN_TICK_SECONDS } from './subsystems/MiningBurningSubsystem';
 
 const OIL = { ignitionChance: 1, spreadChance: 0, burnDuration: 400, heat: 3, burnsInto: null }; // burns for ages, never spreads
+/** The player is wider than the 0.625 tiles these distances were worked out for, so it stands this much farther off to keep the same gap from the flames. */
+const WIDER = MINING_CONFIG.PLAYER_COLLIDER_WIDTH_TILES / 2 - 0.3125;
+
 const RULE = { burnDamagePerSecond: 6, burnSeconds: 5, heatRadius: 2.5, heatDamagePerSecond: 1.5 };
 
 describe('burning and heat in a mining room', () => {
@@ -141,7 +144,7 @@ describe('burning and heat in a mining room', () => {
 
   describe('heat', () => {
     it('hurts near a fire without setting a body alight', () => {
-      place(23.5); // 1.2 tiles from the flames' edge: 4.5 x (1 - 1.2/2.5) = about 2.3 a second
+      place(23.5 + WIDER); // 1.2 tiles from the flames' edge: 4.5 x (1 - 1.2/2.5) = about 2.3 a second
       seconds(2);
       expect(me().burning).toBeFalsy();
       expect(me().maxHealth - me().health).toBeGreaterThanOrEqual(3);
@@ -149,14 +152,14 @@ describe('burning and heat in a mining room', () => {
     });
 
     it('hurts less the farther away it is', () => {
-      place(24.3); // 2 tiles from the edge: 4.5 x (1 - 2/2.5) = about 0.9 a second
+      place(24.3 + WIDER); // 2 tiles from the edge: 4.5 x (1 - 2/2.5) = about 0.9 a second
       seconds(2);
       expect(me().maxHealth - me().health).toBeGreaterThanOrEqual(1);
       expect(me().maxHealth - me().health).toBeLessThanOrEqual(2);
     });
 
     it('does nothing beyond the heat radius', () => {
-      place(22.5 + 3.5);
+      place(22.5 + 3.5 + WIDER);
       seconds(2);
       expect(me().health).toBe(me().maxHealth);
     });

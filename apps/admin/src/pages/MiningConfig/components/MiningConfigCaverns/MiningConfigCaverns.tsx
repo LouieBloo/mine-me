@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import type { MiningConfigFieldProps } from '../MiningConfigTypes';
 import './MiningConfigCaverns.css';
 
@@ -64,7 +65,7 @@ export default function MiningConfigCaverns({ config, onFieldChange }: MiningCon
               id="cavernMinDepth"
               type="number"
               min="1"
-              max="15"
+              max={15 * BLOCK_SCALE}
               value={config.cavernMinDepth}
               onChange={e => onFieldChange('cavernMinDepth', Number(e.target.value))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
@@ -113,7 +114,7 @@ export default function MiningConfigCaverns({ config, onFieldChange }: MiningCon
               id="tunnelMinLength"
               type="number"
               min="5"
-              max="60"
+              max={60 * BLOCK_SCALE}
               value={config.tunnelMinLength}
               onChange={e => onFieldChange('tunnelMinLength', Number(e.target.value))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
@@ -128,7 +129,7 @@ export default function MiningConfigCaverns({ config, onFieldChange }: MiningCon
               id="tunnelMaxLength"
               type="number"
               min="10"
-              max="100"
+              max={100 * BLOCK_SCALE}
               value={config.tunnelMaxLength}
               onChange={e => onFieldChange('tunnelMaxLength', Number(e.target.value))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
@@ -148,8 +149,11 @@ export default function MiningConfigCaverns({ config, onFieldChange }: MiningCon
               onChange={e => onFieldChange('tunnelWidth', Number(e.target.value))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none bg-white cursor-pointer"
             >
-              <option value={1}>1 Tile (Narrow Shaft)</option>
-              <option value={2}>2 Tiles (Wide Shaft)</option>
+              {Array.from({ length: 2 * BLOCK_SCALE }, (_, i) => i + 1).map((width) => (
+                <option key={width} value={width}>
+                  {width} {width === 1 ? 'Tile' : 'Tiles'}{width < BLOCK_SCALE ? ' (too narrow to walk through)' : width === BLOCK_SCALE ? ' (fits the character)' : ''}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -161,7 +165,7 @@ export default function MiningConfigCaverns({ config, onFieldChange }: MiningCon
               id="tunnelMinDepth"
               type="number"
               min="1"
-              max="10"
+              max={10 * BLOCK_SCALE}
               value={config.tunnelMinDepth}
               onChange={e => onFieldChange('tunnelMinDepth', Number(e.target.value))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"

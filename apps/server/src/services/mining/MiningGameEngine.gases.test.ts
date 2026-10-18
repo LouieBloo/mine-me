@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { MiningTileType, MINING_CONFIG } from '@mine-me/shared';
+import { BLOCK_SCALE, MiningTileType, MINING_CONFIG } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 
 describe('gases in a mining room', () => {
@@ -26,7 +26,8 @@ describe('gases in a mining room', () => {
     for (let y = 18; y <= 24; y++) {
       for (let x = 8; x <= 16; x++) {
         const open = x >= 10 && x <= 14 && y >= 20 && y <= 22;
-        setTile(x, y, open ? MiningTileType.EMPTY : MiningTileType.DIRT);
+        // (through changeTile, so the gas grid hears about it, whatever the generated map had there)
+        changeTile(x, y, open ? MiningTileType.EMPTY : MiningTileType.DIRT);
       }
     }
     engine.players.get(cid)!.playerBody.position = { x: 5.5, y: 5.5 };
@@ -34,6 +35,9 @@ describe('gases in a mining room', () => {
     const grid = engine.gasSubsystem.grid;
     for (let y = 0; y < grid.height; y++) for (let x = 0; x < grid.width; x++) if (grid.getConcentration(x, y) > 0) grid.setCell(x, y, 0, 0);
     grid.drainChanges();
+    // ...and no generated fluid pockets (fluid wins a cell, so a pocket under the shaft would block the gas)
+    const fluids = engine.fluidSubsystem.grid;
+    for (let y = 0; y < fluids.height; y++) for (let x = 0; x < fluids.width; x++) fluids.setCell(x, y, 0, 0);
   });
 
   it('knows the gases from the definitions', () => {
@@ -78,6 +82,8 @@ describe('gases in a mining room', () => {
 
   it('breaking the roof of a pocket under an open shaft lets hydrogen escape and fade away', () => {
     // A shaft straight up to the surface, closed at the top by the surface dirt
+    // (with solid walls on both sides: the generated caves are finer now and could otherwise open into it)
+    for (let y = 0; y <= 19; y++) { setTile(11, y, MiningTileType.DIRT); setTile(13, y, MiningTileType.DIRT); }
     for (let y = 1; y <= 19; y++) setTile(12, y, MiningTileType.EMPTY);
     engine.gasSubsystem.placeGas(12, 22, 'HYDROGEN');
     engine.gasSubsystem.placeGas(11, 22, 'HYDROGEN');
@@ -133,8 +139,8 @@ describe('gases in a mining room', () => {
 
 describe('generated gas pockets in a mining room', () => {
   const big = () => new MiningGameEngine({
-    characterId: 'gen-gas-char', cityId: 'c', seed: 5,
-    mapConfig: { mobSpawnCount: 0, gridWidth: 80, gridHeight: 80 },
+    characterId: 'gen-gas-char', cityId: 'c', seed: 7, // (a seed whose map has gas pockets at this size: they are rare, and placement is random)
+    mapConfig: { mobSpawnCount: 0, gridWidth: 80 * BLOCK_SCALE, gridHeight: 80 * BLOCK_SCALE },
     socket: { connected: true, emit: () => {} } as any,
   });
 
@@ -151,8 +157,8 @@ describe('generated gas pockets in a mining room', () => {
     // Sealed and full: nothing escaped, nothing faded, and the pocket cells were never solid
     expect(grid.ventedVolume).toBe(0);
     expect(grid.totalVolume()).toBeGreaterThan(volume - 0.5);
-    for (let y = 0; y < 80; y++) {
-      for (let x = 0; x < 80; x++) {
+    for (let y = 0; y < 80 * BLOCK_SCALE; y++) {
+      for (let x = 0; x < 80 * BLOCK_SCALE; x++) {
         if (grid.getConcentration(x, y) > 0) expect(room.grid[y][x].type).toBe(MiningTileType.EMPTY);
       }
     }
@@ -160,8 +166,8 @@ describe('generated gas pockets in a mining room', () => {
 
   it('keeps gas and fluid pockets apart', () => {
     const room = big();
-    for (let y = 0; y < 80; y++) {
-      for (let x = 0; x < 80; x++) {
+    for (let y = 0; y < 80 * BLOCK_SCALE; y++) {
+      for (let x = 0; x < 80 * BLOCK_SCALE; x++) {
         expect(room.gasSubsystem.grid.getConcentration(x, y) > 0 && room.fluidSubsystem.grid.getLevel(x, y) > 0).toBe(false);
       }
     }
@@ -171,7 +177,7 @@ describe('generated gas pockets in a mining room', () => {
     const room = big();
     const grid = room.gasSubsystem.grid;
     // Make the pocket cells the only open floor candidates by filling in every other cave
-    for (let y = 0; y < 80; y++) for (let x = 0; x < 80; x++) if (grid.getConcentration(x, y) <= 0) room.grid[y][x] = { type: MiningTileType.DIRT, revealed: true };
+    for (let y = 0; y < 80 * BLOCK_SCALE; y++) for (let x = 0; x < 80 * BLOCK_SCALE; x++) if (grid.getConcentration(x, y) <= 0) room.grid[y][x] = { type: MiningTileType.DIRT, revealed: true };
     const pos = room.mobSubsystem.findValidCavernSpawnPosition(2);
     expect(grid.getConcentration(Math.floor(pos.x), Math.floor(pos.y) - 1)).toBe(0);
   });

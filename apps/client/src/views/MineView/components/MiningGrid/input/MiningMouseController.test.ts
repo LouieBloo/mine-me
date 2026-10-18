@@ -1,7 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MiningMouseController } from './MiningMouseController';
 import { TorchPlacementAction, LadderPlacementAction, BridgePlacementAction, DynamiteThrowAction, ThrowableItemAction, ShootWeaponAction } from './MouseAction';
-import { MiningTileType, MouseActionTriggerMode, type MiningClientTile } from '@mine-me/shared';
+import { MINING_QUEUE_LENGTH, MiningTileType, MouseActionTriggerMode, type MiningClientTile } from '@mine-me/shared';
+import { TILE_SIZE } from '../renderers/MiningTileRenderer';
+
+/** The pixel a little inside tile `tile` (the tests click and hover by tile). */
+const px = (tile: number) => tile * TILE_SIZE + 10;
 
 describe('MiningMouseController and MouseAction', () => {
   let controller: MiningMouseController;
@@ -9,8 +13,8 @@ describe('MiningMouseController and MouseAction', () => {
 
   beforeEach(() => {
     controller = new MiningMouseController();
-    mockGrid = Array.from({ length: 10 }, () =>
-      Array.from({ length: 10 }, () => ({
+    mockGrid = Array.from({ length: 20 }, () =>
+      Array.from({ length: 20 }, () => ({
         type: MiningTileType.EMPTY,
         revealed: true,
       }))
@@ -51,7 +55,7 @@ describe('MiningMouseController and MouseAction', () => {
       const action = new LadderPlacementAction(onPlace);
 
       // Out of reach
-      expect(action.canExecute({ x: 0, y: 0 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(false);
+      expect(action.canExecute({ x: 12, y: 12 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(false);
 
       // Already ladder
       mockGrid[5][5].type = MiningTileType.LADDER;
@@ -86,7 +90,8 @@ describe('MiningMouseController and MouseAction', () => {
       const action = new BridgePlacementAction(vi.fn());
       expect(action.triggerMode).toBe(MouseActionTriggerMode.HOLD);
       expect(action.name).toBe('place_bridge');
-      const style = action.getReticleStyle({ x: 6, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid);
+      // (two cells to the side: the player is 1.25 tiles wide, so the next cell over is partly inside them)
+      const style = action.getReticleStyle({ x: 7, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid);
       expect(style.isValid).toBe(true);
       expect(style.previewType).toBe('BRIDGE');
     });
@@ -94,20 +99,20 @@ describe('MiningMouseController and MouseAction', () => {
     it('only goes into empty space within reach', () => {
       const action = new BridgePlacementAction(vi.fn());
       const player = { x: 5.5, y: 5.5 };
-      mockGrid[5][6].type = MiningTileType.DIRT;
-      expect(action.canExecute({ x: 6, y: 5 }, player, mockGrid)).toBe(false);
-      mockGrid[5][6].type = MiningTileType.BRIDGE;
-      expect(action.canExecute({ x: 6, y: 5 }, player, mockGrid)).toBe(false);
-      mockGrid[5][6].type = MiningTileType.EMPTY;
-      expect(action.canExecute({ x: 6, y: 5 }, player, mockGrid)).toBe(true);
-      expect(action.canExecute({ x: 0, y: 0 }, player, mockGrid)).toBe(false);
+      mockGrid[5][7].type = MiningTileType.DIRT;
+      expect(action.canExecute({ x: 7, y: 5 }, player, mockGrid)).toBe(false);
+      mockGrid[5][7].type = MiningTileType.BRIDGE;
+      expect(action.canExecute({ x: 7, y: 5 }, player, mockGrid)).toBe(false);
+      mockGrid[5][7].type = MiningTileType.EMPTY;
+      expect(action.canExecute({ x: 7, y: 5 }, player, mockGrid)).toBe(true);
+      expect(action.canExecute({ x: 12, y: 12 }, player, mockGrid)).toBe(false);
     });
 
     it('cannot be placed into the player\'s own space', () => {
       const action = new BridgePlacementAction(vi.fn());
       expect(action.canExecute({ x: 5, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(false);
-      // Just below the feet is fine
-      expect(action.canExecute({ x: 5, y: 6 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(true);
+      // Just below the feet is fine (the player is 1.75 tiles tall, so the feet are in the second cell down)
+      expect(action.canExecute({ x: 5, y: 7 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(true);
     });
   });
 
@@ -139,15 +144,15 @@ describe('MiningMouseController and MouseAction', () => {
       expect(style.color).toBe(0x22c55e); // Green
     });
 
-    it('rejects placement if target is more than 1 tile away from player', () => {
+    it('rejects placement if the target is out of reach of the player', () => {
       const onPlace = vi.fn();
       const action = new TorchPlacementAction(onPlace);
 
-      // Target (8, 5) is 3 tiles away from player at (5.5, 5.5)
-      const canPlace = action.canExecute({ x: 8, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid);
+      // Target (12, 5) is 7 tiles away from player at (5.5, 5.5): past the 3.7 reach
+      const canPlace = action.canExecute({ x: 12, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid);
       expect(canPlace).toBe(false);
 
-      const style = action.getReticleStyle({ x: 8, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid);
+      const style = action.getReticleStyle({ x: 12, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid);
       expect(style.isValid).toBe(false);
       expect(style.showPreview).toBe(false);
       expect(style.color).toBe(0xef4444); // Red
@@ -191,10 +196,10 @@ describe('MiningMouseController and MouseAction', () => {
       expect(controller.isWithinReach({ x: 4, y: 5 })).toBe(true);
       expect(controller.isWithinReach({ x: 2, y: 3 })).toBe(true);
 
-      // Out of reach (2 tiles away)
-      expect(controller.isWithinReach({ x: 6, y: 4 })).toBe(false);
-      expect(controller.isWithinReach({ x: 3, y: 7 })).toBe(false);
-      expect(controller.isWithinReach({ x: 0, y: 2 })).toBe(false);
+      // Out of reach (the reach is 5.55 tiles from the player's centre)
+      expect(controller.isWithinReach({ x: 11, y: 4 })).toBe(false);
+      expect(controller.isWithinReach({ x: 3, y: 12 })).toBe(false);
+      expect(controller.isWithinReach({ x: 0, y: 14 })).toBe(false);
 
       // Player at far right edge of block (x = 3.8) can still reach block to the left (x = 2)
       controller.setPlayerPosition({ x: 3.8, y: 4.5 });
@@ -234,21 +239,21 @@ describe('MiningMouseController and MouseAction', () => {
       const miningSpy = vi.fn();
       controller.onMiningStateChange(miningSpy);
 
-      // Pointer down at tile (2, 2): 2 * 64 + 10 = 138
+      // Pointer down at tile (2, 2)
       window.dispatchEvent(
-        new PointerEvent('pointerdown', { button: 0, clientX: 138, clientY: 138 })
+        new PointerEvent('pointerdown', { button: 0, clientX: px(2), clientY: px(2) })
       );
 
       expect(controller.getIsMouseDown()).toBe(true);
-      expect(miningSpy).toHaveBeenCalledWith(true, { x: 2, y: 2 });
+      expect(miningSpy).toHaveBeenCalledWith(true, { x: 2, y: 2 }, false);
 
       // Pointer up -> stops mining
       window.dispatchEvent(
-        new PointerEvent('pointerup', { button: 0, clientX: 138, clientY: 138 })
+        new PointerEvent('pointerup', { button: 0, clientX: px(2), clientY: px(2) })
       );
 
       expect(controller.getIsMouseDown()).toBe(false);
-      expect(miningSpy).toHaveBeenCalledWith(false, null);
+      expect(miningSpy).toHaveBeenCalledWith(false, null, false);
 
       controller.detach();
     });
@@ -267,7 +272,7 @@ describe('MiningMouseController and MouseAction', () => {
         return { canvas, miningSpy };
       };
       const down = (el: Element) =>
-        el.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 138, clientY: 138, bubbles: true }));
+        el.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: px(2), clientY: px(2), bubbles: true }));
 
       it('ignores a pointerdown on the side panel (not the canvas)', () => {
         const { canvas, miningSpy } = setup();
@@ -284,7 +289,7 @@ describe('MiningMouseController and MouseAction', () => {
         const { canvas, miningSpy } = setup();
         down(canvas);
         expect(controller.getIsMouseDown()).toBe(true);
-        expect(miningSpy).toHaveBeenCalledWith(true, { x: 2, y: 2 });
+        expect(miningSpy).toHaveBeenCalledWith(true, { x: 2, y: 2 }, false);
         canvas.remove();
       });
 
@@ -293,7 +298,7 @@ describe('MiningMouseController and MouseAction', () => {
         down(canvas);
         window.dispatchEvent(new Event('pointercancel'));
         expect(controller.getIsMouseDown()).toBe(false);
-        expect(miningSpy).toHaveBeenLastCalledWith(false, null);
+        expect(miningSpy).toHaveBeenLastCalledWith(false, null, false);
         canvas.remove();
       });
 
@@ -302,7 +307,7 @@ describe('MiningMouseController and MouseAction', () => {
         down(canvas);
         window.dispatchEvent(new Event('dragstart'));
         expect(controller.getIsMouseDown()).toBe(false);
-        expect(miningSpy).toHaveBeenLastCalledWith(false, null);
+        expect(miningSpy).toHaveBeenLastCalledWith(false, null, false);
         canvas.remove();
       });
     });
@@ -310,8 +315,8 @@ describe('MiningMouseController and MouseAction', () => {
     it('returns appropriate reticle style for minable, out of reach, and rock tiles in mining mode', () => {
       // (6, 5) is DIRT and adjacent to player at (5.5, 5.5) -> valid in reach
       mockGrid[5][6] = { type: MiningTileType.DIRT, revealed: true };
-      // (9, 5) is DIRT and out of reach
-      mockGrid[5][9] = { type: MiningTileType.DIRT, revealed: true };
+      // (13, 5) is DIRT and out of reach
+      mockGrid[5][13] = { type: MiningTileType.DIRT, revealed: true };
       // (5, 5) is ROCK
       mockGrid[5][5] = { type: MiningTileType.ROCK, revealed: true };
 
@@ -332,23 +337,26 @@ describe('MiningMouseController and MouseAction', () => {
       } as any;
       controller.attach(mockCanvas);
       controller.setCamera(mockCamera);
+      // Below the blocks, so the line to each one runs through open air
+      controller.setPlayerPosition({ x: 5.5, y: 8.5 });
 
       // Hover over in-reach dirt tile (6 * 64 + 10 = 394, 5 * 64 + 10 = 330)
-      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 394, clientY: 330 }));
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: px(6), clientY: px(5) }));
       const reticleInReach = controller.getReticleState();
       expect(reticleInReach.active).toBe(true);
       expect(reticleInReach.style?.isValid).toBe(true);
       expect(reticleInReach.style?.color).toBe(0xeab308); // Gold/amber
 
-      // Hover over out-of-reach dirt tile (9 * 64 + 10 = 586, 5 * 64 + 10 = 330)
-      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 586, clientY: 330 }));
+      // Hover over out-of-reach dirt tile (more than the 5.55 reach away)
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: px(13), clientY: px(5) }));
       const reticleOutOfReach = controller.getReticleState();
       expect(reticleOutOfReach.active).toBe(true);
       expect(reticleOutOfReach.style?.isValid).toBe(false);
       expect(reticleOutOfReach.style?.color).toBe(0xef4444); // Red
 
-      // Hover over rock tile (5 * 64 + 10 = 330, 5 * 64 + 10 = 330)
-      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 330, clientY: 330 }));
+      // Hover over rock tile (5 * 64 + 10 = 330, 5 * 64 + 10 = 330), with nothing mineable beside it
+      mockGrid[5][6] = { type: MiningTileType.EMPTY, revealed: true };
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: px(5), clientY: px(5) }));
       const reticleRock = controller.getReticleState();
       expect(reticleRock.active).toBe(true);
       expect(reticleRock.style?.isValid).toBe(false);
@@ -380,18 +388,18 @@ describe('MiningMouseController and MouseAction', () => {
       const miningSpy = vi.fn();
       controller.onMiningStateChange(miningSpy);
 
-      // Mouse is at clientX: 138 (tile 2) and pressed down
+      // Mouse is at clientX: px(2) (tile 2) and pressed down
       window.dispatchEvent(
-        new PointerEvent('pointerdown', { button: 0, clientX: 138, clientY: 138 })
+        new PointerEvent('pointerdown', { button: 0, clientX: px(2), clientY: px(2) })
       );
-      expect(miningSpy).toHaveBeenCalledWith(true, { x: 2, y: 2 });
+      expect(miningSpy).toHaveBeenCalledWith(true, { x: 2, y: 2 }, false);
 
-      // Now camera scrolls right by 64px (1 tile), but NO pointer event is fired
-      cameraOffset = 64;
+      // Now camera scrolls right by one tile, but NO pointer event is fired
+      cameraOffset = TILE_SIZE;
       controller.update();
 
       // Should automatically re-target to tile 3 without moving mouse!
-      expect(miningSpy).toHaveBeenCalledWith(true, { x: 3, y: 2 });
+      expect(miningSpy).toHaveBeenCalledWith(true, { x: 3, y: 2 }, false);
       expect(controller.getHoveredTile()).toEqual({ x: 3, y: 2 });
 
       controller.detach();
@@ -437,9 +445,9 @@ describe('MiningMouseController and MouseAction', () => {
       const torchAction = new TorchPlacementAction(onPlace);
       controller.setActiveAction(torchAction);
 
-      // Mouse down on tile (5, 5) -> clientX: 5 * 64 + 10 = 330, clientY: 330
+      // Mouse down on tile (5, 5) -> clientX: 5 * 64 + 10 = 330, clientY: px(5)
       window.dispatchEvent(
-        new PointerEvent('pointerdown', { button: 0, clientX: 330, clientY: 330 })
+        new PointerEvent('pointerdown', { button: 0, clientX: px(5), clientY: px(5) })
       );
       await flushPromises();
 
@@ -447,7 +455,7 @@ describe('MiningMouseController and MouseAction', () => {
       expect(onPlace).toHaveBeenCalledWith({ x: 5, y: 5 });
 
       // Pointer moves to tile (6, 5) while holding mouse button down -> clientX: 6 * 64 + 10 = 394
-      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 394, clientY: 330 }));
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: px(6), clientY: px(5) }));
       controller.update();
       await flushPromises();
 
@@ -455,8 +463,8 @@ describe('MiningMouseController and MouseAction', () => {
       expect(onPlace).toHaveBeenCalledTimes(1);
 
       // Releasing and clicking on (6, 5) triggers second torch
-      window.dispatchEvent(new PointerEvent('pointerup', { button: 0, clientX: 394, clientY: 330 }));
-      window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 394, clientY: 330 }));
+      window.dispatchEvent(new PointerEvent('pointerup', { button: 0, clientX: px(6), clientY: px(5) }));
+      window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: px(6), clientY: px(5) }));
       await flushPromises();
 
       expect(onPlace).toHaveBeenCalledTimes(2);
@@ -476,7 +484,7 @@ describe('MiningMouseController and MouseAction', () => {
 
       // Mouse down on tile (5, 5)
       window.dispatchEvent(
-        new PointerEvent('pointerdown', { button: 0, clientX: 330, clientY: 330 })
+        new PointerEvent('pointerdown', { button: 0, clientX: px(5), clientY: px(5) })
       );
       await flushPromises();
 
@@ -490,7 +498,7 @@ describe('MiningMouseController and MouseAction', () => {
 
       // Player moves down 1 block and pointer moves down to tile (5, 6) -> clientY: 6 * 64 + 10 = 394
       controller.setPlayerPosition({ x: 5.5, y: 6.5 });
-      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 330, clientY: 394 }));
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: px(5), clientY: px(6) }));
       controller.update();
       await flushPromises();
 
@@ -500,7 +508,7 @@ describe('MiningMouseController and MouseAction', () => {
 
       // Player moves down to tile (5, 7)
       controller.setPlayerPosition({ x: 5.5, y: 7.5 });
-      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 330, clientY: 458 }));
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: px(5), clientY: px(7) }));
       controller.update();
       await flushPromises();
 
@@ -508,9 +516,9 @@ describe('MiningMouseController and MouseAction', () => {
       expect(onPlace).toHaveBeenLastCalledWith({ x: 5, y: 7 });
 
       // Releasing pointer stops hold placement
-      window.dispatchEvent(new PointerEvent('pointerup', { button: 0, clientX: 330, clientY: 458 }));
+      window.dispatchEvent(new PointerEvent('pointerup', { button: 0, clientX: px(5), clientY: px(7) }));
       controller.setPlayerPosition({ x: 5.5, y: 8.5 });
-      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 330, clientY: 522 }));
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: px(5), clientY: px(8) }));
       controller.update();
       await flushPromises();
 
@@ -526,11 +534,14 @@ describe('MiningMouseController and MouseAction', () => {
       });
       const ladderAction = new LadderPlacementAction(onPlace);
       controller.setActiveAction(ladderAction);
+      // A ladder is a whole block tall, so it needs room around the cursor: use a taller map
+      mockGrid = Array.from({ length: 20 }, () => Array.from({ length: 10 }, () => ({ type: MiningTileType.EMPTY, revealed: true })));
+      controller.setGrid(mockGrid);
 
-      // Player at (5.5, 3.5), clicks and holds at tile (5, 6) -> dy = Math.abs(6.5 - 3.5) = 3.0 > 1.85 (out of reach)
-      controller.setPlayerPosition({ x: 5.5, y: 3.5 });
+      // Player at (5.5, 1.5), clicks and holds at tile (5, 12) -> the ladder's middle is at 12.5, dy = 11.0 > 5.55 (out of reach)
+      controller.setPlayerPosition({ x: 5.5, y: 1.5 });
       window.dispatchEvent(
-        new PointerEvent('pointerdown', { button: 0, clientX: 330, clientY: 394 })
+        new PointerEvent('pointerdown', { button: 0, clientX: px(5), clientY: px(12) })
       );
       await flushPromises();
 
@@ -538,20 +549,20 @@ describe('MiningMouseController and MouseAction', () => {
       expect(onPlace).not.toHaveBeenCalled();
       expect(controller.getIsMouseDown()).toBe(true);
 
-      // Player starts climbing down to (5.5, 4.5) -> dy = 2.0 > 1.85
-      controller.setPlayerPosition({ x: 5.5, y: 4.5 });
+      // Player starts climbing down to (5.5, 6.5) -> dy = 6.0 > 5.55
+      controller.setPlayerPosition({ x: 5.5, y: 6.5 });
       controller.update();
       await flushPromises();
       expect(onPlace).not.toHaveBeenCalled();
 
-      // Player moves closer to (5.5, 5.0) -> dy = 1.5 <= 1.85 (in reach!)
-      controller.setPlayerPosition({ x: 5.5, y: 5.0 });
+      // Player moves closer to (5.5, 8.0) -> dy = 4.5 <= 5.55 (in reach!)
+      controller.setPlayerPosition({ x: 5.5, y: 8.0 });
       controller.update();
       await flushPromises();
 
       // Automatically executes as soon as it becomes available!
       expect(onPlace).toHaveBeenCalledTimes(1);
-      expect(onPlace).toHaveBeenCalledWith({ x: 5, y: 6 });
+      expect(onPlace).toHaveBeenCalledWith({ x: 5, y: 12 });
 
       controller.detach();
     });
@@ -562,7 +573,7 @@ describe('MiningMouseController and MouseAction', () => {
       controller.setActiveAction(ladderAction);
 
       window.dispatchEvent(
-        new PointerEvent('pointerdown', { button: 0, clientX: 330, clientY: 330 })
+        new PointerEvent('pointerdown', { button: 0, clientX: px(5), clientY: px(5) })
       );
       expect(controller.getIsMouseDown()).toBe(true);
 
@@ -581,7 +592,7 @@ describe('MiningMouseController and MouseAction', () => {
       controller.setActiveAction(ladderAction1);
 
       window.dispatchEvent(
-        new PointerEvent('pointerdown', { button: 0, clientX: 330, clientY: 330 })
+        new PointerEvent('pointerdown', { button: 0, clientX: px(5), clientY: px(5) })
       );
       expect(controller.getIsMouseDown()).toBe(true);
 
@@ -654,15 +665,15 @@ describe('MiningMouseController and MouseAction', () => {
       } as any;
       controller.setCamera(mockCamera);
 
-      // Move mouse to (clientX: 200, clientY: 150) -> world: (300, 200) -> continuous tiles: (300/64, 200/64) = (4.6875, 3.125)
+      // Move mouse to (clientX: 200, clientY: 150) -> world: (300, 200) -> continuous tiles: (300/TILE_SIZE, 200/TILE_SIZE)
       window.dispatchEvent(new PointerEvent('pointermove', { clientX: 200, clientY: 150 }));
       controller.update();
 
       const reticle = controller.getReticleState();
       expect(reticle.active).toBe(true);
       expect(reticle.style?.isFreeAim).toBe(true);
-      expect(reticle.target?.x).toBeCloseTo(4.6875);
-      expect(reticle.target?.y).toBeCloseTo(3.125);
+      expect(reticle.target?.x).toBeCloseTo(300 / TILE_SIZE);
+      expect(reticle.target?.y).toBeCloseTo(200 / TILE_SIZE);
 
       // Click and release to throw
       window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 200, clientY: 150 }));
@@ -671,8 +682,8 @@ describe('MiningMouseController and MouseAction', () => {
 
       expect(onThrow).toHaveBeenCalledTimes(1);
       const thrownTarget = onThrow.mock.calls[0][0];
-      expect(thrownTarget.x).toBeCloseTo(4.6875);
-      expect(thrownTarget.y).toBeCloseTo(3.125);
+      expect(thrownTarget.x).toBeCloseTo(300 / TILE_SIZE);
+      expect(thrownTarget.y).toBeCloseTo(200 / TILE_SIZE);
 
       controller.detach();
     });
@@ -930,3 +941,81 @@ describe('MiningMouseController and MouseAction', () => {
   });
 });
 
+
+describe('MiningMouseController pickaxe auto-target and Ctrl', () => {
+  let controller: MiningMouseController;
+  let grid: MiningClientTile[][];
+  const canvas = () => {
+    const c = document.createElement('canvas');
+    c.getBoundingClientRect = () => ({ left: 0, top: 0, width: 2000, height: 2000, right: 2000, bottom: 2000, x: 0, y: 0, toJSON: () => {} });
+    return c;
+  };
+
+  beforeEach(() => {
+    controller = new MiningMouseController();
+    // Rows 9-11 are a wall of dirt left of the player, who stands at (20.5, 10.5)
+    grid = Array.from({ length: 30 }, (_, y) => Array.from({ length: 30 }, (_, x) => ({ type: y >= 9 && y <= 11 && x < 20 ? MiningTileType.DIRT : MiningTileType.EMPTY, revealed: true })));
+    controller.setGrid(grid);
+    controller.setPlayerPosition({ x: 20.5, y: 10.5 });
+    controller.attach(canvas());
+    controller.setCamera({ screenToWorld: (pos: { x: number; y: number }) => ({ x: pos.x, y: pos.y }) } as any);
+  });
+  afterEach(() => controller.destroy());
+
+  it('lines up the face of the wall in front, the block nearest the cursor first, and shows it in the reticle', () => {
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: px(14), clientY: px(10) }));
+    const queue = controller.miningQueue({ x: 14, y: 10 });
+    expect(queue).toHaveLength(MINING_QUEUE_LENGTH);
+    expect(queue[0]).toEqual({ x: 19, y: 10 });
+    expect(queue.every((c) => c.x === 19)).toBe(true);
+    expect(controller.miningQueue({ x: 19, y: 9 })[0]).toEqual({ x: 19, y: 9 });
+    expect(controller.miningQueue({ x: 19, y: 11 })[0]).toEqual({ x: 19, y: 11 });
+    const reticle = controller.getReticleState();
+    expect(reticle.style?.miningQueue).toEqual(controller.miningQueue({ x: 14, y: 10 }));
+    expect(reticle.style?.isValid).toBe(true);
+  });
+
+  it('sends the cursor cell, not the block, so the server can apply the same rule', () => {
+    const spy = vi.fn();
+    controller.onMiningStateChange(spy);
+    window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: px(14), clientY: px(10) }));
+    expect(spy).toHaveBeenCalledWith(true, { x: 14, y: 10 }, false);
+  });
+
+  it('Ctrl narrows the queue to the block under the cursor and tells the server, even while the button is held', () => {
+    const spy = vi.fn();
+    controller.onMiningStateChange(spy);
+    window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: px(17), clientY: px(10) }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control' }));
+    expect(controller.isPreciseMining()).toBe(true);
+    expect(spy).toHaveBeenLastCalledWith(true, { x: 17, y: 10 }, true);
+    expect(controller.miningQueue({ x: 17, y: 10 })).toEqual([{ x: 17, y: 10 }]);
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control' }));
+    expect(spy).toHaveBeenLastCalledWith(true, { x: 17, y: 10 }, false);
+    expect(controller.miningQueue({ x: 17, y: 10 }).length).toBeGreaterThan(1);
+  });
+
+  it('a click made with Ctrl already down is precise, and losing focus lets go of Ctrl', () => {
+    const spy = vi.fn();
+    controller.onMiningStateChange(spy);
+    window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: px(17), clientY: px(10), ctrlKey: true }));
+    expect(spy).toHaveBeenCalledWith(true, { x: 17, y: 10 }, true);
+    window.dispatchEvent(new Event('blur'));
+    expect(controller.isPreciseMining()).toBe(false);
+  });
+
+  it('pressing Ctrl with the button up changes nothing to send', () => {
+    const spy = vi.fn();
+    controller.onMiningStateChange(spy);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control' }));
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('shows no queue and the blocked colour for a block with nothing minable in the way within reach', () => {
+    controller.setPlayerPosition({ x: 40.5, y: 10.5 });
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: px(5), clientY: px(10) }));
+    const reticle = controller.getReticleState();
+    expect(reticle.style?.miningQueue).toBeUndefined();
+    expect(reticle.style?.isValid).toBe(false);
+  });
+});

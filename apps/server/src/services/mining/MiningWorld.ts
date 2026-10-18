@@ -21,6 +21,8 @@ export interface PendingTileUpdate {
   y: number;
   type: MiningTileType;
   damageStage?: number;
+  /** Set when the cell is part of a multi-cell piece: [column, row] inside it. */
+  piece?: [ox: number, oy: number];
 }
 
 /**

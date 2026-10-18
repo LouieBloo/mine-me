@@ -1,4 +1,4 @@
-import { MiningTileType } from '@mine-me/shared';
+import { BLOCK_SCALE, MiningTileType } from '@mine-me/shared';
 
 /** An inclusive rectangle of tiles. */
 export interface TileRect {
@@ -17,8 +17,8 @@ export type SandboxZone =
   | { kind: 'fill'; tile: MiningTileType; rect: TileRect }
   /** Paints single tiles. */
   | { kind: 'tiles'; tile: MiningTileType; at: ReadonlyArray<{ x: number; y: number }> }
-  /** One tile of each type, left to right, `spacing` apart. */
-  | { kind: 'blockRow'; y: number; startX: number; spacing: number; tiles: readonly MiningTileType[] }
+  /** One tile of each type, left to right, `spacing` apart. Each is `size` x `size` cells (default 1). */
+  | { kind: 'blockRow'; y: number; startX: number; spacing: number; tiles: readonly MiningTileType[]; size?: number }
   /** Carves the rectangle open and fills it with the fluid whose typeKey is `fluid`; a fluid that is not loaded leaves the pool dry. */
   | { kind: 'pool'; rect: TileRect; fluid: string; fillFromY?: number }
   /** Carves the rectangle open and fills it with `concentration` (default 1) of the gas in `gasSlot` (the loaded gases in key order); a slot with no gas stays empty. Leave solid ground around it and it is a sealed pocket. */
@@ -48,14 +48,57 @@ export interface SandboxLayout {
   mobs: readonly SandboxMobSpawn[];
 }
 
-/** Open sky above the sandbox's ground: room to pour fluid and watch it fall. */
-export const SANDBOX_SKY_ROWS = 12;
+/** Open sky above the sandbox's ground, in old-size blocks: room to pour fluid and watch it fall. */
+export const SANDBOX_SKY_ROWS_OLD = 12;
+
+/** How many blocks make up one original block along each side. */
+export const SANDBOX_BLOCK_SCALE = BLOCK_SCALE;
+
+/** Open sky above the sandbox's ground, in blocks. */
+export const SANDBOX_SKY_ROWS = SANDBOX_SKY_ROWS_OLD * SANDBOX_BLOCK_SCALE;
+
+/**
+ * Redraws a layout written in old-size blocks with every block `factor` times smaller (so `factor` x `factor` small
+ * blocks per old block). The layout stays the same size in the world: rectangles, single blocks and the gallery are all
+ * enlarged, and mobs keep their place. This lets the layout below stay readable in the coordinates it was drawn in.
+ */
+export function scaleSandboxLayout(layout: SandboxLayout, factor: number): SandboxLayout {
+  const cell = (x: number, y: number) => {
+    const out: Array<{ x: number; y: number }> = [];
+    for (let dy = 0; dy < factor; dy++) for (let dx = 0; dx < factor; dx++) out.push({ x: x * factor + dx, y: y * factor + dy });
+    return out;
+  };
+  const scaleRect = (r: TileRect): TileRect => ({ x0: r.x0 * factor, y0: r.y0 * factor, x1: (r.x1 + 1) * factor - 1, y1: (r.y1 + 1) * factor - 1 });
+  const zones: SandboxZone[] = layout.zones.map((zone): SandboxZone => {
+    switch (zone.kind) {
+      case 'fill':
+        return { ...zone, rect: scaleRect(zone.rect) };
+      case 'tiles':
+        return { ...zone, at: zone.at.flatMap((p) => cell(p.x, p.y)) };
+      case 'blockRow':
+        // One zone per block type is not available, so the row is spaced out and each block is drawn as a factor x factor square
+        return { ...zone, y: zone.y * factor, startX: zone.startX * factor, spacing: zone.spacing * factor, size: factor };
+      case 'pool':
+        return { ...zone, rect: scaleRect(zone.rect), fillFromY: zone.fillFromY === undefined ? undefined : zone.fillFromY * factor };
+      case 'chamber':
+        return { ...zone, rect: scaleRect(zone.rect) };
+    }
+  });
+  return {
+    ...layout,
+    width: layout.width * factor,
+    height: layout.height * factor,
+    skyRows: layout.skyRows * factor,
+    zones,
+    mobs: layout.mobs.map((mob) => ({ ...mob, x: mob.x * factor, y: mob.y * factor })),
+  };
+}
 
 const rect = (x0: number, y0: number, x1: number, y1: number): TileRect => ({ x0, y0, x1, y1 });
 const { EMPTY, DIRT, ROCK, MINERAL, CHEST, LADDER, COPPERIUM, SILVERIUM } = MiningTileType;
 
 /**
- * The standard sandbox, 90 wide by 30 deep, under {@link SANDBOX_SKY_ROWS} rows of open sky. Left to right on the surface: spawn (x 22), two target dummies, the
+ * The standard sandbox, 90 wide by 30 deep in old-size blocks (180 by 60 now), under {@link SANDBOX_SKY_ROWS_OLD} rows of open sky. Left to right on the surface: spawn (x 22), two target dummies, the
  * ladder shaft into the hall (x 12-14), and oil and water pools side by side (x 32-43 and 45-56) that open onto
  * the surface so you can jump straight in, a lava pool at the far left (x 1-4), and
  *  two sealed gas chambers under the ground (x 60-67 hydrogen, x 70-77 nitrogen). Underground: a long open hall with one of every block and a
@@ -64,10 +107,15 @@ const { EMPTY, DIRT, ROCK, MINERAL, CHEST, LADDER, COPPERIUM, SILVERIUM } = Mini
  * `blockTiles` is every block type in the game, so a new block shows up in the gallery by itself.
  */
 export function createDefaultSandboxLayout(blockTiles: readonly MiningTileType[]): SandboxLayout {
+  return scaleSandboxLayout(createOldSizeSandboxLayout(blockTiles), SANDBOX_BLOCK_SCALE);
+}
+
+/** The standard sandbox drawn in old-size blocks (see {@link createDefaultSandboxLayout}, which draws it with half-size blocks). */
+function createOldSizeSandboxLayout(blockTiles: readonly MiningTileType[]): SandboxLayout {
   return {
     width: 90,
     height: 30,
-    skyRows: SANDBOX_SKY_ROWS,
+    skyRows: SANDBOX_SKY_ROWS_OLD,
     base: DIRT,
     zones: [
       // Ladder shaft from the surface down to the hall

@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { withVolume } from '../../../../../services/sound/sfxVolume';
 import { useEffect, useRef } from 'react';
 import type { Application } from 'pixi.js';
@@ -14,6 +15,11 @@ import { HeldItemParticles } from '../../../../../components/game/particles/Held
 import { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
 import { miningProfiler } from '../utils/MiningProfiler';
 import { installRenderInstrumentation } from '../utils/renderInstrumentation';
+import { sampleSceneGauges } from '../utils/sceneStats';
+import { Culler, Rectangle } from 'pixi.js';
+
+/** Extra pixels around the screen that stay drawn, so a chunk is never culled the frame before it scrolls into view. */
+const TILE_CULL_MARGIN_PX = 400;
 
 // Frame Systems
 import type { MiningClientWorld } from '../systems/MiningClientWorld';
@@ -112,6 +118,8 @@ export function useMiningTicker({
     const heldItemLight = new HeldItemLight('held_item_light_local', TILE_SIZE);
     const heldItemParticles = new HeldItemParticles((id) => DroppedItemVisualManager.getEffectConfig(id));
 
+    let sceneSampleFrames = 0;
+    const cullView = new Rectangle();
     const tickerCallback = () => {
       miningProfiler.beginFrame();
       const playerContainer = playerContainerRef.current;
@@ -269,6 +277,7 @@ export function useMiningTicker({
       world.fluidGlowRef?.current?.sync(nowMs, currentPos);
       world.burningBodiesRef?.current?.move('self', currentPos.x, currentPos.y);
       world.fluidSoundsRef?.current?.syncLoops(nowMs, currentPos);
+      miningProfiler.startSection('Fluid & Gas Draw');
       world.fluidRendererRef?.current?.update(nowMs / 1000);
       world.gasRendererRef?.current?.update(nowMs / 1000);
 
@@ -343,7 +352,7 @@ export function useMiningTicker({
       miningProfiler.startSection('Lighting Engine');
       const flashlight = flashlightRef.current;
       if (flashlight) {
-        flashlight.setPosition(currentPos.x, currentPos.y - 0.28);
+        flashlight.setPosition(currentPos.x, currentPos.y - 0.28 * BLOCK_SCALE);
         flashlight.setDirection(playerFacingDirRef.current.x, playerFacingDirRef.current.y);
       }
 
@@ -395,6 +404,32 @@ export function useMiningTicker({
 
       // 10. Particle Engine
       particleEngineRef?.current?.update(dt);
+
+      // Skip drawing every chunk of tiles that is off screen (Pixi does not cull on its own). The margin covers the
+      // camera having moved since the transforms were last computed.
+      miningProfiler.startSection('Culling');
+      const tilesContainer = world.tilesContainerRef?.current;
+      if (tilesContainer && app.screen) {
+        cullView.x = -TILE_CULL_MARGIN_PX;
+        cullView.y = -TILE_CULL_MARGIN_PX;
+        cullView.width = app.screen.width + TILE_CULL_MARGIN_PX * 2;
+        cullView.height = app.screen.height + TILE_CULL_MARGIN_PX * 2;
+        Culler.shared.cull(tilesContainer, cullView);
+      }
+
+      // About once a second, while profiling, note how big the scene is
+      if (miningProfiler.enabled && ++sceneSampleFrames >= 60) {
+        sceneSampleFrames = 0;
+        sampleSceneGauges(miningProfiler, {
+          stage: app.stage,
+          lights: lightingEngineRef.current,
+          particles: particleEngineRef?.current,
+          tileSprites: world.tileSpritesMap?.current,
+          tileGraphics: world.tileGraphicsMap?.current,
+          renderer: app.renderer,
+          gridCells: grid ? grid.length * (grid[0]?.length ?? 0) : undefined,
+        });
+      }
 
       // With the render hook installed it ends the frame; otherwise (or when profiling is off, a no-op) end it here
       if (!restoreRender) {

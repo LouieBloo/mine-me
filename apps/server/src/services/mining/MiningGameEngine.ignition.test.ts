@@ -42,6 +42,9 @@ describe('sparks in a mining room', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
+  // (the oil stays where a test puts it: this is about where the spark lands, not where the oil flows)
+  beforeEach(() => { vi.spyOn(engine.fluidSubsystem, 'update').mockImplementation(() => {}); });
+
   const mineBlockNextToOil = (weaponId: string) => {
     engine.grid[19][23] = { type: MiningTileType.DIRT, revealed: true };
     engine.fluidSubsystem.placeFluid(23, 20, 'OIL', 1); // directly under the block

@@ -1,8 +1,12 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import {
   MiningTileType,
   MINING_CONFIG,
   canPlaceBuildable,
   bodyOverlapsCell,
+  findPieceAnchor,
+  getTileFootprint,
+  pieceCentre,
   MouseActionTriggerMode,
   calculateThrowVelocity,
   type MiningClientTile,
@@ -10,8 +14,8 @@ import {
   type Vector2D,
 } from '@mine-me/shared';
 
-const PLAYER_HALF_WIDTH = MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE / 2;
-const PLAYER_HALF_HEIGHT = MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE / 2;
+const PLAYER_HALF_WIDTH = MINING_CONFIG.PLAYER_COLLIDER_WIDTH_TILES / 2;
+const PLAYER_HALF_HEIGHT = MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2;
 
 export interface ReticleStyle {
   color: number;
@@ -25,6 +29,11 @@ export interface ReticleStyle {
   isCharging?: boolean;
   chargeRatio?: number;
   isOvercharged?: boolean;
+  /** The blocks a pickaxe has lined up, nearest first (the first is the one being mined).
+   */
+  miningQueue?: MiningPosition[];
+  /** A multi-cell placement's area in cells (top-left cell and size); the reticle covers all of it. */
+  pieceArea?: { x: number; y: number; width: number; height: number };
 }
 
 export interface MouseActionConfig {
@@ -90,6 +99,36 @@ export abstract class BaseMouseAction implements IMouseAction {
   ): ReticleStyle;
 }
 
+/**
+ * Where a placeable would go if the player points at `cursor`: the top-left cell of its piece, nudged to the
+ * nearest spot where every cell is on the map, uncovered and empty (and, for solid pieces, clear of the player),
+ * and the piece's middle is within `reach` of the player. Null if it cannot go anywhere around the cursor.
+ * The server runs the same shared search, so what the reticle shows is what a click will do.
+ */
+export function resolveBuildableAnchor(
+  buildableType: MiningTileType,
+  cursor: MiningPosition,
+  playerPos: Vector2D,
+  grid: MiningClientTile[][],
+  reach: number,
+  blockedByPlayer: boolean
+): MiningPosition | null {
+  if (!cursor || typeof cursor.x !== 'number' || typeof cursor.y !== 'number') return null;
+  if (cursor.y < 0 || cursor.y >= grid.length || cursor.x < 0 || cursor.x >= (grid[0]?.length || 0)) return null;
+
+  const footprint = getTileFootprint(buildableType);
+  const anchor = findPieceAnchor(cursor, footprint, (x, y) => {
+    const tile = grid[y]?.[x];
+    if (!tile || !tile.revealed || !canPlaceBuildable(buildableType, tile.type)) return false;
+    // Something solid cannot go on top of the player
+    return !(blockedByPlayer && bodyOverlapsCell(playerPos, PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT, x, y));
+  });
+  if (!anchor) return null;
+
+  const centre = pieceCentre(anchor, footprint);
+  return Math.abs(centre.x - playerPos.x) > reach || Math.abs(centre.y - playerPos.y) > reach ? null : anchor;
+}
+
 export interface BuildablePlacementConfig extends MouseActionConfig {
   buildableType: MiningTileType;
   previewType: 'TORCH' | 'LADDER' | 'BRIDGE';
@@ -132,40 +171,7 @@ export abstract class BaseBuildablePlacementAction extends BaseMouseAction {
    * 4. Tile allows this buildable type (not entrance, not already this type).
    */
   public canExecute(target: MiningPosition, playerPos: Vector2D, grid: MiningClientTile[][]): boolean {
-    if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') {
-      return false;
-    }
-
-    // Boundary check
-    if (target.y < 0 || target.y >= grid.length || target.x < 0 || target.x >= (grid[0]?.length || 0)) {
-      return false;
-    }
-
-    // Distance check center-to-center
-    const tileCenterX = target.x + 0.5;
-    const tileCenterY = target.y + 0.5;
-    const dx = Math.abs(tileCenterX - playerPos.x);
-    const dy = Math.abs(tileCenterY - playerPos.y);
-
-    if (dx > this.reach || dy > this.reach) {
-      return false;
-    }
-
-    const tile = grid[target.y]?.[target.x];
-    if (!tile || !tile.revealed) {
-      return false;
-    }
-
-    if (!canPlaceBuildable(this.buildableType, tile.type)) {
-      return false;
-    }
-
-    // Something solid cannot go on top of the player
-    if (this.blockedByPlayer && bodyOverlapsCell(playerPos, PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT, target.x, target.y)) {
-      return false;
-    }
-
-    return true;
+    return resolveBuildableAnchor(this.buildableType, target, playerPos, grid, this.reach, this.blockedByPlayer) !== null;
   }
 
   public async execute(target: MiningPosition, _playerPos?: Vector2D): Promise<boolean> {
@@ -173,9 +179,15 @@ export abstract class BaseBuildablePlacementAction extends BaseMouseAction {
   }
 
   public getReticleStyle(target: MiningPosition, playerPos: Vector2D, grid: MiningClientTile[][]): ReticleStyle {
-    const valid = this.canExecute(target, playerPos, grid);
-    if (valid) {
+    const footprint = getTileFootprint(this.buildableType);
+    const anchor = resolveBuildableAnchor(this.buildableType, target, playerPos, grid, this.reach, this.blockedByPlayer);
+    // Where the piece would go, or (when it cannot) the area centred on the cursor so the red box still shows its size
+    const area = anchor
+      ? { x: anchor.x, y: anchor.y, ...footprint }
+      : { x: target.x - Math.floor(footprint.width / 2), y: target.y - Math.floor(footprint.height / 2), ...footprint };
+    if (anchor) {
       return {
+        pieceArea: area,
         color: 0x22c55e, // Emerald Green
         alpha: 0.3,
         strokeColor: 0x4ade80,
@@ -190,6 +202,7 @@ export abstract class BaseBuildablePlacementAction extends BaseMouseAction {
       strokeColor: 0xf87171,
       isValid: false,
       showPreview: false,
+      pieceArea: area,
     };
   }
 }
@@ -364,7 +377,7 @@ export class ThrowableItemAction extends BaseMouseAction {
     const startX = playerPos.x;
     const startY = playerPos.y;
 
-    const throwPower = this.physicsConfig?.throwPower ?? 20.5;
+    const throwPower = this.physicsConfig?.throwPower ?? 20.5 * BLOCK_SCALE;
     const gravityScale = this.physicsConfig?.gravityScale ?? 1.0;
     const gravity = MINING_CONFIG.GRAVITY * gravityScale;
 

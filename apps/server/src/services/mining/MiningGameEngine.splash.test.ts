@@ -83,7 +83,7 @@ describe('splashes when bodies cross a fluid surface', () => {
   });
 
   it('only players close enough to hear get the event', () => {
-    standAt(2.5, 5.5);
+    standAt(33.5, 130.5); // well below the tank: outside the interest box (far away is a matter of depth)
     const mob = engine.spawnMob({ id: 'm', name: 'Wader', aiType: 'STATIONARY', moveSpeed: 0, jumpForce: 0 }, { x: 33.5, y: DRY_Y });
     mob.mobBody.position = { x: 33.5, y: 31.2 };
     tick(1);

@@ -6,6 +6,13 @@ import {
   canPlaceBuildable,
   isTileMineable,
   isTileSolid,
+  findPieceAnchor,
+  selectMiningTargets,
+  getTileFootprint,
+  pieceAnchorOf,
+  pieceCells,
+  pieceCentre,
+  pieceCentreCell,
   type MiningPosition,
   type MiningBlockHitEvent,
   type DamageEvent,
@@ -91,73 +98,80 @@ export class MiningBlockSubsystem {
     session.miningProgress = 0;
   }
 
-  /** Returns the tile a ladder would be placed on, or null if placement is not allowed. */
+  /**
+   * Where a piece of `type` would go if the player points at `cursor`, or why it cannot go there. A piece covers
+   * several cells (getTileFootprint); the cursor is its middle and it is nudged to the nearest spot that fits.
+   * Every cell must be on the map, uncovered (not in fog), empty, and, for solid pieces, free of bodies. Reach is
+   * measured to the middle of the piece. The server allows a little extra reach (PLACEMENT_LAG_SLACK) because while
+   * the player runs, their position here trails what their own screen shows, so a target that was in reach when
+   * clicked would otherwise be refused.
+   */
+  public piecePlacement(
+    type: MiningTileType,
+    session: MiningPlayerSession | undefined,
+    cursor: MiningPosition | undefined
+  ): { anchor: MiningPosition } | { problem: PlacementProblem } {
+    if (!session) return { problem: 'no_player' };
+    const at = cursor ?? { x: Math.floor(session.playerBody.position.x), y: Math.floor(session.playerBody.position.y) };
+    if (typeof at.x !== 'number' || typeof at.y !== 'number' || !isInBounds(at.x, at.y, this.world.grid)) {
+      return { problem: 'out_of_bounds' };
+    }
+
+    const footprint = getTileFootprint(type);
+    const solid = isTileSolid(type);
+    // Why one cell cannot take the piece, or null if it can
+    const cellProblem = (x: number, y: number): PlacementProblem | null => {
+      if (!isInBounds(x, y, this.world.grid)) return 'out_of_bounds';
+      const tile = this.world.grid[y][x];
+      if (!tile.revealed) return 'hidden';
+      if (!canPlaceBuildable(type, tile.type)) return 'occupied';
+      if (solid && this.bodyOverlapsCell(x, y)) return 'body_in_way';
+      return null;
+    };
+    const anchor = findPieceAnchor(at, footprint, (x, y) => cellProblem(x, y) === null);
+    if (!anchor) {
+      // Every spot that could hold the piece covers the cursor cell, so that cell's problem is the one to report
+      return { problem: cellProblem(at.x, at.y) ?? 'occupied' };
+    }
+
+    const centre = pieceCentre(anchor, footprint);
+    const reach = MINING_CONFIG.TORCH_PLACEMENT_REACH + MINING_CONFIG.PLACEMENT_LAG_SLACK;
+    if (Math.abs(centre.x - session.playerBody.position.x) > reach || Math.abs(centre.y - session.playerBody.position.y) > reach) {
+      return { problem: 'out_of_reach' };
+    }
+    return { anchor };
+  }
+
+  /** Writes a piece into the grid: every cell gets the type and its offset, solid pieces get colliders, clients are told. */
+  private placePiece(type: MiningTileType, anchor: MiningPosition): void {
+    const solid = isTileSolid(type);
+    for (const cell of pieceCells(anchor, getTileFootprint(type))) {
+      this.world.grid[cell.y][cell.x] = { type, revealed: true, damage: 0, piece: cell.offset };
+      if (solid) this.world.rigidWorld.addTileCollider(cell.x, cell.y);
+      this.world.pushTileUpdate({ x: cell.x, y: cell.y, type, damageStage: 0, piece: cell.offset });
+    }
+  }
+
+  /** Returns the top-left cell a ladder would be placed at, or null if placement is not allowed. */
   public validateLadderPlacement(
     session: MiningPlayerSession | undefined,
     target: MiningPosition | undefined
   ): MiningPosition | null {
-    if (!session) return null;
-    const grid = this.world.grid;
-
-    const x = target ? target.x : Math.floor(session.playerBody.position.x);
-    const y = target ? target.y : Math.floor(session.playerBody.position.y);
-
-    if (!isInBounds(x, y, this.world.grid)) return null;
-
-    if (target && typeof target.x === 'number' && typeof target.y === 'number') {
-      const tileCenterX = target.x + 0.5;
-      const tileCenterY = target.y + 0.5;
-      const dx = Math.abs(tileCenterX - session.playerBody.position.x);
-      const dy = Math.abs(tileCenterY - session.playerBody.position.y);
-      const reach = MINING_CONFIG.TORCH_PLACEMENT_REACH + MINING_CONFIG.PLACEMENT_LAG_SLACK;
-      if (dx > reach || dy > reach) return null;
-    }
-
-    const tile = grid[y][x];
-    if (tile.type === MiningTileType.ENTRANCE) return null;
-    if (!canPlaceBuildable(MiningTileType.LADDER, tile.type)) return null;
-
-    return { x, y };
+    const result = this.piecePlacement(MiningTileType.LADDER, session, target);
+    return 'anchor' in result ? result.anchor : null;
   }
 
   public placeLadder(session: MiningPlayerSession | undefined, target: MiningPosition | undefined): boolean {
-    const pos = this.validateLadderPlacement(session, target);
-    if (!pos) return false;
-
-    const tile = this.world.grid[pos.y][pos.x];
-    tile.type = MiningTileType.LADDER;
-    tile.revealed = true;
-    tile.damage = 0;
-
-    this.world.pushTileUpdate({
-      x: pos.x,
-      y: pos.y,
-      type: MiningTileType.LADDER,
-      damageStage: 0,
-    });
-
+    const anchor = this.validateLadderPlacement(session, target);
+    if (!anchor) return false;
+    this.placePiece(MiningTileType.LADDER, anchor);
     return true;
   }
 
-  /**
-   * Why a buildable cannot go at target, or null if it can: out of the map, out of reach, in fog, or the
-   * cell is not empty. The server allows a little extra reach (PLACEMENT_LAG_SLACK) because while the
-   * player runs, their position here trails what their own screen shows, so a target that was in reach
-   * when clicked would otherwise be refused.
-   */
+  /** Why a torch cannot go at target, or null if it can (see piecePlacement). */
   public torchPlacementProblem(session: MiningPlayerSession | undefined, target: MiningPosition): PlacementProblem | null {
-    if (!session) return 'no_player';
-    if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return 'out_of_bounds';
-    if (!isInBounds(target.x, target.y, this.world.grid)) return 'out_of_bounds';
-
-    const dx = Math.abs(target.x + 0.5 - session.playerBody.position.x);
-    const dy = Math.abs(target.y + 0.5 - session.playerBody.position.y);
-    const reach = MINING_CONFIG.TORCH_PLACEMENT_REACH + MINING_CONFIG.PLACEMENT_LAG_SLACK;
-    if (dx > reach || dy > reach) return 'out_of_reach';
-
-    const tile = this.world.grid[target.y][target.x];
-    if (!tile.revealed) return 'hidden';
-    return canPlaceBuildable(MiningTileType.TORCH, tile.type) ? null : 'occupied';
+    const result = this.piecePlacement(MiningTileType.TORCH, session, target);
+    return 'problem' in result ? result.problem : null;
   }
 
   /** Returns true if a torch can currently be placed at target. */
@@ -165,49 +179,69 @@ export class MiningBlockSubsystem {
     return this.torchPlacementProblem(session, target) === null;
   }
 
-  /** `itemId` is the torch item used; its Ignites effect (if any) is what lets the placed torch light oil. */
+  /**
+   * `itemId` is the torch item used; its Ignites effect (if any) is what lets the placed torch light oil. The torch
+   * is one light and one ignition source, in the middle cell of its piece.
+   */
   public placeTorch(session: MiningPlayerSession | undefined, target: MiningPosition, itemId?: string): boolean {
-    if (!this.validateTorchPlacement(session, target)) return false;
-
-    const tile = this.world.grid[target.y][target.x];
-    tile.type = MiningTileType.TORCH;
-    tile.revealed = true;
-    tile.damage = 0;
-
-    this.world.pushTileUpdate({
-      x: target.x,
-      y: target.y,
-      type: MiningTileType.TORCH,
-      damageStage: 0,
-    });
-    if (itemId) this.world.ignition.addTorch(target.x, target.y, itemId);
-
+    const result = this.piecePlacement(MiningTileType.TORCH, session, target);
+    if (!('anchor' in result)) return false;
+    this.placePiece(MiningTileType.TORCH, result.anchor);
+    if (itemId) {
+      const centre = pieceCentreCell(result.anchor, getTileFootprint(MiningTileType.TORCH));
+      this.world.ignition.addTorch(centre.x, centre.y, itemId);
+    }
     return true;
   }
 
-  /** Why a bridge cannot go at target, or null if it can: the buildable rules, plus no player or mob inside the cell (a solid tile placed on a body would trap it). */
+  /** Why a bridge cannot go at target, or null if it can: the buildable rules, plus no player or mob inside any of its cells (a solid tile placed on a body would trap it). */
   public bridgePlacementProblem(session: MiningPlayerSession | undefined, target: MiningPosition): PlacementProblem | null {
-    const problem = this.torchPlacementProblem(session, target);
-    if (problem) return problem;
-    return this.bodyOverlapsCell(target.x, target.y) ? 'body_in_way' : null;
+    const result = this.piecePlacement(MiningTileType.BRIDGE, session, target);
+    return 'problem' in result ? result.problem : null;
   }
 
   public validateBridgePlacement(session: MiningPlayerSession | undefined, target: MiningPosition): boolean {
     return this.bridgePlacementProblem(session, target) === null;
   }
 
-  /** Places a bridge: a solid tile with a physics collider. Returns false (changing nothing) if it cannot go there. */
+  /** Places a bridge: solid cells with physics colliders. Returns false (changing nothing) if it cannot go there. */
   public placeBridge(session: MiningPlayerSession | undefined, target: MiningPosition): boolean {
-    if (!this.validateBridgePlacement(session, target)) return false;
-
-    const tile = this.world.grid[target.y][target.x];
-    tile.type = MiningTileType.BRIDGE;
-    tile.revealed = true;
-    tile.damage = 0;
-
-    this.world.rigidWorld.addTileCollider(target.x, target.y);
-    this.world.pushTileUpdate({ x: target.x, y: target.y, type: MiningTileType.BRIDGE, damageStage: 0 });
+    const result = this.piecePlacement(MiningTileType.BRIDGE, session, target);
+    if (!('anchor' in result)) return false;
+    this.placePiece(MiningTileType.BRIDGE, result.anchor);
     return true;
+  }
+
+  /** The other cells of the piece that (x, y) belongs to, still in the grid as that piece. Empty for ordinary tiles. */
+  public pieceSiblings(x: number, y: number): MiningPosition[] {
+    const tile = this.world.grid[y]?.[x];
+    if (!tile?.piece) return [];
+    const anchor = pieceAnchorOf(x, y, tile.piece);
+    return pieceCells(anchor, getTileFootprint(tile.type))
+      .filter((c) => (c.x !== x || c.y !== y) && this.world.grid[c.y]?.[c.x]?.type === tile.type)
+      .filter((c) => {
+        const other = this.world.grid[c.y][c.x].piece;
+        return other !== undefined && other[0] === c.offset[0] && other[1] === c.offset[1];
+      })
+      .map(({ x: cx, y: cy }) => ({ x: cx, y: cy }));
+  }
+
+  /** The key of the piece (x, y) belongs to ("anchorX,anchorY"), or null for an ordinary tile. */
+  public pieceKey(x: number, y: number): string | null {
+    const tile = this.world.grid[y]?.[x];
+    if (!tile?.piece) return null;
+    const anchor = pieceAnchorOf(x, y, tile.piece);
+    return `${anchor.x},${anchor.y}`;
+  }
+
+  /** Clears the rest of the piece (x, y) belongs to, so a piece is never left half there. Call before clearing (x, y) itself. */
+  public clearPieceSiblings(x: number, y: number): void {
+    for (const cell of this.pieceSiblings(x, y)) {
+      this.world.grid[cell.y][cell.x] = { type: MiningTileType.EMPTY, revealed: true };
+      this.world.rigidWorld.removeTileCollider(cell.x, cell.y);
+      this.world.pushTileUpdate({ x: cell.x, y: cell.y, type: MiningTileType.EMPTY, damageStage: 0 });
+      this.world.rocks.checkAndTriggerFallingRocks(cell.x, cell.y);
+    }
   }
 
   /** Whether any living player or mob body overlaps the tile cell (x, y). */
@@ -219,6 +253,13 @@ export class MiningBlockSubsystem {
     return false;
   }
 
+  /** The blocks this player's pickaxe has lined up right now, nearest first; empty unless they are holding the mine button. */
+  public miningQueue(session: MiningPlayerSession): MiningPosition[] {
+    const cursor = session.inputs.miningTarget;
+    if (!session.inputs.miningKey || !cursor) return [];
+    return selectMiningTargets(this.world.grid, session.playerBody.position, cursor, { precise: session.inputs.preciseMining, keep: session.isMining ? session.miningTarget : null });
+  }
+
   public updateMiningProgress(_dt: number): void {
     const grid = this.world.grid;
     const playerList = Array.from(this.world.players.values());
@@ -226,8 +267,11 @@ export class MiningBlockSubsystem {
     // 1. Validate & trigger mining actions for each player
     for (const session of playerList) {
       const canMineStance = session.playerBody.isGrounded || session.playerBody.isOnLadder;
-      const isTargeting = Boolean(session.inputs.miningKey && session.inputs.miningTarget);
-      const target = session.inputs.miningTarget;
+      // The client sends the cell under its cursor; which block that means is decided here, by the same rule the
+      // client's reticle uses (see selectMiningTargets): the next block along the line toward the cursor, or the
+      // cursor's own block while Ctrl is held
+      const target = this.miningQueue(session)[0] ?? null;
+      const isTargeting = Boolean(session.inputs.miningKey && target);
       const playerSpeed =
         typeof session.miningSpeed === 'function' ? session.miningSpeed() : session.miningSpeed;
 
@@ -337,6 +381,7 @@ export class MiningBlockSubsystem {
     if (grid[y]?.[x]?.type === undefined || grid[y][x].type === MiningTileType.EMPTY) return;
     const into = burnsInto ? MiningTileType[burnsInto as keyof typeof MiningTileType] : undefined;
     if (into !== undefined && into !== MiningTileType.EMPTY) {
+      this.clearPieceSiblings(x, y);
       grid[y][x] = { type: into, revealed: true };
       rigidWorld.removeTileCollider(x, y);
       if (isTileSolid(into)) rigidWorld.addTileCollider(x, y);
@@ -356,6 +401,7 @@ export class MiningBlockSubsystem {
     const tile = grid[y]?.[x];
     const into = MiningTileType[typeKey as keyof typeof MiningTileType];
     if (!tile || into === undefined || into === MiningTileType.EMPTY || isTileSolid(tile.type)) return false;
+    this.clearPieceSiblings(x, y);
     grid[y][x] = { type: into, revealed: tile.revealed };
     rigidWorld.removeTileCollider(x, y);
     if (isTileSolid(into)) rigidWorld.addTileCollider(x, y);
@@ -384,6 +430,9 @@ export class MiningBlockSubsystem {
     if (tile.type === MiningTileType.EMPTY) return;
     const previousType = tile.type;
     const dropItems = options.dropItems ?? true;
+
+    // A piece goes whole (one drop for all its cells)
+    this.clearPieceSiblings(target.x, target.y);
 
     const players = Array.from(this.world.players.values());
 

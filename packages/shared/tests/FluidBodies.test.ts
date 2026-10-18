@@ -14,15 +14,22 @@ const grid = () => {
   return g;
 };
 
-/** Oil (viscosity 0.6) filling rows 8 and 9 around x 4..6 (so a standing body is about 1.25 tiles deep in it). */
+/** Oil (viscosity 0.6) filling rows 8 and 9 around x 4..6 (so a standing body is about 1.75 tiles deep in it). */
 const oilEnvironment = (): FluidEnvironment => {
   const field = new FluidField(20, 11);
   for (let y = 8; y <= 9; y++) for (let x = 4; x <= 6; x++) field.set(x, y, 1, quantizeFluidLevel(1));
   return { sampler: field, propertiesOf: (id) => (id === 1 ? { viscosity: 0.6, density: 0.8 } : undefined) };
 };
 
+/** A pool deep enough for a body that falls a few tiles per step (rows 3..9, x 4..6) to be slowed by it. */
+const deepOilEnvironment = (): FluidEnvironment => {
+  const field = new FluidField(20, 11);
+  for (let y = 3; y <= 9; y++) for (let x = 4; x <= 6; x++) field.set(x, y, 1, quantizeFluidLevel(1));
+  return { sampler: field, propertiesOf: (id) => (id === 1 ? { viscosity: 0.6, density: 0.8 } : undefined) };
+};
+
 const standingAt = (x: number, env: FluidEnvironment | null) => {
-  const body = new MiningPlayerBody({ x, y: 10 - 0.8 });
+  const body = new MiningPlayerBody({ x, y: 10 - MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2 - 0.01 });
   body.isGrounded = true;
   body.fluidEnvironment = env;
   return body;
@@ -50,7 +57,7 @@ describe('a player wading through fluid', () => {
 
   it('walking in shallow fluid is slowed less than in deep fluid', () => {
     const env = oilEnvironment();
-    (env.sampler as FluidField).set(5, 8, 0, 0); // only one cell deep here
+    for (let x = 4; x <= 6; x++) (env.sampler as FluidField).set(x, 8, 0, 0); // only one cell deep under the whole body
     const shallow = standingAt(5.5, env);
     shallow.processInputs(input({ right: true }), grid());
     const deep = standingAt(4.5, oilEnvironment());
@@ -71,11 +78,11 @@ describe('a player wading through fluid', () => {
   it('cannot move at all in a fluid with viscosity 1 at full depth, but is not stuck forever', () => {
     const env: FluidEnvironment = { sampler: (oilEnvironment().sampler), propertiesOf: () => ({ viscosity: 1, density: 1 }) };
     const field = env.sampler as FluidField;
-    for (let y = 6; y <= 9; y++) field.set(5, y, 1, quantizeFluidLevel(1));
+    for (let y = 5; y <= 9; y++) for (let x = 4; x <= 6; x++) field.set(x, y, 1, quantizeFluidLevel(1)); // the whole body is under
     const body = standingAt(5.5, env);
     body.processInputs(input({ right: true }), grid());
     expect(body.velocity.x).toBe(0);
-    body.position = { x: 15.5, y: 10 - 0.8 };
+    body.position = { x: 15.5, y: 10 - MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2 - 0.01 };
     body.processInputs(input({ right: true }), grid());
     expect(body.velocity.x).toBeGreaterThan(0);
   });
@@ -92,9 +99,9 @@ describe('a player wading through fluid', () => {
   it('falls into fluid at a reduced top speed, but never below the minimum, and never at a standstill', () => {
     const g = grid();
     const body = new MiningPlayerBody({ x: 5.5, y: 4 });
-    body.fluidEnvironment = oilEnvironment();
-    // Drop it into the pool and let the cap act
-    body.position = { x: 5.5, y: 8.6 };
+    body.fluidEnvironment = deepOilEnvironment();
+    // Put it in the pool and let the cap act
+    body.position = { x: 5.5, y: 4.5 };
     body.velocity = { x: 0, y: MINING_CONFIG.TERMINAL_FALL_SPEED };
     body.processInputs(IDLE, g);
     body.update(1 / 30, g);
@@ -128,7 +135,7 @@ describe('a player wading through fluid', () => {
       return worst;
     };
     const dry = drop(null, 5.5);
-    const wet = drop(oilEnvironment(), 5.5);
+    const wet = drop(deepOilEnvironment(), 5.5);
     expect(dry).toBeGreaterThan(0);
     expect(wet).toBeLessThan(dry);
   });

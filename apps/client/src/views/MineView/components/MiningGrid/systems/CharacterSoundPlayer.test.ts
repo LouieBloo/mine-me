@@ -122,7 +122,7 @@ describe('CharacterSoundPlayer', () => {
 
     it('does not play when stepping off a ladder, and forgets the speed from before', () => {
       const { player, played } = setup();
-      player.observeMotion(frame({ isGrounded: false, velocityY: 15 }));
+      player.observeMotion(frame({ isGrounded: false, velocityY: LAND_SOUND_MIN_IMPACT_SPEED + 5 }));
       player.observeMotion(frame({ isGrounded: false, isOnLadder: true, velocityY: 2 }));
       player.observeMotion(frame({ isGrounded: true }));
       expect(played()).toEqual([]);
@@ -130,8 +130,8 @@ describe('CharacterSoundPlayer', () => {
 
     it('plays one land sound per landing and a second one for the next fall', () => {
       const { player, played } = setup();
-      fall(player, 12);
-      fall(player, 14);
+      fall(player, LAND_SOUND_MIN_IMPACT_SPEED + 2);
+      fall(player, LAND_SOUND_MIN_IMPACT_SPEED + 4);
       expect(played()).toEqual(['/assets/sounds/land.mp3', '/assets/sounds/land.mp3']);
     });
 

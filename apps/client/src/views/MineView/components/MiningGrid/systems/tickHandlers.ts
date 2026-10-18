@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { withVolume } from '../../../../../services/sound/sfxVolume';
 import {
   type FireWireCell,
@@ -8,6 +9,9 @@ import {
   MINING_CONFIG,
   DEFAULT_PARTICLE_EFFECTS,
   canTileBeDamaged,
+  getTileFootprint,
+  isPieceCentreCell,
+  pieceOrigin,
   MINING_SPATIAL_AUDIO_PRESETS,
 } from '@mine-me/shared';
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
@@ -55,7 +59,7 @@ export interface TickHandlerContext {
 const SOUND_REPEAT_MS = 80;
 const PARTICLE_REPEAT_MS = 100;
 const EXPLOSION_MEMORY_MS = 600;
-const EXPLOSION_DESTROY_MARGIN = 1.2;
+const EXPLOSION_DESTROY_MARGIN = 1.2 * BLOCK_SCALE;
 
 /** Where on a tile to put hit effects: under the cursor when the player is aiming at it, else the centre. */
 export function getHitPosition(world: MiningClientWorld, tileX: number, tileY: number): { x: number; y: number } {
@@ -276,6 +280,7 @@ export function applyTileUpdates(payload: MiningStateTickPayload, ctx: TickHandl
     prevTile.type = rt.type;
     prevTile.revealed = true;
     prevTile.damageStage = canTileBeDamaged(rt.type) ? (rt.damageStage ?? prevTile.damageStage ?? 0) : 0;
+    prevTile.piece = rt.piece;
   }
 
   const tilesContainer = world.tilesContainerRef.current;
@@ -290,7 +295,7 @@ export function applyTileUpdates(payload: MiningStateTickPayload, ctx: TickHandl
       world.tileSpritesMap.current,
       TILE_SIZE
     );
-    miningProfiler.recordExternal('Tile Reveal Render', performance.now() - start);
+    miningProfiler.recordEvent('Tile Reveal Render', performance.now() - start);
   }
 
   syncTileLights(revealed, ctx);
@@ -413,18 +418,21 @@ export function syncTileLights(revealed: NonNullable<MiningStateTickPayload['rev
       lightingEngine.removeLight(chestLightId);
     }
 
-    if (tile.revealed && tile.type === MiningTileType.TORCH) {
+    // A torch is a piece of several cells; its flame belongs to the middle one, so it lights the cavern once
+    if (tile.revealed && tile.type === MiningTileType.TORCH && isPieceCentreCell(tile.piece, getTileFootprint(MiningTileType.TORCH))) {
+      const origin = pieceOrigin(x, y, tile.piece);
+      const span = getTileFootprint(MiningTileType.TORCH).width;
       if (!lightingEngine.getLight(torchLightId)) {
         lightingEngine.addLight(
-          new PointLight(torchLightId, { x: x + 0.446, y: y + 0.35 }, 0xf59e0b, 1.25, MINING_CONFIG.TORCH_RADIUS, {
+          new PointLight(torchLightId, { x: origin.x + 0.446 * span, y: origin.y + 0.35 * span }, 0xf59e0b, 1.25, MINING_CONFIG.TORCH_RADIUS, {
             flicker: { speed: MINING_CONFIG.TORCH_FLICKER_SPEED, amount: MINING_CONFIG.TORCH_FLICKER_AMOUNT },
           })
         );
       }
       if (particleEngine && !world.torchEmittersRef.current.has(torchLightId)) {
         const emitter = particleEngine.addEmitter(DEFAULT_PARTICLE_EFFECTS.torch_flame, {
-          x: (x + 0.446) * TILE_SIZE,
-          y: (y + 0.28) * TILE_SIZE,
+          x: (origin.x + 0.446 * span) * TILE_SIZE,
+          y: (origin.y + 0.28 * span) * TILE_SIZE,
         });
         world.torchEmittersRef.current.set(torchLightId, emitter);
       }
@@ -449,8 +457,13 @@ export function syncTileLights(revealed: NonNullable<MiningStateTickPayload['rev
 }
 
 /** Runs every section handler, in the order the sections depend on each other. */
+let lastTickAt = 0;
+
 export function handleStateTick(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
   const start = performance.now();
+  // How evenly the server's ticks arrive (about 33ms apart at 30 Hz); a long gap here is a network or server stall
+  if (lastTickAt > 0) miningProfiler.recordEvent('Server Tick Interval', start - lastTickAt);
+  lastTickAt = start;
   applySelfState(payload, ctx);
   applyEntities(payload, ctx);
   applySessionData(payload, ctx);
@@ -463,5 +476,6 @@ export function handleStateTick(payload: MiningStateTickPayload, ctx: TickHandle
   applyItemPickupSounds(payload, ctx);
   applyGasSounds(payload, ctx);
   applyBurning(payload, ctx);
-  miningProfiler.recordExternal('Socket Tick Handler', performance.now() - start);
+  miningProfiler.recordEvent('Server Tick Handling', performance.now() - start);
+  miningProfiler.setServerPerf(payload.perf);
 }

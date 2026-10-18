@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Container } from 'pixi.js';
 import { MiningMobRenderer } from './MiningMobRenderer';
+import { TILE_SIZE } from './MiningTileRenderer';
 import type { MiningActiveMob } from '@mine-me/shared';
 import { Assets, Texture } from 'pixi.js';
 
@@ -552,7 +553,7 @@ describe('MiningMobRenderer', () => {
       renderer.updateMobs([{ ...mobData, health: 65 }]);
 
       expect(mockFloatingTextManager.spawnDamage).toHaveBeenCalledWith(
-        5 * 64, // spawnX (position.x * TILE_SIZE)
+        5 * TILE_SIZE, // spawnX (position.x * TILE_SIZE)
         expect.any(Number), // spawnY
         35 // damageTaken
       );

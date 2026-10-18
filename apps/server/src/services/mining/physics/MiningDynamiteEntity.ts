@@ -1,3 +1,4 @@
+import { BLOCK_SCALE, MINING_TILE_PIXELS } from '@mine-me/shared';
 import { MiningPhysicsBody, type MiningCollisionGrid } from './MiningPhysicsBody';
 import type { Vector2D, MiningRigidWorld, DynamiteBodyOptions, ItemPhysicsConfig, ItemSoundEffectsConfig } from '@mine-me/shared';
 import * as planck from 'planck';
@@ -58,7 +59,7 @@ export class MiningDynamiteEntity extends MiningPhysicsBody {
   ) {
     super({
       position: { ...initialPosition },
-      radius: 0.25,
+      radius: 16 / MINING_TILE_PIXELS, // the sprite is 32px across
       hasGravity: true,
       gravityScale: 1.0,
       mass: 1.0,
@@ -122,7 +123,7 @@ export class MiningDynamiteEntity extends MiningPhysicsBody {
 
   protected override onGroundHit(): void {
     this.velocity.x *= 0.5;
-    if (Math.abs(this.velocity.x) < 0.05) {
+    if (Math.abs(this.velocity.x) < 0.05 * BLOCK_SCALE) {
       this.velocity.x = 0;
     }
   }

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, act } from '@testing-library/react';
 import { MiningGrid } from '../src/views/MineView/components/MiningGrid/MiningGrid';
-import { MiningTileType, type MiningSessionClientState, type PlayerState } from '@mine-me/shared';
+import { MINING_SPATIAL_AUDIO_PRESETS, MiningTileType, type MiningSessionClientState, type PlayerState } from '@mine-me/shared';
 
 const mockPlaySfx = vi.fn();
 const mockPlayPositionalSfx = vi.fn();
@@ -468,8 +468,8 @@ describe('Mining Weapon Sound Effect Playback', () => {
       { x: 1.5, y: 1.5 },
       expect.objectContaining({
         spatial: expect.objectContaining({
-          maxDistance: 16,
-          minDistance: 2,
+          maxDistance: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING.maxDistance,
+          minDistance: MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING.minDistance,
         }),
       })
     );

@@ -65,6 +65,7 @@ import { SandboxTools } from './sandbox/SandboxTools';
 import { getGameModeRules, type GameModeRules } from './gameModeRules';
 import { MiningIgnitionSubsystem } from './subsystems/MiningIgnitionSubsystem';
 import { MiningFireSubsystem } from './subsystems/MiningFireSubsystem';
+import { MiningTickProfiler } from './MiningTickProfiler';
 import { MiningBurningSubsystem } from './subsystems/MiningBurningSubsystem';
 import { MiningMobSubsystem, type MiningActiveMobSession } from './subsystems/MiningMobSubsystem';
 
@@ -134,6 +135,8 @@ export class MiningGameEngine {
   private tickHadError = false;
 
   private tickCount = 0;
+  /** Always-on timing of this room's ticks (see MiningTickProfiler); its summary goes to players about once a second. */
+  public readonly profiler = new MiningTickProfiler(1000 / MINING_CONFIG.SERVER_TICK_RATE);
   private accumulatorSeconds = 0;
   private lastLoopAtMs = 0;
   /** Total ticks skipped because the loop fell too far behind (for diagnostics). */
@@ -386,6 +389,8 @@ export class MiningGameEngine {
   // ============================================================================
 
   /** Length of one simulation step in seconds. */
+  /** The performance summary goes out every this many ticks (about once a second). */
+  private static readonly PERF_REPORT_TICKS = MINING_CONFIG.SERVER_TICK_RATE;
   public static readonly TICK_SECONDS = 1 / MINING_CONFIG.SERVER_TICK_RATE;
 
   /** How often the loop checks the clock; finer than a tick so steps start close to on time. */
@@ -414,6 +419,7 @@ export class MiningGameEngine {
     if (this.isStopped || !Number.isFinite(elapsedSeconds) || elapsedSeconds <= 0) return 0;
 
     const step = MiningGameEngine.TICK_SECONDS;
+    this.profiler.noteLoop();
     this.accumulatorSeconds += elapsedSeconds;
 
     let ticks = 0;
@@ -464,8 +470,10 @@ export class MiningGameEngine {
     }
 
     this.tickHadError = false;
+    this.profiler.beginTick();
     this.runTickSteps(dt);
-    this.processDeaths();
+    this.runStep('deaths', () => this.processDeaths());
+    this.profiler.endTick();
 
     if (this.tickHadError) {
       this.consecutiveFailedTicks++;
@@ -483,7 +491,7 @@ export class MiningGameEngine {
    */
   private runStep(name: string, step: () => void): void {
     try {
-      step();
+      this.profiler.time(name, step);
     } catch (err) {
       this.tickHadError = true;
       console.error(`[Mining] Room ${this.roomId} tick ${this.tickCount} step "${name}" failed:`, err);
@@ -831,6 +839,7 @@ export class MiningGameEngine {
             y: ny,
             type: this.grid[ny][nx].type,
             damageStage: getDamageStage(this.grid[ny][nx]),
+            ...(this.grid[ny][nx].piece ? { piece: this.grid[ny][nx].piece } : {}),
             ...(fluid ? { fluid } : {}),
             ...(gas ? { gas } : {}),
             ...(this.fireSubsystem.isBurning(nx, ny) ? { fire: 1 as const } : {}),
@@ -857,6 +866,11 @@ export class MiningGameEngine {
     const fireChanges = this.fireSubsystem.takeVisibleChanges();
     const splashesToSend = this.fluidSubsystem.takeSplashes();
     const pickupsToSend = this.dropSubsystem.takePickups();
+
+    // About once a second every player is also told what the server is spending on this room
+    const sendPerf = this.tickCount % MiningGameEngine.PERF_REPORT_TICKS === 0;
+    const perf = sendPerf ? this.profiler.snapshot(this.droppedTicks, this.perfCounts()) : undefined;
+    let emitMs = 0;
 
     for (const session of this.players.values()) {
       if (!session.socket || !session.socket.connected) continue;
@@ -949,12 +963,31 @@ export class MiningGameEngine {
         temporaryBackpack: session.backpackDirty ? session.temporaryBackpack : undefined,
       };
 
+      if (sendPerf) payload.perf = perf;
+      const emitStart = performance.now();
       session.socket.emit('mining_state_tick', payload);
+      emitMs += performance.now() - emitStart;
+      if (sendPerf) this.profiler.notePayloadBytes(JSON.stringify(payload).length);
       session.backpackDirty = false;
     }
 
+    this.profiler.recordStep('broadcast (socket emit)', emitMs);
     this.dropSubsystem.droppedItemsDirty = false;
     this.pendingRevealedTiles = [];
+  }
+
+  /** What the server is simulating right now, for the performance report. */
+  private perfCounts(): Record<string, number> {
+    return {
+      players: this.players.size,
+      mobs: this.activeMobs.size,
+      droppedItems: this.droppedItems.length,
+      fallingRocks: this.rockSubsystem.activeRocks.length,
+      projectiles: this.projectileSubsystem.activeProjectiles.length,
+      dynamites: this.explosiveSubsystem.activeDynamites.length,
+      tilesChangedThisTick: this.pendingRevealedTiles.length,
+      gridCells: this.grid.length * (this.grid[0]?.length ?? 0),
+    };
   }
 
   /**

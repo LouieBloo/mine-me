@@ -56,7 +56,10 @@ export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDef
         for (const p of zone.at) set(p.x, p.y, zone.tile, 'tile');
         break;
       case 'blockRow':
-        zone.tiles.forEach((tile, i) => set(zone.startX + i * zone.spacing, zone.y, tile, 'block row'));
+        zone.tiles.forEach((tile, i) => {
+          const size = zone.size ?? 1;
+          for (let dy = 0; dy < size; dy++) for (let dx = 0; dx < size; dx++) set(zone.startX + i * zone.spacing + dx, zone.y + dy, tile, 'block row');
+        });
         break;
       case 'chamber': {
         const gas = gasBySlot[zone.gasSlot];

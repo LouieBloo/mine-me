@@ -45,6 +45,7 @@ export function useMiningInput({
     jump: boolean;
     miningKey: boolean;
     miningTarget: MiningPosition | null;
+    preciseMining?: boolean;
     aimDirection?: Vector2D;
     isFacingLeft?: boolean;
     flashlightOn?: boolean;
@@ -79,15 +80,17 @@ export function useMiningInput({
     const mouseController = mouseControllerRef?.current;
     if (!mouseController) return;
 
-    const unsubscribe = mouseController.onMiningStateChange((isMining, target) => {
+    const unsubscribe = mouseController.onMiningStateChange((isMining, target, precise) => {
       const current = keysPressedRef.current;
       const changed =
         current.miningKey !== isMining ||
+        Boolean(current.preciseMining) !== precise ||
         current.miningTarget?.x !== target?.x ||
         current.miningTarget?.y !== target?.y;
 
       if (changed) {
         current.miningKey = isMining;
+        current.preciseMining = precise;
         current.miningTarget = target ? { ...target } : null;
         current.aimDirection = playerFacingDirRef.current ? { ...playerFacingDirRef.current } : undefined;
         current.isFacingLeft = isFacingLeftRef.current;

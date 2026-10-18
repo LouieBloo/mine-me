@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MiningTileType } from '@mine-me/shared';
+import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
 import { MiningGameEngine } from '../MiningGameEngine';
 import { hitPlayer } from '../testHelpers';
-import { createDefaultSandboxLayout, SANDBOX_SKY_ROWS } from './SandboxLayout';
+import { createDefaultSandboxLayout, SANDBOX_BLOCK_SCALE, SANDBOX_SKY_ROWS } from './SandboxLayout';
 
 const SKY = SANDBOX_SKY_ROWS;
+// The sandbox is drawn in original-size blocks; coordinates below are those, times the scale (the small blocks it is built from).
+const S = SANDBOX_BLOCK_SCALE;
 
 const cid = 'tools';
 let engine: MiningGameEngine;
@@ -30,26 +32,26 @@ describe('sandbox tools exist only in a sandbox', () => {
 
 describe('pourFluid', () => {
   it('adds fluid to an open cell', () => {
-    expect(tools().pourFluid(35, SKY - 3, 'OIL')).toEqual({ ok: true }); // in the open sky
-    expect(fluidAt(35, SKY - 3)).toBeGreaterThan(0);
+    expect(tools().pourFluid(35 * S, SKY - 3 * S, 'OIL')).toEqual({ ok: true }); // in the open sky
+    expect(fluidAt(35 * S, SKY - 3 * S)).toBeGreaterThan(0);
   });
 
   it('fills a tile up to one full cell and never past it, however often it is used', () => {
     expect(tools().setSim({ paused: true }).ok).toBe(true);
-    for (let i = 0; i < 5; i++) expect(tools().pourFluid(35, SKY - 3, 'OIL')).toEqual({ ok: true });
-    expect(fluidAt(35, SKY - 3)).toBeCloseTo(1, 6);
-    engine.fluidSubsystem.grid.setCell(35, SKY - 3, engine.fluidSubsystem.registry.idOf('OIL')!, 0.4);
-    tools().pourFluid(35, SKY - 3, 'OIL');
-    expect(fluidAt(35, SKY - 3)).toBeCloseTo(1, 6); // topped up, not 1.4
+    for (let i = 0; i < 5; i++) expect(tools().pourFluid(35 * S, SKY - 3 * S, 'OIL')).toEqual({ ok: true });
+    expect(fluidAt(35 * S, SKY - 3 * S)).toBeCloseTo(1, 6);
+    engine.fluidSubsystem.grid.setCell(35 * S, SKY - 3 * S, engine.fluidSubsystem.registry.idOf('OIL')!, 0.4);
+    tools().pourFluid(35 * S, SKY - 3 * S, 'OIL');
+    expect(fluidAt(35 * S, SKY - 3 * S)).toBeCloseTo(1, 6); // topped up, not 1.4
     tools().setSim({ paused: false });
   });
   it.each([
-    ['a solid tile', [10, SKY + 5, 'OIL'], /cannot hold/],
-    ['an unknown fluid', [35, SKY, 'LAVA9'], /Unknown fluid/],
-    ['a tile off the map', [90, SKY, 'OIL'], /inside the map/],
+    ['a solid tile', [10 * S, SKY + 5 * S, 'OIL'], /cannot hold/],
+    ['an unknown fluid', [35 * S, SKY, 'LAVA9'], /Unknown fluid/],
+    ['a tile off the map', [90 * S, SKY, 'OIL'], /inside the map/],
     ['a fractional tile', [35.5, SKY, 'OIL'], /inside the map/],
     ['a non-number', ['a', SKY, 'OIL'], /inside the map/],
-    ['a missing fluid', [35, SKY, undefined], /Unknown fluid/],
+    ['a missing fluid', [35 * S, SKY, undefined], /Unknown fluid/],
   ])('refuses %s', (_name, [x, y, key], message) => {
     const res = tools().pourFluid(x, y, key);
     expect(res.ok).toBe(false);
@@ -59,35 +61,35 @@ describe('pourFluid', () => {
 
 describe('pouring in the sky', () => {
   it('lets fluid poured high above the ground fall and land on it', () => {
-    expect(tools().pourFluid(20, 0, 'OIL')).toEqual({ ok: true }); // the very top row of the map
+    expect(tools().pourFluid(20 * S, 0, 'OIL')).toEqual({ ok: true }); // the very top row of the map
     tick(400);
-    expect(fluidAt(20, 0)).toBe(0); // it has left the top
+    expect(fluidAt(20 * S, 0)).toBe(0); // it has left the top
     // ...and rests on the ground (the row just above the surface), spreading along it
     let onGround = 0;
-    for (let x = 0; x < 90; x++) onGround += fluidAt(x, SKY - 1);
+    for (let x = 0; x < 90 * S; x++) onGround += fluidAt(x, SKY - 1);
     expect(onGround).toBeGreaterThan(0.5);
   });
 
   it('lets fluid poured above a pool fall into it', () => {
     const before = engine.fluidSubsystem.grid.totalVolume();
-    tools().pourFluid(38, 2, 'OIL');
+    tools().pourFluid(38 * S, 2 * S, 'OIL');
     tick(300);
     expect(engine.fluidSubsystem.grid.totalVolume()).toBeGreaterThan(before);
-    expect(fluidAt(38, 2)).toBe(0);
+    expect(fluidAt(38 * S, 2 * S)).toBe(0);
   });
 });
 
 describe('spawnMob', () => {
   it('spawns any mob in open space', () => {
     const before = engine.getActiveMobs().length;
-    const res = tools().spawnMob('Mole Person', 60.5, SKY + 13);
+    const res = tools().spawnMob('Mole Person', 60.5 * S, SKY + 13 * S);
     expect(res.ok).toBe(true);
     expect(engine.getActiveMobs()).toHaveLength(before + 1);
   });
   it('refuses unknown mobs, solid spots and points off the map', () => {
-    expect(tools().spawnMob('nobody', 60, SKY + 13)).toEqual({ ok: false, error: 'Unknown mob.' });
-    expect(tools().spawnMob('Mole Person', 5, SKY + 5)).toEqual({ ok: false, error: 'That spot is inside a block.' });
-    expect(tools().spawnMob('Mole Person', 200, SKY + 5).ok).toBe(false);
+    expect(tools().spawnMob('nobody', 60 * S, SKY + 13 * S)).toEqual({ ok: false, error: 'Unknown mob.' });
+    expect(tools().spawnMob('Mole Person', 5 * S, SKY + 5 * S)).toEqual({ ok: false, error: 'That spot is inside a block.' });
+    expect(tools().spawnMob('Mole Person', 200 * S, SKY + 5).ok).toBe(false);
     expect(tools().spawnMob('Mole Person', NaN, SKY + 5).ok).toBe(false);
     expect(tools().spawnMob(5, 5, SKY + 5).ok).toBe(false);
   });
@@ -98,7 +100,7 @@ describe('spawnMob', () => {
 
 describe('spawning in the sky', () => {
   it('can place a mob high in the air', () => {
-    expect(tools().spawnMob('Mole Person', 60.5, 2.5).ok).toBe(true);
+    expect(tools().spawnMob('Mole Person', 60.5 * S, 2.5 * S).ok).toBe(true);
   });
 });
 
@@ -120,30 +122,30 @@ describe('god mode', () => {
 
 describe('simulation control', () => {
   // A cell of oil in the open air of the hall falls and spreads once the simulation steps
-  const drop = () => tools().pourFluid(60, SKY + 13, 'OIL');
+  const drop = () => tools().pourFluid(60 * S, SKY + 13 * S, 'OIL');
 
   it('freezes the flow while paused and resumes it', () => {
     expect(tools().setSim({ paused: true }).ok).toBe(true);
     drop();
     tick(120);
-    expect(fluidAt(60, SKY + 13)).toBeGreaterThan(0);
+    expect(fluidAt(60 * S, SKY + 13 * S)).toBeGreaterThan(0);
     expect(tools().status(cid).paused).toBe(true);
     tools().setSim({ paused: false });
     tick(120);
-    expect(fluidAt(60, SKY + 13)).toBe(0);
+    expect(fluidAt(60 * S, SKY + 13 * S)).toBe(0);
   });
 
   it('runs exactly one step per request while paused', () => {
     tools().setSim({ paused: true });
     drop();
     tick(60);
-    expect(fluidAt(60, SKY + 14)).toBe(0); // nothing has flowed yet
+    expect(fluidAt(60 * S, SKY + 13 * S + 1)).toBe(0); // nothing has flowed yet
     tools().setSim({ step: true });
     tick(1);
-    const afterOne = fluidAt(60, SKY + 14);
+    const afterOne = fluidAt(60 * S, SKY + 13 * S + 1);
     expect(afterOne).toBeGreaterThan(0); // exactly one step moved some down
     tick(60);
-    expect(fluidAt(60, SKY + 14)).toBe(afterOne); // and no more without another request
+    expect(fluidAt(60 * S, SKY + 13 * S + 1)).toBe(afterOne); // and no more without another request
   });
 
   it('does not stop the players while the flow is paused', () => {
@@ -167,9 +169,9 @@ describe('simulation control', () => {
     const settled = (speed: number) => {
       const e = new MiningGameEngine({ characterId: 'f', cityId: 'c', seed: 1, gameMode: 'sandbox', socket: { connected: true, emit: vi.fn() } as any });
       e.sandbox!.setSim({ speed });
-      e.sandbox!.pourFluid(60, SKY + 13, 'OIL');
+      e.sandbox!.pourFluid(60 * S, SKY + 13 * S, 'OIL');
       for (let i = 0; i < 12; i++) (e as any).tick(1 / 30);
-      return e.fluidSubsystem.grid.getLevel(60, SKY + 13);
+      return e.fluidSubsystem.grid.getLevel(60 * S, SKY + 13 * S);
     };
     expect(settled(4)).toBeLessThanOrEqual(settled(0.25));
   });
@@ -178,7 +180,7 @@ describe('simulation control', () => {
 describe('clearHazards', () => {
   it('removes all fluid, including the pools, and puts the fire out', () => {
     expect(engine.fluidSubsystem.grid.totalVolume()).toBeGreaterThan(0);
-    tools().ignite(38, SKY + 5);
+    tools().ignite(38 * S, SKY + 5 * S);
     expect(engine.fireSubsystem.grid.burningCount).toBeGreaterThan(0);
     tools().clearHazards();
     expect(engine.fluidSubsystem.grid.totalVolume()).toBe(0);
@@ -188,13 +190,13 @@ describe('clearHazards', () => {
 
 describe('ignite', () => {
   it('sets fire to fluid that burns, and not twice', () => {
-    expect(tools().ignite(38, SKY + 5)).toEqual({ ok: true });
-    expect(engine.fireSubsystem.grid.isBurning(38, SKY + 5)).toBe(true);
-    expect(tools().ignite(38, SKY + 5).ok).toBe(false);
+    expect(tools().ignite(38 * S, SKY + 5 * S)).toEqual({ ok: true });
+    expect(engine.fireSubsystem.grid.isBurning(38 * S, SKY + 5 * S)).toBe(true);
+    expect(tools().ignite(38 * S, SKY + 5 * S).ok).toBe(false);
   });
 
   it('refuses a cell with nothing to burn', () => {
-    expect(tools().ignite(20, SKY)).toEqual({ ok: false, error: 'Nothing there can burn.' });
+    expect(tools().ignite(20 * S, SKY)).toEqual({ ok: false, error: 'Nothing there can burn.' });
     expect(tools().ignite(-1, 0).ok).toBe(false);
     expect(tools().ignite('x', 0).ok).toBe(false);
   });
@@ -204,26 +206,26 @@ describe('reset', () => {
   it('rebuilds the map, fluid and mobs and sends players back to the start', () => {
     const me = engine.getPlayer(cid)!;
     // Wreck the world
-    engine.grid[SKY + 12][30] = { type: MiningTileType.EMPTY, revealed: true };
-    tools().pourFluid(35, 0, 'OIL');
-    tools().spawnMob('Mole Person', 60.5, SKY + 13);
+    engine.grid[SKY + 12 * S][30 * S] = { type: MiningTileType.EMPTY, revealed: true };
+    tools().pourFluid(35 * S, 0, 'OIL');
+    tools().spawnMob('Mole Person', 60.5 * S, SKY + 13 * S);
     tools().setGodMode(cid, true);
     tools().setSim({ paused: true, speed: 2 });
     me.temporaryBackpack.push({ itemId: 'i', itemName: 'Copper', quantity: 1, iconUrl: null });
-    me.playerBody.position = { x: 70, y: SKY + 13 };
+    me.playerBody.position = { x: 70 * S, y: SKY + 13 * S };
     me.health = 5;
 
     tools().reset();
 
     const fresh = createDefaultSandboxLayout([]);
     expect(engine.grid).toHaveLength(fresh.height + fresh.skyRows);
-    expect(engine.grid[SKY + 12][30].type).toBe(MiningTileType.EMPTY); // hall is open at row 12...
+    expect(engine.grid[SKY + 12 * S][30 * S].type).toBe(MiningTileType.EMPTY); // hall is open at row 12...
     expect(engine.getActiveMobs()).toHaveLength(2);
-    expect(fluidAt(35, 0)).toBe(0);
+    expect(fluidAt(35 * S, 0)).toBe(0);
     expect(engine.getPlayer(cid)).toBe(me);
     expect(me.health).toBe(me.maxHealth);
     expect(me.temporaryBackpack).toEqual([]);
-    expect(Math.round(me.playerBody.position.x)).toBe(22);
+    expect(Math.round(me.playerBody.position.x)).toBe(MINING_CONFIG.ENTRANCE_X);
     expect(Math.round(me.playerBody.position.y)).toBe(SKY);
     expect(me.godMode).toBe(true); // a player's own setting survives
     expect(tools().status(cid).paused).toBe(false);
@@ -231,7 +233,7 @@ describe('reset', () => {
   });
 
   it('puts a block that was mined back', () => {
-    const wall = { x: 31, y: SKY + 4 }; // a rock in the pool wall
+    const wall = { x: 31 * S, y: SKY + 4 * S }; // a rock in the pool wall
     expect(engine.grid[wall.y][wall.x].type).toBe(MiningTileType.ROCK);
     engine.grid[wall.y][wall.x] = { type: MiningTileType.EMPTY, revealed: true };
     tools().reset();
@@ -240,9 +242,9 @@ describe('reset', () => {
 
   it('still simulates after a reset', () => {
     tools().reset();
-    tools().pourFluid(60, SKY + 13, 'OIL');
+    tools().pourFluid(60 * S, SKY + 13 * S, 'OIL');
     tick(120);
-    expect(fluidAt(60, SKY + 13)).toBe(0);
+    expect(fluidAt(60 * S, SKY + 13 * S)).toBe(0);
     expect(engine.fluidSubsystem.grid.totalVolume()).toBeGreaterThan(0);
   });
 });
@@ -251,19 +253,19 @@ const gasAt = (x: number, y: number) => engine.gasSubsystem.grid.getConcentratio
 
 describe('releaseGas', () => {
   it('adds gas to an open cell, up to a full cell', () => {
-    expect(tools().releaseGas(35, SKY - 3, 'HYDROGEN')).toEqual({ ok: true });
-    expect(gasAt(35, SKY - 3)).toBeGreaterThan(0);
-    expect(tools().releaseGas(35, SKY - 3, 'HYDROGEN')).toMatchObject({ ok: false }); // already full
+    expect(tools().releaseGas(35 * S, SKY - 3 * S, 'HYDROGEN')).toEqual({ ok: true });
+    expect(gasAt(35 * S, SKY - 3 * S)).toBeGreaterThan(0);
+    expect(tools().releaseGas(35 * S, SKY - 3 * S, 'HYDROGEN')).toMatchObject({ ok: false }); // already full
   });
 
   it.each([
-    ['a solid tile', [10, SKY + 5, 'HYDROGEN'], /cannot hold/],
-    ['an unknown gas', [35, SKY, 'NOPE9'], /Unknown gas/],
-    ['a tile off the map', [90, SKY, 'HYDROGEN'], /inside the map/],
+    ['a solid tile', [10 * S, SKY + 5 * S, 'HYDROGEN'], /cannot hold/],
+    ['an unknown gas', [35 * S, SKY, 'NOPE9'], /Unknown gas/],
+    ['a tile off the map', [90 * S, SKY, 'HYDROGEN'], /inside the map/],
     ['a fractional tile', [35.5, SKY, 'HYDROGEN'], /inside the map/],
     ['a non-number', ['a', SKY, 'HYDROGEN'], /inside the map/],
-    ['a missing gas', [35, SKY, undefined], /Unknown gas/],
-    ['a cell holding another gas', [64, SKY + 4, 'NITROGEN'], /cannot hold/],
+    ['a missing gas', [35 * S, SKY, undefined], /Unknown gas/],
+    ['a cell holding another gas', [64 * S, SKY + 4 * S, 'NITROGEN'], /cannot hold/],
   ])('refuses %s', (_name, [x, y, key], message) => {
     const res = tools().releaseGas(x, y, key);
     expect(res.ok).toBe(false);
@@ -271,16 +273,16 @@ describe('releaseGas', () => {
   });
 
   it('refuses a cell that holds fluid: fluid wins the cell', () => {
-    tools().pourFluid(35, SKY - 3, 'OIL');
-    expect(tools().releaseGas(35, SKY - 3, 'HYDROGEN')).toMatchObject({ ok: false });
+    tools().pourFluid(35 * S, SKY - 3 * S, 'OIL');
+    expect(tools().releaseGas(35 * S, SKY - 3 * S, 'HYDROGEN')).toMatchObject({ ok: false });
   });
 
   it('lets hydrogen released in the open sky rise and fade away', () => {
-    tools().releaseGas(5, SKY - 2, 'HYDROGEN');
+    tools().releaseGas(5 * S, SKY - 2 * S, 'HYDROGEN');
     tick(60);
     // Hydrogen is going up (and out): there is some above where it was let go
     let hydrogenHigh = 0;
-    for (let y = 0; y < SKY - 2; y++) for (let x = 0; x < 90; x++) hydrogenHigh += gasAt(x, y) * (x >= 3 && x <= 7 ? 1 : 0);
+    for (let y = 0; y < SKY - 2 * S; y++) for (let x = 0; x < 90 * S; x++) hydrogenHigh += gasAt(x, y) * (x >= 3 * S && x <= 7 * S ? 1 : 0);
     expect(hydrogenHigh + engine.gasSubsystem.grid.ventedVolume).toBeGreaterThan(0.2);
     tick(900);
     expect(engine.gasSubsystem.grid.totalVolume(engine.gasSubsystem.registry.idOf('HYDROGEN')!) - startingHydrogen()).toBeLessThan(0.5);
@@ -288,57 +290,60 @@ describe('releaseGas', () => {
 });
 
 /** Hydrogen already in the sealed chamber (it never leaves while the roof is on). */
-const startingHydrogen = () => 48;
+const startingHydrogen = () => 48 * S * S;
 
 describe('the sandbox start', () => {
   it('begins with sealed hydrogen and nitrogen chambers that sit still', () => {
     const hydrogen = engine.gasSubsystem.registry.idOf('HYDROGEN')!;
     const nitrogen = engine.gasSubsystem.registry.idOf('NITROGEN')!;
-    expect(engine.gasSubsystem.grid.totalVolume(hydrogen)).toBeCloseTo(48, 3);
-    expect(engine.gasSubsystem.grid.totalVolume(nitrogen)).toBeCloseTo(48, 3);
+    expect(engine.gasSubsystem.grid.totalVolume(hydrogen)).toBeCloseTo(48 * S * S, 3);
+    expect(engine.gasSubsystem.grid.totalVolume(nitrogen)).toBeCloseTo(48 * S * S, 3);
     tick(300);
     expect(engine.gasSubsystem.grid.ventedVolume).toBe(0);
-    expect(engine.gasSubsystem.grid.totalVolume(hydrogen)).toBeCloseTo(48, 1);
+    expect(engine.gasSubsystem.grid.totalVolume(hydrogen)).toBeCloseTo(48 * S * S, 1);
   });
 
   it('lets hydrogen out when the roof is mined through, and it rises out and fades', () => {
     const grid = engine.gasSubsystem.grid;
     const hydrogen = engine.gasSubsystem.registry.idOf('HYDROGEN')!;
-    for (const y of [SKY, SKY + 1]) {
-      engine.grid[y][63] = { type: MiningTileType.EMPTY, revealed: true };
-      (engine as any).buildWorld().pushTileUpdate({ x: 63, y, type: MiningTileType.EMPTY });
+    // The roof is two original blocks thick; open a hole one original block wide through all of it
+    for (let y = SKY; y < SKY + 2 * S; y++) {
+      for (let x = 63 * S; x < 64 * S; x++) {
+        engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+        (engine as any).buildWorld().pushTileUpdate({ x, y, type: MiningTileType.EMPTY });
+      }
     }
-    expect(grid.isOpenToSky(63, SKY + 5)).toBe(true);
+    expect(grid.isOpenToSky(63 * S, SKY + 5 * S)).toBe(true);
     tick(1500);
     expect(grid.ventedVolume).toBeGreaterThan(10);
-    expect(grid.totalVolume(hydrogen)).toBeLessThan(48);
+    expect(grid.totalVolume(hydrogen)).toBeLessThan(48 * S * S);
     // The nitrogen chamber next door is untouched
-    expect(grid.totalVolume(engine.gasSubsystem.registry.idOf('NITROGEN')!)).toBeCloseTo(48, 1);
+    expect(grid.totalVolume(engine.gasSubsystem.registry.idOf('NITROGEN')!)).toBeCloseTo(48 * S * S, 1);
   });
 });
 
 describe('igniting gas', () => {
   it('sets off hydrogen as an explosion, with no dice, and the front crosses the chamber', () => {
-    expect(tools().ignite(63, SKY + 4)).toEqual({ ok: true });
+    expect(tools().ignite(63 * S, SKY + 4 * S)).toEqual({ ok: true });
     expect(engine.gasExplosionSubsystem.pendingCount).toBe(1);
     expect(engine.fireSubsystem.grid.burningCount).toBe(0);
     tick(60);
     // Nearly all of it went up; only a thin cloud (too thin to burn) is left
-    expect(engine.gasSubsystem.grid.totalVolume(engine.gasSubsystem.registry.idOf('HYDROGEN')!)).toBeLessThan(12);
+    expect(engine.gasSubsystem.grid.totalVolume(engine.gasSubsystem.registry.idOf('HYDROGEN')!)).toBeLessThan(12 * S * S);
     expect(engine.gasExplosionSubsystem.pendingCount).toBe(0);
   });
 
   it('cannot light nitrogen or clear air, and still lights oil as before', () => {
-    expect(tools().ignite(73, SKY + 4)).toEqual({ ok: false, error: 'Nothing there can burn.' });
-    expect(tools().ignite(5, SKY - 3)).toEqual({ ok: false, error: 'Nothing there can burn.' });
-    tools().pourFluid(35, SKY + 3, 'OIL');
-    expect(tools().ignite(35, SKY + 3)).toEqual({ ok: true });
+    expect(tools().ignite(73 * S, SKY + 4 * S)).toEqual({ ok: false, error: 'Nothing there can burn.' });
+    expect(tools().ignite(5 * S, SKY - 3 * S)).toEqual({ ok: false, error: 'Nothing there can burn.' });
+    tools().pourFluid(35 * S, SKY + 3 * S, 'OIL');
+    expect(tools().ignite(35 * S, SKY + 3 * S)).toEqual({ ok: true });
   });
 });
 
 describe('clearing hazards removes gas too', () => {
   it('empties every chamber and every cloud', () => {
-    tools().releaseGas(5, SKY - 2, 'HYDROGEN');
+    tools().releaseGas(5 * S, SKY - 2 * S, 'HYDROGEN');
     tools().clearHazards();
     expect(engine.gasSubsystem.grid.totalVolume()).toBe(0);
   });
@@ -346,16 +351,16 @@ describe('clearing hazards removes gas too', () => {
 
 describe('the simulation control also governs gas', () => {
   it('a paused sandbox holds gas still, a single step moves it, and a reset restores the chambers', () => {
-    tools().releaseGas(5, SKY - 2, 'HYDROGEN');
+    tools().releaseGas(5 * S, SKY - 2 * S, 'HYDROGEN');
     tools().setSim({ paused: true });
     tick(60);
-    expect(gasAt(5, SKY - 3)).toBe(0);
+    expect(gasAt(5 * S, SKY - 2 * S - 1)).toBe(0);
     tools().setSim({ step: true });
     tick(1);
-    expect(gasAt(5, SKY - 3)).toBeGreaterThan(0);
+    expect(gasAt(5 * S, SKY - 2 * S - 1)).toBeGreaterThan(0);
     tools().clearHazards();
     tools().reset();
-    expect(engine.gasSubsystem.grid.totalVolume(engine.gasSubsystem.registry.idOf('HYDROGEN')!)).toBeCloseTo(48, 3);
-    expect(engine.gasSubsystem.grid.getConcentration(5, SKY - 2)).toBe(0);
+    expect(engine.gasSubsystem.grid.totalVolume(engine.gasSubsystem.registry.idOf('HYDROGEN')!)).toBeCloseTo(48 * S * S, 3);
+    expect(engine.gasSubsystem.grid.getConcentration(5 * S, SKY - 2 * S)).toBe(0);
   });
 });

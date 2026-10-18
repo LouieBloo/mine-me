@@ -57,6 +57,8 @@ export abstract class MiningPhysicsBody {
   public fluidEnvironment: FluidEnvironment | null = null;
   /** Speed multiplier from wading through fluid, 1 when dry (see `updateFluidContact`). */
   public movementFactor = 1;
+  /** How far (tiles) the body stepped up onto a ledge during the last `update` (0 when it did not). Drawing eases this out. */
+  public stepUpLift = 0;
   /** The gas around the body, if the room has any. Set by whoever steps the body (server or client prediction). */
   public gasEnvironment: GasEnvironment | null = null;
   /** The gas the body is in right now (null in clear air). Nothing reads it yet: gases do not affect bodies for now. */
@@ -71,8 +73,8 @@ export abstract class MiningPhysicsBody {
       this.halfWidth = options.radius;
       this.halfHeight = options.radius;
     } else {
-      this.halfWidth = (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE) / 2;
-      this.halfHeight = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE) / 2;
+      this.halfWidth = MINING_CONFIG.PLAYER_COLLIDER_WIDTH_TILES / 2;
+      this.halfHeight = MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2;
     }
     this.radius = Math.max(this.halfWidth, this.halfHeight);
     this._hasGravity = options.hasGravity ?? true;
@@ -145,6 +147,7 @@ export abstract class MiningPhysicsBody {
    * through a thin wall. Slow bodies run a single step, exactly as before.
    */
   public update(dt: number, grid: MiningCollisionGrid): void {
+    this.stepUpLift = 0;
     // Fresh every step, so a body that moves out of (or into) fluid is never held to the last reading
     this.updateFluidContact();
     this.updateGasContact();
@@ -216,6 +219,8 @@ export abstract class MiningPhysicsBody {
 
     if (!this.checkTileCollision(targetX, this.position.y, grid)) {
       this.position.x = targetX;
+    } else if (this.tryStepUp(targetX, grid)) {
+      this.position.x = targetX;
     } else {
       if (this.velocity.x > 0) {
         // Moving right into a wall -> snap flush to left surface of blocking wall tile
@@ -238,6 +243,40 @@ export abstract class MiningPhysicsBody {
         this.isGrounded = false;
       }
     }
+  }
+
+  /**
+   * Walks a grounded body up onto a ledge that blocks it, if the ledge is no higher than MAX_STEP_UP_TILES and there is
+   * room for the whole body on top: the body moves up by the ledge height and on to `targetX` in the same step instead
+   * of stopping. Never in the air, and never over a wall taller than the step, so a jump is still needed for those.
+   */
+  private tryStepUp(targetX: number, grid: MiningCollisionGrid): boolean {
+    const lift = MINING_CONFIG.MAX_STEP_UP_TILES;
+    if (!(lift > 0) || !this.isGrounded || this.velocity.y < 0) return false;
+    const y = this.position.y - lift;
+    if (this.checkTileCollision(targetX, y, grid)) return false;
+    // It must be a ledge to stand on: solid ground right under the lifted feet
+    if (!this.hasSolidUnder(targetX, y, grid)) return false;
+    this.position.y = y;
+    this.stepUpLift += lift;
+    return true;
+  }
+
+  /** Whether any solid tile lies directly under the body's feet if it stood at (x, y). */
+  private hasSolidUnder(x: number, y: number, grid: MiningCollisionGrid): boolean {
+    const { width, height } = getGridDimensions(grid);
+    const feet = y + this.halfHeight;
+    const row = Math.floor(feet + 0.05);
+    if (row >= height) return true;
+    if (row < 0) return false;
+    const minTileX = Math.floor(x - this.halfWidth + 0.001);
+    const maxTileX = Math.floor(x + this.halfWidth - 0.001);
+    for (let tx = minTileX; tx <= maxTileX; tx++) {
+      if (tx < 0 || tx >= width) continue;
+      const tile = grid[row]?.[tx];
+      if (tile && isTileSolid(tile.type)) return true;
+    }
+    return false;
   }
 
   /**

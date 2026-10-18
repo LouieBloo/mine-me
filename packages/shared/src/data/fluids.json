@@ -20,10 +20,10 @@
     },
     "flammability": null,
     "generation": {
-      "maxSize": 4,
-      "minSize": 2,
+      "maxSize": 12,
+      "minSize": 6,
       "maxDepth": null,
-      "minDepth": 15,
+      "minDepth": 45,
       "percentage": 3
     },
     "soundEffects": null,
@@ -35,7 +35,7 @@
       "type": "POINT",
       "color": "#ff6a1a",
       "effect": "FLICKER",
-      "radius": 5,
+      "radius": 15,
       "enabled": true,
       "intensity": 0.9,
       "flickerSpeed": 6,
@@ -77,7 +77,7 @@
         "type": "POINT",
         "color": "#ff7a1c",
         "effect": "FLICKER",
-        "radius": 3.2,
+        "radius": 9.6,
         "enabled": true,
         "intensity": 0.75,
         "flickerSpeed": 11,
@@ -89,10 +89,10 @@
       "ignitionChance": 0.8
     },
     "generation": {
-      "maxSize": 4,
-      "minSize": 2,
+      "maxSize": 12,
+      "minSize": 6,
       "maxDepth": null,
-      "minDepth": 2,
+      "minDepth": 6,
       "percentage": 10
     },
     "soundEffects": null,
@@ -124,10 +124,10 @@
     "flammability": null,
     "generation": {
       "mode": "POOL",
-      "maxSize": 6,
-      "minSize": 3,
+      "maxSize": 18,
+      "minSize": 9,
       "maxDepth": null,
-      "minDepth": 2,
+      "minDepth": 6,
       "percentage": 6
     },
     "soundEffects": null,

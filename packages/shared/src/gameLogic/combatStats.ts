@@ -1,5 +1,5 @@
 import type { GameItem } from '../types';
-import type { Vector2D } from '../types/mining';
+import { BLOCK_SCALE, type Vector2D } from '../types/mining';
 
 /**
  * Equipment-derived combat stats. Each is the sum of the matching effect (by effect flag) over the
@@ -54,8 +54,8 @@ export const getItemPickPowerEffect = (item?: GameItem | null): number => sumIte
 /** Melee knockback in tenths of tiles/s. */
 export const getItemKnockbackEffect = (item?: GameItem | null): number => sumItemEffect(item, 'knockbackModifier');
 
-/** Melee knockback used by weapons without a Knockback effect (4.5 tiles/s sideways). */
-export const DEFAULT_MELEE_KNOCKBACK = 45;
+/** Melee knockback used by weapons without a Knockback effect (9 tiles/s sideways: 4.5 old tiles/s, in half-size blocks). */
+export const DEFAULT_MELEE_KNOCKBACK = 45 * BLOCK_SCALE;
 
 /** Upward lift per unit of sideways knockback (matches the original 4.5 / -3.2 push). */
 export const KNOCKBACK_LIFT_RATIO = 3.2 / 4.5;

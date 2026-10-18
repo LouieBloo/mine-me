@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MiningTileType, type MiningStateTickPayload } from '@mine-me/shared';
+import { MiningTileType, type MiningStateTickPayload, BLOCK_SCALE } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MiningSessionManager } from './MiningSessionManager';
 
@@ -39,7 +39,7 @@ describe('explosive gas going off', () => {
     const g = gas().grid;
     for (let y = 0; y < g.height; y++) for (let x = 0; x < g.width; x++) g.setCell(x, y, 0, 0);
     gas().drainChanges();
-    me().playerBody.position = { x: 5.5, y: 5.5 };
+    me().playerBody.position = { x: 85.5, y: 5.5 };
     engine.dataManager.getFluid('OIL')!.flammability = OIL_BURNS;
   });
 
@@ -58,7 +58,7 @@ describe('explosive gas going off', () => {
       expect(engine.gasExplosionSubsystem.canIgnite(20, 20)).toBe(true);
       expect(engine.gasExplosionSubsystem.canIgnite(30, 20)).toBe(false);
       expect(engine.gasExplosionSubsystem.canIgnite(25, 20)).toBe(false); // clear air
-      expect(engine.gasExplosionSubsystem.flammabilityAt(20, 20)?.explosion?.frontSpeed).toBe(3);
+      expect(engine.gasExplosionSubsystem.flammabilityAt(20, 20)?.explosion?.frontSpeed).toBe(3 * BLOCK_SCALE);
     });
 
     it('a spark on hydrogen lines it up; it does not burn as a fluid fire', () => {
@@ -333,7 +333,7 @@ describe('explosive gas going off', () => {
       const defs = MiningSessionManager.getInstance().buildClientState(engine, cid).gases!;
       const hydrogen = defs.find((d) => d.typeKey === 'HYDROGEN')!;
       expect(hydrogen.explosion?.effect).toEqual(FLASH);
-      expect(hydrogen.explosion?.light).toMatchObject({ color: '#cfe8ff', radius: 3 });
+      expect(hydrogen.explosion?.light).toMatchObject({ color: '#cfe8ff', radius: 3 * BLOCK_SCALE });
       expect(defs.find((d) => d.typeKey === 'NITROGEN')!.explosion).toBeUndefined();
     });
 

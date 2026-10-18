@@ -30,6 +30,9 @@ export class LightingEngine {
   private lightsGraphics: Graphics;
 
   private lights: Map<string, LightSource> = new Map();
+
+  /** Told how long each costly phase took (sunlight, lights, lightmap pass); the profiler listens, nothing else does. */
+  public onTiming?: (phase: string, ms: number) => void;
   private sunlightMap: number[][] | null = null;
   private sunlightDirty: boolean = false;
   private cachedGrid: MiningClientTile[][] | null = null;
@@ -146,9 +149,13 @@ export class LightingEngine {
     if (!grid || grid.length === 0) return;
     this.cachedGrid = grid;
     // Most grid updates are fog-of-war reveals that don't change which tiles are open air.
-    if (this.sunlightSignature === getSunlightSignature(this.fromSurface(grid))) return;
+    let unchanged = false;
+    this.timed('Sunlight Signature', () => {
+      unchanged = this.sunlightSignature === getSunlightSignature(this.fromSurface(grid));
+    });
+    if (unchanged) return;
     if (immediate) {
-      this.recalculateSunlight();
+      this.timed('Sunlight Recalc', () => this.recalculateSunlight());
     } else {
       this.sunlightDirty = true;
     }
@@ -192,11 +199,12 @@ export class LightingEngine {
    * Updates light animations and re-renders the lightmap ONLY when dirty.
    */
   public update(dt: number, playerPos?: Vector2D, playerFacing?: Vector2D): void {
-    if (this.isDestroyed || !this.lightmapRT || !this.app.renderer) return;
+    const lightmapRT = this.lightmapRT;
+    if (this.isDestroyed || !lightmapRT || !this.app.renderer) return;
 
     // 0. Recalculate sunlight if marked dirty by tile reveals or block digging
     if (this.sunlightDirty && this.cachedGrid) {
-      this.recalculateSunlight();
+      this.timed('Sunlight Recalc', () => this.recalculateSunlight());
     }
 
     // 1. Check flashlight state and movement
@@ -240,7 +248,7 @@ export class LightingEngine {
     this.isLightmapDirty = false;
 
     // 4. Render active dynamic light sources (torches, headlamp)
-    this.renderLights();
+    this.timed('Lights Draw', () => this.renderLights());
 
     // 5. Position and scale lights container relative to downscaled lightmap origin (-sideMargin, -skyMargin)
     this.lightsContainer.scale.set(this.lightmapScale);
@@ -248,15 +256,29 @@ export class LightingEngine {
     this.lightsContainer.y = this.skyMargin * this.lightmapScale;
 
     // 6. Render lightsContainer into lightmap RenderTexture
-    try {
-      this.app.renderer.render({
-        container: this.lightsContainer,
-        target: this.lightmapRT,
-        clear: true,
-      });
-    } catch {
-      // In headless or test environments renderer.render may be mocked/unavailable
-    }
+    this.timed('Lightmap Pass', () => {
+      try {
+        this.app.renderer.render({
+          container: this.lightsContainer,
+          target: lightmapRT,
+          clear: true,
+        });
+      } catch {
+        // In headless or test environments renderer.render may be mocked/unavailable
+      }
+    });
+  }
+
+  private timed(phase: string, work: () => void): void {
+    if (!this.onTiming) return work();
+    const start = performance.now();
+    work();
+    this.onTiming(phase, performance.now() - start);
+  }
+
+  /** How many light sources are active (for the performance overlay). */
+  public getLightCount(): number {
+    return this.lights.size;
   }
 
   /**

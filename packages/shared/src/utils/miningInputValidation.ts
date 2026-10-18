@@ -51,7 +51,8 @@ export function sanitizeMiningInput(raw: unknown): MiningInputState | null {
   const jump = readBoolean(raw, 'jump', false);
   const isFacingLeft = readBoolean(raw, 'isFacingLeft', false);
   const flashlightOn = readBoolean(raw, 'flashlightOn', false);
-  if ([up, down, left, right, miningKey, jump, isFacingLeft, flashlightOn].some((v) => v === null)) {
+  const preciseMining = readBoolean(raw, 'preciseMining', false);
+  if ([up, down, left, right, miningKey, jump, isFacingLeft, flashlightOn, preciseMining].some((v) => v === null)) {
     return null;
   }
 
@@ -73,6 +74,7 @@ export function sanitizeMiningInput(raw: unknown): MiningInputState | null {
   if (jump !== undefined) out.jump = jump as boolean;
   if (isFacingLeft !== undefined) out.isFacingLeft = isFacingLeft as boolean;
   if (flashlightOn !== undefined) out.flashlightOn = flashlightOn as boolean;
+  if (preciseMining !== undefined) out.preciseMining = preciseMining as boolean;
 
   if (raw.miningTarget !== undefined && raw.miningTarget !== null) {
     const target = sanitizeTilePosition(raw.miningTarget);

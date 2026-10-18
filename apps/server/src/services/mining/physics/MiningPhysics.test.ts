@@ -151,7 +151,7 @@ describe('MiningPhysicsBody & Subclasses (Gravity & Collision)', () => {
     });
 
     it('allows player at surface to jump into the open sky (y < 0) without ceiling clamp', () => {
-      const expectedRestingY = 1.0 - MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE);
+      const expectedRestingY = 1.0 - MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2;
       // Surface level: player standing at entrance y=0 on dirt below (tile y=1)
       const player = new MiningPlayerBody({ x: 15, y: expectedRestingY });
       grid[1][15] = { type: MiningTileType.DIRT, revealed: true };

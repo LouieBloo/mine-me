@@ -1,3 +1,5 @@
+import { miningProfiler } from '../utils/MiningProfiler';
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { useEffect, useRef, useState } from 'react';
 import { Application, Container, Graphics, Sprite, TilingSprite, Assets, Texture } from 'pixi.js';
 import { ModularCharacterSprite, FloatingTextManager, type GearLayerDescriptor } from '../../../../../components/game/sprites';
@@ -270,11 +272,12 @@ export function useMiningScene({
       TILE_SIZE,
       surfaceRow
     );
+    lightingEngine.onTiming = (phase, ms) => miningProfiler.recordEvent(phase, ms);
     remotePlayerRenderer.setLightingEngine(lightingEngine);
 
     const flashlight = new SpotLight(
       'player_flashlight',
-      { x: initialSessionState.position.x, y: initialSessionState.position.y - 0.28 },
+      { x: initialSessionState.position.x, y: initialSessionState.position.y - 0.28 * BLOCK_SCALE },
       playerFacingDirRef.current,
       0xfffae6,
       1.1,
@@ -526,7 +529,7 @@ export function useMiningScene({
           }
 
           // Scale sprite deterministically based on reference height to fit tile height (~34.5px tall)
-          const targetHeight = TILE_SIZE * 1.08;
+          const targetHeight = TILE_SIZE * MINING_CONFIG.CHARACTER_HEIGHT_TILES;
           sprite.scaleToHeight(targetHeight);
 
           // Foot alignment: unscaled feet are ~426px below pelvis origin.

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
+import { BLOCK_SCALE, MINING_CONFIG, MiningTileType } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 
@@ -271,8 +271,8 @@ describe('tool stats: one swing, separate tool/weapon damage, pick power, knockb
       const m = mob(23.4);
       hold(null);
       tick(1 / 30);
-      expect(pushOf(m).x).toBeGreaterThan(4);
-      expect(pushOf(m).x).toBeLessThanOrEqual(4.5 + 1e-6);
+      expect(pushOf(m).x).toBeGreaterThan(4 * BLOCK_SCALE);
+      expect(pushOf(m).x).toBeLessThanOrEqual(4.5 * BLOCK_SCALE + 1e-6);
       expect(pushOf(m).y).toBeLessThan(0);
     });
 

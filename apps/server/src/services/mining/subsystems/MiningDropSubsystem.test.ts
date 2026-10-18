@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
+import { BLOCK_SCALE, MINING_CONFIG, MiningTileType } from '@mine-me/shared';
 import { MiningGameEngine } from '../MiningGameEngine';
 import { MiningDataManager } from './MiningDataManager';
 
@@ -56,8 +56,8 @@ describe('dropped items', () => {
       const xs = s.drops.droppedItems.map((i) => i.position.x);
       expect(xs).toHaveLength(3);
       expect(new Set(xs).size).toBe(3); // spread out, not stacked
-      expect(Math.min(...xs)).toBeCloseTo(9.75, 5);
-      expect(Math.max(...xs)).toBeCloseTo(10.25, 5);
+      expect(Math.min(...xs)).toBeCloseTo(10 - 0.25 * BLOCK_SCALE, 5);
+      expect(Math.max(...xs)).toBeCloseTo(10 + 0.25 * BLOCK_SCALE, 5);
       expect(s.drops.droppedItems.every((i) => i.position.y === 8)).toBe(true);
       expect(s.drops.activeItemBodies.size).toBe(3);
       expect(s.drops.droppedItems.map((i) => i.quantity)).toEqual([1, 2, 3]);

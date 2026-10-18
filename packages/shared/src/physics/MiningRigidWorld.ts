@@ -1,5 +1,5 @@
 import * as planck from 'planck';
-import { MINING_CONFIG, MINING_TILE_WORLD_PIXELS, type Vector2D, isTileSolid, type MiningTileType } from '../types/mining';
+import { BLOCK_SCALE, MINING_CONFIG, MINING_TILE_PIXELS, type Vector2D, isTileSolid, type MiningTileType } from '../types/mining';
 import type { MiningCollisionGrid } from './MiningPhysicsBody';
 import type { ItemPhysicsConfig, ItemSoundEffectsConfig } from '../types';
 import { DEFAULT_DYNAMITE_PHYSICS_CONFIG } from '../constants';
@@ -249,9 +249,9 @@ export class MiningRigidWorld {
     const friction = physicsConfig?.friction ?? options?.friction ?? this.config.dynamiteFriction;
     const density = options?.density ?? (physicsConfig?.mass ? physicsConfig.mass : 1.0);
 
-    // 1 grid tile = 1.0 unit in Planck.js world space, and corresponds to 64px in screen rendering space.
-    // Collider dimensions are specified in pixels (e.g. 32px width = 0.5 tiles, 10px height = 0.15625 tiles).
-    const tilePixels = MINING_TILE_WORLD_PIXELS;
+    // 1 grid tile = 1.0 unit in Planck.js world space, and corresponds to MINING_TILE_PIXELS (32px) in screen rendering space.
+    // Collider dimensions are specified in pixels (e.g. 32px width = 1 tile, 10px height = 0.3125 tiles).
+    const tilePixels = MINING_TILE_PIXELS;
 
     if (physicsConfig?.colliderType === 'CIRCLE') {
       const radius = (physicsConfig.colliderRadius ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG.colliderRadius ?? 8) / tilePixels;
@@ -320,7 +320,7 @@ export class MiningRigidWorld {
 
   /**
    * Creates a dynamic rigid body for dropped items.
-   * Simple square collider of half normal tile size (0.5 x 0.5 tiles, or hx=0.25, hy=0.25).
+   * Simple square collider of one tile (32px, the size an item is drawn at; hx=0.5, hy=0.5).
    * Respects gravity, lands on tiles, and keeps fixed rotation for clean sprite rendering.
    */
   public createItemBody(
@@ -340,9 +340,9 @@ export class MiningRigidWorld {
       fixedRotation: true,
     });
 
-    // Simple square collider, half a normal tile size (0.5 x 0.5 total dimension)
+    // Simple square collider, one tile (1 x 1 total dimension, 32px)
     body.createFixture({
-      shape: planck.Box(0.25, 0.25),
+      shape: planck.Box(16 / MINING_TILE_PIXELS, 16 / MINING_TILE_PIXELS), // an item is drawn 32px across
       density: options?.density ?? 1.0,
       restitution: options?.restitution ?? 0.2,
       friction: options?.friction ?? 0.6,
@@ -406,7 +406,7 @@ export function calculateThrowVelocity(
   targetX: number,
   targetY: number,
   forceRatio: number = 1.0,
-  throwPower: number = 20.5,
+  throwPower: number = 20.5 * BLOCK_SCALE,
   gravity: number = MINING_CONFIG.GRAVITY,
   gravityScale: number = 1.0,
   isFacingLeft: boolean = false
@@ -415,14 +415,14 @@ export function calculateThrowVelocity(
   const dy = targetY - startY;
   const dist = Math.hypot(dx, dy);
 
-  if (dist < 0.05) {
+  if (dist < 0.05 * BLOCK_SCALE) {
     const dirX = isFacingLeft ? -1 : 1;
-    const speed = Math.min(throwPower, 6.0) * Math.max(0.05, Math.min(1.0, forceRatio));
-    return { x: dirX * speed, y: -2.0 * forceRatio };
+    const speed = Math.min(throwPower, 6.0 * BLOCK_SCALE) * Math.max(0.05, Math.min(1.0, forceRatio));
+    return { x: dirX * speed, y: -2.0 * BLOCK_SCALE * forceRatio };
   }
 
   const effectiveGravity = Math.max(1.0, gravity * (gravityScale ?? 1.0));
-  const dxAbs = Math.max(0.4, Math.abs(dx));
+  const dxAbs = Math.max(0.4 * BLOCK_SCALE, Math.abs(dx));
   const dyUp = Math.max(0, -dy);
 
   // Flight time tuned so trajectory is broad, flat, and forward-reaching rather than overly steep

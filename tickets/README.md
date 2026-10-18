@@ -88,3 +88,10 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Set `
 | [082](082-per-cell-fluid-geometry.md) | Per-cell fluid geometry (Minecraft-style corners) | P1 (Done) |
 | [083](083-fluid-flow-rendering.md) | Fluid rendering: motion by animation, not moving shapes | P1 (Done; judge the look in the game) |
 | [084](084-fluid-scenario-sandbox.md) | Fluid test scenes (repeatable audit cases) | P2 (Done) |
+| [085](085-half-size-blocks-core.md) | Small blocks (3x): engine constants, units and rendering (phase 1) | P1 (Done in code at 3x; cleanup before merging listed in the ticket) |
+| [086](086-half-size-blocks-data-migration.md) | Small blocks (3x): migrate DB rows and dev seed (phase 1) | P1 (Done; dev DB at 3x; seed JSON still 2x) |
+| [087](087-step-up-for-small-ledges.md) | Auto step-up over 1-cell ledges, players and mobs (phase 1) | P1 (Done) |
+| [088](088-half-size-blocks-world-systems.md) | Small blocks (3x): generation, fluids, fire, gas, profiling at 135x135 (phase 2) | P1 (Open) |
+| [089](089-two-by-two-placeables.md) | Placeables take 3x3 cells: ladder, torch, bridge (phase 2) | P1 (Done) |
+| [090](090-mob-pathing-for-tall-bodies.md) | Mob pathfinding and digging for bodies bigger than one cell (phase 2) | P1 (Done) |
+| [091](091-pickaxe-auto-target.md) | Pickaxe auto-target: mine the next blocks along the line to the cursor, Ctrl for 1x1 | P1 (Done) |

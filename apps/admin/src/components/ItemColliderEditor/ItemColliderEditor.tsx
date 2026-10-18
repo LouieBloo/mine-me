@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import React, { useState, useRef } from 'react';
 import type { ItemPhysicsConfig, ItemColliderType } from '@mine-me/shared';
 import './ItemColliderEditor.css';
@@ -582,15 +583,15 @@ export default function ItemColliderEditor({
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-xs">
                     <label htmlFor="dynamiteThrowPower" className="font-semibold text-amber-900">Throw Power</label>
-                    <span className="font-bold text-amber-800">{currentConfig.throwPower ?? 14.0}</span>
+                    <span className="font-bold text-amber-800">{currentConfig.throwPower ?? 14.0 * BLOCK_SCALE}</span>
                   </div>
                   <input
                     id="dynamiteThrowPower"
                     type="range"
-                    min="5"
-                    max="30"
-                    step="0.5"
-                    value={currentConfig.throwPower ?? 14.0}
+                    min={5 * BLOCK_SCALE}
+                    max={30 * BLOCK_SCALE}
+                    step={0.5 * BLOCK_SCALE}
+                    value={currentConfig.throwPower ?? 14.0 * BLOCK_SCALE}
                     onChange={e => updateConfig({ throwPower: parseFloat(e.target.value) })}
                     className="w-full item-collider-slider cursor-pointer"
                   />

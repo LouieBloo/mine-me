@@ -123,7 +123,7 @@ describe('MiningProjectileEntity', () => {
   });
 
   it('stops at the cavern wall underground', () => {
-    const proj = new MiningProjectileEntity('proj-w', 'char-1', { x: 1, y: 5.5 }, { x: -100, y: 0 });
+    const proj = new MiningProjectileEntity('proj-w', 'char-1', { x: 2.5, y: 5.5 }, { x: -100, y: 0 }); // (past the muzzle clearance)
     proj.update(0.05, grid);
     expect(proj.hasHit).toBe(true);
     expect(proj.hitTile).toBeUndefined();

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MiningProjectileEntity } from './physics/MiningProjectileEntity';
-import { MiningTileType } from '@mine-me/shared';
+import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
 
 describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
   let engine: MiningGameEngine;
@@ -29,7 +29,7 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
   const mag = (weaponId = REVOLVER) => engine.projectileSubsystem.magazines.peek('char-shooter-1', weaponId);
 
   it('shoots a projectile towards the target and tracks magazine rounds (6 shots)', () => {
-    const res1 = engine.shootProjectile('char-shooter-1', { x: 35, y: 0 });
+    const res1 = engine.shootProjectile('char-shooter-1', { x: 70, y: 0 });
     expect(res1.success).toBe(true);
     expect(res1.remainingAmmo).toBe(5);
     expect(res1.isReloading).toBe(false);
@@ -41,7 +41,7 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
   });
 
   it('tells clients how loud the gunshot is on this weapon (100% unless set)', () => {
-    engine.shootProjectile('char-shooter-1', { x: 35, y: 0 });
+    engine.shootProjectile('char-shooter-1', { x: 70, y: 0 });
     const shot = engine.projectileSubsystem.pendingGunshots[0];
     expect(shot.soundVolume).toBe(1);
 
@@ -51,7 +51,7 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
     try {
       const ammo = mag();
       if (ammo) ammo.lastShotAt = -Infinity;
-      engine.shootProjectile('char-shooter-1', { x: 35, y: 0 });
+      engine.shootProjectile('char-shooter-1', { x: 70, y: 0 });
       const gunshots = engine.projectileSubsystem.pendingGunshots;
       const quiet = gunshots[gunshots.length - 1];
       expect(quiet.soundUrl).toBe('/assets/sounds/shot.mp3');
@@ -184,8 +184,8 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
   });
 
   it('spawns projectile at specified muzzlePosition and aims directly towards target', () => {
-    const muzzlePos = { x: 22.4, y: -0.3 };
-    const target = { x: 30.0, y: 10.0 };
+    const muzzlePos = { x: MINING_CONFIG.ENTRANCE_X + 1.6, y: -0.3 };
+    const target = { x: MINING_CONFIG.ENTRANCE_X + 16, y: 10.0 };
     const res = engine.shootProjectile('char-shooter-1', target, muzzlePos);
     expect(res.success).toBe(true);
     expect(engine.activeProjectiles.length).toBe(1);

@@ -15,8 +15,8 @@ export class MiningPlayerBody extends MiningPhysicsBody {
   constructor(position: Vector2D) {
     super({
       position,
-      width: MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE,
-      height: MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE,
+      width: MINING_CONFIG.PLAYER_COLLIDER_WIDTH_TILES,
+      height: MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES,
       hasGravity: true,
       gravityScale: 1.0,
       mass: 1.0,

@@ -1,6 +1,6 @@
 import { BaseMobAI, type MobAIContext, type MobActionIntent, type PlayerTargetInfo } from './BaseMobAI';
-import { MiningPathfinder } from '../pathfinding/MiningPathfinder';
-import { isTileSolid, type MiningPathWaypoint } from '../../types/mining';
+import { MiningPathfinder, footprintOf } from '../pathfinding/MiningPathfinder';
+import { isTileSolid, BLOCK_SCALE, MINING_CONFIG, type MiningPathWaypoint } from '../../types/mining';
 
 const MIN_PATH_INTERVAL = 1.0;
 const PATH_INTERVAL_JITTER = 0.5;
@@ -36,11 +36,53 @@ export class ChaseAndMineAI extends BaseMobAI {
   public update(dt: number, context: MobAIContext): MobActionIntent {
     this.pathTimer = Math.max(0, this.pathTimer - dt);
 
-    const aggroRange = context.config?.aggroRange ?? 20.0;
-    const attackRange = context.config?.attackRange ?? 1.25;
+    const aggroRange = context.config?.aggroRange ?? MINING_CONFIG.MOB_DEFAULT_AGGRO_RANGE;
+    const attackRange = context.config?.attackRange ?? MINING_CONFIG.MOB_DEFAULT_ATTACK_RANGE;
     const canMine = context.config?.canMine ?? true;
-    const mineRange = context.config?.mineRange ?? 2.0;
-    const maxJumpTiles = context.config?.maxJumpTiles ?? 1;
+    const mineRange = context.config?.mineRange ?? MINING_CONFIG.MOB_DEFAULT_MINE_RANGE;
+    const maxJumpTiles = context.config?.maxJumpTiles ?? Math.max(1, Math.floor(context.jumpTiles ?? 1));
+
+    // A mob with a body size is planned for as a block of cells (a footprint); without, as the one cell it stands in
+    const bodyMode = context.body !== undefined;
+    const fp = context.body ? footprintOf(context.body.width, context.body.height) : { width: 1, height: 1 };
+    const halfHeight = context.body ? context.body.height / 2 : 0;
+    const playerHalfHeight = MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2;
+    /** The footprint node (left column, bottom row) a body centred at `p` occupies. */
+    const nodeOf = (p: { x: number; y: number }, half: number): { x: number; y: number } =>
+      bodyMode
+        ? { x: Math.round(p.x - fp.width / 2), y: Math.floor(p.y + half - 0.001) }
+        : { x: Math.floor(p.x), y: Math.floor(p.y) };
+    const isObstacle = (tx: number, ty: number): boolean => {
+      const row = context.grid[ty];
+      const tile = row ? row[tx] : undefined;
+      return tile ? isTileSolid(tile.type) : false;
+    };
+    /** Whether any cell of the footprint at node (nx, ny) is solid. */
+    const footprintBlocked = (nx: number, ny: number): boolean => {
+      for (let r = ny - fp.height + 1; r <= ny; r++) for (let c = nx; c < nx + fp.width; c++) if (isObstacle(c, r)) return true;
+      return false;
+    };
+    /** The solid cell of the footprint at a waypoint to dig next: the one the pathfinder chose if it is still there, else the nearest. */
+    const cellToMine = (wp: MiningPathWaypoint): { x: number; y: number } | null => {
+      if (!bodyMode) return isObstacle(wp.x, wp.y) ? { x: wp.x, y: wp.y } : null;
+      if (wp.mineTarget && isObstacle(wp.mineTarget.x, wp.mineTarget.y)) return wp.mineTarget;
+      let best: { x: number; y: number } | null = null;
+      let bestDist = Infinity;
+      for (let r = wp.y - fp.height + 1; r <= wp.y; r++) {
+        for (let c = wp.x; c < wp.x + fp.width; c++) {
+          if (!isObstacle(c, r)) continue;
+          const d = Math.hypot(c + 0.5 - context.position.x, r + 0.5 - context.position.y);
+          if (d < bestDist) { best = { x: c, y: r }; bestDist = d; }
+        }
+      }
+      return best;
+    };
+    /** The world x a body should walk to to stand on waypoint `wp`: the middle of its footprint. */
+    const centreX = (wp: { x: number }): number => wp.x + (bodyMode ? fp.width / 2 : 0.5);
+    const steer = (wp: { x: number }): number => {
+      const diff = centreX(wp) - context.position.x;
+      return bodyMode && Math.abs(diff) < 0.15 ? 0 : Math.sign(diff);
+    };
 
     // 1. Locate nearest living player
     let nearestPlayer: PlayerTargetInfo | null = null;
@@ -95,38 +137,33 @@ export class ChaseAndMineAI extends BaseMobAI {
     }
 
     // Helper to check if a tile is currently solid
-    const isTileObstacle = (tx: number, ty: number): boolean => {
-      const row = context.grid[ty];
-      const tile = row ? row[tx] : undefined;
-      return tile ? isTileSolid(tile.type) : false;
-    };
+    const isTileObstacle = isObstacle;
 
     // 3. Path Recalculation
-    const targetTile = {
-      x: Math.floor(nearestPlayer.position.x),
-      y: Math.floor(nearestPlayer.position.y),
-    };
+    const targetTile = bodyMode
+      ? nodeOf(nearestPlayer.position, playerHalfHeight)
+      : { x: Math.floor(nearestPlayer.position.x), y: Math.floor(nearestPlayer.position.y) };
+    const mobNode = nodeOf(context.position, halfHeight);
 
     const currentWpAtIdx = this.path[this.currentWaypointIndex];
+    const activeMineCell = currentWpAtIdx?.action === 'MINE' ? cellToMine(currentWpAtIdx) : null;
     const isActivelyMining =
-      currentWpAtIdx?.action === 'MINE' &&
-      BaseMobAI.isWithinReach(context.position, currentWpAtIdx, mineRange) &&
-      isTileObstacle(currentWpAtIdx.x, currentWpAtIdx.y);
+      activeMineCell !== null && BaseMobAI.isWithinReach(context.position, activeMineCell, mineRange);
 
     const targetMoved =
       !this.lastTargetPos ||
-      Math.abs(this.lastTargetPos.x - targetTile.x) > 1.5 ||
-      Math.abs(this.lastTargetPos.y - targetTile.y) > 1.5;
+      Math.abs(this.lastTargetPos.x - targetTile.x) > 1.5 * BLOCK_SCALE ||
+      Math.abs(this.lastTargetPos.y - targetTile.y) > 1.5 * BLOCK_SCALE;
 
     // Do not interrupt an active block excavation on the periodic timer
     const needsPath = this.pathTimer <= 0 || targetMoved || this.currentWaypointIndex >= this.path.length;
     // Over the tick's search budget: keep the current path and ask again next tick
     if (!isActivelyMining && needsPath && (context.pathBudget?.tryConsume() ?? true)) {
       this.path = MiningPathfinder.findPath(
-        { x: context.position.x, y: context.position.y },
-        targetTile,
+        bodyMode ? { x: mobNode.x + 0.5, y: mobNode.y + 0.5 } : { x: context.position.x, y: context.position.y },
+        bodyMode ? { x: targetTile.x + 0.5, y: targetTile.y + 0.5 } : targetTile,
         context.grid,
-        { canMine, maxJumpTiles }
+        { canMine, maxJumpTiles, bodyWidth: fp.width, bodyHeight: fp.height, maxSearchDepth: 500 * BLOCK_SCALE }
       );
       this.currentWaypointIndex = 0;
       this.pathTimer = this.pathInterval;
@@ -137,15 +174,35 @@ export class ChaseAndMineAI extends BaseMobAI {
     while (
       this.currentWaypointIndex < this.path.length &&
       this.path[this.currentWaypointIndex].action === 'MINE' &&
-      !isTileObstacle(this.path[this.currentWaypointIndex].x, this.path[this.currentWaypointIndex].y)
+      cellToMine(this.path[this.currentWaypointIndex]) === null
     ) {
       this.currentWaypointIndex++;
     }
 
     // If no path could be found or path is exhausted, attempt direct approach towards target
     if (this.path.length === 0 || this.currentWaypointIndex >= this.path.length) {
+      if (bodyMode) {
+        const dir = Math.sign(dx);
+        const ahead = mobNode.x + dir;
+        const blockedAhead = dir !== 0 && footprintBlocked(ahead, mobNode.y);
+        // A one-cell step is walked up; a higher obstacle is jumped if the body fits through the air above it
+        if (context.isGrounded && blockedAhead && footprintBlocked(ahead, mobNode.y - 1)) {
+          for (let k = 2; k <= maxJumpTiles; k++) {
+            if (!footprintBlocked(ahead, mobNode.y - k) && !footprintBlocked(mobNode.x, mobNode.y - k)) {
+              return { moveX: dir, jump: true, climbUp: false, climbDown: false, isMining: false, miningTarget: null, isAttacking: false, animationState: 'jump' };
+            }
+          }
+        }
+        if (canMine && blockedAhead) {
+          const cell = cellToMine({ x: ahead, y: mobNode.y, action: 'MINE' });
+          if (cell && BaseMobAI.isWithinReach(context.position, cell, mineRange)) {
+            return { moveX: 0, jump: false, climbUp: false, climbDown: false, isMining: true, miningTarget: cell, isAttacking: false, animationState: 'mine' };
+          }
+        }
+        return { moveX: dir, jump: false, climbUp: false, climbDown: false, isMining: false, miningTarget: null, isAttacking: false, animationState: Math.abs(dx) > 0.1 ? 'walk' : 'idle' };
+      }
       const dirX = Math.sign(dx);
-      const nextTileX = Math.floor(context.position.x + dirX * 0.6);
+      const nextTileX = Math.floor(context.position.x + dirX * 0.6 * BLOCK_SCALE);
       const currentTileY = Math.floor(context.position.y);
       const headTileY = currentTileY - 1;
       const isObstacleAhead = isTileObstacle(nextTileX, currentTileY);
@@ -196,8 +253,8 @@ export class ChaseAndMineAI extends BaseMobAI {
     // 4. Follow Waypoint
     let wp = this.path[this.currentWaypointIndex];
 
-    const mobTileX = Math.floor(context.position.x);
-    const mobTileY = Math.floor(context.position.y);
+    const mobTileX = bodyMode ? mobNode.x : Math.floor(context.position.x);
+    const mobTileY = bodyMode ? mobNode.y : Math.floor(context.position.y);
 
     // For non-MINE waypoints, advance once mob reaches the tile
     if (wp.action !== 'MINE') {
@@ -215,10 +272,11 @@ export class ChaseAndMineAI extends BaseMobAI {
 
     switch (currentWp.action) {
       case 'MINE': {
-        const inReach = BaseMobAI.isWithinReach(context.position, currentWp, mineRange);
+        const mineCell = cellToMine(currentWp) ?? { x: currentWp.x, y: currentWp.y };
+        const inReach = BaseMobAI.isWithinReach(context.position, mineCell, mineRange);
         if (!inReach) {
           // Walk towards the block until within mining reach
-          const moveDir = Math.sign(currentWp.x + 0.5 - context.position.x);
+          const moveDir = steer(currentWp);
           return {
             moveX: moveDir,
             jump: false,
@@ -237,7 +295,7 @@ export class ChaseAndMineAI extends BaseMobAI {
           climbUp: false,
           climbDown: false,
           isMining: true,
-          miningTarget: { x: currentWp.x, y: currentWp.y },
+          miningTarget: { x: mineCell.x, y: mineCell.y },
           isAttacking: false,
           animationState: 'mine',
         };
@@ -245,7 +303,7 @@ export class ChaseAndMineAI extends BaseMobAI {
 
       case 'JUMP':
         return {
-          moveX: Math.sign(currentWp.x + 0.5 - context.position.x),
+          moveX: steer(currentWp),
           jump: context.isGrounded,
           climbUp: false,
           climbDown: false,
@@ -257,10 +315,10 @@ export class ChaseAndMineAI extends BaseMobAI {
 
       case 'CLIMB':
         return {
-          moveX: Math.sign(currentWp.x + 0.5 - context.position.x) * 0.5,
+          moveX: steer(currentWp) * 0.5,
           jump: false,
-          climbUp: currentWp.y < context.position.y,
-          climbDown: currentWp.y > context.position.y,
+          climbUp: bodyMode ? currentWp.y < mobNode.y : currentWp.y < context.position.y,
+          climbDown: bodyMode ? currentWp.y > mobNode.y : currentWp.y > context.position.y,
           isMining: false,
           miningTarget: null,
           isAttacking: false,
@@ -269,7 +327,7 @@ export class ChaseAndMineAI extends BaseMobAI {
 
       case 'FALL':
         return {
-          moveX: Math.sign(currentWp.x + 0.5 - context.position.x),
+          moveX: steer(currentWp),
           jump: false,
           climbUp: false,
           climbDown: false,
@@ -281,10 +339,18 @@ export class ChaseAndMineAI extends BaseMobAI {
 
       case 'WALK':
       default: {
-        const moveDir = Math.sign(currentWp.x + 0.5 - context.position.x);
+        const moveDir = steer(currentWp);
         let shouldJump = false;
-        if (context.isGrounded && moveDir !== 0) {
-          const aheadX = Math.floor(context.position.x + moveDir * 0.55);
+        if (bodyMode) {
+          // A one-cell step is walked up by the body itself; only a higher obstacle needs a jump
+          const ahead = mobNode.x + moveDir;
+          if (context.isGrounded && moveDir !== 0 && footprintBlocked(ahead, mobNode.y) && footprintBlocked(ahead, mobNode.y - 1)) {
+            for (let k = 2; k <= maxJumpTiles && !shouldJump; k++) {
+              if (!footprintBlocked(ahead, mobNode.y - k) && !footprintBlocked(mobNode.x, mobNode.y - k)) shouldJump = true;
+            }
+          }
+        } else if (context.isGrounded && moveDir !== 0) {
+          const aheadX = Math.floor(context.position.x + moveDir * 0.55 * BLOCK_SCALE);
           const currentY = Math.floor(context.position.y);
           const headY = currentY - 1;
           const isObstacleAhead = isTileObstacle(aheadX, currentY);

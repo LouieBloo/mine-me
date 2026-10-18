@@ -56,7 +56,7 @@ describe('MiningMobBody', () => {
   });
 
   it('jumps only when grounded', () => {
-    const halfHeight = MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE);
+    const halfHeight = MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2;
     const mob = new MiningMobBody({
       position: { x: 5.5, y: 10.0 - halfHeight }, // Resting on top of dirt floor at y=10
       jumpForce: 6.5,

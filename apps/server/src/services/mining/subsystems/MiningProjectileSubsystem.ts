@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import {
   clampSoundVolume,
   type DamageEvent,
@@ -106,7 +107,7 @@ export class MiningProjectileSubsystem {
     const dirX = dx / dist;
     const dirY = dy / dist;
 
-    const speed = projConfig.projectileSpeed ?? 28.0;
+    const speed = projConfig.projectileSpeed ?? 28.0 * BLOCK_SCALE;
     const initialVel: Vector2D = {
       x: dirX * speed,
       y: dirY * speed,

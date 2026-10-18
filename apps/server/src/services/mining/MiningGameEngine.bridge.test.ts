@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MiningTileType, isTileSolid, type MiningStateTickPayload } from '@mine-me/shared';
+import { BLOCK_SCALE, MiningTileType, isTileSolid, type MiningStateTickPayload } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 
 describe('placing and mining bridges', () => {
@@ -11,13 +11,13 @@ describe('placing and mining bridges', () => {
   const tileAt = (x: number, y: number) => engine.grid[y][x].type;
   const tileUpdates = () => socket.emit.mock.calls.filter((c) => c[0] === 'mining_state_tick').flatMap((c) => (c[1] as MiningStateTickPayload).revealedTiles ?? []);
 
-  /** An open room x 16..28, y 17..20 over a dirt floor at row 21; the player stands at x = 22.5 on the floor. */
+  /** An open room x 10..34, y 8..20 over a dirt floor at row 21; the player (1.25 x 1.75 tiles) stands at x = 22.5 on the floor. */
   beforeEach(() => {
     socket = { connected: true, emit: vi.fn() };
     engine = new MiningGameEngine({ characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0 }, socket: socket as any });
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
-    for (let x = 16; x <= 28; x++) {
-      for (let y = 17; y <= 20; y++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+    for (let x = 10; x <= 34; x++) {
+      for (let y = 8; y <= 20; y++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
       engine.grid[21][x] = { type: MiningTileType.DIRT, revealed: true };
     }
     me().playerBody.position = { x: 22.5, y: 21 - me().playerBody.halfHeight };
@@ -28,58 +28,62 @@ describe('placing and mining bridges', () => {
     expect(isTileSolid(MiningTileType.BRIDGE)).toBe(true);
   });
 
-  it('places a bridge in an empty cell within reach and tells clients', () => {
-    expect(engine.placeBridge(cid, { x: 23, y: 19 })).toBe(true);
-    expect(tileAt(23, 19)).toBe(MiningTileType.BRIDGE);
+  it('places a bridge piece around the cursor within reach and tells clients', () => {
+    expect(engine.placeBridge(cid, { x: 25, y: 19 })).toBe(true);
+    expect(tileAt(25, 19)).toBe(MiningTileType.BRIDGE);
     tick();
-    expect(tileUpdates()).toContainEqual(expect.objectContaining({ x: 23, y: 19, type: MiningTileType.BRIDGE }));
+    const updates = tileUpdates().filter((u) => u.type === MiningTileType.BRIDGE);
+    expect(updates).toHaveLength(BLOCK_SCALE * BLOCK_SCALE);
+    expect(updates).toContainEqual(expect.objectContaining({ x: 25, y: 19, piece: [1, 1] }));
   });
 
   it('cannot go out of reach, over a block, over another bridge, or in an unrevealed cell', () => {
-    expect(engine.canPlaceBridge(cid, { x: 27, y: 19 })).toBe(false); // too far
+    expect(engine.canPlaceBridge(cid, { x: 31, y: 19 })).toBe(false); // too far
     expect(engine.canPlaceBridge(cid, { x: 22, y: 21 })).toBe(false); // dirt
-    engine.placeBridge(cid, { x: 23, y: 19 });
-    expect(engine.canPlaceBridge(cid, { x: 23, y: 19 })).toBe(false); // already a bridge
-    engine.grid[19][21].revealed = false;
-    expect(engine.canPlaceBridge(cid, { x: 21, y: 19 })).toBe(false);
+    engine.placeBridge(cid, { x: 25, y: 19 });
+    expect(engine.canPlaceBridge(cid, { x: 25, y: 19 })).toBe(false); // already a bridge
+    engine.grid[19][19].revealed = false;
+    expect(engine.canPlaceBridge(cid, { x: 19, y: 19 })).toBe(false);
+    expect(engine.canPlaceBridge(cid, { x: 12, y: 19 })).toBe(false); // too far
   });
 
   it('cannot go on top of a player or a mob', () => {
     expect(engine.canPlaceBridge(cid, { x: 22, y: 20 })).toBe(false); // the player's own cell
     // A mob standing in the next cell
-    const mob = { health: 10, mobBody: { position: { x: 23.5, y: 20.5 }, halfWidth: 0.3, halfHeight: 0.4 } } as any;
+    const mob = { health: 10, mobBody: { position: { x: 25.5, y: 20.1 }, halfWidth: 0.6, halfHeight: 0.85 } } as any;
     engine.activeMobs.set('m', mob);
-    expect(engine.canPlaceBridge(cid, { x: 23, y: 20 })).toBe(false);
+    expect(engine.canPlaceBridge(cid, { x: 25, y: 20 })).toBe(false);
     engine.activeMobs.delete('m');
-    expect(engine.canPlaceBridge(cid, { x: 23, y: 20 })).toBe(true);
+    expect(engine.canPlaceBridge(cid, { x: 25, y: 20 })).toBe(true);
   });
 
   it('is walked on like a floor and cannot be passed from below', () => {
-    expect(engine.placeBridge(cid, { x: 22, y: 19 })).toBe(true); // from the floor, in reach
+    // High enough that the player (about 2.7 tiles tall) can stand under it
+    expect(engine.placeBridge(cid, { x: 24, y: 15 })).toBe(true); // from the floor, in reach; covers rows 14-16
     const body = me().playerBody;
 
     // From above: lands on it
-    body.position = { x: 22.5, y: 17 - body.halfHeight };
+    body.position = { x: 24.5, y: 10 };
     body.velocity = { x: 0, y: 0 };
     body.isGrounded = false;
     tick(30);
     expect(body.isGrounded).toBe(true);
-    expect(body.position.y).toBeCloseTo(19 - body.halfHeight, 1);
+    expect(body.position.y).toBeCloseTo(14 - body.halfHeight, 1);
 
-    // From below: a full-power jump stops against its underside (y = 20)
-    body.position = { x: 22.5, y: 21 - body.halfHeight };
+    // From below: a full-power jump stops against its underside (y = 17)
+    body.position = { x: 24.5, y: 21 - body.halfHeight };
     body.velocity = { x: 0, y: -30 };
     body.isGrounded = false;
     tick(40);
-    expect(body.position.y).toBeGreaterThan(20);
+    expect(body.position.y - body.halfHeight).toBeGreaterThan(17 - 0.05);
   });
 
-  it('mining it breaks it in one hit of a basic tool and gives a bridge back', () => {
-    engine.placeBridge(cid, { x: 23, y: 19 });
+  it('mining a cell of it breaks the whole piece in one hit of a basic tool and gives one bridge back', () => {
+    engine.placeBridge(cid, { x: 25, y: 19 });
     expect(engine.dataManager.getBlockMaxHealth(MiningTileType.BRIDGE)).toBeLessThanOrEqual(25);
-    const result = engine.damageTile(23, 19, { amount: 25, type: 'mining', source: { kind: 'player', id: cid } });
+    const result = engine.damageTile(25, 19, { amount: 25, type: 'mining', source: { kind: 'player', id: cid } });
     expect(result.destroyed).toBe(true);
-    expect(tileAt(23, 19)).toBe(MiningTileType.EMPTY);
+    for (let y = 18; y <= 20; y++) for (let x = 24; x <= 26; x++) expect(tileAt(x, y)).toBe(MiningTileType.EMPTY);
     expect(engine.droppedItems.map((d) => d.itemId)).toEqual(['item_bridge']);
   });
 });
@@ -125,8 +129,8 @@ describe('laying a bridge while running', () => {
 
   it('allows a little extra reach for a player whose server position trails their screen, but not far', () => {
     me().playerBody.position = { x: 20.5, y: 21 - me().playerBody.halfHeight };
-    expect(engine.bridgePlacementProblem(cid, { x: 22, y: 20 })).toBe(null); // 2.0 tiles away: past 1.85, inside the slack
-    expect(engine.bridgePlacementProblem(cid, { x: 24, y: 20 })).toBe('out_of_reach');
+    expect(engine.bridgePlacementProblem(cid, { x: 26, y: 20 })).toBe(null); // 6.0 tiles away: past the 5.55 reach, inside the 1.8 slack
+    expect(engine.bridgePlacementProblem(cid, { x: 29, y: 20 })).toBe('out_of_reach');
   });
 
   it('says why a bridge was refused', () => {
@@ -146,24 +150,24 @@ describe('buildables only go into empty tiles', () => {
     engine = new MiningGameEngine({ characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0 }, socket: { connected: true, emit: vi.fn() } as any });
     engine.players.get(cid)!.playerBody.position = { x: 22.5, y: 20.5 };
     for (const t of [MiningTileType.DIRT, MiningTileType.ROCK, MiningTileType.CHEST, MiningTileType.COPPERIUM, MiningTileType.LADDER, MiningTileType.TORCH, MiningTileType.BRIDGE]) {
-      engine.grid[20][23] = { type: t, revealed: true };
+      engine.grid[20][25] = { type: t, revealed: true };
     }
   });
 
   it.each([MiningTileType.DIRT, MiningTileType.ROCK, MiningTileType.CHEST, MiningTileType.COPPERIUM, MiningTileType.LADDER, MiningTileType.TORCH, MiningTileType.BRIDGE])(
     'refuses a ladder, torch and bridge over tile type %i',
     (type) => {
-      engine.grid[20][23] = { type, revealed: true };
-      expect(engine.canPlaceLadder(cid, { x: 23, y: 20 })).toBe(false);
-      expect(engine.canPlaceTorch(cid, { x: 23, y: 20 })).toBe(false);
-      expect(engine.canPlaceBridge(cid, { x: 23, y: 20 })).toBe(false);
+      engine.grid[20][25] = { type, revealed: true };
+      expect(engine.canPlaceLadder(cid, { x: 25, y: 20 })).toBe(false);
+      expect(engine.canPlaceTorch(cid, { x: 25, y: 20 })).toBe(false);
+      expect(engine.canPlaceBridge(cid, { x: 25, y: 20 })).toBe(false);
     }
   );
 
   it('accepts all three in an empty tile', () => {
-    engine.grid[20][23] = { type: MiningTileType.EMPTY, revealed: true };
-    expect(engine.canPlaceLadder(cid, { x: 23, y: 20 })).toBe(true);
-    expect(engine.canPlaceTorch(cid, { x: 23, y: 20 })).toBe(true);
-    expect(engine.canPlaceBridge(cid, { x: 23, y: 20 })).toBe(true);
+    for (let y = 18; y <= 22; y++) for (let x = 23; x <= 27; x++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+    expect(engine.canPlaceLadder(cid, { x: 25, y: 20 })).toBe(true);
+    expect(engine.canPlaceTorch(cid, { x: 25, y: 20 })).toBe(true);
+    expect(engine.canPlaceBridge(cid, { x: 25, y: 20 })).toBe(true);
   });
 });

@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { MiningTileType, computeSpeedDamage, isTileSolid, knockbackAway, type Vector2D } from '@mine-me/shared';
 import { rockDamageRule } from '../environmentalDamage';
 import { isInBounds } from '../../miningMap.service';
@@ -7,10 +8,10 @@ import type { MiningWorld } from '../MiningWorld';
 /** How close (tiles) a falling rock's center must be to a player's to hit them. */
 const CRUSH_RADIUS = 0.6;
 /** A rock must be moving down faster than this (tiles/s) and have fallen this far (tiles) to count as falling. */
-const CRUSH_MIN_DOWNWARD_SPEED = 2.0;
-const CRUSH_MIN_FALL_DISTANCE = 0.5;
+const CRUSH_MIN_DOWNWARD_SPEED = 2.0 * BLOCK_SCALE;
+const CRUSH_MIN_FALL_DISTANCE = 0.5 * BLOCK_SCALE;
 /** Sideways shove (tiles/s) away from the rock, so the player is not left standing inside it. */
-const ROCK_HIT_KNOCKBACK = { x: 3, y: -1.5 };
+const ROCK_HIT_KNOCKBACK = { x: 3 * BLOCK_SCALE, y: -1.5 * BLOCK_SCALE };
 
 /** Shortest distance from `point` to the line segment `a`-`b`. */
 export function distanceToSegment(point: Vector2D, a: Vector2D, b: Vector2D): number {

@@ -1,3 +1,4 @@
+import { MINING_CONFIG } from '@mine-me/shared';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React, { useState } from 'react';
 import { render, screen, act } from '@testing-library/react';
@@ -270,7 +271,7 @@ describe('MineView Navigation & Session Lifecycle', () => {
 
   describe('sandbox', () => {
     const sandboxState = (over: Record<string, unknown> = {}) => ({
-      grid: [], position: { x: 22, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3,
+      grid: [], position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3,
       canExtract: false, isMining: false, gameMode: 'sandbox',
       fluids: [{ typeKey: 'OIL', name: 'Oil' }],
       gases: [{ typeKey: 'HYDROGEN', name: 'Hydrogen' }, { typeKey: 'NITROGEN', name: 'Nitrogen' }],
@@ -335,7 +336,7 @@ describe('MineView Navigation & Session Lifecycle', () => {
       );
       mockSendGameEvent.mockResolvedValueOnce({
         success: true,
-        data: { sessionState: { grid: [], position: { x: 22, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3, canExtract: true, isMining: false, gameMode: 'singleplayer' } },
+        data: { sessionState: { grid: [], position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3, canExtract: true, isMining: false, gameMode: 'singleplayer' } },
       });
       await act(async () => {
         screen.getByText(/Single Player/i).click();
@@ -376,7 +377,7 @@ describe('MineView Navigation & Session Lifecycle', () => {
       });
       // Off the entrance, then back on it: a normal mine would offer to extract here
       await act(async () => setSession((prev) => ({ ...prev, position: { x: 30, y: 8 } })));
-      await act(async () => setSession((prev) => ({ ...prev, position: { x: 22, y: 0 } })));
+      await act(async () => setSession((prev) => ({ ...prev, position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 } })));
       expect(screen.queryByText(/Leave Mine\?/)).toBeNull();
     });
 
@@ -397,13 +398,13 @@ describe('MineView Navigation & Session Lifecycle', () => {
       );
       mockSendGameEvent.mockResolvedValueOnce({
         success: true,
-        data: { sessionState: { grid: [], position: { x: 22, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3, canExtract: true, isMining: false, gameMode: 'singleplayer' } },
+        data: { sessionState: { grid: [], position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3, canExtract: true, isMining: false, gameMode: 'singleplayer' } },
       });
       await act(async () => {
         screen.getByText(/Single Player/i).click();
       });
       await act(async () => setSession((prev) => ({ ...prev, position: { x: 30, y: 8 } })));
-      await act(async () => setSession((prev) => ({ ...prev, position: { x: 22, y: 0 } })));
+      await act(async () => setSession((prev) => ({ ...prev, position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 } })));
       expect(screen.getByText(/Leave Mine\?/)).toBeDefined();
     });
 
@@ -411,7 +412,7 @@ describe('MineView Navigation & Session Lifecycle', () => {
       const infoSpy = vi.spyOn(notificationService, 'info').mockImplementation(() => undefined as any);
       const handlers: Record<string, (p: any) => void> = {};
       const { getSession } = await enterSandbox(handlers);
-      const fresh = sandboxState({ position: { x: 22, y: 0 }, visionRange: 7 });
+      const fresh = sandboxState({ position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 }, visionRange: 7 });
 
       await act(async () => {
         handlers['mining_sandbox_reset']({ sessionState: fresh });

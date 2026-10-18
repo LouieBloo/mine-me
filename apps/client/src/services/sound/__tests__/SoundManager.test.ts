@@ -120,9 +120,9 @@ describe('SoundManager', () => {
     const manager = SoundManager.getInstance();
     manager.setListenerPosition({ x: 0, y: 0 });
 
-    // Sound at (25, 0) is 25 tiles away; default maxDistance is 16 tiles
+    // Sound at (50, 0) is 50 tiles away; default maxDistance is 32 tiles
     const howl = manager.playSfx('/assets/sounds/far_mob_mine.mp3', {
-      position: { x: 25, y: 0 },
+      position: { x: 50, y: 0 },
       throttleMs: 0,
     });
 

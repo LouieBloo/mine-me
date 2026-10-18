@@ -20,15 +20,15 @@
       "burnsInto": null,
       "explosion": {
         "damage": 8,
-        "frontSpeed": 3,
-        "blastRadius": 3,
+        "frontSpeed": 9,
+        "blastRadius": 9,
         "minConcentration": 0.1
       },
       "flameLight": {
         "type": "POINT",
         "color": "#cfe8ff",
         "effect": "FLICKER",
-        "radius": 3,
+        "radius": 9,
         "enabled": true,
         "intensity": 0.9,
         "flickerSpeed": 14,
@@ -40,10 +40,10 @@
       "ignitionChance": 0.9
     },
     "generation": {
-      "maxSize": 10,
-      "minSize": 2,
+      "maxSize": 30,
+      "minSize": 6,
       "maxDepth": null,
-      "minDepth": 3,
+      "minDepth": 9,
       "percentage": 3,
       "concentration": 1
     },

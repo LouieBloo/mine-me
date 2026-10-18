@@ -16,18 +16,33 @@ import type { SkeletonManifest } from './modularRig';
 // Constants
 // ---------------------------------------------------------------------------
 
+/**
+ * How many blocks make up one side of the original 64px tile: 1 is the original game, 2 and 3 are the smaller-block
+ * experiments (tickets 085-090). Every distance, speed, radius and depth below is written as its original value times
+ * this, so changing it rescales the whole game. The block data in the database must be rescaled to match
+ * (`prisma/migrate-half-size-blocks.ts`).
+ */
+export const BLOCK_SCALE = 3;
+const S = BLOCK_SCALE;
+
+/** One block on screen, in pixels (the original 64px tile divided by the scale). */
+export const MINING_TILE_PIXELS = Math.round(64 / BLOCK_SCALE);
+const TILE_PX = MINING_TILE_PIXELS;
+
 export const MINING_CONFIG = {
-  /** Grid dimensions (45x45, 50% larger than 30x30) */
-  GRID_WIDTH: 45,
-  GRID_HEIGHT: 45,
+  /** Grid dimensions: 90x90 half-size blocks (the same area the old 45x45 grid covered; ticket 085) */
+  GRID_WIDTH: 45 * S,
+  GRID_HEIGHT: 45 * S,
 
   /** Entrance tile position (top-center of the grid) */
-  ENTRANCE_X: 22,
+  ENTRANCE_X: 22 * S,
   ENTRANCE_Y: 0,
 
   /** Default vision range in tiles (cardinally adjacent) */
-  DEFAULT_VISION_RANGE: 18,
-  MAX_VISION_RANGE: 40, // Hard cap on tiles of vision (Manhattan radius); bounds the reveal loop cost
+  DEFAULT_VISION_RANGE: 18 * S,
+  /** How far (tiles) either side of the entrance, and above/below it, still counts as standing on the exit */
+  ENTRANCE_EXIT_RADIUS: Math.ceil(S / 2),
+  MAX_VISION_RANGE: 40 * S, // Hard cap on tiles of vision (Manhattan radius); bounds the reveal loop cost
 
   /** Stamina cost per block mined */
   MINING_STAMINA_COST: 1,
@@ -38,44 +53,45 @@ export const MINING_CONFIG = {
   CHEST_MINE_TIME_MS: 1000,
 
   /** Melee hit box: pivot height above player center (shoulder), in tiles */
-  MELEE_SHOULDER_OFFSET_Y: 0.35,
+  MELEE_SHOULDER_OFFSET_Y: 0.35 * S,
   /** Melee hit box: distance from shoulder pivot to weapon center along aim, in tiles */
-  MELEE_WEAPON_OFFSET: 0.7,
+  MELEE_WEAPON_OFFSET: 0.7 * S,
   /** Melee hit box: half-width/height of the box around the weapon, in tiles */
   // Ranged weapons: server-side estimate of the barrel position (tiles from the shoulder along the aim)
   // Mob digging feedback: hit events are batched at this cadence (seconds) and only sent to players
   // within BLOCK_HIT_HEARING_RANGE tiles of the block (rough on-screen/earshot distance; tune as needed)
   EXPLOSION_DEFAULT_DAMAGE: 50, // blast damage at the centre when the explosive item has no Damage effect
   EXPLOSION_MIN_DAMAGE_FRACTION: 0.25, // fraction of that damage left at the very edge of the radius (linear falloff)
-  EXPLOSION_KNOCKBACK_X: 8.0, // push (tiles/s) away from the centre on anything the blast moves
-  EXPLOSION_KNOCKBACK_Y: -6.0,
+  EXPLOSION_KNOCKBACK_X: 8.0 * S, // push (tiles/s) away from the centre on anything the blast moves
+  EXPLOSION_KNOCKBACK_Y: -6.0 * S,
   TOOL_NOTICE_COOLDOWN_SECONDS: 3.0, // minimum gap between "your pickaxe is too weak"-style messages
   // Defaults for a mob whose data leaves a stat out (a mob's own value always wins)
-  MOB_DEFAULT_MOVE_SPEED: 3.2, // tiles/s
-  MOB_DEFAULT_JUMP_FORCE: 8.8,
-  MOB_DEFAULT_AGGRO_RANGE: 20, // tiles at which it notices a player
-  MOB_DEFAULT_ATTACK_RANGE: 1.25, // tiles
-  MOB_DEFAULT_MINE_RANGE: 2.0, // tiles
+  MOB_DEFAULT_MOVE_SPEED: 3.2 * S, // tiles/s
+  MOB_DEFAULT_JUMP_FORCE: 8.8 * S,
+  MOB_DEFAULT_CLIMB_SPEED: 3.0 * S, // tiles/s
+  MOB_DEFAULT_AGGRO_RANGE: 20 * S, // tiles at which it notices a player
+  MOB_DEFAULT_ATTACK_RANGE: 1.25 * S, // tiles
+  MOB_DEFAULT_MINE_RANGE: 2.0 * S, // tiles
   MOB_PATHS_PER_TICK: 4, // most A* searches all mobs together may start in one tick (the rest wait a tick)
   MOB_ATTACK_WINDUP_SECONDS: 0.3, // default telegraph between a mob starting an attack and it landing (aiConfig.attackWindupMs overrides)
-  MOB_ATTACK_DODGE_MARGIN: 0.75, // tiles a target must get beyond the attack's start distance during wind-up to dodge it
-  MOB_SEPARATION_SPEED: 4.0, // tiles/s at which overlapping mobs/players are pushed apart (soft collision)
+  MOB_ATTACK_DODGE_MARGIN: 0.75 * S, // tiles a target must get beyond the attack's start distance during wind-up to dodge it
+  MOB_SEPARATION_SPEED: 4.0 * S, // tiles/s at which overlapping mobs/players are pushed apart (soft collision)
   MOB_HIT_STUN_MS: 250, // default time a mob loses control when hit (a mob's own hitStunMs overrides)
   MOB_STUN_IMMUNITY_MS: 500, // default time after a stun ends during which it can't be stunned again
   MAX_DROPPED_ITEMS: 1000, // hard safety limit per room (items never despawn); drops beyond it are skipped
   MOB_DEATH_LINGER_SECONDS: 1.0, // how long a killed mob stays (inert) so clients can play its death animation
-  BLOCK_HIT_HEARING_RANGE: 14,
+  BLOCK_HIT_HEARING_RANGE: 14 * S,
   // Interest management: a client is only told about entities inside this box around its player
   // (more than the screen shows even on a wide monitor, and about as far as a sound carries).
-  INTEREST_RADIUS_X: 28, // tiles either side of the player
-  INTEREST_RADIUS_Y: 20, // tiles above/below
-  INTEREST_HYSTERESIS: 6, // extra tiles an entity already known to the client may drift out before it is dropped
-  GUN_MUZZLE_REACH: 0.9,
+  INTEREST_RADIUS_X: 28 * S, // tiles either side of the player
+  INTEREST_RADIUS_Y: 20 * S, // tiles above/below
+  INTEREST_HYSTERESIS: 6 * S, // extra tiles an entity already known to the client may drift out before it is dropped
+  GUN_MUZZLE_REACH: 0.9 * S,
   // A client-reported muzzle is trusted only within this distance of the server estimate
-  GUN_MUZZLE_MAX_DEVIATION: 1.0,
-  MELEE_HIT_HALF_SIZE: 0.55,
+  GUN_MUZZLE_MAX_DEVIATION: 1.0 * S,
+  MELEE_HIT_HALF_SIZE: 0.55 * S,
   /** Extra tolerance so a mob's body (not just its center) can be struck, in tiles */
-  MELEE_MOB_BODY_MARGIN: 0.3,
+  MELEE_MOB_BODY_MARGIN: 0.3 * S,
 
   /** Number of damage crack progression stages before a tile is destroyed (1..4) */
   DAMAGE_STAGES: 4,
@@ -98,8 +114,9 @@ export const MINING_CONFIG = {
   FLUID_SPLASH_EXIT_DEPTH: 0.1, // ...and as out once less than this is (the gap stops splash spam at the surface)
   FLUID_SPLASH_COOLDOWN_SECONDS: 0.4, // fewest seconds between splashes of the same body
   FLUID_MIN_FALL_FACTOR: 0.2, // fluid never slows a fall below this share of the normal top speed
-  FLUID_STEP_TICKS: 3, // the fluid simulation steps every Nth tick (10 Hz at 30 Hz ticks)
-  GAS_STEP_TICKS: 3, // the gas simulation steps every Nth tick (10 Hz at 30 Hz ticks)
+  FLUID_STEP_TICKS: Math.max(1, Math.round(3 / S)), // the fluid simulation steps every Nth tick: 10 Hz for the original blocks, and faster for smaller ones so a pour crosses the same screen distance in the same time (every tick at 3x)
+  GAS_STEP_TICKS: Math.max(1, Math.round(3 / S)), // the gas simulation steps every Nth tick (like the fluid)
+  EXPLOSION_STEP_TICKS: 3, // a gas explosion's front moves every Nth tick (10 Hz); `frontSpeed` is the cells it moves in one such beat, so it is already in the current block size
   GAS_ENTER_CONCENTRATION: 0.3, // a body counts as in a gas cloud once the gas around it is this thick
   GAS_EXIT_CONCENTRATION: 0.1, // ...and as out once it is thinner than this (the gap stops sound spam at the edge of a cloud)
   GAS_EVENT_COOLDOWN_SECONDS: 0.5, // fewest seconds between enter/exit sounds of the same body
@@ -107,8 +124,8 @@ export const MINING_CONFIG = {
   MAX_CATCHUP_TICKS: 5, // most steps run in one loop wake-up; any more lag is dropped instead of spiralling
   DEFAULT_PLAYER_MAX_HEALTH: 100,
   PLAYER_HIT_INVULNERABILITY: 0.5,
-  PLAYER_HIT_KNOCKBACK_X: 5.0,
-  PLAYER_HIT_KNOCKBACK_Y: -4.0,
+  PLAYER_HIT_KNOCKBACK_X: 5.0 * S,
+  PLAYER_HIT_KNOCKBACK_Y: -4.0 * S,
   PLAYER_HIT_KNOCKBACK_SECONDS: 0.2, // movement input is ignored this long after being hit
 
   /** Number of treasure chests per map */
@@ -121,41 +138,50 @@ export const MINING_CONFIG = {
   MINERAL_PERCENTAGE: 10,
 
   /** Continuous physics parameters */
-  TILE_SIZE: 32,
-  TILE_WORLD_PIXELS: 64, // Client viewport & rigid world rendering tile size in pixels (64px)
-  PLAYER_RADIUS: 12,
-  PLAYER_COLLIDER_WIDTH: 20, // Fall & movement rectangle collider width in pixels (~0.625 tiles)
-  PLAYER_COLLIDER_HEIGHT: 28, // Fall & movement rectangle collider height in pixels (~0.875 tiles)
-  PLAYER_MINING_REACH: 1.85, // Mining interaction reach radius in tiles (allows adjacent tiles regardless of player sub-tile position)
-  MOVE_SPEED: 4.5, // Grid tiles per second
-  GRAVITY: 28.0, // Grid tiles per second squared (snappy natural 2D gravity)
-  MAX_ENTITY_SPEED: 60.0, // Hard cap on any body's speed per axis (tiles/s); keeps knockback/blasts sane
+  PLAYER_RADIUS: 12, // pixels: the character sprite's foot offset below the body centre
+  PLAYER_COLLIDER_WIDTH_TILES: 40 / TILE_PX, // Fall & movement rectangle collider width in tiles (40px)
+  PLAYER_COLLIDER_HEIGHT_TILES: 56 / TILE_PX, // Fall & movement rectangle collider height in tiles (56px)
+  /** How tall the character is drawn, in tiles (a little taller than its collider, about 69px) */
+  CHARACTER_HEIGHT_TILES: 69.12 / TILE_PX,
+  /** How tall a mob is drawn relative to its collider height */
+  MOB_DRAW_HEIGHT_FACTOR: 1.05,
+  /** Height (tiles) a mob is drawn at when its data gives no collider height */
+  MOB_DEFAULT_DRAW_COLLIDER_HEIGHT: 1.25 * S,
+  PLAYER_MINING_REACH: 1.85 * S, // Mining interaction reach radius in tiles (allows adjacent tiles regardless of player sub-tile position)
+  MOVE_SPEED: 4.5 * S, // Grid tiles per second
+  GRAVITY: 28.0 * S, // Grid tiles per second squared (snappy natural 2D gravity)
+  MAX_ENTITY_SPEED: 60.0 * S, // Hard cap on any body's speed per axis (tiles/s); keeps knockback/blasts sane
+  MAX_STEP_UP_TILES: 1, // A grounded body walks up a ledge this high (tiles) without jumping; 0 turns it off
   MAX_STEP_DISPLACEMENT: 0.4, // A body never moves more than this in one collision step (tiles); smaller than any collider half-extent
-  TERMINAL_FALL_SPEED: 20.0, // Maximum downward velocity in tiles per second
-  JUMP_FORCE: 8.5, // Initial upward velocity for jumping (~1.3 tiles height)
+  TERMINAL_FALL_SPEED: 20.0 * S, // Maximum downward velocity in tiles per second
+  JUMP_FORCE: 8.5 * S, // Initial upward velocity for jumping (~1.3 tiles height)
   SIMULATION_TICK_RATE_HZ: 30,
 
   /** Lighting system configuration */
-  SUNLIGHT_MAX_DEPTH: 8, // tiles before sunlight fully fades
-  SUNLIGHT_LATERAL_FALLOFF: 0.6, // multiplier per lateral tile (gentle so overhang penumbras span ~3 tiles)
-  FLASHLIGHT_RADIUS: 11.0, // tiles (scaled with doubled vision range)
+  SUNLIGHT_MAX_DEPTH: 8 * S, // tiles before sunlight fully fades
+  SUNLIGHT_LATERAL_FALLOFF: Math.pow(0.6, 1 / S), // multiplier per lateral tile (gentle so overhang penumbras span ~6 tiles; the square root of the old 0.6 at double the cell count)
+  FLASHLIGHT_RADIUS: 11.0 * S, // tiles (scaled with doubled vision range)
   FLASHLIGHT_CONE_ANGLE: 75, // degrees
-  FLASHLIGHT_AURA_RADIUS: 3.2, // small 360° aura so player is never blind behind (doubled from 1.6)
-  TORCH_RADIUS: 3.8, // tiles
+  FLASHLIGHT_AURA_RADIUS: 3.2 * S, // small 360° aura so player is never blind behind (doubled from 1.6)
+  TORCH_RADIUS: 3.8 * S, // tiles
   TORCH_FLICKER_SPEED: 4.0, // Hz
   TORCH_FLICKER_AMOUNT: 0.15, // intensity variation
   /** Extra reach (tiles) the server allows when placing, because the player's server position trails what they see while running (about 130 ms at MOVE_SPEED). */
-  PLACEMENT_LAG_SLACK: 0.6,
-  TORCH_PLACEMENT_REACH: 1.85, // max center-to-center tile reach distance (allows adjacent tiles regardless of player sub-tile position)
+  PLACEMENT_LAG_SLACK: 0.6 * S,
+  TORCH_PLACEMENT_REACH: 1.85 * S, // max center-to-center tile reach distance (allows adjacent tiles regardless of player sub-tile position)
 
-  CLIMB_SPEED: 3.5, // Grid tiles per second while ascending or descending ladders
-  LADDER_GRAB_WIDTH: 0.55, // Horizontal distance in tiles from ladder center within which player grips ladder
+  CLIMB_SPEED: 3.5 * S, // Grid tiles per second while ascending or descending ladders
+  LADDER_GRAB_WIDTH: 0.55 * S, // Horizontal distance in tiles from ladder center within which player grips ladder
 
   /** Max session duration before server automatically closes session (15 minutes) */
   MAX_SESSION_DURATION_SECONDS: 15 * 60,
 } as const;
 
-export const MINING_TILE_WORLD_PIXELS = 64;
+/** Whether (x, y) is standing on the mine's exit. `surfaceRow` is the first ground row (the sandbox has sky above it). */
+export function isOnEntrance(x: number, y: number, surfaceRow: number = 0): boolean {
+  const r = MINING_CONFIG.ENTRANCE_EXIT_RADIUS;
+  return Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= r && Math.abs(y - surfaceRow - MINING_CONFIG.ENTRANCE_Y) <= r;
+}
 
 // ---------------------------------------------------------------------------
 // Tile Types
@@ -506,6 +532,8 @@ export interface MiningClientTile {
   revealed: boolean;
   /** Crack damage stage (0 = undamaged, 1 = 25%, 2 = 50%, 3 = 75%, 4 = 90% cracked) */
   damageStage?: number;
+  /** Set on a cell of a multi-cell piece (ladder, torch, bridge): [column, row] inside the piece, from its top-left cell. */
+  piece?: [ox: number, oy: number];
 }
 
 
@@ -691,7 +719,10 @@ export interface MiningInputState {
   right: boolean;
   jump?: boolean;
   miningKey: boolean;
+  /** The cell under the cursor. The server decides which block that means (see selectMiningTargets). */
   miningTarget?: MiningPosition | null;
+  /** Ctrl held: mine only the block under the cursor instead of the next blocks along the line to it. */
+  preciseMining?: boolean;
   aimDirection?: Vector2D;
   isFacingLeft?: boolean;
   flashlightOn?: boolean;
@@ -795,8 +826,40 @@ export interface MiningItemPickupEvent {
 }
 
 /** 30 Hz real-time simulation snapshot emitted by server to client. */
+/** One simulation step's cost on the server over the profiler's window. */
+export interface MiningServerPerfStep {
+  name: string;
+  avgMs: number;
+  maxMs: number;
+}
+
+/**
+ * How hard the server is working for this room, sent about once a second in the state tick (see MiningTickProfiler).
+ * A tick must fit in `budgetMs` (1000 / tick rate) or the game falls behind.
+ */
+export interface MiningServerPerf {
+  /** Ticks the numbers cover. */
+  windowTicks: number;
+  budgetMs: number;
+  tickMs: { avg: number; p95: number; max: number };
+  /** Average tick time as a share of the budget (100 = no headroom left). */
+  loadPercent: number;
+  /** Gap between loop wake-ups, which shows event-loop lag from other rooms or work. */
+  loopGapMs: { avg: number; max: number };
+  /** Steps ordered by average cost, most expensive first. */
+  steps: MiningServerPerfStep[];
+  /** Ticks dropped since the room started because the loop fell too far behind. */
+  droppedTicks: number;
+  /** Things the server is simulating right now. */
+  counts: Record<string, number>;
+  /** Size of the last sampled state tick for this player, in bytes of JSON. */
+  payloadBytes: number;
+}
+
 export interface MiningStateTickPayload {
   tick: number;
+  /** Server cost of the last second of ticks; sent about once a second. */
+  perf?: MiningServerPerf;
   position: Vector2D;
   velocity: Vector2D;
   /**
@@ -832,7 +895,7 @@ export interface MiningStateTickPayload {
   explosions?: MiningExplosionEvent[];
   /** Block damage hit events (e.g. tool swing hits dealing damage) triggered during this tick. */
   blockHits?: MiningBlockHitEvent[];
-  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; fluid?: [fluidId: number, level: number, falling?: number]; gas?: [gasId: number, concentration: number]; fire?: 1 }[];
+  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; piece?: [ox: number, oy: number]; fluid?: [fluidId: number, level: number, falling?: number]; gas?: [gasId: number, concentration: number]; fire?: 1 }[];
   /**
    * Fluid cells that changed this tick, as [x, y, fluidId, level]. Only cells the fog of war has revealed
    * are ever sent (a newly revealed tile carries its fluid in `revealedTiles`).
@@ -890,9 +953,13 @@ export interface MobAIConfig {
 
 /** Waypoint in an A* navigation path across the mine grid. */
 export interface MiningPathWaypoint {
+  /** The body's footprint cell: its left column. (For a one-cell body, simply the cell.) */
   x: number;
+  /** The body's footprint cell: its bottom row, the one the feet are in. */
   y: number;
   action: 'WALK' | 'JUMP' | 'CLIMB' | 'FALL' | 'MINE';
+  /** For MINE: the solid cell of the footprint to dig out next (a body bigger than one cell has several to dig). */
+  mineTarget?: { x: number; y: number };
 }
 
 /** State of an active mob within a mining cavern session. */
@@ -1033,43 +1100,43 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   gridHeight: MINING_CONFIG.GRID_HEIGHT,
   cavernDensity: 42,
   cavernIterations: 3,
-  cavernMinDepth: 4,
+  cavernMinDepth: 4 * S,
   tunnelCount: 5,
-  tunnelMinLength: 15,
-  tunnelMaxLength: 30,
-  tunnelWidth: 1,
-  tunnelMinDepth: 2,
+  tunnelMinLength: 15 * S,
+  tunnelMaxLength: 30 * S,
+  tunnelWidth: S,
+  tunnelMinDepth: 2 * S,
   rockPercentage: MINING_CONFIG.ROCK_PERCENTAGE,
   mineralPercentage: MINING_CONFIG.MINERAL_PERCENTAGE,
   chestCount: MINING_CONFIG.TREASURE_CHEST_COUNT,
   copperiumPercentage: 4,
   silveriumPercentage: 2,
-  silveriumMinDepth: 12,
+  silveriumMinDepth: 12 * S,
   oreClusterChance: 65,
   gravityEnabled: true,
-  gravity: 28.0,
+  gravity: 28.0 * S,
   dynamiteBounciness: 0.45,
   dynamiteFriction: 0.4,
-  dynamiteThrowPower: 14.0,
+  dynamiteThrowPower: 14.0 * S,
   dynamiteFuseSeconds: 4.0,
   rockGravityScale: 1.2,
   rockRestitution: 0.1,
-  // A normal jump lands at ~8.5 tiles/s and a 2 tile drop at ~10.6, so neither hurts
-  fallDamageMinSpeed: 11,
-  fallDamagePerSpeed: 6,
+  // A normal jump lands at ~17 tiles/s and a 2 old-tile drop at ~21, so neither hurts (tiles are half the old size)
+  fallDamageMinSpeed: 11 * S,
+  fallDamagePerSpeed: 6 / S,
   fallDamageMax: 80,
-  // A rock that has fallen ~0.5 tile is moving ~6 tiles/s; 3 tiles of fall is ~40 damage
-  rockDamageMinSpeed: 6,
-  rockDamagePerSpeed: 5,
+  // A rock that has fallen ~1 tile is moving ~12 tiles/s; 6 tiles of fall is ~40 damage
+  rockDamageMinSpeed: 6 * S,
+  rockDamagePerSpeed: 5 / S,
   rockDamageMax: 80,
   // Burning for the default 5 s costs 30 health; oil (heat 3) hurts about 4.5 per second at its edge
   burnDamagePerSecond: 6,
   burnSeconds: 5,
-  heatRadius: 2.5,
+  heatRadius: 2.5 * S,
   heatDamagePerSecond: 1.5,
   burningEffectId: null,
   mobSpawnCount: 3,
-  mobSpawnMinDepth: 5,
+  mobSpawnMinDepth: 5 * S,
   // No built-in mobs: the active map config (database) says which mobs live in the mine
   allowedMobIds: [],
   surfaceDummyMobId: null,

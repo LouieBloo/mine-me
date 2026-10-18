@@ -25,7 +25,7 @@ describe('MiningPhysicsBody Ground Stability & Zero Jitter', () => {
     grid[5][5] = { type: MiningTileType.DIRT };
 
     // Player positioned resting directly on the top surface of block y=5
-    const player = new MiningPlayerBody({ x: 5.5, y: 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE)) });
+    const player = new MiningPlayerBody({ x: 5.5, y: 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2) });
     player.isGrounded = true;
 
     const initialY = player.position.y;
@@ -74,7 +74,7 @@ describe('MiningPhysicsBody Ground Stability & Zero Jitter', () => {
 
   it('ungrounds and falls immediately when the floor block beneath is mined', () => {
     grid[5][5] = { type: MiningTileType.DIRT };
-    const player = new MiningPlayerBody({ x: 5.5, y: 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE)) });
+    const player = new MiningPlayerBody({ x: 5.5, y: 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2) });
     player.isGrounded = true;
 
     player.update(0.016, grid);
@@ -94,7 +94,7 @@ describe('MiningPhysicsBody Ground Stability & Zero Jitter', () => {
     // Solid block only at (5, 5), tile (6, 5) is empty pit
     grid[5][5] = { type: MiningTileType.DIRT };
 
-    const restingY = 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE));
+    const restingY = 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2);
     const player = new MiningPlayerBody({ x: 5.5, y: restingY });
     player.isGrounded = true;
 
@@ -114,7 +114,7 @@ describe('MiningPhysicsBody Ground Stability & Zero Jitter', () => {
 
   it('allows jumping immediately from grounded stance without ground clamp resistance', () => {
     grid[5][5] = { type: MiningTileType.DIRT };
-    const player = new MiningPlayerBody({ x: 5.5, y: 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE)) });
+    const player = new MiningPlayerBody({ x: 5.5, y: 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2) });
     player.isGrounded = true;
 
     player.processInputs({ left: false, right: false, up: false, down: false, jump: true, miningKey: false, sequence: 1 });
@@ -132,9 +132,10 @@ describe('MiningPhysicsBody Ground Stability & Zero Jitter', () => {
     grid[5][5] = { type: MiningTileType.DIRT };
     grid[5][6] = { type: MiningTileType.DIRT };
     grid[5][7] = { type: MiningTileType.DIRT };
-    grid[4][7] = { type: MiningTileType.DIRT }; // Wall blocking right movement
+    grid[4][7] = { type: MiningTileType.DIRT }; // Wall blocking right movement (two cells high: a one-cell ledge would be stepped up)
+    grid[3][7] = { type: MiningTileType.DIRT };
 
-    const restingY = 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE));
+    const restingY = 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2);
     const player = new MiningPlayerBody({ x: 5.5, y: restingY });
     player.isGrounded = true;
 
@@ -165,9 +166,10 @@ describe('MiningPhysicsBody Ground Stability & Zero Jitter', () => {
     grid[5][3] = { type: MiningTileType.DIRT };
     grid[5][4] = { type: MiningTileType.DIRT };
     grid[5][5] = { type: MiningTileType.DIRT };
-    grid[4][3] = { type: MiningTileType.DIRT }; // Wall blocking left movement
+    grid[4][3] = { type: MiningTileType.DIRT }; // Wall blocking left movement (two cells high)
+    grid[3][3] = { type: MiningTileType.DIRT };
 
-    const restingY = 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / (2 * MINING_CONFIG.TILE_SIZE));
+    const restingY = 5.0 - (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2);
     const player = new MiningPlayerBody({ x: 5.0, y: restingY });
     player.isGrounded = true;
 

@@ -10,6 +10,7 @@ import {
   type MiningCombatStats,
   type MiningGearLayer,
   type MiningBackpackItem,
+  isOnEntrance,
   MINING_CONFIG,
   type MiningGameMode,
 } from '@mine-me/shared';
@@ -140,7 +141,7 @@ export class MiningSessionManager {
     const session = engine.getPlayer(characterId);
     if (!session) throw new Error(`Player ${characterId} is not in this mining room.`);
     const pos = session.playerBody.position;
-    const isAtEntrance = Math.round(pos.x) === MINING_CONFIG.ENTRANCE_X && Math.round(pos.y) - engine.surfaceRow === MINING_CONFIG.ENTRANCE_Y;
+    const isAtEntrance = isOnEntrance(pos.x, pos.y, engine.surfaceRow);
 
     const otherPlayers: MiningRemotePlayer[] = [];
     for (const other of engine.players.values()) {

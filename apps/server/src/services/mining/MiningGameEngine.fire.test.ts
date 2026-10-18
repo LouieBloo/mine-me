@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MiningTileType, type MiningStateTickPayload } from '@mine-me/shared';
+import { MINING_CONFIG, MiningTileType, type MiningStateTickPayload } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MiningSessionManager } from './MiningSessionManager';
 import { FIRE_STEP_SECONDS } from './subsystems/MiningFireSubsystem';
@@ -40,7 +40,7 @@ describe('fire in a mining room', () => {
     }
     engine.dataManager.getFluid('OIL')!.flammability = OIL;
     for (let x = 10; x <= 20; x++) engine.fluidSubsystem.placeFluid(x, 22, 'OIL', 1);
-    engine.players.get(cid)!.playerBody.position = { x: 5.5, y: 5.5 };
+    engine.players.get(cid)!.playerBody.position = { x: 85.5, y: 5.5 };
     engine.fluidSubsystem.drainChanges();
     engine.fireSubsystem.grid.drainChanges();
   });
@@ -48,7 +48,7 @@ describe('fire in a mining room', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('steps on the fluid beat', () => {
-    expect(FIRE_STEP_SECONDS).toBeCloseTo(0.1, 5);
+    expect(FIRE_STEP_SECONDS).toBeCloseTo(MINING_CONFIG.FLUID_STEP_TICKS / MINING_CONFIG.SERVER_TICK_RATE, 5);
   });
 
   it('a spark on oil sets it burning, and nothing burns before a spark', () => {
@@ -134,6 +134,8 @@ describe('fire in a mining room', () => {
 
     it('sends nothing on ticks where no fire changed', () => {
       light(15, 22);
+      seconds(60); // let it burn out (a fire that is still spreading changes every step)
+      expect(burning()).toEqual([]);
       const before = ticks().length;
       tick(2);
       expect(ticks().slice(before).every((t) => t.fireCells === undefined)).toBe(true);

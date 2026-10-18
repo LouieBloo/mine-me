@@ -8,8 +8,8 @@ describe('clients are only told about what is near their player', () => {
 
   const cid = 'interest-char';
   const RX = MINING_CONFIG.INTEREST_RADIUS_X;
-  const B = 5; // where the player starts; the grid is only 45 wide
-  const FAR = B + RX + 9; // well outside even the hysteresis band
+  const B = 5; // where the player starts; the grid is only 90 wide
+  const FAR = B + RX + MINING_CONFIG.INTEREST_HYSTERESIS + 3; // just outside the hysteresis band
   const ROW = 19; // the player's row; dirt floor below it
   let engine: MiningGameEngine;
   let ticks: any[];

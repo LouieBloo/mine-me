@@ -1,8 +1,12 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { useEffect } from 'react';
 import {
   MiningTileType,
   MINING_CONFIG,
   DEFAULT_PARTICLE_EFFECTS,
+  getTileFootprint,
+  isPieceCentreCell,
+  pieceOrigin,
 } from '@mine-me/shared';
 import { PointLight } from '../../../../../components/game/lighting/PointLight';
 import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
@@ -77,19 +81,21 @@ export function useMiningAmbientEffects({
                   { x: x + 0.5, y: y + 0.5 },
                   0xfbbf24,
                   0.9,
-                  2.0,
+                  2.0 * BLOCK_SCALE,
                   { pulse: { speed: 3.2, minIntensity: 0.5, maxIntensity: 1.0 } }
                 )
               );
             }
           }
 
-          if (tile.revealed && tile.type === MiningTileType.TORCH) {
+          if (tile.revealed && tile.type === MiningTileType.TORCH && isPieceCentreCell(tile.piece, getTileFootprint(MiningTileType.TORCH))) {
+            const origin = pieceOrigin(x, y, tile.piece);
+            const span = getTileFootprint(MiningTileType.TORCH).width;
             if (!lightingEngine.getLight(torchLightId)) {
               lightingEngine.addLight(
                 new PointLight(
                   torchLightId,
-                  { x: x + 0.446, y: y + 0.35 },
+                  { x: origin.x + 0.446 * span, y: origin.y + 0.35 * span },
                   0xf59e0b,
                   1.25,
                   MINING_CONFIG.TORCH_RADIUS,
@@ -105,7 +111,7 @@ export function useMiningAmbientEffects({
             if (particleEngineRef.current && !torchEmittersRef.current.has(torchLightId)) {
               const emitter = particleEngineRef.current.addEmitter(
                 DEFAULT_PARTICLE_EFFECTS.torch_flame,
-                { x: (x + 0.446) * TILE_SIZE, y: (y + 0.28) * TILE_SIZE }
+                { x: (origin.x + 0.446 * span) * TILE_SIZE, y: (origin.y + 0.28 * span) * TILE_SIZE }
               );
               torchEmittersRef.current.set(torchLightId, emitter);
             }

@@ -4,7 +4,7 @@ vi.mock('../../../index', () => ({ prisma: { character: { update: vi.fn().mockRe
 vi.mock('../../../services/characterBroadcast', () => ({ broadcastStatUpdate: vi.fn() }));
 vi.mock('../../../services/inventory.service', () => ({ InventoryService: { giveItemsToCharacter: vi.fn() } }));
 
-import { SANDBOX_SKY_ROWS as SKY } from '../../../services/mining/sandbox/SandboxLayout';
+import { SANDBOX_BLOCK_SCALE as S, SANDBOX_SKY_ROWS as SKY } from '../../../services/mining/sandbox/SandboxLayout';
 import { miningSessionManager } from '../../../services/mining/MiningSessionManager';
 import {
   handleSandboxPourFluid,
@@ -58,21 +58,21 @@ describe('sandbox handlers', () => {
     it('pours fluid, reports bad input and spawns mobs', async () => {
       join('hs-a', 'sandbox');
       const socket = socketFor('hs-a');
-      expect(await handleSandboxPourFluid(io, socket, { x: 60, y: SKY + 13, fluidKey: 'OIL' })).toEqual({ success: true, data: undefined });
-      expect(miningSessionManager.getSession('hs-a')!.fluidSubsystem.grid.getLevel(60, SKY + 13)).toBeGreaterThan(0);
-      expect(await handleSandboxPourFluid(io, socket, { x: 'a', y: SKY + 13, fluidKey: 'OIL' })).toMatchObject({ success: false });
+      expect(await handleSandboxPourFluid(io, socket, { x: 60 * S, y: SKY + 13 * S, fluidKey: 'OIL' })).toEqual({ success: true, data: undefined });
+      expect(miningSessionManager.getSession('hs-a')!.fluidSubsystem.grid.getLevel(60 * S, SKY + 13 * S)).toBeGreaterThan(0);
+      expect(await handleSandboxPourFluid(io, socket, { x: 'a', y: SKY + 13 * S, fluidKey: 'OIL' })).toMatchObject({ success: false });
       expect(await handleSandboxPourFluid(io, socket, undefined as any)).toMatchObject({ success: false });
-      expect(await handleSandboxSpawnMob(io, socket, { mobId: 'Mole Person', x: 61.5, y: SKY + 13 })).toMatchObject({ success: true });
-      expect(await handleSandboxSpawnMob(io, socket, { mobId: 'nope', x: 61.5, y: SKY + 13 })).toEqual({ success: false, error: 'Unknown mob.' });
+      expect(await handleSandboxSpawnMob(io, socket, { mobId: 'Mole Person', x: 60.5 * S, y: SKY + 13 * S })).toMatchObject({ success: true });
+      expect(await handleSandboxSpawnMob(io, socket, { mobId: 'nope', x: 60.5 * S, y: SKY + 13 * S })).toEqual({ success: false, error: 'Unknown mob.' });
     });
 
     it('releases gas, and reports bad input', async () => {
       join('hs-a', 'sandbox');
       const socket = socketFor('hs-a');
-      expect(await handleSandboxReleaseGas(io, socket, { x: 60, y: SKY - 3, gasKey: 'HYDROGEN' })).toEqual({ success: true, data: undefined });
-      expect(miningSessionManager.getSession('hs-a')!.gasSubsystem.grid.getConcentration(60, SKY - 3)).toBeGreaterThan(0);
-      expect(await handleSandboxReleaseGas(io, socket, { x: 60, y: SKY - 3, gasKey: 'NOPE' })).toEqual({ success: false, error: 'Unknown gas.' });
-      expect(await handleSandboxReleaseGas(io, socket, { x: 'a', y: SKY - 3, gasKey: 'HYDROGEN' })).toMatchObject({ success: false });
+      expect(await handleSandboxReleaseGas(io, socket, { x: 60 * S, y: SKY - 3 * S, gasKey: 'HYDROGEN' })).toEqual({ success: true, data: undefined });
+      expect(miningSessionManager.getSession('hs-a')!.gasSubsystem.grid.getConcentration(60 * S, SKY - 3 * S)).toBeGreaterThan(0);
+      expect(await handleSandboxReleaseGas(io, socket, { x: 60 * S, y: SKY - 3 * S, gasKey: 'NOPE' })).toEqual({ success: false, error: 'Unknown gas.' });
+      expect(await handleSandboxReleaseGas(io, socket, { x: 'a', y: SKY - 3 * S, gasKey: 'HYDROGEN' })).toMatchObject({ success: false });
       expect(await handleSandboxReleaseGas(io, socket, undefined as any)).toMatchObject({ success: false });
     });
 
@@ -100,7 +100,7 @@ describe('sandbox handlers', () => {
         const call = s.emit.mock.calls.find((c: unknown[]) => c[0] === 'mining_sandbox_reset');
         expect(call).toBeDefined();
         expect(call![1].sessionState.gameMode).toBe('sandbox');
-        expect(call![1].sessionState.grid).toHaveLength(30 + SKY);
+        expect(call![1].sessionState.grid).toHaveLength(30 * S + SKY);
         expect(call![1].sessionState.surfaceRow).toBe(SKY);
         expect(call![1].sessionState.sandbox.mobs.length).toBeGreaterThan(0);
       }

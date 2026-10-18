@@ -12,7 +12,7 @@ for (let y = 0; y < 12; y++) {
   }
 }
 
-const body = (x = 8.5, y = 9.5) => {
+const body = (x = 8.5, y = 10 - MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES / 2) => {
   const b = new MiningPlayerBody({ x, y });
   b.isGrounded = true;
   return b;
@@ -21,17 +21,17 @@ const body = (x = 8.5, y = 9.5) => {
 describe('MiningPlayerBody knockback', () => {
   it('launches the body and ungrounds it', () => {
     const b = body();
-    b.applyKnockback(5, -4, 0.2);
-    expect(b.velocity).toEqual({ x: 5, y: -4 });
+    b.applyKnockback(10, -8, 0.2);
+    expect(b.velocity).toEqual({ x: 10, y: -8 });
     expect(b.isGrounded).toBe(false);
     expect(b.knockbackRemaining).toBeCloseTo(0.2);
   });
 
   it('ignores movement input while knocked back, then resumes', () => {
     const b = body();
-    b.applyKnockback(5, -4, 0.2);
+    b.applyKnockback(10, -8, 0.2);
     b.processInputs(input({ left: true }), grid);
-    expect(b.velocity.x).toBe(5); // not overridden by "left"
+    expect(b.velocity.x).toBe(10); // not overridden by "left"
     b.update(0.25, grid);
     expect(b.knockbackRemaining).toBe(0);
     b.processInputs(input({ left: true }), grid);
@@ -41,22 +41,23 @@ describe('MiningPlayerBody knockback', () => {
   it('moves the body away from the source', () => {
     const b = body();
     const startX = b.position.x;
-    b.applyKnockback(5, -4, 0.2);
+    const startY = b.position.y;
+    b.applyKnockback(10, -8, 0.2);
     b.processInputs(input(), grid);
     b.update(0.1, grid);
     expect(b.position.x).toBeGreaterThan(startX);
-    expect(b.position.y).toBeLessThan(9.5);
+    expect(b.position.y).toBeLessThan(startY);
   });
 
   it('lets go of a ladder and ignores climb input during knockback', () => {
     const b = body(5.5, 5.5);
     b.processInputs(input({ up: true }), grid);
     expect(b.isOnLadder).toBe(true);
-    b.applyKnockback(-5, -4, 0.2);
+    b.applyKnockback(-10, -8, 0.2);
     expect(b.isOnLadder).toBe(false);
     b.processInputs(input({ up: true }), grid);
     expect(b.hasGravity).toBe(true);
-    expect(b.velocity.x).toBe(-5);
+    expect(b.velocity.x).toBe(-10);
   });
 
   it('negative durations do not extend the lock', () => {

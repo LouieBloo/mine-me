@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import {
   BaseMobAI,
   MINING_CONFIG,
@@ -135,11 +136,11 @@ export class MiningMobSubsystem {
     const colW =
       mobData.colliderWidth ??
       mobData.aiConfig?.colliderWidth ??
-      (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE);
+      MINING_CONFIG.PLAYER_COLLIDER_WIDTH_TILES;
     const colH =
       mobData.colliderHeight ??
       mobData.aiConfig?.colliderHeight ??
-      (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE);
+      MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES;
     const halfHeight = colH / 2;
     // A mob's own numbers always win; the defaults only fill in what its data leaves out.
     // (Stationary mobs such as target dummies default to not moving at all.)
@@ -214,26 +215,42 @@ export class MiningMobSubsystem {
     return session;
   }
 
-  public findValidCavernSpawnPosition(minDepth = 5): Vector2D {
+  /**
+   * Whether a default-sized mob (the player's size, 1.25 x 1.75 tiles) standing with its feet at `feetY` and its centre at
+   * `centerX` is clear of solid blocks, fluid and gas, with solid ground under at least one of the cells it stands on.
+   */
+  private bodyFitsAt(centerX: number, feetY: number): boolean {
+    const grid = this.world.grid;
+    const halfWidth = MINING_CONFIG.PLAYER_COLLIDER_WIDTH_TILES / 2;
+    const minX = Math.floor(centerX - halfWidth + 0.001);
+    const maxX = Math.floor(centerX + halfWidth - 0.001);
+    const minY = Math.floor(feetY - MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES + 0.001);
+    const maxY = Math.floor(feetY - 0.001);
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const tile = grid[y]?.[x];
+        if (!tile || isTileSolid(tile.type)) return false;
+        if (this.world.fluids.grid.getLevel(x, y) > 0) return false; // not inside a sealed oil pocket
+        if (this.world.gases.grid.getConcentration(x, y) > 0) return false; // ...or a sealed gas pocket
+      }
+    }
+    for (let x = minX; x <= maxX; x++) {
+      const floor = grid[maxY + 1]?.[x];
+      if (floor && isTileSolid(floor.type)) return true;
+    }
+    return false;
+  }
+
+  public findValidCavernSpawnPosition(minDepth = 5 * BLOCK_SCALE): Vector2D {
     const grid = this.world.grid;
     const candidates: Vector2D[] = [];
     const startY = Math.max(2, minDepth);
     const { width, height } = getGridDimensions(grid);
     for (let y = startY; y < height - 3; y++) {
       for (let x = 2; x < width - 2; x++) {
-        if (Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= 3 && y <= 5) continue;
-        const tile = grid[y]?.[x];
-        const floor = grid[y + 1]?.[x];
-        if (
-          tile &&
-          tile.type === MiningTileType.EMPTY &&
-          floor &&
-          isTileSolid(floor.type) &&
-          this.world.fluids.grid.getLevel(x, y) <= 0 && // not inside a sealed oil pocket
-          this.world.gases.grid.getConcentration(x, y) <= 0 // ...or a sealed gas pocket
-        ) {
-          candidates.push({ x: x + 0.5, y: y + 1.0 });
-        }
+        if (Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= 3 * BLOCK_SCALE && y <= 5 * BLOCK_SCALE) continue;
+        // Stood on the edge between two cells, a mob 1.25 tiles wide covers two of them; it needs two rows of height too
+        if (this.bodyFitsAt(x, y + 1.0)) candidates.push({ x, y: y + 1.0 });
       }
     }
 
@@ -242,7 +259,7 @@ export class MiningMobSubsystem {
       return candidates[idx];
     }
 
-    return { x: 22.5, y: Math.max(15, minDepth + 5) };
+    return { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: Math.max(15 * BLOCK_SCALE, minDepth + 5 * BLOCK_SCALE) };
   }
 
   public populateCavernMobs(options?: { count?: number; minDepth?: number; mobIds?: string[] }): void {
@@ -318,6 +335,9 @@ export class MiningMobSubsystem {
         grid,
         players: playerTargets,
         pathBudget: this.pathBudget,
+        // The mob is planned for as the block of cells its body fills, and as high as its jump goes
+        body: { width: mob.mobBody.halfWidth * 2, height: mob.mobBody.halfHeight * 2 },
+        jumpTiles: Math.floor((mob.mobBody.jumpForce * mob.mobBody.jumpForce) / (2 * MINING_CONFIG.GRAVITY * mob.mobBody.gravityScale)),
         config: {
           canMine: mob.canMine,
           mineRange: mob.mineRange,
@@ -613,7 +633,7 @@ export class MiningMobSubsystem {
     if (!dummyMobId) return null;
     const dummyDef = this.world.data.getMobData(dummyMobId);
     if (!dummyDef) return null;
-    const spawnPos = position ?? { x: MINING_CONFIG.ENTRANCE_X + 2.5, y: 0.0 };
+    const spawnPos = position ?? { x: MINING_CONFIG.ENTRANCE_X + 2.5 * BLOCK_SCALE, y: 0.0 };
     return this.spawnMob(dummyDef, spawnPos);
   }
 

@@ -106,14 +106,14 @@ export class DynamiteVisualManager {
 
   /**
    * Computes the world pixel and tile coordinates of the dynamite fuse tip.
-   * On the 32px sprite (0.5 of a 64px tile, centered at anchor 0.5),
-   * the fuse is located at the middle-right (+0.22 tiles, y=0).
+   * On the 32px sprite (one tile across, centered at anchor 0.5),
+   * the fuse is located at the middle-right (+0.44 of the sprite width from the centre, y=0).
    */
   public static calculateFuseWorldPosition(
     dyn: MiningActiveDynamite,
     tileSize: number = TILE_SIZE
   ): { pixel: Vector2D; tile: Vector2D } {
-    const spriteWidth = tileSize * 0.5;
+    const spriteWidth = 32; // the dynamite sprite is 32px across, whatever the block size
     // Local offset from center (middle-right of sprite image)
     const localX = spriteWidth * 0.44;
     const localY = 0;

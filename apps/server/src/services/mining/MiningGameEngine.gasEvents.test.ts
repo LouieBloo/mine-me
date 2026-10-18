@@ -17,6 +17,10 @@ describe('gas events: the sounds gases make', () => {
     gas().trackBodies();
   };
   const taken = () => gas().takeEvents();
+  /** A cloud of `concentration` over the 3x3 cells around (x, y): the player and mobs are 1.25 x 1.75 tiles, so one cell is only part of the air around them. */
+  const setCloud = (x: number, y: number, key: string, concentration: number) => {
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) gas().grid.setCell(x + dx, y + dy, gas().registry.idOf(key)!, concentration);
+  };
   /** Lets game time go by (the cooldown between a body's sounds is measured in it) without running the room. */
   const passTime = (seconds: number) => {
     (engine as any).elapsedTimeSeconds += seconds;
@@ -53,7 +57,7 @@ describe('gas events: the sounds gases make', () => {
 
   describe('walking into and out of a cloud', () => {
     it('queues an enter event when the gas around a body gets thick enough, and an exit when it thins out', () => {
-      gas().placeGas(22, 21, 'NITROGEN', 1);
+      setCloud(22, 21, 'NITROGEN', 1);
       standAt(22.5, 21.5);
       expect(taken()).toEqual([{ kind: 'enter', gasId: gas().registry.idOf('NITROGEN'), x: 22.5, y: 21.5 }]);
       // Still in it: nothing more
@@ -66,26 +70,26 @@ describe('gas events: the sounds gases make', () => {
     });
 
     it('does not enter on a wisp, and gives some slack at the edge: thick enough to enter, but only thin enough to leave', () => {
-      gas().placeGas(22, 21, 'NITROGEN', 0.2);
+      setCloud(22, 21, 'NITROGEN', 0.2);
       standAt(22.5, 21.5);
       expect(taken()).toEqual([]);
-      gas().grid.setCell(22, 21, gas().registry.idOf('NITROGEN')!, 0.5);
+      setCloud(22, 21, 'NITROGEN', 0.5);
       standAt(22.5, 21.5);
       expect(taken().map((e) => e.kind)).toEqual(['enter']);
       // Thinned, but not below the exit level: still counts as in the cloud (time has passed, so only the thresholds hold it)
       passTime(10);
-      gas().grid.setCell(22, 21, gas().registry.idOf('NITROGEN')!, 0.2);
+      setCloud(22, 21, 'NITROGEN', 0.2);
       standAt(22.5, 21.5);
       expect(taken()).toEqual([]);
       // ...and below the exit level it is out
-      gas().grid.setCell(22, 21, gas().registry.idOf('NITROGEN')!, 0.05);
+      setCloud(22, 21, 'NITROGEN', 0.05);
       standAt(22.5, 21.5);
       expect(taken().map((e) => e.kind)).toEqual(['exit']);
     });
 
     it('moving from one gas straight into another is an exit and an enter', () => {
-      gas().placeGas(22, 21, 'NITROGEN', 1);
-      gas().placeGas(27, 21, 'HYDROGEN', 1);
+      setCloud(22, 21, 'NITROGEN', 1);
+      setCloud(27, 21, 'HYDROGEN', 1);
       standAt(22.5, 21.5);
       taken();
       passTime(10);
@@ -94,7 +98,7 @@ describe('gas events: the sounds gases make', () => {
     });
 
     it('does not repeat a body\'s sounds faster than the cooldown, but still tracks where it is', () => {
-      gas().placeGas(22, 21, 'NITROGEN', 1);
+      setCloud(22, 21, 'NITROGEN', 1);
       standAt(22.5, 21.5);
       expect(taken()).toHaveLength(1);
       // Out and in again straight away: the sound is held back, not queued for later
@@ -104,7 +108,7 @@ describe('gas events: the sounds gases make', () => {
     });
 
     it('hears mobs too', () => {
-      gas().placeGas(22, 21, 'NITROGEN', 1);
+      setCloud(22, 21, 'NITROGEN', 1);
       const mob = engine.mobSubsystem.spawnMob(engine.dataManager.getMobs()[0], { x: 22.5, y: 21.5 });
       gas().trackBodies();
       const events = taken();
@@ -120,14 +124,14 @@ describe('gas events: the sounds gases make', () => {
     });
 
     it('sends an enter event to the client of the player who walked into the cloud', () => {
-      gas().placeGas(22, 21, 'NITROGEN', 1);
+      setCloud(22, 21, 'NITROGEN', 1);
       me().playerBody.position = { x: 22.5, y: 21.5 };
       tick(2);
       expect(sent().some((e) => e.kind === 'enter')).toBe(true);
     });
 
     it('is forgotten when the body goes, so the next one starts clean', () => {
-      gas().placeGas(22, 21, 'NITROGEN', 1);
+      setCloud(22, 21, 'NITROGEN', 1);
       standAt(22.5, 21.5);
       taken();
       const mob = engine.mobSubsystem.spawnMob(engine.dataManager.getMobs()[0], { x: 22.5, y: 21.5 });

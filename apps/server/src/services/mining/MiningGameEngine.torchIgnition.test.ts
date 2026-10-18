@@ -50,12 +50,13 @@ describe('torches and carried items that light oil', () => {
   afterEach(() => vi.restoreAllMocks());
 
   describe('a placed torch', () => {
-    it('lights oil in its own cell and the cells touching it, and nothing further away', () => {
+    it('lights oil in its own piece and the cells touching it, and nothing further away', () => {
+      // The torch covers x 21-23, rows 18-20 (the floor is row 21); its middle cell is (22, 19)
       expect(placeTorch(22, 20, 'torch')).toBe(true);
-      for (const [x, y] of [[22, 20], [21, 20], [23, 20], [22, 19], [24, 20], [22, 18]]) engine.fluidSubsystem.placeFluid(x, y, 'OIL', 1);
+      for (const [x, y] of [[22, 19], [21, 18], [24, 19], [20, 19], [27, 19], [22, 15]]) engine.fluidSubsystem.placeFluid(x, y, 'OIL', 1);
       me().playerBody.position = { x: 17.5, y: 20.5 };
       engine.ignitionSubsystem.emitFromSources();
-      expect(lit()).toEqual(['21,20', '22,19', '22,20', '23,20']);
+      expect(lit()).toEqual(['20,19', '21,18', '22,19', '24,19']);
     });
 
     it('lights oil that flows up to it later, not just oil that was there', () => {
@@ -104,11 +105,11 @@ describe('torches and carried items that light oil', () => {
     it('stops lighting things once the torch is mined or blown away', () => {
       placeTorch(22, 20, 'torch');
       engine.fluidSubsystem.placeFluid(23, 20, 'OIL', 1);
-      engine.grid[20][22] = { type: MiningTileType.EMPTY, revealed: true };
+      engine.grid[19][22] = { type: MiningTileType.EMPTY, revealed: true }; // the torch's middle cell
       engine.ignitionSubsystem.emitFromSources();
       expect(lit()).toEqual([]);
       // ...and a different block put there later is not mistaken for the torch
-      engine.grid[20][22] = { type: MiningTileType.TORCH, revealed: true };
+      engine.grid[19][22] = { type: MiningTileType.TORCH, revealed: true };
       engine.ignitionSubsystem.emitFromSources();
       expect(lit()).toEqual([]);
     });

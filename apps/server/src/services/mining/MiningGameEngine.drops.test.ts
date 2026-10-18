@@ -15,6 +15,8 @@ describe('dropped items are only re-sent when something changes', () => {
   const listsSince = (from: number) => ticks.slice(from).map((t) => t.droppedItems !== undefined);
 
   beforeEach(() => {
+    // Drops pop out with random velocities, and how long they take to settle varies with them; pin that down
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
     ticks = [];
     engine = new MiningGameEngine({
       characterId: cid, cityId: 'c', seed: 4, mapConfig: { mobSpawnCount: 0 },
@@ -51,6 +53,26 @@ describe('dropped items are only re-sent when something changes', () => {
     expect(sent.filter(Boolean).length).toBeGreaterThan(1); // updates while falling
     expect(sent.slice(-45).some(Boolean)).toBe(false); // settled: the last 1.5 s send nothing
     expect(engine.droppedItems.every((i) => Math.abs(i.velocity?.y ?? 0) < 0.01)).toBe(true);
+  });
+
+  it('puts items that have come to rest to sleep, so a pile of them costs nothing to keep', () => {
+    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    tick(90);
+    const bodies = [...engine.activeItemBodies.values()];
+    expect(bodies.length).toBeGreaterThan(0);
+    expect(bodies.every((b) => !b.isAwake())).toBe(true);
+  });
+
+  it('wakes a sleeping item when the floor under it is mined away', () => {
+    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    tick(90);
+    const item = engine.droppedItems[0];
+    const body = engine.activeItemBodies.get(item.id!)!;
+    expect(body.isAwake()).toBe(false);
+    const tx = Math.floor(item.position.x);
+    engine.grid[21][tx] = { type: MiningTileType.EMPTY, revealed: true };
+    engine.rigidWorld.removeTileCollider(tx, 21);
+    expect(body.isAwake()).toBe(true);
   });
 
   it('ticks carry only ids and positions; each item is described once, in `spawned`', () => {
@@ -115,9 +137,12 @@ describe('dropped items are only re-sent when something changes', () => {
     const before = ticks.length;
     const item = engine.droppedItems[0];
     // Dig out the floor under the item
+    // (the item is a tile and a half across, so it rests on two or three floor cells: dig out all of them)
     const tx = Math.floor(item.position.x);
-    engine.grid[21][tx] = { type: MiningTileType.EMPTY, revealed: true };
-    engine.rigidWorld.removeTileCollider(tx, 21);
+    for (const x of [tx - 1, tx, tx + 1]) {
+      engine.grid[21][x] = { type: MiningTileType.EMPTY, revealed: true };
+      engine.rigidWorld.removeTileCollider(x, 21);
+    }
     tick(60);
     expect(listsSince(before).some(Boolean)).toBe(true);
   });

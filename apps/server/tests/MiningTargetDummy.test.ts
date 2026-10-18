@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MiningGameEngine } from '../src/services/mining/MiningGameEngine';
-import { MINING_CONFIG } from '@mine-me/shared';
+import { MINING_CONFIG, BLOCK_SCALE } from '@mine-me/shared';
 import { hitMob, hitPlayer } from '../src/services/mining/testHelpers';
 
 describe('MiningGameEngine - Target Dummy', () => {
@@ -50,7 +50,7 @@ describe('MiningGameEngine - Target Dummy', () => {
     expect(dummy?.name).toBe('Target Dummy');
     expect(dummy?.health).toBe(1000000);
     expect(dummy?.maxHealth).toBe(1000000);
-    expect(dummy?.position.x).toBeCloseTo(MINING_CONFIG.ENTRANCE_X + 2.5, 0.1);
+    expect(dummy?.position.x).toBeCloseTo(MINING_CONFIG.ENTRANCE_X + 2.5 * BLOCK_SCALE, 0.1);
     expect(dummy?.position.y).toBeLessThanOrEqual(1.0);
   });
 

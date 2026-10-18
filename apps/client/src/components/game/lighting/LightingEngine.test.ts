@@ -253,6 +253,22 @@ describe('LightingEngine', () => {
     engine.destroy();
   });
 
+  it('reports how long its costly phases take to a listener, and counts its lights', () => {
+    const engine = new LightingEngine(mockApp, mockContainer, 10, 10, 64);
+    const timings: string[] = [];
+    engine.onTiming = (phase, ms) => {
+      expect(ms).toBeGreaterThanOrEqual(0);
+      timings.push(phase);
+    };
+    engine.addLight(new PointLight('t', { x: 2, y: 2 }));
+    expect(engine.getLightCount()).toBe(1);
+    const grid: MiningClientTile[][] = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ type: MiningTileType.EMPTY, revealed: true })));
+    engine.updateGrid(grid, true);
+    engine.update(0.016, { x: 2, y: 2 }, { x: 1, y: 0 });
+    expect(timings).toEqual(expect.arrayContaining(['Sunlight Signature', 'Sunlight Recalc', 'Lights Draw', 'Lightmap Pass']));
+    engine.destroy();
+  });
+
   describe('with open sky above the ground (the sandbox)', () => {
     // 3 rows of sky, then ground (dirt) with an open shaft at x = 2 going down
     const skyGrid = (): MiningClientTile[][] =>
@@ -291,7 +307,7 @@ describe('LightingEngine', () => {
       const map = (engine as any).sunlightMap as number[][];
       // Treated as a mine: the sky rows are the surface, so the ground row is already in shadow
       expect(map.length).toBe(9);
-      expect(map[3][2]).toBeLessThan(0.9);
+      expect(map[3][2]).toBeLessThan(map[0][2]);
       engine.destroy();
     });
   });

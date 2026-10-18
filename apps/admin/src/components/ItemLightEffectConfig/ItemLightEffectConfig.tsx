@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ItemLightConfig, LightType, LightEffectMode } from '@mine-me/shared';
+import { MINING_TILE_PIXELS, type ItemLightConfig, type LightType, type LightEffectMode, BLOCK_SCALE } from '@mine-me/shared';
 import './ItemLightEffectConfig.css';
 
 interface ItemLightEffectConfigProps {
@@ -15,7 +15,7 @@ const DEFAULT_CONFIG: ItemLightConfig = {
   type: 'POINT',
   effect: 'PULSE',
   color: '#fbbf24',
-  radius: 1.8,
+  radius: 1.8 * BLOCK_SCALE,
   intensity: 0.45,
   pulseSpeed: 2.5,
   minIntensity: 0.3,
@@ -182,14 +182,14 @@ export const ItemLightEffectConfig: React.FC<ItemLightEffectConfigProps> = ({
                     Radius ({current.radius.toFixed(1)} tiles)
                   </label>
                   <span className="text-[11px] font-mono text-amber-400 font-bold">
-                    {(current.radius * 64).toFixed(0)} px
+                    {(current.radius * MINING_TILE_PIXELS).toFixed(0)} px
                   </span>
                 </div>
                 <input
                   type="range"
-                  min="0.5"
-                  max="5.0"
-                  step="0.1"
+                  min={0.5 * BLOCK_SCALE}
+                  max={5 * BLOCK_SCALE}
+                  step={0.1}
                   value={current.radius}
                   onChange={(e) => update({ radius: parseFloat(e.target.value) })}
                   className="w-full accent-amber-500 cursor-pointer"
@@ -283,8 +283,8 @@ export const ItemLightEffectConfig: React.FC<ItemLightEffectConfigProps> = ({
                         : ''
                     }`}
                     style={{
-                      width: `${Math.min(180, current.radius * 36)}px`,
-                      height: `${Math.min(180, current.radius * 36)}px`,
+                      width: `${Math.min(180, current.radius * 36 / BLOCK_SCALE)}px`,
+                      height: `${Math.min(180, current.radius * 36 / BLOCK_SCALE)}px`,
                       background: `radial-gradient(circle, ${current.color} 0%, ${current.color}66 35%, transparent 75%)`,
                       opacity: current.intensity,
                     }}

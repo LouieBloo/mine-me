@@ -155,7 +155,7 @@ describe('MobAI System', () => {
             health: 100,
           },
         ],
-        config: { aggroRange: 20, canMine: true },
+        config: { aggroRange: 20, attackRange: 1.25, canMine: true },
       };
 
       const intent = ai.update(0.1, context);
@@ -192,7 +192,7 @@ describe('MobAI System', () => {
             health: 100,
           },
         ],
-        config: { aggroRange: 20 },
+        config: { aggroRange: 20, attackRange: 1.25 },
       };
 
       const intent = ai.update(0.1, context);
@@ -226,7 +226,7 @@ describe('MobAI System', () => {
             health: 100,
           },
         ],
-        config: { aggroRange: 20, canMine: false },
+        config: { aggroRange: 20, attackRange: 1.25, canMine: false },
       };
 
       const intent = ai.update(0.1, context);
@@ -254,7 +254,7 @@ describe('MobAI System', () => {
         isOnLadder: false,
         grid,
         players: [{ characterId: 'p1', position: { x: 16, y: 9 }, health: 100 }],
-        config: { aggroRange: 20, mineRange: 1.85, canMine: true },
+        config: { aggroRange: 20, attackRange: 1.25, mineRange: 1.85, canMine: true },
       };
 
       const intent = ai.update(0.1, context);

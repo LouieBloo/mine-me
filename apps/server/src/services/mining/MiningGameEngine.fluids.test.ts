@@ -18,10 +18,15 @@ describe('fluids in a mining room', () => {
       socket: { connected: true, emit: () => {} } as any,
     });
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
+    // Forget the generated fluid, so only what a test places is there
+    const fluids = engine.fluidSubsystem.grid;
+    for (let y = 0; y < fluids.height; y++) for (let x = 0; x < fluids.width; x++) fluids.setCell(x, y, 0, 0);
     for (let y = 18; y <= 24; y++) {
-      for (let x = 8; x <= 16; x++) {
+      for (let x = 8; x <= 19; x++) { // (walled in beyond the cell this test opens at x = 16 too)
         const open = x >= 10 && x <= 14 && y >= 20 && y <= 22;
+        // (through the world's tile update, so the fluid grid hears about it)
         setTile(x, y, open ? MiningTileType.EMPTY : MiningTileType.DIRT);
+        (engine as any).buildWorld().pushTileUpdate({ x, y, type: open ? MiningTileType.EMPTY : MiningTileType.DIRT });
       }
     }
     engine.players.get(cid)!.playerBody.position = { x: 5.5, y: 5.5 };
@@ -59,6 +64,7 @@ describe('fluids in a mining room', () => {
     setTile(15, 22, MiningTileType.EMPTY);
     setTile(16, 22, MiningTileType.EMPTY);
     (engine as any).buildWorld().pushTileUpdate({ x: 15, y: 22, type: MiningTileType.EMPTY });
+    (engine as any).buildWorld().pushTileUpdate({ x: 16, y: 22, type: MiningTileType.EMPTY });
     expect(engine.fluidSubsystem.grid.activeCount).toBeGreaterThan(0);
     tick(600);
     expect(oilAt(15, 22)).toBeGreaterThan(0.1);

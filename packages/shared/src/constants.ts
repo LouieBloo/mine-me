@@ -1,6 +1,7 @@
 /** Response header the server sets when an admin save worked but the live game definitions could not be reloaded. */
 export const DEFINITIONS_RELOAD_FAILED_HEADER = 'X-Definitions-Reload-Failed';
 
+import { BLOCK_SCALE } from './types/mining';
 import type { GearSubType, ItemType, ItemPhysicsConfig, ItemSoundEffectsConfig } from './types';
 
 export const DEFAULT_DYNAMITE_SOUNDS: ItemSoundEffectsConfig = {
@@ -32,7 +33,7 @@ export const DEFAULT_DYNAMITE_PHYSICS_CONFIG: ItemPhysicsConfig = {
   linearDamping: 0.05,
   angularDamping: 0.4,
   allowRotation: true,
-  throwPower: 14.0,
+  throwPower: 14.0 * BLOCK_SCALE,
   fuseSeconds: 4.0,
 };
 

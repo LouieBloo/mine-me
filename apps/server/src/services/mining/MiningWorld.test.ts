@@ -56,7 +56,7 @@ describe('subsystems depend only on the world they are given', () => {
     expect(blocks.validateTorchPlacement(player, { x: 30, y: 5 })).toBe(false); // out of reach
     expect(blocks.placeTorch(player, { x: 11, y: 5 })).toBe(true);
     expect(world.grid[5][11].type).toBe(MiningTileType.TORCH);
-    expect(world.pushTileUpdate).toHaveBeenCalledWith({ x: 11, y: 5, type: MiningTileType.TORCH, damageStage: 0 });
+    expect(world.pushTileUpdate).toHaveBeenCalledWith({ x: 11, y: 5, type: MiningTileType.TORCH, damageStage: 0, piece: [1, 1] });
   });
 
   it('tile damage runs against a stand-in world: cracks announce a stage, breaking is delegated', () => {

@@ -135,9 +135,9 @@ describe('MiningEntityRenderer', () => {
     // Also test sprite dynamic scaling update when existing view is a Sprite
     const mockSprite = new Sprite(Texture.WHITE);
     spritesMap.set('drop-scale-large', mockSprite);
-    MiningEntityRenderer.updateDroppedItems(container, droppedItems, spritesMap, 64);
+    MiningEntityRenderer.updateDroppedItems(container, droppedItems, spritesMap, 32);
 
-    // Base size is 64 * 0.5 = 32. With inGameScale 2.0, size = 64
+    // Base size is one tile (32). With inGameScale 2.0, size = 64
     expect(mockSprite.width).toBe(64);
     expect(mockSprite.height).toBe(64);
   });
@@ -185,7 +185,7 @@ describe('MiningEntityRenderer', () => {
 
     it('applies the texture to the tracked sprite once loaded, keeping its size', async () => {
       const map = new Map<string, Sprite | Graphics>();
-      MiningEntityRenderer.updateDroppedItems(container, [item()], map, 64);
+      MiningEntityRenderer.updateDroppedItems(container, [item()], map, 32);
       const sprite = map.get('drop-img') as Sprite;
       finishLoad(Texture.WHITE);
       await Promise.resolve();
@@ -267,11 +267,11 @@ describe('MiningEntityRenderer', () => {
       const viewsMap = new Map<string, Sprite | Graphics>();
       const mockTexture = Texture.WHITE;
 
-      MiningEntityRenderer.updateActiveDynamites(container, dynamites, viewsMap, 64, mockTexture);
+      MiningEntityRenderer.updateActiveDynamites(container, dynamites, viewsMap, 32, mockTexture);
 
       const sprite = viewsMap.get('dyn-scaled') as Sprite;
       expect(sprite).toBeDefined();
-      // Base size: 64 * 0.5 = 32. With inGameScale 0.5, targetSize = 16
+      // Base size: one tile = 32. With inGameScale 0.5, targetSize = 16
       expect(sprite.width).toBe(16);
       expect(sprite.height).toBe(16);
     });

@@ -18,11 +18,12 @@ describe('separateBodies', () => {
   it('pushes two overlapping movable bodies apart, evenly, never faster than the separation speed', () => {
     const grid = openGrid();
     const a = body(10);
-    const b = body(10.4);
-    separateBodies([part('a', a), part('b', b)], 0.1, grid);
-    const maxPush = MINING_CONFIG.MOB_SEPARATION_SPEED * 0.1;
+    const b = body(10.1); // 0.9 of overlap: more than one step can push
+    const dt = 0.5 / MINING_CONFIG.MOB_SEPARATION_SPEED; // a step can push half a tile: less than the overlap
+    separateBodies([part('a', a), part('b', b)], dt, grid);
+    const maxPush = MINING_CONFIG.MOB_SEPARATION_SPEED * dt;
     expect(a.position.x).toBeCloseTo(10 - maxPush / 2, 6);
-    expect(b.position.x).toBeCloseTo(10.4 + maxPush / 2, 6);
+    expect(b.position.x).toBeCloseTo(10.1 + maxPush / 2, 6);
   });
 
   it('eventually resolves the overlap and then stops', () => {
@@ -48,10 +49,11 @@ describe('separateBodies', () => {
   it('never moves an immovable body; the movable one takes the whole push', () => {
     const grid = openGrid();
     const fixed = body(10);
-    const mover = body(10.3);
-    separateBodies([part('fixed', fixed, false), part('mover', mover)], 0.1, grid);
+    const mover = body(10.1);
+    const dt = 0.5 / MINING_CONFIG.MOB_SEPARATION_SPEED;
+    separateBodies([part('fixed', fixed, false), part('mover', mover)], dt, grid);
     expect(fixed.position.x).toBe(10);
-    expect(mover.position.x).toBeCloseTo(10.3 + MINING_CONFIG.MOB_SEPARATION_SPEED * 0.1, 6);
+    expect(mover.position.x).toBeCloseTo(10.1 + MINING_CONFIG.MOB_SEPARATION_SPEED * dt, 6);
   });
 
   it('ignores bodies that do not overlap, including ones at different heights', () => {

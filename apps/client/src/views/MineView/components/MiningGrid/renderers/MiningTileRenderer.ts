@@ -1,9 +1,46 @@
-import { Graphics, Sprite, Texture, type Container } from 'pixi.js';
-import { MiningTileType, canTileBeDamaged, type MiningClientTile } from '@mine-me/shared';
+import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import {
+  MINING_TILE_PIXELS,
+  MiningTileType,
+  canTileBeDamaged,
+  getTileFootprint,
+  type MiningClientTile,
+  type PieceOffset,
+} from '@mine-me/shared';
 
-export const TILE_SIZE = 64;
+/** One block on screen, in pixels (shared with the server's pixel-sized colliders and the admin previews). */
+export const TILE_SIZE = MINING_TILE_PIXELS;
+
+/** The slices of a piece's art, so each cell of a ladder, torch or bridge shows its own part of the one picture. */
+const pieceSlices = new WeakMap<Texture, Map<string, Texture>>();
+
+/** Cells along one side of a chunk of tiles (see MiningTileRenderer.chunkFor). */
+export const TILE_CHUNK_CELLS = 16;
+const tileChunks = new WeakMap<Container, Map<string, Container>>();
 
 export class MiningTileRenderer {
+  /**
+   * The part of a piece's `texture` that the cell at `offset` shows: the picture is cut into a grid of
+   * footprint-width by footprint-height parts. Cached, since every cell asks every time it is redrawn.
+   */
+  public static pieceSlice(texture: Texture, offset: PieceOffset, footprint: { width: number; height: number }): Texture {
+    let slices = pieceSlices.get(texture);
+    if (!slices) {
+      slices = new Map();
+      pieceSlices.set(texture, slices);
+    }
+    const key = `${offset[0]},${offset[1]}`;
+    let slice = slices.get(key);
+    if (!slice) {
+      const frame = texture.frame;
+      const w = frame.width / footprint.width;
+      const h = frame.height / footprint.height;
+      slice = new Texture({ source: texture.source, frame: new Rectangle(frame.x + offset[0] * w, frame.y + offset[1] * h, w, h) });
+      slices.set(key, slice);
+    }
+    return slice;
+  }
+
   public static drawDamageCracks(graphics: Graphics, damageStage: number, tileSize: number = TILE_SIZE): void {
     const c = tileSize / 2;
     const darkColor = 0x000000;
@@ -228,6 +265,39 @@ export class MiningTileRenderer {
     graphics.fill({ color: 0xfbbf24, alpha: alpha * 0.8 });
   }
 
+  /**
+   * The container that holds the cells around (x, y). Tiles live in square chunks rather than all in one
+   * container, so the culler can skip every chunk that is off screen with one check instead of visiting each of
+   * the tens of thousands of cells, and Pixi never has to draw or even walk them.
+   */
+  public static chunkFor(tilesContainer: Container, x: number, y: number, tileSize: number): Container {
+    let chunks = tileChunks.get(tilesContainer);
+    if (!chunks) {
+      chunks = new Map();
+      tileChunks.set(tilesContainer, chunks);
+      tilesContainer.cullableChildren = true;
+    }
+    const cx = Math.floor(x / TILE_CHUNK_CELLS);
+    const cy = Math.floor(y / TILE_CHUNK_CELLS);
+    const key = `${cx},${cy}`;
+    let chunk = chunks.get(key);
+    if (!chunk) {
+      chunk = new Container();
+      chunk.cullable = true;
+      chunk.cullableChildren = false; // the chunk is culled as a whole; its cells are never visited
+      const size = TILE_CHUNK_CELLS * tileSize;
+      chunk.cullArea = new Rectangle(cx * size, cy * size, size, size);
+      tilesContainer.addChild(chunk);
+      chunks.set(key, chunk);
+    }
+    return chunk;
+  }
+
+  /**
+   * Draws one cell. A cell costs a display object only when it has something to show: a sprite for a textured
+   * block or for fog (a tinted white square, so fog batches with the blocks), and a Graphics only for
+   * what a sprite cannot do (art-less fallback blocks and crack overlays). Empty revealed cells cost nothing.
+   */
   public static renderSingleTile(
     tilesContainer: Container,
     x: number,
@@ -239,53 +309,64 @@ export class MiningTileRenderer {
     tileSize: number = TILE_SIZE
   ): void {
     const key = `${x},${y}`;
+    const chunk = this.chunkFor(tilesContainer, x, y, tileSize);
     let graphics = tileGraphicsMap.get(key);
+    let tileSprite = tileSpritesMap.get(key);
+
+    const footprint = getTileFootprint(tile.type);
+    const wholeTexture = tile.revealed ? blockTextures.get(tile.type) : undefined;
+    // A cell of a piece shows its slice of the piece's art
+    const blockTexture = wholeTexture && tile.piece ? this.pieceSlice(wholeTexture, tile.piece, footprint) : wholeTexture;
+
+    // 1. The sprite: fog, or the block's art
+    const spriteTexture = !tile.revealed ? Texture.WHITE : blockTexture;
+    if (spriteTexture) {
+      if (!tileSprite) {
+        tileSprite = new Sprite(spriteTexture);
+        tileSprite.x = x * tileSize;
+        tileSprite.y = y * tileSize;
+        // Under the cell's graphics (cracks) when it already has some
+        if (graphics && graphics.parent === chunk) chunk.addChildAt(tileSprite, chunk.getChildIndex(graphics));
+        else chunk.addChild(tileSprite);
+        tileSpritesMap.set(key, tileSprite);
+      } else {
+        tileSprite.texture = spriteTexture;
+        tileSprite.visible = true;
+      }
+      // Set after the texture, since the size is relative to the texture it has
+      tileSprite.width = tileSize;
+      tileSprite.height = tileSize;
+      tileSprite.tint = tile.revealed ? 0xffffff : 0x000000;
+    } else if (tileSprite) {
+      tileSprite.visible = false;
+    }
+
+    // 2. The graphics: only what a sprite cannot show
+    const needsFallback = tile.revealed && !blockTexture && tile.type !== MiningTileType.EMPTY;
+    const needsCracks = tile.revealed && Boolean(tile.damageStage && tile.damageStage > 0 && canTileBeDamaged(tile.type));
+    if (!needsFallback && !needsCracks) {
+      if (graphics) {
+        graphics.destroy();
+        tileGraphicsMap.delete(key);
+      }
+      return;
+    }
 
     if (!graphics) {
       graphics = new Graphics();
       graphics.x = x * tileSize;
       graphics.y = y * tileSize;
-      graphics.cullable = true;
-      tilesContainer.addChild(graphics);
+      chunk.addChild(graphics);
       tileGraphicsMap.set(key, graphics);
     }
-
-    const blockTexture = tile.revealed ? blockTextures.get(tile.type) : undefined;
-    let tileSprite = tileSpritesMap.get(key);
-
-    if (tile.revealed && blockTexture) {
-      if (!tileSprite) {
-        tileSprite = new Sprite(blockTexture);
-        tileSprite.x = x * tileSize;
-        tileSprite.y = y * tileSize;
-        tileSprite.width = tileSize;
-        tileSprite.height = tileSize;
-        tileSprite.cullable = true;
-        // Add below graphics overlay (cracks)
-        tilesContainer.addChildAt(tileSprite, Math.max(0, tilesContainer.getChildIndex(graphics)));
-        tileSpritesMap.set(key, tileSprite);
-      } else {
-        tileSprite.texture = blockTexture;
-        tileSprite.visible = true;
-      }
-    } else if (tileSprite) {
-      tileSprite.visible = false;
-    }
-
     graphics.clear();
-    if (!tile.revealed) {
-      graphics.rect(0, 0, tileSize, tileSize);
-      graphics.fill(0x000000);
-    } else {
-      if (!blockTexture) {
-        this.drawFallbackTile(graphics, tile.type, tileSize);
-      }
-
-      // Render crack overlay if block is partially mined and tile can be damaged
-      if (tile.damageStage && tile.damageStage > 0 && canTileBeDamaged(tile.type)) {
-        this.drawDamageCracks(graphics, tile.damageStage, tileSize);
-      }
+    if (needsFallback) {
+      // A piece with no art is drawn whole by its top-left cell; the other cells have nothing to add
+      if (!tile.piece) this.drawFallbackTile(graphics, tile.type, tileSize);
+      else if (tile.piece[0] === 0 && tile.piece[1] === 0) this.drawFallbackTile(graphics, tile.type, tileSize * footprint.width);
     }
+    // Render crack overlay if block is partially mined and tile can be damaged
+    if (needsCracks) this.drawDamageCracks(graphics, tile.damageStage as number, tileSize);
   }
 
   public static renderGrid(

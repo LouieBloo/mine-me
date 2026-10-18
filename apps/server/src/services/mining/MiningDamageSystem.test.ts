@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { MINING_CONFIG, MiningTileType, blastDamageAt, type DamageEvent } from '@mine-me/shared';
+import { BLOCK_SCALE, MINING_CONFIG, MiningTileType, blastDamageAt, type DamageEvent } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 import { giveBlockDrops, hitMob, mobEffects, mobSwing } from './testHelpers';
 
@@ -221,7 +221,7 @@ describe('MiningDamageSystem', () => {
       const hit = hits.find((h) => h.kind === 'entity' && h.target.kind === 'mob');
       expect(hit).toBeDefined();
       expect(hit!.target.id).toBe(mob.id);
-      expect(hit!.event).toMatchObject({ type: 'melee', amount: 25, source: { kind: 'player', id: cid }, knockback: { y: -3.2 } });
+      expect(hit!.event).toMatchObject({ type: 'melee', amount: 25, source: { kind: 'player', id: cid }, knockback: { y: expect.closeTo(-3.2 * BLOCK_SCALE, 5) } });
     });
 
     it('bullets hitting a mob: type ranged, credited to the owner and weapon, no knockback', () => {

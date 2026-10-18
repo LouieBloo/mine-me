@@ -135,7 +135,7 @@ describe('handleMiningPlaceTorch', () => {
   it('places torch and deducts from inventory when character has torch', async () => {
     const session = miningSessionManager.createSession('char-torch-1', 'city-1', mockSocket);
     session.getPlayer('char-torch-1')!.playerBody.position = { x: 10.5, y: 5.5 };
-    session.grid[5][11] = { type: 0 as any, revealed: true };
+    for (let gy = 2; gy <= 9; gy++) for (let gx = 8; gx <= 16; gx++) session.grid[gy][gx] = { type: 0 as any, revealed: true }; // room for a 3x3 piece
 
     (prisma.inventoryItem.findFirst as any).mockResolvedValue({
       id: 'inv-torch-1',
@@ -185,7 +185,7 @@ describe('handleMiningPlaceLadder', () => {
   it('places ladder and deducts from inventory when character has ladder', async () => {
     const session = miningSessionManager.createSession('char-ladder-1', 'city-1', mockSocket);
     session.getPlayer('char-ladder-1')!.playerBody.position = { x: 10.5, y: 5.5 };
-    session.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
+    for (let gy = 2; gy <= 9; gy++) for (let gx = 8; gx <= 16; gx++) session.grid[gy][gx] = { type: MiningTileType.EMPTY, revealed: true }; // room for a 3x3 piece
 
     (prisma.inventoryItem.findFirst as any).mockResolvedValue({
       id: 'inv-ladder-1',
@@ -211,7 +211,7 @@ describe('handleMiningPlaceLadder', () => {
   it('deletes inventory item if remaining quantity was 1', async () => {
     const session = miningSessionManager.createSession('char-ladder-1', 'city-1', mockSocket);
     session.getPlayer('char-ladder-1')!.playerBody.position = { x: 10.5, y: 5.5 };
-    session.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
+    for (let gy = 2; gy <= 9; gy++) for (let gx = 8; gx <= 16; gx++) session.grid[gy][gx] = { type: MiningTileType.EMPTY, revealed: true }; // room for a 3x3 piece
 
     (prisma.inventoryItem.findFirst as any).mockResolvedValue({
       id: 'inv-ladder-last',

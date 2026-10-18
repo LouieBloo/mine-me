@@ -44,6 +44,14 @@ describe('sanitizeMiningInput', () => {
     });
   });
 
+  it('keeps the Ctrl flag only when it is a boolean', () => {
+    const base = { up: false, down: false, left: false, right: false, miningKey: true, sequence: 1 };
+    expect(sanitizeMiningInput({ ...base, preciseMining: true })?.preciseMining).toBe(true);
+    expect(sanitizeMiningInput({ ...base, preciseMining: false })?.preciseMining).toBe(false);
+    expect(sanitizeMiningInput(base)?.preciseMining).toBeUndefined();
+    expect(sanitizeMiningInput({ ...base, preciseMining: 'yes' })).toBeNull();
+  });
+
   it('strips unknown fields', () => {
     const out = sanitizeMiningInput({ ...base, evil: 'x', __proto__: { a: 1 } }) as any;
     expect(out.evil).toBeUndefined();

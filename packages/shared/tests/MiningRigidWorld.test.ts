@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { MiningRigidWorld, calculateThrowVelocity } from '../src/physics/MiningRigidWorld';
-import { MiningTileType } from '../src/types/mining';
+import { MiningTileType, MINING_CONFIG, MINING_TILE_PIXELS } from '../src/types/mining';
 
 describe('MiningRigidWorld (Planck.js Integration)', () => {
   it('creates world with default gravity pointing downwards', () => {
     const rigidWorld = new MiningRigidWorld();
     expect(rigidWorld.config.gravityEnabled).toBe(true);
-    expect(rigidWorld.config.gravity).toBe(28.0);
+    expect(rigidWorld.config.gravity).toBe(MINING_CONFIG.GRAVITY);
     const g = rigidWorld.world.getGravity();
     expect(g.x).toBe(0);
-    expect(g.y).toBe(28.0);
+    expect(g.y).toBe(MINING_CONFIG.GRAVITY);
   });
 
   it('can toggle gravity on and off dynamically', () => {
@@ -121,7 +121,7 @@ describe('MiningRigidWorld (Planck.js Integration)', () => {
     expect(finalPos.y).toBeLessThan(8.0);
   });
 
-  it('creates rectangular hotdog collider with dimensions matching MINING_TILE_WORLD_PIXELS scale', () => {
+  it('creates rectangular hotdog collider with dimensions matching MINING_TILE_PIXELS scale', () => {
     const rigidWorld = new MiningRigidWorld();
     const dynamite = rigidWorld.createDynamiteBody(
       'dyn-hotdog',
@@ -142,14 +142,13 @@ describe('MiningRigidWorld (Planck.js Integration)', () => {
     const shape = fixture!.getShape() as any;
     expect(shape.getType()).toBe('polygon');
 
-    // Expected half-width: (32 / 64) / 2 = 0.25 tiles
-    // Expected half-height: (10 / 64) / 2 = 0.078125 tiles
+    // Collider sizes are in pixels: half-width (32 px / tile size) / 2, half-height (10 px / tile size) / 2
     const v0 = shape.m_vertices[0];
-    expect(Math.abs(v0.x)).toBeCloseTo(0.25, 4);
-    expect(Math.abs(v0.y)).toBeCloseTo(0.078125, 4);
+    expect(Math.abs(v0.x)).toBeCloseTo(32 / MINING_TILE_PIXELS / 2, 4);
+    expect(Math.abs(v0.y)).toBeCloseTo(10 / MINING_TILE_PIXELS / 2, 4);
   });
 
-  it('creates circle collider with radius matching MINING_TILE_WORLD_PIXELS scale', () => {
+  it('creates circle collider with radius matching MINING_TILE_PIXELS scale', () => {
     const rigidWorld = new MiningRigidWorld();
     const dynamite = rigidWorld.createDynamiteBody(
       'dyn-circle',
@@ -168,8 +167,8 @@ describe('MiningRigidWorld (Planck.js Integration)', () => {
     expect(fixture).not.toBeNull();
     const shape = fixture!.getShape() as any;
     expect(shape.getType()).toBe('circle');
-    // Expected radius: 16 / 64 = 0.25 tiles
-    expect(shape.m_radius).toBeCloseTo(0.25, 4);
+    // Expected radius: 16 px / tile size
+    expect(shape.m_radius).toBeCloseTo(16 / MINING_TILE_PIXELS, 4);
   });
 
   describe('calculateThrowVelocity', () => {

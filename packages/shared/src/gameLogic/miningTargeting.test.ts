@@ -1,0 +1,150 @@
+import { describe, it, expect } from 'vitest';
+import { BLOCK_SCALE, MINING_CONFIG, MiningTileType } from '../types/mining';
+import { MINING_QUEUE_LENGTH, selectMiningTargets, type TargetableTile } from './miningTargeting';
+
+const S = BLOCK_SCALE;
+const REACH = MINING_CONFIG.PLAYER_MINING_REACH;
+
+/** An open room of `size` cells; `solid` cells are dirt. */
+const room = (size = 40, solid: (x: number, y: number) => boolean = () => false): TargetableTile[][] =>
+  Array.from({ length: size }, (_, y) =>
+    Array.from({ length: size }, (_, x) => ({ type: solid(x, y) ? MiningTileType.DIRT : MiningTileType.EMPTY, revealed: true }))
+  );
+
+const keys = (cells: { x: number; y: number }[]) => cells.map((c) => `${c.x},${c.y}`);
+/** The player stands in the middle of cell (20, 20). */
+const player = { x: 20.5, y: 20.5 };
+
+describe('selectMiningTargets (auto): the face in front of the player', () => {
+  it('pointing right at a wall, mines the middle block, then the top, then the bottom', () => {
+    const grid = room(40, (x) => x >= 22 && x <= 24);
+    expect(MINING_QUEUE_LENGTH).toBe(S);
+    expect(keys(selectMiningTargets(grid, player, { x: 30, y: 20 }))).toEqual(['22,20', '22,19', '22,21']);
+  });
+
+  it('pointing left works the same, and the next face becomes the front once this one is gone', () => {
+    const grid = room(40, (x) => x >= 16 && x <= 18);
+    expect(keys(selectMiningTargets(grid, player, { x: 5, y: 20 }))).toEqual(['18,20', '18,19', '18,21']);
+    for (const y of [19, 20, 21]) grid[y][18] = { type: MiningTileType.EMPTY, revealed: true };
+    expect(keys(selectMiningTargets(grid, player, { x: 5, y: 20 }))).toEqual(['17,20', '17,19', '17,21']);
+  });
+
+  it('pointing up at a ceiling, mines the middle block, then the left, then the right', () => {
+    const grid = room(40, (_x, y) => y <= 18);
+    expect(keys(selectMiningTargets(grid, player, { x: 20, y: 8 }))).toEqual(['20,18', '19,18', '21,18']);
+  });
+
+  it('pointing down at the floor works the same', () => {
+    const grid = room(40, (_x, y) => y >= 22);
+    expect(keys(selectMiningTargets(grid, player, { x: 20, y: 35 }))).toEqual(['20,22', '19,22', '21,22']);
+  });
+
+  it('pointing diagonally, mines the diagonal block and its neighbours, and nothing behind them', () => {
+    const grid = room(40, (x, y) => x + y >= 42);
+    const result = selectMiningTargets(grid, player, { x: 30, y: 30 });
+    expect(result[0]).toEqual({ x: 21, y: 21 });
+    expect(result).toHaveLength(S);
+    for (const c of result) expect(c.x + c.y).toBe(42);
+  });
+
+  it('starts with the block the cursor is closest to, not always the middle', () => {
+    const grid = room(40, (x) => x >= 22 && x <= 24);
+    expect(keys(selectMiningTargets(grid, player, { x: 22, y: 19 }))[0]).toBe('22,19');
+    expect(keys(selectMiningTargets(grid, player, { x: 22, y: 21 }))[0]).toBe('22,21');
+    expect(keys(selectMiningTargets(grid, player, { x: 22, y: 20 }))[0]).toBe('22,20');
+  });
+});
+
+describe('selectMiningTargets (auto): direction, reach and what is in the way', () => {
+  it('a cursor over a far block mines whatever is in the way, up to reach', () => {
+    const grid = room(60, (x) => x >= 22);
+    const far = { x: 20.5, y: 20.5 };
+    const result = selectMiningTargets(grid, far, { x: 50, y: 20 });
+    expect(keys(result)).toEqual(['22,20', '22,19', '22,21']);
+    for (const c of result) expect(Math.abs(c.x + 0.5 - far.x)).toBeLessThanOrEqual(REACH);
+  });
+
+  it('a cursor right beside the player still mines the wall ahead along that direction', () => {
+    const grid = room(40, (x) => x >= 24);
+    expect(selectMiningTargets(grid, player, { x: 21, y: 20 })[0]).toEqual({ x: 24, y: 20 });
+  });
+
+  it('never picks a block behind another block', () => {
+    const grid = room(40, (x) => x >= 22 && x <= 26);
+    const result = keys(selectMiningTargets(grid, player, { x: 30, y: 20 }, { count: 20 }));
+    expect(result.every((k) => k.startsWith('22,'))).toBe(true);
+  });
+
+  it('does not reach through a block that cannot be mined', () => {
+    const grid = room(40, (x) => x >= 23);
+    for (const y of [19, 20, 21]) grid[y][22] = { type: MiningTileType.ROCK, revealed: true }; // solid, not mineable
+    expect(selectMiningTargets(grid, player, { x: 30, y: 20 })).toEqual([]);
+  });
+
+  it('does not reach into fog', () => {
+    const grid = room(40, (x) => x >= 22);
+    for (let y = 0; y < 40; y++) grid[y][22].revealed = false;
+    expect(selectMiningTargets(grid, player, { x: 30, y: 20 })).toEqual([]);
+  });
+
+  it('never picks a block out of reach', () => {
+    const grid = room(60, (x) => x >= 30);
+    expect(selectMiningTargets(grid, player, { x: 50, y: 20 })).toEqual([]);
+    const near = room(60, (x) => x >= 20 + Math.floor(REACH));
+    expect(selectMiningTargets(near, player, { x: 50, y: 20 }).length).toBeGreaterThan(0);
+  });
+
+  it('takes what is in front through open air with a gap before the wall', () => {
+    const grid = room(40, (x) => x >= 24);
+    expect(keys(selectMiningTargets(grid, player, { x: 36, y: 20 }))).toEqual(['24,20', '24,19', '24,21']);
+  });
+
+  it('does not take blocks behind the player', () => {
+    const grid = room(40, (x) => x <= 19);
+    expect(selectMiningTargets(grid, player, { x: 30, y: 20 })).toEqual([]);
+  });
+
+  it('stays inside the map', () => {
+    const grid = room(10, () => true);
+    const result = selectMiningTargets(grid, { x: 0.5, y: 5.5 }, { x: 0, y: 5 });
+    for (const c of result) {
+      expect(c.x).toBeGreaterThanOrEqual(0);
+      expect(c.y).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('can be given another count and reach', () => {
+    const grid = room(40, (x) => x >= 22);
+    expect(selectMiningTargets(grid, player, { x: 30, y: 20 }, { count: 2 })).toHaveLength(2);
+    expect(selectMiningTargets(grid, player, { x: 30, y: 20 }, { reach: 1.4 })).toEqual([]);
+  });
+
+  it('keeps the block being mined first while it is still among those lined up', () => {
+    const grid = room(40, (x) => x >= 22 && x <= 24);
+    const base = selectMiningTargets(grid, player, { x: 30, y: 20 });
+    expect(base[0]).toEqual({ x: 22, y: 20 });
+    expect(selectMiningTargets(grid, player, { x: 30, y: 20 }, { keep: { x: 22, y: 21 } })[0]).toEqual({ x: 22, y: 21 });
+    expect(selectMiningTargets(grid, player, { x: 30, y: 20 }, { keep: { x: 30, y: 30 } })).toEqual(base);
+  });
+
+  it('a block in the player\'s own cell is mined', () => {
+    const grid = room(40);
+    grid[20][20] = { type: MiningTileType.DIRT, revealed: true };
+    expect(selectMiningTargets(grid, player, { x: 20, y: 20 })).toEqual([{ x: 20, y: 20 }]);
+  });
+});
+
+describe('selectMiningTargets (precise, Ctrl)', () => {
+  it('is only the cursor cell', () => {
+    const grid = room(40, (x) => x >= 22);
+    expect(selectMiningTargets(grid, player, { x: 24, y: 20 }, { precise: true })).toEqual([{ x: 24, y: 20 }]);
+  });
+
+  it('is empty when the cursor cell is air, out of reach, or not mineable', () => {
+    const grid = room(40, (x) => x >= 22);
+    expect(selectMiningTargets(grid, player, { x: 21, y: 20 }, { precise: true })).toEqual([]);
+    expect(selectMiningTargets(grid, player, { x: 39, y: 20 }, { precise: true })).toEqual([]);
+    grid[20][23] = { type: MiningTileType.ROCK, revealed: true };
+    expect(selectMiningTargets(grid, player, { x: 23, y: 20 }, { precise: true })).toEqual([]);
+  });
+});

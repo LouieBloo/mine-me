@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import type { MiningConfigFieldProps } from '../MiningConfigTypes';
 import './MiningConfigResources.css';
 
@@ -102,8 +103,8 @@ export default function MiningConfigResources({ config, onFieldChange }: MiningC
               id="silveriumMinDepth"
               type="number"
               min="1"
-              max="40"
-              value={config.silveriumMinDepth ?? 12}
+              max={40 * BLOCK_SCALE}
+              value={config.silveriumMinDepth ?? 12 * BLOCK_SCALE}
               onChange={e => onFieldChange('silveriumMinDepth', Number(e.target.value))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
             />

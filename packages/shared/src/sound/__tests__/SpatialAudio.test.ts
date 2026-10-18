@@ -92,10 +92,10 @@ describe('SpatialAudio', () => {
 
     it('marks sound as inaudible and volume 0 when beyond max distance', () => {
       const listener = { x: 0, y: 0 };
-      const distantSource = { x: 25, y: 0 }; // 25 tiles away (max is 16)
+      const distantSource = { x: 50, y: 0 }; // 50 tiles away (max is 32)
       const result = calculateSpatialAudio(listener, distantSource);
 
-      expect(result.distance).toBe(25);
+      expect(result.distance).toBe(50);
       expect(result.volumeScale).toBe(0.0);
       expect(result.isAudible).toBe(false);
     });
@@ -136,7 +136,8 @@ describe('SpatialAudio', () => {
 
     it('works with BLOCK_MINING preset', () => {
       const listener = { x: 5, y: 5 };
-      const mobMiningFar = { x: 25, y: 5 }; // 20 tiles away > 16 maxDistance
+      const preset = MINING_SPATIAL_AUDIO_PRESETS.BLOCK_MINING;
+      const mobMiningFar = { x: listener.x + preset.maxDistance + 8, y: 5 }; // well past the preset's max distance
       const resultFar = calculateSpatialAudio(
         listener,
         mobMiningFar,
@@ -145,7 +146,7 @@ describe('SpatialAudio', () => {
       expect(resultFar.isAudible).toBe(false);
       expect(resultFar.volumeScale).toBe(0.0);
 
-      const mobMiningNear = { x: 7, y: 5 }; // 2 tiles away <= minDistance (2)
+      const mobMiningNear = { x: listener.x + preset.minDistance, y: 5 }; // exactly the preset's min distance away
       const resultNear = calculateSpatialAudio(
         listener,
         mobMiningNear,

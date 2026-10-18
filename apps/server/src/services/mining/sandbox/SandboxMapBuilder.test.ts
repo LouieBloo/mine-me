@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { MiningTileType, isTileSolid, type FluidDefinition, type GasDefinition } from '@mine-me/shared';
 import { buildSandboxMap } from './SandboxMapBuilder';
-import { createDefaultSandboxLayout, SANDBOX_SKY_ROWS, type SandboxLayout } from './SandboxLayout';
+import { createDefaultSandboxLayout, SANDBOX_BLOCK_SCALE, SANDBOX_SKY_ROWS, type SandboxLayout } from './SandboxLayout';
 import { BLOCK_TILE_TYPES } from '../subsystems/MiningDataManager';
 
 const SKY = SANDBOX_SKY_ROWS;
+/** The layout is drawn in old-size blocks; this many small blocks make one. */
+const S = SANDBOX_BLOCK_SCALE;
 const fluid = (typeKey: string) => ({ typeKey }) as FluidDefinition;
 const gas = (typeKey: string) => ({ typeKey }) as GasDefinition;
 const build = (fluids: FluidDefinition[] = [fluid('LAVA'), fluid('OIL'), fluid('WATER')], gases: GasDefinition[] = [gas('HYDROGEN'), gas('NITROGEN')]) =>
@@ -13,10 +15,10 @@ const build = (fluids: FluidDefinition[] = [fluid('LAVA'), fluid('OIL'), fluid('
 const at = (grid: ReturnType<typeof build>['grid'], x: number, y: number) => grid[y + SKY][x];
 
 describe('the default sandbox map', () => {
-  it('is 90 wide and 30 deep under open sky, fully revealed (no fog of war)', () => {
+  it('is 90 by 30 original blocks (270 by 90 now) under open sky, fully revealed (no fog of war)', () => {
     const { grid, surfaceRow } = build();
-    expect(grid).toHaveLength(30 + SKY);
-    expect(grid.every((row) => row.length === 90)).toBe(true);
+    expect(grid).toHaveLength(30 * S + SKY);
+    expect(grid.every((row) => row.length === 90 * S)).toBe(true);
     expect(grid.flat().every((t) => t.revealed)).toBe(true);
     expect(surfaceRow).toBe(SKY);
   });
@@ -25,12 +27,12 @@ describe('the default sandbox map', () => {
     const { grid } = build();
     for (let y = 0; y < SKY; y++) expect(grid[y].every((t) => t.type === MiningTileType.EMPTY)).toBe(true);
     // ...and solid ground directly under it where there is no pool or shaft
-    expect(isTileSolid(at(grid, 5, 0).type)).toBe(true);
+    expect(isTileSolid(at(grid, 5 * S, 0).type)).toBe(true);
   });
 
   it('has one of every block type in the hall', () => {
     const { grid } = build();
-    const gallery = grid[15 + SKY].slice(20, 20 + BLOCK_TILE_TYPES.length * 2).filter((_, i) => i % 2 === 0).map((t) => t.type);
+    const gallery = grid[15 * S + SKY].slice(20 * S, 20 * S + BLOCK_TILE_TYPES.length * 2 * S).filter((_, i) => i % (2 * S) === 0).map((t) => t.type);
     expect(gallery).toEqual([...BLOCK_TILE_TYPES]);
   });
 
@@ -44,12 +46,12 @@ describe('the default sandbox map', () => {
   it('opens the pools onto the surface, filled with oil and water', () => {
     const { grid, fluidCells } = build([fluid('WATER'), fluid('OIL'), fluid('LAVA')]);
     // the ground is open above each pool, solid dirt next to it
-    expect(at(grid, 38, 0).type).toBe(MiningTileType.EMPTY);
-    expect(at(grid, 50, 0).type).toBe(MiningTileType.EMPTY);
-    expect(isTileSolid(at(grid, 30, 0).type)).toBe(true);
-    expect(fluidCells.find((c) => c.x === 38 && c.y === 5 + SKY)?.typeKey).toBe('OIL');
-    expect(fluidCells.find((c) => c.x === 50 && c.y === 5 + SKY)?.typeKey).toBe('WATER');
-    expect(fluidCells.find((c) => c.x === 3 && c.y === 5 + SKY)?.typeKey).toBe('LAVA');
+    expect(at(grid, 38 * S, 0).type).toBe(MiningTileType.EMPTY);
+    expect(at(grid, 50 * S, 0).type).toBe(MiningTileType.EMPTY);
+    expect(isTileSolid(at(grid, 30 * S, 0).type)).toBe(true);
+    expect(fluidCells.find((c) => c.x === 38 * S && c.y === 5 * S + SKY)?.typeKey).toBe('OIL');
+    expect(fluidCells.find((c) => c.x === 50 * S && c.y === 5 * S + SKY)?.typeKey).toBe('WATER');
+    expect(fluidCells.find((c) => c.x === 3 * S && c.y === 5 * S + SKY)?.typeKey).toBe('LAVA');
     // fluid starts one tile below the lip, so the ground level and the sky are open air
     expect(fluidCells.some((c) => c.y <= SKY)).toBe(false);
     expect(fluidCells.every((c) => grid[c.y][c.x].type === MiningTileType.EMPTY)).toBe(true);
@@ -70,8 +72,8 @@ describe('the default sandbox map', () => {
   it('leaves a pool dry when there is no fluid for it', () => {
     const { fluidCells } = build([fluid('OIL')]);
     expect(fluidCells.length).toBeGreaterThan(0);
-    expect(fluidCells.every((c) => c.x >= 32 && c.x <= 43)).toBe(true);
-    expect(build([fluid('LAVA')]).fluidCells.every((c) => c.x >= 1 && c.x <= 4)).toBe(true);
+    expect(fluidCells.every((c) => c.x >= 32 * S && c.x <= 44 * S - 1)).toBe(true);
+    expect(build([fluid('LAVA')]).fluidCells.every((c) => c.x >= 1 * S && c.x <= 5 * S - 1)).toBe(true);
     expect(build([]).fluidCells).toEqual([]);
   });
 
@@ -83,8 +85,11 @@ describe('the default sandbox map', () => {
 
   it('is reachable: a ladder runs from the ground down into the hall', () => {
     const { grid } = build();
-    for (let y = 0; y <= 11; y++) expect(at(grid, 13, y).type).toBe(MiningTileType.LADDER);
-    expect(at(grid, 13, 12).type).toBe(MiningTileType.EMPTY);
+    // the ladder is 2 cells wide, one old-size block
+    for (const x of [13 * S, 13 * S + 1]) {
+      for (let y = 0; y <= 12 * S - 1; y++) expect(at(grid, x, y).type).toBe(MiningTileType.LADDER);
+      expect(at(grid, x, 12 * S).type).toBe(MiningTileType.EMPTY);
+    }
   });
 });
 
@@ -139,8 +144,8 @@ describe('the sandbox gas chambers', () => {
     const { gasCells } = build([], [gas('NITROGEN'), gas('HYDROGEN')]);
     const hydrogen = chamber(gasCells, 'HYDROGEN');
     const nitrogen = chamber(gasCells, 'NITROGEN');
-    expect(hydrogen.length).toBe(8 * 6);
-    expect(nitrogen.length).toBe(8 * 6);
+    expect(hydrogen.length).toBe(8 * 6 * S * S);
+    expect(nitrogen.length).toBe(8 * 6 * S * S);
     expect(Math.max(...hydrogen.map((c) => c.x))).toBeLessThan(Math.min(...nitrogen.map((c) => c.x)));
     for (const c of gasCells) expect(c.concentration).toBe(1);
   });
@@ -155,19 +160,19 @@ describe('the sandbox gas chambers', () => {
         expect(isTileSolid(grid[c.y + dy][c.x + dx].type)).toBe(true);
       }
     }
-    // The roof over the hydrogen: two plain dirt blocks, with open sky above them
-    for (const y of [0, 1]) expect(at(grid, 63, y).type).toBe(MiningTileType.DIRT);
-    expect(grid[SKY - 1][63].type).toBe(MiningTileType.EMPTY);
+    // The roof over the hydrogen: two old-size blocks of plain dirt (four rows), with open sky above them
+    for (let y = 0; y < 2 * S; y++) expect(at(grid, 63 * S, y).type).toBe(MiningTileType.DIRT);
+    expect(grid[SKY - 1][63 * S].type).toBe(MiningTileType.EMPTY);
   });
 
   it('leaves a chamber empty when there is no gas for its slot, and all of them when there are no gases', () => {
     const one = build([], [gas('HYDROGEN')]);
-    expect(chamber(one.gasCells, 'HYDROGEN').length).toBe(48);
-    expect(one.gasCells.length).toBe(48);
+    expect(chamber(one.gasCells, 'HYDROGEN').length).toBe(48 * S * S);
+    expect(one.gasCells.length).toBe(48 * S * S);
     const none = build([], []);
     expect(none.gasCells).toEqual([]);
     // The chambers are still carved out, just empty
-    expect(at(none.grid, 63, 4).type).toBe(MiningTileType.EMPTY);
+    expect(at(none.grid, 63 * S, 4 * S).type).toBe(MiningTileType.EMPTY);
   });
 
   it('does not touch the pools', () => {

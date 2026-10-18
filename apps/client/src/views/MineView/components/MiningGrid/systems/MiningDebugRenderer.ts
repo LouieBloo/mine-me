@@ -1,7 +1,8 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import type { Graphics } from 'pixi.js';
 import {
   MINING_CONFIG,
-  MINING_TILE_WORLD_PIXELS,
+  MINING_TILE_PIXELS,
   isTileSolid,
   type Vector2D,
   type MiningPosition,
@@ -53,8 +54,8 @@ export class MiningDebugRenderer {
 
     const playerPixelX = currentPos.x * TILE_SIZE;
     const playerPixelY = currentPos.y * TILE_SIZE;
-    const colliderPixelW = (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE) * TILE_SIZE;
-    const colliderPixelH = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE) * TILE_SIZE;
+    const colliderPixelW = MINING_CONFIG.PLAYER_COLLIDER_WIDTH_TILES * TILE_SIZE;
+    const colliderPixelH = MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES * TILE_SIZE;
 
     // 1. Current Tile Grid Outline
     const tileX = Math.floor(currentPos.x) * TILE_SIZE;
@@ -82,7 +83,7 @@ export class MiningDebugRenderer {
     debugGraphics.fill({ color: 0x06b6d4, alpha: 0.95 });
 
     // 5. Mining Reach Radius
-    const reachPixelRadius = (MINING_CONFIG.PLAYER_MINING_REACH ?? 1.85) * TILE_SIZE;
+    const reachPixelRadius = (MINING_CONFIG.PLAYER_MINING_REACH ?? 1.85 * BLOCK_SCALE) * TILE_SIZE;
     debugGraphics.circle(playerPixelX, playerPixelY, reachPixelRadius);
     debugGraphics.stroke({ width: 1.5, color: 0xeab308, alpha: 0.35 });
 
@@ -90,7 +91,7 @@ export class MiningDebugRenderer {
     const aimDir = playerFacingDir || { x: isFacingLeft ? -1 : 1, y: 0 };
     const aimAngle = Math.atan2(aimDir.y, aimDir.x);
     const halfSpread = (72.5 * Math.PI) / 180;
-    const swingRadius = 2.2 * TILE_SIZE;
+    const swingRadius = 2.2 * BLOCK_SCALE * TILE_SIZE;
     const arcStartAngle = aimAngle - halfSpread;
     const arcEndAngle = aimAngle + halfSpread;
 
@@ -142,7 +143,7 @@ export class MiningDebugRenderer {
 
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
-        const scale = TILE_SIZE / MINING_TILE_WORLD_PIXELS;
+        const scale = TILE_SIZE / MINING_TILE_PIXELS;
 
         if (cfg.colliderType === 'CIRCLE') {
           const radius = (cfg.colliderRadius ?? DEFAULT_DYNAMITE_PHYSICS_CONFIG.colliderRadius ?? 8) * scale;

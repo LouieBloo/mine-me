@@ -1,4 +1,4 @@
-import { MINING_CONFIG, computeSpeedDamage, type MiningMapConfigData } from '@mine-me/shared';
+import { MINING_CONFIG, computeSpeedDamage, type MiningMapConfigData, BLOCK_SCALE } from '@mine-me/shared';
 import type { MiningConfigFieldProps } from '../MiningConfigTypes';
 import './MiningConfigDamage.css';
 
@@ -25,7 +25,7 @@ export const FALL_DAMAGE_RULE: DamageRuleDefinition = {
   title: 'Fall Damage',
   icon: '🪂',
   description:
-    'Players take damage when they land hard: (impact speed - minimum speed) x damage per speed. Mobs are not affected. Speeds are in tiles per second; a normal jump lands at about 8.5.',
+    'Players take damage when they land hard: (impact speed - minimum speed) x damage per speed. Mobs are not affected. Speeds are in tiles per second; a normal jump lands at about 8.5 times the block scale.',
   fields: [
     {
       field: 'fallDamageMinSpeed',
@@ -116,7 +116,7 @@ export const FIRE_DAMAGE_RULE: DamageRuleDefinition = {
       label: 'Heat Radius (tiles)',
       help: 'How far a fire\'s heat reaches. 0 turns heat off.',
       min: 0,
-      max: 20,
+      max: 20 * BLOCK_SCALE,
       step: 0.5,
     },
     {
@@ -133,10 +133,10 @@ export const FIRE_DAMAGE_RULE: DamageRuleDefinition = {
 const DAMAGE_RULES: DamageRuleDefinition[] = [FALL_DAMAGE_RULE, ROCK_DAMAGE_RULE, FIRE_DAMAGE_RULE];
 
 /** Sample drops (in tiles) used for the "what would this do" preview. */
-export const SAMPLE_DROP_TILES = [2, 4, 6, 10];
+export const SAMPLE_DROP_TILES = [2, 4, 6, 10].map((n) => n * BLOCK_SCALE);
 
 /** Sample rock speeds (tiles/s) used for the rock damage preview. */
-export const SAMPLE_ROCK_SPEEDS = [8, 12, 20, 30];
+export const SAMPLE_ROCK_SPEEDS = [8, 12, 20, 30].map((n) => n * BLOCK_SCALE);
 
 /** Landing speed after falling `tiles` from rest, limited by terminal velocity. */
 export function impactSpeedForDrop(tiles: number, gravity: number): number {

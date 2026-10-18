@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { Socket } from 'socket.io';
 import {
   MINING_CONFIG,
@@ -85,7 +86,7 @@ function isObstructedBySolidTiles(
   const dx = mx - px;
   const dy = my - py;
   const dist = Math.hypot(dx, dy);
-  if (dist < 0.8) return false;
+  if (dist < 0.8 * BLOCK_SCALE) return false;
 
   const steps = Math.ceil(dist / 0.25);
   for (let i = 1; i < steps; i++) {

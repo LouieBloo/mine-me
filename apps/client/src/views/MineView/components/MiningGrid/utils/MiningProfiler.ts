@@ -6,12 +6,23 @@
  * (e.g. every 5 seconds) without console flooding.
  */
 
+import type { MiningServerPerf } from '@mine-me/shared';
+
 export interface ProfilerSectionStat {
   name: string;
   avgMs: number;
   maxMs: number;
   totalMs: number;
   percent: number;
+}
+
+/** A thing that happens now and then (a server tick arriving, a lightmap redraw), timed per occurrence rather than per frame. */
+export interface ProfilerEventStat {
+  name: string;
+  count: number;
+  perSecond: number;
+  avgMs: number;
+  maxMs: number;
 }
 
 export interface SpikeEvent {
@@ -47,6 +58,12 @@ export interface ProfilerStats {
   longTasksCount: number;
   maxLongTaskMs: number;
   diagnosis: string;
+  /** Timed per occurrence, busiest first. */
+  events: ProfilerEventStat[];
+  /** Latest value of each counter set with `setGauge` (scene size, particle counts...). */
+  gauges: Record<string, number>;
+  /** The server's own cost summary, from the latest state tick that carried one. */
+  server: MiningServerPerf | null;
 }
 
 export class MiningProfiler {
@@ -75,6 +92,13 @@ export class MiningProfiler {
   private lastHeapBytes: number = 0;
   private _enabled: boolean;
   private enabledListeners = new Set<(enabled: boolean) => void>();
+
+  private eventStats = new Map<string, { count: number; total: number; max: number }>();
+  private gauges = new Map<string, number>();
+  private serverPerf: MiningServerPerf | null = null;
+  private reportListeners = new Set<(stats: ProfilerStats) => void>();
+  /** Whether each report is also printed to the console (the on-screen overlay turns this off). */
+  public logToConsole = true;
 
   /**
    * @param enabled Whether to measure at all. The shared instance starts disabled unless the debug
@@ -249,6 +273,52 @@ export class MiningProfiler {
   }
 
   /**
+   * Records one occurrence of something that is not once per frame (a server tick arriving, a lightmap
+   * redraw). Its average is per occurrence, so it is not diluted by the frame count.
+   */
+  public recordEvent(name: string, durationMs: number): void {
+    if (!this.enabled) return;
+    const e = this.eventStats.get(name) ?? { count: 0, total: 0, max: 0 };
+    e.count++;
+    e.total += durationMs;
+    e.max = Math.max(e.max, durationMs);
+    this.eventStats.set(name, e);
+  }
+
+  /** Times `work` as an event called `name`; costs nothing but the call while profiling is off. */
+  public timeEvent<T>(name: string, work: () => T): T {
+    if (!this.enabled) return work();
+    const start = performance.now();
+    try {
+      return work();
+    } finally {
+      this.recordEvent(name, performance.now() - start);
+    }
+  }
+
+  /** Sets a counter shown beside the timings (display objects, lights, particles...). Kept across reports. */
+  public setGauge(name: string, value: number): void {
+    if (!this.enabled) return;
+    this.gauges.set(name, value);
+  }
+
+  /** The server's latest cost summary for this room. */
+  public setServerPerf(perf: MiningServerPerf | null | undefined): void {
+    if (this.enabled && perf) this.serverPerf = perf;
+  }
+
+  /** Calls `listener` with the stats each time a report period ends. Returns the unsubscribe function. */
+  public onReport(listener: (stats: ProfilerStats) => void): () => void {
+    this.reportListeners.add(listener);
+    return () => this.reportListeners.delete(listener);
+  }
+
+  /** Seconds between reports (the overlay uses a short one so its numbers stay fresh). */
+  public setReportInterval(ms: number): void {
+    this.logIntervalMs = Math.max(250, ms);
+  }
+
+  /**
    * Called at the end of a frame tick. Checks if periodic log should fire.
    */
   public endFrame(now: number = performance.now()): void {
@@ -276,7 +346,9 @@ export class MiningProfiler {
 
     // Check if reporting interval has elapsed
     if (now - this.lastLogTime >= this.logIntervalMs) {
-      this.report(now);
+      const stats = this.getStats(now);
+      if (this.logToConsole) this.report(now);
+      for (const listener of this.reportListeners) listener(stats);
       this.reset(now);
     }
   }
@@ -365,7 +437,20 @@ export class MiningProfiler {
       }))
       .sort((a, b) => b.avgMs - a.avgMs);
 
+    const events: ProfilerEventStat[] = Array.from(this.eventStats.entries())
+      .map(([name, e]) => ({
+        name,
+        count: e.count,
+        perSecond: Math.round((e.count / durationSeconds) * 10) / 10,
+        avgMs: Math.round((e.total / e.count) * 100) / 100,
+        maxMs: Math.round(e.max * 100) / 100,
+      }))
+      .sort((a, b) => b.avgMs * b.perSecond - a.avgMs * a.perSecond);
+
     return {
+      events,
+      gauges: Object.fromEntries(this.gauges),
+      server: this.serverPerf,
       frameCount: count,
       durationSeconds,
       fps: {
@@ -409,6 +494,10 @@ export class MiningProfiler {
           .join('\n')
       : '  (No sections instrumented)';
 
+    const eventLines = stats.events.map((e) => `\n  • ${e.name.padEnd(22)} ${e.perSecond}/s | avg: ${e.avgMs.toFixed(2)}ms | peak: ${e.maxMs.toFixed(2)}ms`).join('');
+    const gaugeLine = Object.keys(stats.gauges).length > 0 ? `\n  Counts: ${Object.entries(stats.gauges).map(([k, v]) => `${k} ${v}`).join(', ')}` : '';
+    const serverLine = stats.server ? `\n  Server: tick avg ${stats.server.tickMs.avg}ms (p95 ${stats.server.tickMs.p95}ms, max ${stats.server.tickMs.max}ms) of ${stats.server.budgetMs}ms | load ${stats.server.loadPercent}% | top: ${stats.server.steps.slice(0, 3).map((x) => `${x.name} ${x.avgMs}ms`).join(', ')}` : '';
+
     let spikeLine = '';
     if (stats.spikeCount > 0 && stats.worstSpike) {
       spikeLine = `\n  🚨 Spikes Detected: ${stats.spikeCount} frame drops (< 20 FPS). Worst: ${stats.worstSpike.intervalMs.toFixed(1)}ms interval (Ticker CPU: ${stats.worstSpike.cpuMs.toFixed(2)}ms, Browser/GPU Gap: ${stats.worstSpike.gapMs.toFixed(1)}ms)`;
@@ -417,7 +506,7 @@ export class MiningProfiler {
     const diagnosisLine = `\n  🔍 Root Cause Analysis: ${stats.diagnosis}`;
 
     console.log(
-      `${header}\n  Simulation & Render Breakdown:\n${sectionLines}${spikeLine}${diagnosisLine}`,
+      `${header}\n  Simulation & Render Breakdown:\n${sectionLines}${eventLines}${gaugeLine}${serverLine}${spikeLine}${diagnosisLine}`,
       'font-weight: bold; color: #38bdf8;',
       `font-weight: bold; color: ${fpsColor};`
     );
@@ -435,6 +524,7 @@ export class MiningProfiler {
     this.sectionTotals.clear();
     this.sectionSpikes.clear();
     this.currentFrameSections.clear();
+    this.eventStats.clear();
     this.spikeEvents = [];
     this.longTasks = [];
   }

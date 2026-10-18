@@ -80,8 +80,8 @@ describe('falling rock damage', () => {
   });
 
   it('a very fast rock is judged by its real speed, even though it moves over a tile per tick', () => {
-    start({ rockDamageMax: 0 });
-    dropRock(10); // ~30 tiles: ~38 tiles/s, far above the 100 health at 5 per tile/s
+    start({ rockDamageMax: 0, rockDamagePerSpeed: 5 });
+    dropRock(10); // a long drop: very fast, far above the 100 health at 5 per tile/s
     expect(me().health).toBe(0);
     expect(hurt()[0].damage).toBeGreaterThan(100);
   });

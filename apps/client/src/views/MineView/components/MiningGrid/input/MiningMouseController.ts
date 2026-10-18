@@ -3,6 +3,7 @@ import {
   MiningTileType,
   MouseActionTriggerMode,
   isTileMineable,
+  selectMiningTargets,
   type MiningClientTile,
   type MiningPosition,
   type Vector2D,
@@ -36,7 +37,9 @@ export class MiningMouseController {
 
   private hoverListeners: Set<(tile: MiningPosition | null) => void> = new Set();
   private actionListeners: Set<(action: IMouseAction, target: MiningPosition | Vector2D, success: boolean) => void> = new Set();
-  private miningListeners: Set<(isMining: boolean, target: MiningPosition | null) => void> = new Set();
+  private miningListeners: Set<(isMining: boolean, target: MiningPosition | null, precise: boolean) => void> = new Set();
+  /** Ctrl is held: mining targets only the block under the cursor instead of the next blocks along the line to it. */
+  private preciseHeld = false;
 
   constructor(options?: MouseControllerOptions) {
     this.tileSize = options?.tileSize ?? TILE_SIZE;
@@ -53,6 +56,8 @@ export class MiningMouseController {
     window.addEventListener('pointermove', this.handlePointerMove);
     window.addEventListener('pointerdown', this.handlePointerDown);
     window.addEventListener('pointerup', this.handlePointerUp);
+    window.addEventListener('keydown', this.handleKey);
+    window.addEventListener('keyup', this.handleKey);
     window.addEventListener('blur', this.handleBlur);
     window.addEventListener('pointercancel', this.handleBlur);
     window.addEventListener('dragstart', this.handleBlur);
@@ -67,6 +72,8 @@ export class MiningMouseController {
     window.removeEventListener('pointermove', this.handlePointerMove);
     window.removeEventListener('pointerdown', this.handlePointerDown);
     window.removeEventListener('pointerup', this.handlePointerUp);
+    window.removeEventListener('keydown', this.handleKey);
+    window.removeEventListener('keyup', this.handleKey);
     window.removeEventListener('blur', this.handleBlur);
     window.removeEventListener('pointercancel', this.handleBlur);
     window.removeEventListener('dragstart', this.handleBlur);
@@ -244,7 +251,23 @@ export class MiningMouseController {
       };
     }
 
-    // Default Mining Reticle
+    // Default Mining Reticle: the blocks the pickaxe has lined up (the same rule the server mines by)
+    const queue = this.miningQueue(this.hoveredTile);
+    if (queue.length > 0) {
+      return {
+        active: true,
+        target: this.hoveredTile,
+        style: {
+          color: this.isMouseDown ? 0xf59e0b : 0xeab308,
+          alpha: this.isMouseDown ? 0.35 : 0.2,
+          strokeColor: this.isMouseDown ? 0xfbbf24 : 0xfde047,
+          isValid: true,
+          showPreview: false,
+          miningQueue: queue,
+        },
+      };
+    }
+
     const inReach = this.isWithinReach(this.hoveredTile);
     const tile =
       this.hoveredTile.y >= 0 &&
@@ -254,38 +277,22 @@ export class MiningMouseController {
         ? this.grid[this.hoveredTile.y][this.hoveredTile.x]
         : null;
 
-    const isMinable = tile ? isTileMineable(tile.type) : false;
-    const isRock = tile && tile.type === MiningTileType.ROCK;
-
-    if (isMinable) {
-      if (inReach) {
-        return {
-          active: true,
-          target: this.hoveredTile,
-          style: {
-            color: this.isMouseDown ? 0xf59e0b : 0xeab308,
-            alpha: this.isMouseDown ? 0.35 : 0.2,
-            strokeColor: this.isMouseDown ? 0xfbbf24 : 0xfde047,
-            isValid: true,
-            showPreview: false,
-          },
-        };
-      } else {
-        return {
-          active: true,
-          target: this.hoveredTile,
-          style: {
-            color: 0xef4444,
-            alpha: 0.15,
-            strokeColor: 0xf87171,
-            isValid: false,
-            showPreview: false,
-          },
-        };
-      }
+    // A block under the cursor that nothing can be mined toward: too far, or with something unmineable or hidden in the way
+    if (tile && isTileMineable(tile.type)) {
+      return {
+        active: true,
+        target: this.hoveredTile,
+        style: {
+          color: 0xef4444,
+          alpha: 0.15,
+          strokeColor: 0xf87171,
+          isValid: false,
+          showPreview: false,
+        },
+      };
     }
 
-    if (isRock) {
+    if (tile && tile.type === MiningTileType.ROCK) {
       return {
         active: true,
         target: this.hoveredTile,
@@ -313,6 +320,12 @@ export class MiningMouseController {
     };
   }
 
+  /** The blocks the pickaxe would mine for a cursor on `cursor`, nearest first (Ctrl: just that block). */
+  public miningQueue(cursor: MiningPosition | null): MiningPosition[] {
+    if (!cursor) return [];
+    return selectMiningTargets(this.grid, this.playerPos, cursor, { precise: this.preciseHeld });
+  }
+
   public onHoverChange(callback: (tile: MiningPosition | null) => void): () => void {
     this.hoverListeners.add(callback);
     return () => this.hoverListeners.delete(callback);
@@ -325,8 +338,9 @@ export class MiningMouseController {
     return () => this.actionListeners.delete(callback);
   }
 
+  /** `target` is the cell under the cursor; `precise` is Ctrl (mine only that cell). The server decides which blocks that means. */
   public onMiningStateChange(
-    callback: (isMining: boolean, target: MiningPosition | null) => void
+    callback: (isMining: boolean, target: MiningPosition | null, precise: boolean) => void
   ): () => void {
     this.miningListeners.add(callback);
     return () => this.miningListeners.delete(callback);
@@ -397,6 +411,7 @@ export class MiningMouseController {
       return;
     }
 
+    this.preciseHeld = e.ctrlKey;
     this.isMouseDown = true;
     this.screenMousePos = { x: e.clientX, y: e.clientY };
     const tile = this.targetTileAt(e.clientX, e.clientY) || this.hoveredTile;
@@ -534,6 +549,7 @@ export class MiningMouseController {
 
   /** Releases any held mouse state: window blur, pointer cancel, or a drag-and-drop starting. */
   private handleBlur = (): void => {
+    this.preciseHeld = false;
     if (this.activeAction instanceof ThrowableItemAction && this.activeAction.isCharging) {
       this.activeAction.cancelCharging();
     }
@@ -573,7 +589,23 @@ export class MiningMouseController {
 
   private notifyMiningListeners(isMining: boolean, target: MiningPosition | null): void {
     const targetCopy = target ? { ...target } : null;
-    this.miningListeners.forEach((cb) => cb(isMining, targetCopy));
+    this.miningListeners.forEach((cb) => cb(isMining, targetCopy, this.preciseHeld));
+  }
+
+  public isPreciseMining(): boolean {
+    return this.preciseHeld;
+  }
+
+  /** Ctrl going down or up switches between auto-target and the single block under the cursor, even mid-swing. */
+  private handleKey = (e: KeyboardEvent): void => {
+    if (e.key !== 'Control') return;
+    this.setPreciseHeld(e.type === 'keydown');
+  };
+
+  private setPreciseHeld(held: boolean): void {
+    if (this.preciseHeld === held) return;
+    this.preciseHeld = held;
+    if (this.isMouseDown && !this.activeAction) this.notifyMiningListeners(true, this.hoveredTile);
   }
 
   public destroy(): void {

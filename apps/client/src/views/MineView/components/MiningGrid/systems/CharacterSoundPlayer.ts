@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import {
   MINING_SPATIAL_AUDIO_PRESETS,
   type CharacterSoundEffectsConfig,
@@ -25,8 +26,8 @@ export interface CharacterMotionFrame {
   jumpPressed: boolean;
 }
 
-/** A landing must be at least this fast (tiles/s) to be heard; a normal jump lands at ~8.5, a small hop or step is slower. */
-export const LAND_SOUND_MIN_IMPACT_SPEED = 6;
+/** A landing must be at least this fast (tiles/s) to be heard; a normal jump lands at ~8.5 x the block scale, a small hop or step is slower. */
+export const LAND_SOUND_MIN_IMPACT_SPEED = 6 * BLOCK_SCALE;
 
 /**
  * Plays the player character's sounds (hurt, jump, land, pickup, death). The sounds come from the server

@@ -1,4 +1,4 @@
-import type { MiningPosition, Vector2D, MobAIConfig } from '../../types/mining';
+import { MINING_CONFIG, type MiningPosition, type Vector2D, type MobAIConfig } from '../../types/mining';
 import type { MiningCollisionGrid } from '../../physics/MiningPhysicsBody';
 
 export interface PlayerTargetInfo {
@@ -45,6 +45,13 @@ export interface MobAIContext {
   grid: MiningCollisionGrid;
   players: PlayerTargetInfo[];
   config?: MobAIConfig;
+  /**
+   * The size of the mob's body in tiles. Present, the AI plans for a body that fills several cells (it needs its whole
+   * footprint free, steps up one-cell ledges, digs a gap its own size). Absent, the mob is treated as one cell.
+   */
+  body?: { width: number; height: number };
+  /** How many cells high the mob can jump (from its jump force and gravity). Absent: 1. */
+  jumpTiles?: number;
   /** Shared per-tick limit on path searches; absent means unlimited. */
   pathBudget?: PathRequestBudget;
 }
@@ -85,7 +92,7 @@ export abstract class BaseMobAI {
   public static isWithinReach(
     pos: Vector2D,
     target: MiningPosition,
-    reach: number = 2.0
+    reach: number = MINING_CONFIG.MOB_DEFAULT_MINE_RANGE
   ): boolean {
     const dx = Math.abs(target.x + 0.5 - pos.x);
     const dy = Math.abs(target.y + 0.5 - pos.y);

@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import {
   clampSoundVolume,
   DEFAULT_DYNAMITE_SOUNDS,
@@ -51,7 +52,7 @@ export class MiningExplosiveSubsystem {
     const startY = session.playerBody.position.y;
 
     const config = physicsConfig ?? data.getDynamiteItemPhysicsConfig();
-    const throwPower = config.throwPower ?? rigidWorld.config.dynamiteThrowPower ?? 20.5;
+    const throwPower = config.throwPower ?? rigidWorld.config.dynamiteThrowPower ?? 20.5 * BLOCK_SCALE;
     const gravityScale = config.gravityScale ?? 1.0;
 
     const initialVel = calculateThrowVelocity(
@@ -180,6 +181,7 @@ export class MiningExplosiveSubsystem {
       if (blast) this.world.damage.applyDamage({ kind: 'player', id: session.characterId }, { ...blast, type: 'explosive', source });
     }
 
+    const droppedPieces = new Set<string>();
     // 2. Excavate the blocks in the radius, except blast-proof ones (the entrance)
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
@@ -191,13 +193,19 @@ export class MiningExplosiveSubsystem {
         if (tile.type === MiningTileType.EMPTY || isTileBlastProof(tile.type)) continue;
 
         const previousType = tile.type;
+        // A piece goes whole, and drops once however many of its cells the blast reached
+        const pieceKey = this.world.blocks.pieceKey(tx, ty);
+        const pieceAlreadyDropped = pieceKey !== null && droppedPieces.has(pieceKey);
+        if (pieceKey !== null) droppedPieces.add(pieceKey);
+        this.world.blocks.clearPieceSiblings(tx, ty);
         tile.type = MiningTileType.EMPTY;
+        tile.piece = undefined;
         tile.revealed = true;
         tile.damage = 0;
         rigidWorld.removeTileCollider(tx, ty);
         this.world.pushTileUpdate({ x: tx, y: ty, type: MiningTileType.EMPTY, damageStage: 0 });
         clearedByCol.set(tx, [...(clearedByCol.get(tx) ?? []), ty]);
-        this.world.drops.spawnBlockDrops(tx, ty, previousType);
+        if (!pieceAlreadyDropped) this.world.drops.spawnBlockDrops(tx, ty, previousType);
       }
     }
 

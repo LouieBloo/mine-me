@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DynamiteVisualManager } from './DynamiteVisualManager';
+import { TILE_SIZE } from './MiningTileRenderer';
 import type { MiningActiveDynamite, MiningExplosionEvent } from '@mine-me/shared';
 import { DEFAULT_PARTICLE_EFFECTS } from '@mine-me/shared';
 
@@ -55,11 +56,11 @@ describe('DynamiteVisualManager', () => {
         fuseRemainingSeconds: 3.5,
       };
 
-      const result = DynamiteVisualManager.calculateFuseWorldPosition(dyn, 64);
-      // Sprite is 32px wide (0.5 * 64), fuse is at localX = 32 * 0.44 = 14.08px
-      expect(result.pixel.x).toBeCloseTo(5 * 64 + 14.08, 1);
-      expect(result.pixel.y).toBeCloseTo(10 * 64, 1);
-      expect(result.tile.x).toBeCloseTo(5 + 14.08 / 64, 2);
+      const result = DynamiteVisualManager.calculateFuseWorldPosition(dyn, TILE_SIZE);
+      // Sprite is 32px wide (whatever the tile size), fuse is at localX = 32 * 0.44 = 14.08px
+      expect(result.pixel.x).toBeCloseTo(5 * TILE_SIZE + 14.08, 1);
+      expect(result.pixel.y).toBeCloseTo(10 * TILE_SIZE, 1);
+      expect(result.tile.x).toBeCloseTo(5 + 14.08 / TILE_SIZE, 2);
       expect(result.tile.y).toBeCloseTo(10, 2);
     });
 
@@ -72,9 +73,9 @@ describe('DynamiteVisualManager', () => {
         fuseRemainingSeconds: 3.5,
       };
 
-      const result = DynamiteVisualManager.calculateFuseWorldPosition(dyn, 64);
-      expect(result.pixel.x).toBeCloseTo(5 * 64, 1);
-      expect(result.pixel.y).toBeCloseTo(10 * 64 + 14.08, 1);
+      const result = DynamiteVisualManager.calculateFuseWorldPosition(dyn, TILE_SIZE);
+      expect(result.pixel.x).toBeCloseTo(5 * TILE_SIZE, 1);
+      expect(result.pixel.y).toBeCloseTo(10 * TILE_SIZE + 14.08, 1);
     });
   });
 

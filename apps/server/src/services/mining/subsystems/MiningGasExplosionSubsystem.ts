@@ -84,7 +84,7 @@ export class MiningGasExplosionSubsystem {
 
   /** Runs once per tick; steps the explosions on every Nth tick (the gas beat). */
   public update(): void {
-    if (this.world.tick % MINING_CONFIG.GAS_STEP_TICKS !== 0) return;
+    if (this.world.tick % MINING_CONFIG.EXPLOSION_STEP_TICKS !== 0) return;
     this.step();
   }
 

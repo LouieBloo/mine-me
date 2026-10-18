@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MiningPlayerBody, type MiningClientTile, MiningTileType, type MiningActiveProjectile } from '@mine-me/shared';
+import { MiningPlayerBody, type MiningClientTile, MiningTileType, type MiningActiveProjectile, BLOCK_SCALE } from '@mine-me/shared';
 import { useMiningTicker as useWorldTicker, type UseMiningTickerOptions } from './useMiningTicker';
 import type { MiningClientWorld } from '../systems/MiningClientWorld';
 
@@ -21,6 +21,7 @@ import { renderHook, act } from '@testing-library/react';
 import { miningProfiler } from '../utils/MiningProfiler';
 import { MiningPredictionState } from '../systems/MiningPredictionState';
 import { FreeCamera } from '../systems/FreeCamera';
+import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 
 describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
   let mockApp: any;
@@ -170,7 +171,7 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
     frames(3); // 60 fps frames; the body steps at the server's 30 Hz
     expect(playerBodyRef.current.position.x).toBeGreaterThan(2.05);
     // The sprite is drawn through the partial step after the body's last one, so it is at or just ahead of the body
-    expect(playerContainer.x).toBeGreaterThanOrEqual(playerBodyRef.current.position.x * 64 - 1e-6);
+    expect(playerContainer.x).toBeGreaterThanOrEqual(playerBodyRef.current.position.x * TILE_SIZE - 1e-6);
   });
 
   describe('camera', () => {
@@ -186,7 +187,7 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
     it('looks where the sandbox free camera says while it is on, and the player keeps being simulated', () => {
       cameraRef.current = fakeCamera();
       const freeCamera = new FreeCamera();
-      freeCamera.enable({ x: 300, y: 200 });
+      freeCamera.enable({ x: 150, y: 100 }); // (inside the small test grid: the camera is kept in the map)
       const hook = renderHook(() =>
         useMiningTicker({
           app: mockApp,
@@ -202,7 +203,7 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
       );
       expect(hook).toBeDefined();
       tickerCallbacks[0]();
-      expect(cameraRef.current.update).toHaveBeenLastCalledWith({ x: 300, y: 200 }, expect.any(Number));
+      expect(cameraRef.current.update).toHaveBeenLastCalledWith({ x: 150, y: 100 }, expect.any(Number));
       freeCamera.disable();
       tickerCallbacks[0]();
       expect(cameraRef.current.update).toHaveBeenLastCalledWith({ x: playerContainer.x, y: playerContainer.y }, expect.any(Number));
@@ -258,13 +259,14 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
     frames(1);
     expect(predictionRef.current.predictor.correctionCount).toBe(1);
     expect(playerBodyRef.current.position.x).toBeCloseTo(8, 1);
-    expect(playerContainer.x).toBeCloseTo(8 * 64, -1);
+    expect(playerContainer.x).toBeCloseTo(8 * TILE_SIZE, -1);
     // No smoothing for a teleport: nothing left to blend
     expect(predictionRef.current.predictor.renderOffset).toEqual({ x: 0, y: 0 });
   });
 
   it('does not let a snapshot it cannot line up pull the player backwards while walking into a wall', () => {
     gridRef.current[4][4].type = MiningTileType.DIRT;
+    gridRef.current[3][4].type = MiningTileType.DIRT; // two cells high: a one-cell wall would be stepped up
     mount();
     const flushWallX = 4.0 - playerBodyRef.current.halfWidth;
     playerBodyRef.current.position.x = flushWallX;
@@ -295,7 +297,7 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
       ys.push(playerBodyRef.current.position.y);
     }
     expect(Math.min(...ys)).toBeLessThan(groundedY - 0.1); // it went up
-    for (let i = 1; i < ys.length; i++) expect(Math.abs(ys[i] - ys[i - 1])).toBeLessThan(0.5);
+    for (let i = 1; i < ys.length; i++) expect(Math.abs(ys[i] - ys[i - 1])).toBeLessThan(0.25 * BLOCK_SCALE); // (a step of the jump is a fraction of a tile per step at any scale)
   });
 });
 

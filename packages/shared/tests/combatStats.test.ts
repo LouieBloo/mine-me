@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  BLOCK_SCALE,
   CharacterModEngine,
   DEFAULT_MELEE_KNOCKBACK,
   KNOCKBACK_LIFT_RATIO,
@@ -53,11 +54,11 @@ describe('CharacterModEngine stats from equipped gear', () => {
 });
 
 describe('knockbackImpulse', () => {
-  it('uses the default push (4.5 sideways, 3.2 up) when there is no knockback stat', () => {
-    expect(DEFAULT_MELEE_KNOCKBACK).toBe(45);
+  it('uses the default push (4.5 sideways, 3.2 up, times the block scale) when there is no knockback stat', () => {
+    expect(DEFAULT_MELEE_KNOCKBACK).toBe(45 * BLOCK_SCALE);
     const k = knockbackImpulse(0, 1);
-    expect(k.x).toBeCloseTo(4.5);
-    expect(k.y).toBeCloseTo(-3.2);
+    expect(k.x).toBeCloseTo(4.5 * BLOCK_SCALE);
+    expect(k.y).toBeCloseTo(-3.2 * BLOCK_SCALE);
     expect(knockbackImpulse(-3, 1)).toEqual(k);
   });
 

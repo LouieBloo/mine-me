@@ -98,8 +98,30 @@ export class MiningReticleRenderer {
       reticleGraphics.beginPath();
       reticleGraphics.circle(rx, ry, 2);
       reticleGraphics.fill({ color: aimColor, alpha: aimAlpha });
+    } else if (reticleState.style.miningQueue) {
+      // A pickaxe's reticle: every block lined up, the one being mined first and brightest
+      const queue = reticleState.style.miningQueue;
+      queue.forEach((cell, index) => {
+        const qx = cell.x * TILE_SIZE;
+        const qy = cell.y * TILE_SIZE;
+        reticleGraphics.rect(qx, qy, TILE_SIZE, TILE_SIZE);
+        reticleGraphics.fill({ color: reticleState.style!.color, alpha: reticleState.style!.alpha + (index === 0 ? 0.12 : 0) });
+        reticleGraphics.stroke({ width: index === 0 ? 2 : 1, color: reticleState.style!.strokeColor, alpha: index === 0 ? 0.95 : 0.5 });
+      });
+      const head = queue[0];
+      const isMiningHead = isMining && miningTarget && head && miningTarget.x === head.x && miningTarget.y === head.y;
+      if (isMiningHead) {
+        const pulse = 0.5 + Math.sin(animTime * 15) * 0.5;
+        reticleGraphics.rect(head.x * TILE_SIZE + 3, head.y * TILE_SIZE + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+        reticleGraphics.stroke({ width: 1.5, color: 0xf59e0b, alpha: 0.4 + pulse * 0.5 });
+      }
     } else {
-      reticleGraphics.rect(rx, ry, TILE_SIZE, TILE_SIZE);
+      // A multi-cell placement's reticle covers the whole piece, wherever it was nudged to
+      const area = reticleState.style.pieceArea;
+      const px = area ? area.x * TILE_SIZE : rx;
+      const py = area ? area.y * TILE_SIZE : ry;
+      const pieceSize = area ? area.width * TILE_SIZE : TILE_SIZE;
+      reticleGraphics.rect(px, py, pieceSize, area ? area.height * TILE_SIZE : TILE_SIZE);
       reticleGraphics.fill({ color: reticleState.style.color, alpha: reticleState.style.alpha });
       reticleGraphics.stroke({ width: 2, color: reticleState.style.strokeColor, alpha: 0.9 });
 
@@ -119,13 +141,13 @@ export class MiningReticleRenderer {
         const previewGlow = 0.7 + Math.sin(animTime * 8) * 0.2;
         if (reticleState.style.previewType === 'LADDER') {
           const ladderTex = blockTextures?.get(MiningTileType.LADDER);
-          MiningTileRenderer.drawLadder(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, ladderTex);
+          MiningTileRenderer.drawLadder(reticleGraphics, pieceSize, previewGlow, px, py, ladderTex);
         } else if (reticleState.style.previewType === 'BRIDGE') {
           const bridgeTex = blockTextures?.get(MiningTileType.BRIDGE);
-          MiningTileRenderer.drawBridge(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, bridgeTex);
+          MiningTileRenderer.drawBridge(reticleGraphics, pieceSize, previewGlow, px, py, bridgeTex);
         } else {
           const torchTex = blockTextures?.get(MiningTileType.TORCH);
-          MiningTileRenderer.drawTorch(reticleGraphics, TILE_SIZE, previewGlow, rx, ry, torchTex);
+          MiningTileRenderer.drawTorch(reticleGraphics, pieceSize, previewGlow, px, py, torchTex);
         }
       }
     }

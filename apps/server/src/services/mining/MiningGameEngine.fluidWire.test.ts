@@ -35,7 +35,7 @@ describe('fluids on the wire', () => {
         setTile(x, y, open ? MiningTileType.EMPTY : MiningTileType.DIRT, false);
       }
     }
-    engine.players.get(cid)!.playerBody.position = { x: 5.5, y: 5.5 };
+    engine.players.get(cid)!.playerBody.position = { x: 130.5, y: 5.5 };
   });
 
   it('never sends fluid in cells the fog of war has not revealed', () => {
@@ -47,6 +47,7 @@ describe('fluids on the wire', () => {
   it('sends changed cells once they are revealed, as [x, y, fluidId, level]', () => {
     for (let x = 30; x <= 34; x++) engine.grid[30][x].revealed = true;
     engine.fluidSubsystem.placeFluid(32, 30, 'OIL');
+    vi.spyOn(engine.fluidSubsystem, 'update').mockImplementation(() => {}); // (the wire format of the placed cell, before it starts to flow)
     tick(1);
     const t = lastTick();
     // The oil has open cells under it, so it is falling (the fifth value)
@@ -107,7 +108,7 @@ describe('fluids on the wire', () => {
     for (let y = 30; y <= 32; y++) for (let x = 30; x <= 34; x++) engine.grid[y][x].revealed = true;
     engine.fluidSubsystem.placeFluid(32, 32, 'OIL', 0.5); // resting on the floor of the pocket
     tick(6);
-    engine.fluidSubsystem.grid.drainFluid(32, 32, 5);
+    for (let x = 30; x <= 34; x++) engine.fluidSubsystem.grid.drainFluid(x, 32, 5); // (the oil has spread along the pocket floor by now: drain all of it)
     tick(6);
     const last = new Map<string, Array<number | undefined>>();
     for (const c of ticks().flatMap((t) => t.fluidCells ?? [])) last.set(`${c[0]},${c[1]}`, c);

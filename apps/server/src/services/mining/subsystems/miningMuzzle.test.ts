@@ -39,7 +39,7 @@ describe('resolveMuzzlePosition', () => {
   });
 
   it('rejects a client muzzle too far from the estimate', () => {
-    const m = resolveMuzzlePosition(player, { x: 30.5, y: shoulderY }, emptyGrid(), { x: player.x + 2.4, y: shoulderY });
+    const m = resolveMuzzlePosition(player, { x: 30.5, y: shoulderY }, emptyGrid(), { x: player.x + MINING_CONFIG.GUN_MUZZLE_REACH + 1.5 * MINING_CONFIG.GUN_MUZZLE_MAX_DEVIATION, y: shoulderY });
     expect(m.x).toBeCloseTo(player.x + MINING_CONFIG.GUN_MUZZLE_REACH, 5);
   });
 

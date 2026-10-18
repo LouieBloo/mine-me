@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import type { MiningPlayerDamagedEvent } from '@mine-me/shared';
@@ -58,7 +59,7 @@ describe('showPlayerDamageNumber', () => {
     const manager: any = { spawnDamage: vi.fn() };
     showPlayerDamageNumber(manager, body, event({ damage: 17 }));
     expect(manager.spawnDamage).toHaveBeenCalledTimes(1);
-    expect(manager.spawnDamage).toHaveBeenCalledWith(10 * TILE_SIZE, (20 - 0.7) * TILE_SIZE, 17, { color: PLAYER_DAMAGE_COLOR });
+    expect(manager.spawnDamage).toHaveBeenCalledWith(10 * TILE_SIZE, (20 - 0.7 * BLOCK_SCALE) * TILE_SIZE, 17, { color: PLAYER_DAMAGE_COLOR });
   });
 
   it('shows nothing for zero, negative or invalid damage', () => {

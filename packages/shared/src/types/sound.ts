@@ -1,3 +1,5 @@
+import { BLOCK_SCALE } from './mining';
+
 export type SoundType = 'BGM' | 'SFX';
 
 /** Where a library sound is used. Music is `type: 'BGM'`; sound effects are grouped by what plays them. */
@@ -146,7 +148,7 @@ export interface SpatialAudioConfig {
   minDistance?: number;
   /** Rolloff curve model: 'linear' | 'quadratic' | 'smoothstep' | 'exponential' (default 'linear') */
   falloffModel?: AudioFalloffModel;
-  /** Max distance for stereo panning clamp (default 12) */
+  /** Max distance for stereo panning clamp (default 12 x the block scale) */
   panRange?: number;
   /** Whether stereo panning is enabled (default true) */
   enablePanning?: boolean;
@@ -164,124 +166,124 @@ export interface SpatialAudioCalculation {
 }
 
 export const DEFAULT_SPATIAL_AUDIO_CONFIG: Required<SpatialAudioConfig> = {
-  maxDistance: 16,
-  minDistance: 2,
+  maxDistance: 16 * BLOCK_SCALE,
+  minDistance: 2 * BLOCK_SCALE,
   falloffModel: 'linear',
-  panRange: 12,
+  panRange: 12 * BLOCK_SCALE,
   enablePanning: true,
 };
 
 export const MINING_SPATIAL_AUDIO_PRESETS = {
   ITEM_PICKUP: {
-    maxDistance: 14,
-    minDistance: 2,
+    maxDistance: 14 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 10,
+    panRange: 10 * BLOCK_SCALE,
     enablePanning: true,
   },
   FLUID_SPLASH: {
-    maxDistance: 18,
-    minDistance: 2,
+    maxDistance: 18 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 12,
+    panRange: 12 * BLOCK_SCALE,
     enablePanning: true,
   },
   GAS_ENTER: {
-    maxDistance: 14,
-    minDistance: 2,
+    maxDistance: 14 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 10,
+    panRange: 10 * BLOCK_SCALE,
     enablePanning: true,
   },
   GAS_IGNITE: {
-    maxDistance: 18,
-    minDistance: 2,
+    maxDistance: 18 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 12,
+    panRange: 12 * BLOCK_SCALE,
     enablePanning: true,
   },
   GAS_EXPLOSION: {
-    maxDistance: 28,
-    minDistance: 3,
+    maxDistance: 28 * BLOCK_SCALE,
+    minDistance: 3 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 16,
+    panRange: 16 * BLOCK_SCALE,
     enablePanning: true,
   },
   GAS_VENT: {
-    maxDistance: 16,
-    minDistance: 2,
+    maxDistance: 16 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 12,
+    panRange: 12 * BLOCK_SCALE,
     enablePanning: true,
   },
   FIRE_IGNITE: {
-    maxDistance: 16,
-    minDistance: 2,
+    maxDistance: 16 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 12,
+    panRange: 12 * BLOCK_SCALE,
     enablePanning: true,
   },
   FIRE_CRACKLE: {
-    maxDistance: 12,
+    maxDistance: 12 * BLOCK_SCALE,
     minDistance: 1.5,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 10,
+    panRange: 10 * BLOCK_SCALE,
     enablePanning: true,
   },
   BLOCK_MINING: {
-    maxDistance: 16,
-    minDistance: 2,
+    maxDistance: 16 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 12,
+    panRange: 12 * BLOCK_SCALE,
     enablePanning: true,
   },
   DYNAMITE_EXPLOSION: {
-    maxDistance: 32,
-    minDistance: 4,
+    maxDistance: 32 * BLOCK_SCALE,
+    minDistance: 4 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 16,
+    panRange: 16 * BLOCK_SCALE,
     enablePanning: true,
   },
   DYNAMITE_FUSE: {
-    maxDistance: 14,
+    maxDistance: 14 * BLOCK_SCALE,
     minDistance: 1.5,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 10,
+    panRange: 10 * BLOCK_SCALE,
     enablePanning: true,
   },
   MOB_DIGGING: {
-    maxDistance: 16,
-    minDistance: 2,
+    maxDistance: 16 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 12,
+    panRange: 12 * BLOCK_SCALE,
     enablePanning: true,
   },
   MOB_IDLE: {
-    maxDistance: 12,
+    maxDistance: 12 * BLOCK_SCALE,
     minDistance: 1.5,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 10,
+    panRange: 10 * BLOCK_SCALE,
     enablePanning: true,
   },
   MOB_ATTACK: {
-    maxDistance: 16,
-    minDistance: 2,
+    maxDistance: 16 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 12,
+    panRange: 12 * BLOCK_SCALE,
     enablePanning: true,
   },
   MOB_DEATH: {
-    maxDistance: 18,
-    minDistance: 2,
+    maxDistance: 18 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 12,
+    panRange: 12 * BLOCK_SCALE,
     enablePanning: true,
   },
   MOB_DAMAGE: {
-    maxDistance: 18,
-    minDistance: 2,
+    maxDistance: 18 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
-    panRange: 12,
+    panRange: 12 * BLOCK_SCALE,
     enablePanning: true,
   },
 } as const;

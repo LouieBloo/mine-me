@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { useEffect } from 'react';
 import type { MiningPlayerBody, MiningPlayerDamagedEvent, PlayerPredictor } from '@mine-me/shared';
 import type { FloatingTextManager } from '../../../../../components/game/sprites';
@@ -17,7 +18,7 @@ interface UsePlayerDamageEventsOptions {
 /** Orange, so damage you take reads differently from the red numbers you deal to mobs. */
 export const PLAYER_DAMAGE_COLOR = '#fb923c';
 /** How far above the player's center (in tiles) the number appears. */
-const DAMAGE_NUMBER_OFFSET_TILES = 0.7;
+const DAMAGE_NUMBER_OFFSET_TILES = 0.7 * BLOCK_SCALE;
 
 /** Shows the damage the player just took as a floating number above them. */
 export function showPlayerDamageNumber(

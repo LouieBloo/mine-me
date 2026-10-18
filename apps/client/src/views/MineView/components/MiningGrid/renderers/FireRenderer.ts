@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import type { FireField, ItemLightConfig } from '@mine-me/shared';
 import type { ParticleEngine, EmitterHandle } from '../../../../../components/game/particles/ParticleEngine';
 import type { LightingEngine } from '../../../../../components/game/lighting/LightingEngine';
@@ -154,7 +155,7 @@ export class FireRenderer {
     for (const [key, { cell, config }] of wanted) {
       const position = this.surfacePixel(cell.x, cell.y);
       const x = position.x / this.tileSize;
-      const y = position.y / this.tileSize - 0.3; // a little above the surface
+      const y = position.y / this.tileSize - 0.3 * BLOCK_SCALE; // a little above the surface
       const existing = this.lights.get(key);
       if (existing) {
         existing.light.setPosition(x, y);

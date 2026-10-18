@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MiningGameEngine } from './MiningGameEngine';
-import { MiningTileType, type MiningMapConfigData } from '@mine-me/shared';
+import { DEFAULT_MINING_MAP_CONFIG, MINING_CONFIG, MiningTileType, type MiningMapConfigData } from '@mine-me/shared';
+
+/** A fall long enough to reach terminal speed under the default rule: (terminal - minimum) x damage per speed (54 at every block scale). */
+const FULL_FALL = Math.round((MINING_CONFIG.TERMINAL_FALL_SPEED - DEFAULT_MINING_MAP_CONFIG.fallDamageMinSpeed!) * DEFAULT_MINING_MAP_CONFIG.fallDamagePerSpeed!);
 import { hitPlayer } from './testHelpers';
 
 describe('fall damage', () => {
@@ -26,7 +29,8 @@ describe('fall damage', () => {
   const dropFrom = (y: number, floorY: number) => {
     shaft(floorY);
     const body = me().playerBody;
-    body.position = { x: 22.5, y };
+    // (`y` is where the body's centre starts, but no higher than the top of the shaft allows: the player is nearly 3 tiles tall)
+    body.position = { x: 22.5, y: Math.max(y, 5 + body.halfHeight + 0.05) };
     body.velocity = { x: 0, y: 0 };
     body.isGrounded = false;
     for (let i = 0; i < 200 && !(body.isGrounded && i > 2); i++) tick();
@@ -48,11 +52,11 @@ describe('fall damage', () => {
 
   it('a long fall hurts, using the default linear rule', () => {
     dropFrom(6, 30);
-    // speed at the floor ~ sqrt(2 * 28 * 23.5) capped at terminal 20 -> (20 - 11) * 6 = 54
-    expect(me().health).toBe(100 - 54);
+    // a fall of ~22 tiles reaches terminal speed, so it is the full fall
+    expect(me().health).toBe(100 - FULL_FALL);
     const hurt = emitted('player_damaged');
     expect(hurt).toHaveLength(1);
-    expect(hurt[0]).toMatchObject({ damage: 54, sourceName: 'Fall' });
+    expect(hurt[0]).toMatchObject({ damage: FULL_FALL, sourceName: 'Fall' });
   });
 
   it('a short drop does nothing (below the minimum speed)', () => {
@@ -74,7 +78,7 @@ describe('fall damage', () => {
   });
 
   it('damage grows with the fall height until the cap', () => {
-    dropFrom(24, 30); // 6 tiles: ~ 18.3 tiles/s
+    dropFrom(18, 30); // ~10 tiles: ~42 tiles/s, past the minimum but short of terminal
     const mid = 100 - me().health;
     expect(mid).toBeGreaterThan(0);
     start();
@@ -99,13 +103,13 @@ describe('fall damage', () => {
   it('applies during the post-hit invulnerability window and does not start one', () => {
     shaft(30);
     const body = me().playerBody;
-    body.position = { x: 22.5, y: 6 };
+    body.position = { x: 22.5, y: 5 + body.halfHeight + 0.05 };
     body.isGrounded = false;
     hitPlayer(engine, cid, 10); // starts the window
     expect(me().invulnerableSeconds).toBeGreaterThan(0);
     me().invulnerableSeconds = 100; // still immune on landing
     for (let i = 0; i < 200 && !body.isGrounded; i++) tick();
-    expect(me().health).toBe(100 - 10 - 54);
+    expect(me().health).toBe(100 - 10 - FULL_FALL);
     expect(me().invulnerableSeconds).toBeGreaterThan(50); // not reset by the fall
   });
 

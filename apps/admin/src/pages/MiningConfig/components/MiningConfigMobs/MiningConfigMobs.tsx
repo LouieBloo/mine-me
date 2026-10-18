@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { useEffect, useState } from 'react';
 import type { MiningConfigFieldProps } from '../MiningConfigTypes';
 import LoadingSpinner from '../../../../components/LoadingSpinner/LoadingSpinner';
@@ -88,16 +89,16 @@ export default function MiningConfigMobs({ config, onFieldChange }: MiningConfig
               Min Spawn Depth
             </label>
             <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
-              Depth {config.mobSpawnMinDepth ?? 5}+
+              Depth {config.mobSpawnMinDepth ?? 5 * BLOCK_SCALE}+
             </span>
           </div>
           <input
             id="mobSpawnMinDepth"
             type="range"
             min="2"
-            max="25"
+            max={25 * BLOCK_SCALE}
             step="1"
-            value={config.mobSpawnMinDepth ?? 5}
+            value={config.mobSpawnMinDepth ?? 5 * BLOCK_SCALE}
             onChange={e => onFieldChange('mobSpawnMinDepth', Number(e.target.value))}
             className="w-full custom-slider cursor-pointer"
           />

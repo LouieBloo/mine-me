@@ -1,8 +1,10 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { useEffect, useRef, useState } from 'react';
 import type { GameItem, PlayerState, } from '@mine-me/shared';
 import {
   getAssetUrl,
   MiningTileType,
+  MINING_CONFIG,
   isBridgeItem,
 } from '@mine-me/shared';
 import { notificationService } from '../../../../../services/notificationService';
@@ -13,8 +15,10 @@ import {
   BridgePlacementAction,
   ThrowableItemAction,
   ShootWeaponAction,
+  resolveBuildableAnchor,
   type IMouseAction,
 } from '../input/MouseAction';
+import { applyPlacedPiece } from '../systems/optimisticPlacement';
 import type { SoundManager } from '../../../../../services/sound';
 import { withVolume } from '../../../../../services/sound/sfxVolume';
 import type { MiningClientWorld } from '../systems/MiningClientWorld';
@@ -97,6 +101,28 @@ export function useMiningActions({
     lightingEngineRef,
     dynamicItemsRef,
   } = world;
+
+  /** Draws a piece the server just accepted, ahead of its tick, wherever the shared search puts it. */
+  const showPlacedPiece = (type: MiningTileType, cursor: { x: number; y: number }) => {
+    const playerPos = playerBodyRef.current?.position;
+    if (!playerPos) return;
+    const blockedByPlayer = type === MiningTileType.BRIDGE;
+    const anchor = resolveBuildableAnchor(type, cursor, playerPos, gridRef.current, MINING_CONFIG.TORCH_PLACEMENT_REACH, blockedByPlayer);
+    if (!anchor) return;
+    const changed = applyPlacedPiece(gridRef.current, type, anchor);
+    const tilesContainer = tilesContainerRef.current;
+    if (tilesContainer && containersReady) {
+      MiningTileRenderer.updateRevealedTiles(
+        tilesContainer,
+        changed,
+        gridRef.current,
+        blockTexturesRef.current,
+        tileGraphicsMap.current,
+        tileSpritesMap.current,
+        TILE_SIZE
+      );
+    }
+  };
   const [resolvedSound, setResolvedSound] = useState<ItemSound | null>(weaponSoundOf(equippedWeapon));
 
   useEffect(() => {
@@ -189,24 +215,7 @@ export function useMiningActions({
           try {
             const res = await sendGameEvent({ type: 'mining_place_torch', target });
             if (res.success) {
-              const tile = gridRef.current[target.y]?.[target.x];
-              if (tile) {
-                tile.type = MiningTileType.TORCH;
-                tile.revealed = true;
-                tile.damageStage = 0;
-              }
-              const tilesContainer = tilesContainerRef.current;
-              if (tilesContainer && containersReady) {
-                MiningTileRenderer.updateRevealedTiles(
-                  tilesContainer,
-                  [{ x: target.x, y: target.y, type: MiningTileType.TORCH }],
-                  gridRef.current,
-                  blockTexturesRef.current,
-                  tileGraphicsMap.current,
-                  tileSpritesMap.current,
-                  TILE_SIZE
-                );
-              }
+              showPlacedPiece(MiningTileType.TORCH, target);
               onTorchPlaced?.();
               return true;
             } else {
@@ -232,24 +241,7 @@ export function useMiningActions({
           try {
             const res = await sendGameEvent({ type: 'mining_place_ladder', target });
             if (res.success) {
-              const tile = gridRef.current[target.y]?.[target.x];
-              if (tile) {
-                tile.type = MiningTileType.LADDER;
-                tile.revealed = true;
-                tile.damageStage = 0;
-              }
-              const tilesContainer = tilesContainerRef.current;
-              if (tilesContainer && containersReady) {
-                MiningTileRenderer.updateRevealedTiles(
-                  tilesContainer,
-                  [{ x: target.x, y: target.y, type: MiningTileType.LADDER }],
-                  gridRef.current,
-                  blockTexturesRef.current,
-                  tileGraphicsMap.current,
-                  tileSpritesMap.current,
-                  TILE_SIZE
-                );
-              }
+              showPlacedPiece(MiningTileType.LADDER, target);
               onLadderPlaced?.();
               return true;
             } else {
@@ -271,24 +263,7 @@ export function useMiningActions({
           try {
             const res = await sendGameEvent({ type: 'mining_place_bridge', target });
             if (res.success) {
-              const tile = gridRef.current[target.y]?.[target.x];
-              if (tile) {
-                tile.type = MiningTileType.BRIDGE;
-                tile.revealed = true;
-                tile.damageStage = 0;
-              }
-              const tilesContainer = tilesContainerRef.current;
-              if (tilesContainer && containersReady) {
-                MiningTileRenderer.updateRevealedTiles(
-                  tilesContainer,
-                  [{ x: target.x, y: target.y, type: MiningTileType.BRIDGE }],
-                  gridRef.current,
-                  blockTexturesRef.current,
-                  tileGraphicsMap.current,
-                  tileSpritesMap.current,
-                  TILE_SIZE
-                );
-              }
+              showPlacedPiece(MiningTileType.BRIDGE, target);
               return true;
             }
             notificationService.error('Cannot Place Bridge', res.error || 'Invalid placement position.');
@@ -381,7 +356,7 @@ export function useMiningActions({
 
             let muzzlePos = {
               x: playerPos.x,
-              y: playerPos.y - 0.45,
+              y: playerPos.y - 0.45 * BLOCK_SCALE,
             };
 
             if (gridContainer && sprite) {
@@ -423,7 +398,7 @@ export function useMiningActions({
             // Trigger visual kickback recoil impulse on the aiming arm
             playerSpriteRef?.current?.triggerRecoil(0.22);
 
-            const bulletSpeed = projConfig.projectileSpeed ?? 28.0;
+            const bulletSpeed = projConfig.projectileSpeed ?? 28.0 * BLOCK_SCALE;
             const clientBulletId = `client_proj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
             const projItem = dynamicItemsRef?.current?.find(

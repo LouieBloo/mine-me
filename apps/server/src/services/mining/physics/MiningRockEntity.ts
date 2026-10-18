@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { MiningPhysicsBody, type MiningCollisionGrid } from './MiningPhysicsBody';
 import type { Vector2D, MiningRigidWorld, RockBodyOptions } from '@mine-me/shared';
 import type * as planck from 'planck';
@@ -68,7 +69,7 @@ export class MiningRockEntity extends MiningPhysicsBody {
 
       if (grid && this.totalFallenDistance > 0.3) {
         const check = this.checkGround(grid);
-        if (check.isGrounded && Math.abs(vel.y) < 1.0) {
+        if (check.isGrounded && Math.abs(vel.y) < 1.0 * BLOCK_SCALE) {
           this.settle(check.floorTileY !== undefined ? check.floorTileY - 1 : Math.floor(this.position.y));
         }
       }
@@ -78,6 +79,13 @@ export class MiningRockEntity extends MiningPhysicsBody {
       this.velocity.x = 0;
 
       super.update(dt, grid);
+      // The rock may settle part-way through a split step; the rest of that step must not move it off the tile centre
+      if (this.hasSettled && this.settledTile) {
+        this.position.x = this.settledTile.x + 0.5;
+        this.position.y = this.settledTile.y + 0.5;
+        this.velocity.x = 0;
+        this.velocity.y = 0;
+      }
       this.totalFallenDistance += Math.max(0, this.position.y - prevY);
     }
   }

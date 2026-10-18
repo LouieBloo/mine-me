@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Container, Graphics, Sprite, Texture } from 'pixi.js';
-import { MiningTileRenderer } from './MiningTileRenderer';
-import { MiningTileType, type MiningClientTile } from '@mine-me/shared';
+import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import { MiningTileRenderer, TILE_CHUNK_CELLS } from './MiningTileRenderer';
+import { MiningTileType, getTileFootprint, type MiningClientTile } from '@mine-me/shared';
 
 describe('MiningTileRenderer', () => {
   let container: Container;
@@ -64,12 +64,56 @@ describe('MiningTileRenderer', () => {
 
     MiningTileRenderer.renderGrid(container, grid, blockTextures, tileGraphicsMap, tileSpritesMap, 64);
 
-    expect(tileGraphicsMap.size).toBe(4);
-    expect(tileGraphicsMap.has('0,0')).toBe(true);
-    expect(tileGraphicsMap.has('1,0')).toBe(true);
-    expect(tileGraphicsMap.has('0,1')).toBe(true);
-    expect(tileGraphicsMap.has('1,1')).toBe(true);
-    expect(container.children.length).toBe(4);
+    // A cell costs a display object only when it has something to show: fog and art-less blocks do, an empty cell does not
+    expect(tileSpritesMap.has('1,0')).toBe(true); // fog
+    expect(tileGraphicsMap.has('0,0')).toBe(true); // dirt without art
+    expect(tileGraphicsMap.has('0,1')).toBe(true); // cracked ladder... drawn as fallback art
+    expect(tileGraphicsMap.has('1,1')).toBe(false); // empty
+    expect(tileSpritesMap.has('1,1')).toBe(false);
+    expect(container.children.length).toBe(1); // all in one chunk
+  });
+
+  describe('pieces (ladders, torches, bridges)', () => {
+    const footprint = getTileFootprint(MiningTileType.LADDER);
+    const art = () => Texture.WHITE.frame && new Texture({ source: Texture.WHITE.source, frame: new Rectangle(0, 0, 30, 30) });
+
+    it('cuts the art into one slice per cell, each a different part of the picture, cached', () => {
+      const texture = art();
+      const first = MiningTileRenderer.pieceSlice(texture, [0, 0], footprint);
+      const last = MiningTileRenderer.pieceSlice(texture, [footprint.width - 1, footprint.height - 1], footprint);
+      expect(first.frame.width).toBeCloseTo(30 / footprint.width);
+      expect(first.frame.height).toBeCloseTo(30 / footprint.height);
+      expect(first.frame.x).toBe(0);
+      expect(last.frame.x).toBeCloseTo(30 - 30 / footprint.width);
+      expect(last.frame.y).toBeCloseTo(30 - 30 / footprint.height);
+      expect(MiningTileRenderer.pieceSlice(texture, [0, 0], footprint)).toBe(first);
+    });
+
+    it('shows a cell of a piece with its slice of the art, and a plain tile with the whole texture', () => {
+      const texture = art();
+      const textures = new Map<number, Texture>([[MiningTileType.LADDER, texture], [MiningTileType.DIRT, texture]]);
+      const sprites = new Map<string, Sprite>();
+      const graphics = new Map<string, Graphics>();
+      const grid: MiningClientTile[][] = [[
+        { type: MiningTileType.LADDER, revealed: true, piece: [1, 0] },
+        { type: MiningTileType.DIRT, revealed: true },
+      ]];
+      MiningTileRenderer.renderGrid(container, grid, textures, graphics, sprites, 21);
+      expect(sprites.get('0,0')!.texture).toBe(MiningTileRenderer.pieceSlice(texture, [1, 0], footprint));
+      expect(sprites.get('1,0')!.texture).toBe(texture);
+    });
+
+    it('draws a piece with no art once, whole, from its top-left cell', () => {
+      const spy = vi.spyOn(MiningTileRenderer, 'drawFallbackTile');
+      const grid: MiningClientTile[][] = [[
+        { type: MiningTileType.BRIDGE, revealed: true, piece: [0, 0] },
+        { type: MiningTileType.BRIDGE, revealed: true, piece: [1, 0] },
+      ]];
+      MiningTileRenderer.renderGrid(container, grid, new Map(), new Map(), new Map(), 21);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(expect.anything(), MiningTileType.BRIDGE, 21 * footprint.width);
+      spy.mockRestore();
+    });
   });
 
   it('draws ladder with offsets and alpha', () => {
@@ -145,7 +189,8 @@ describe('MiningTileRenderer', () => {
 
     // Initial render: all 4 are unrevealed
     MiningTileRenderer.renderGrid(container, grid, blockTextures, tileGraphicsMap, tileSpritesMap, 64);
-    expect(tileGraphicsMap.size).toBe(4);
+    expect(tileSpritesMap.size).toBe(4); // fog is a sprite per cell
+    expect(tileGraphicsMap.size).toBe(0);
 
     const renderSingleSpy = vi.spyOn(MiningTileRenderer, 'renderSingleTile');
 
@@ -177,3 +222,56 @@ describe('MiningTileRenderer', () => {
   });
 });
 
+
+describe('MiningTileRenderer chunks and cost', () => {
+  const empty = (): MiningClientTile => ({ type: MiningTileType.EMPTY, revealed: true });
+
+  it('puts cells in square chunks that the culler can skip whole, without visiting their cells', () => {
+    const container = new Container();
+    const grid: MiningClientTile[][] = Array.from({ length: 40 }, () => Array.from({ length: 40 }, () => ({ type: MiningTileType.DIRT, revealed: false })));
+    MiningTileRenderer.renderGrid(container, grid, new Map(), new Map(), new Map(), 21);
+    const chunksPerSide = Math.ceil(40 / TILE_CHUNK_CELLS);
+    expect(container.children).toHaveLength(chunksPerSide * chunksPerSide);
+    const chunk = container.children[0] as Container;
+    expect(chunk.cullable).toBe(true);
+    expect(chunk.cullableChildren).toBe(false);
+    expect(chunk.cullArea).toMatchObject({ x: 0, y: 0, width: TILE_CHUNK_CELLS * 21, height: TILE_CHUNK_CELLS * 21 });
+    expect(container.cullableChildren).toBe(true);
+    // The same chunk is reused for every cell in it
+    expect(MiningTileRenderer.chunkFor(container, 1, 1, 21)).toBe(chunk);
+  });
+
+  it('makes no display object for a revealed empty cell, and drops the graphics when cracks or fallback art go away', () => {
+    const container = new Container();
+    const sprites = new Map<string, Sprite>();
+    const graphics = new Map<string, Graphics>();
+    const tile: MiningClientTile = { type: MiningTileType.DIRT, revealed: true, damageStage: 2 };
+    MiningTileRenderer.renderSingleTile(container, 3, 3, tile, new Map(), graphics, sprites, 21);
+    expect(graphics.has('3,3')).toBe(true);
+    const drawn = graphics.get('3,3')!;
+    tile.type = MiningTileType.EMPTY;
+    tile.damageStage = 0;
+    MiningTileRenderer.renderSingleTile(container, 3, 3, tile, new Map(), graphics, sprites, 21);
+    expect(graphics.has('3,3')).toBe(false);
+    expect(drawn.destroyed).toBe(true);
+    expect(sprites.size).toBe(0);
+    MiningTileRenderer.renderSingleTile(container, 4, 3, empty(), new Map(), graphics, sprites, 21);
+    expect(graphics.size + sprites.size).toBe(0);
+  });
+
+  it('fog is a black tinted sprite that turns into the block art when revealed, resized to the cell', () => {
+    const container = new Container();
+    const sprites = new Map<string, Sprite>();
+    const art = new Texture({ source: Texture.WHITE.source, frame: new Rectangle(0, 0, 64, 64) });
+    const tile: MiningClientTile = { type: MiningTileType.DIRT, revealed: false };
+    MiningTileRenderer.renderSingleTile(container, 2, 2, tile, new Map([[MiningTileType.DIRT, art]]), new Map(), sprites, 21);
+    expect(sprites.get('2,2')!.tint).toBe(0x000000);
+    tile.revealed = true;
+    MiningTileRenderer.renderSingleTile(container, 2, 2, tile, new Map([[MiningTileType.DIRT, art]]), new Map(), sprites, 21);
+    const sprite = sprites.get('2,2')!;
+    expect(sprite.texture).toBe(art);
+    expect(sprite.tint).toBe(0xffffff);
+    expect(sprite.width).toBe(21);
+    expect(sprite.height).toBe(21);
+  });
+});

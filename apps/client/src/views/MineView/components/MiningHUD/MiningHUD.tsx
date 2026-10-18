@@ -3,6 +3,7 @@ import { type MiningSessionClientState, type PlayerState, MINING_CONFIG } from '
 import { ZoomControl } from '../ZoomControl/ZoomControl';
 import { QuickAccessBar } from '../../../../components/QuickAccessBar/QuickAccessBar';
 import { TemporaryBackpack } from '../TemporaryBackpack/TemporaryBackpack';
+import { PerformanceOverlay } from '../PerformanceOverlay/PerformanceOverlay';
 import './MiningHUD.css';
 
 interface MiningHUDProps {
@@ -236,6 +237,7 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
           </button>
         </div>
       </div>
+      <PerformanceOverlay />
     </div>
   );
 };

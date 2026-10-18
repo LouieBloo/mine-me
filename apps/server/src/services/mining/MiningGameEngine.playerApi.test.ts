@@ -22,11 +22,11 @@ describe('engine player API: every call names its player', () => {
     engine.addPlayer({ characterId: A, characterName: 'Alice', socket: sock(), miningSpeed: 25 });
     engine.addPlayer({ characterId: B, characterName: 'Bob', socket: sock(), miningSpeed: 25 });
     // Open room with a dirt floor; both players stand in it
-    for (let x = 16; x <= 28; x++) {
+    for (let x = 16; x <= 50; x++) {
       for (let y = 17; y <= 20; y++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
       engine.grid[21][x] = { type: MiningTileType.DIRT, revealed: true };
     }
-    for (const [id, x] of [[A, 20.5], [B, 24.5]] as const) {
+    for (const [id, x] of [[A, 20.5], [B, 40.5]] as const) {
       const p = engine.getPlayer(id)!;
       p.playerBody.position = { x, y: 21 - p.playerBody.halfHeight };
       p.playerBody.isGrounded = true;
@@ -71,15 +71,15 @@ describe('engine player API: every call names its player', () => {
 
     it('startMining / stopMining affect only that player', () => {
       engine.grid[20][21] = { type: MiningTileType.DIRT, revealed: true }; // within Alice's reach (x = 20.5)
-      engine.grid[20][25] = { type: MiningTileType.DIRT, revealed: true }; // within Bob's reach (x = 24.5)
+      engine.grid[20][41] = { type: MiningTileType.DIRT, revealed: true }; // within Bob's reach (x = 40.5)
       expect(engine.startMining(A, { x: 21, y: 20 })).toBe(true);
       expect(engine.getPlayer(A)!.isMining).toBe(true);
       expect(engine.getPlayer(B)!.isMining).toBe(false);
 
       // Reach is measured from the named player: Alice cannot start on Bob's block
-      expect(engine.startMining(A, { x: 25, y: 20 })).toBe(false);
+      expect(engine.startMining(A, { x: 41, y: 20 })).toBe(false);
 
-      expect(engine.startMining(B, { x: 25, y: 20 })).toBe(true);
+      expect(engine.startMining(B, { x: 41, y: 20 })).toBe(true);
       engine.stopMining(A);
       expect(engine.getPlayer(A)!.isMining).toBe(false);
       expect(engine.getPlayer(B)!.isMining).toBe(true);
@@ -94,9 +94,9 @@ describe('engine player API: every call names its player', () => {
     });
 
     it('placement reach is measured from the named player', () => {
-      // Bob (x=24.5) can reach x=25, Alice (x=20.5) cannot
-      expect(engine.canPlaceTorch(B, { x: 25, y: 20 })).toBe(true);
-      expect(engine.canPlaceTorch(A, { x: 25, y: 20 })).toBe(false);
+      // Bob (x=40.5) can reach x=41, Alice (x=20.5) cannot
+      expect(engine.canPlaceTorch(B, { x: 41, y: 20 })).toBe(true);
+      expect(engine.canPlaceTorch(A, { x: 41, y: 20 })).toBe(false);
     });
 
     it('setMiningSpeed / setLoadout / vision change only the named player', () => {

@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { bodyTouchesCell, distanceToCell, heatDamageRate, sampleFluidContact, type BodyBox, type FireDamageRule, type FluidDefinition } from '@mine-me/shared';
 import { fireDamageRule } from '../environmentalDamage';
 import type { MiningWorld } from '../MiningWorld';
@@ -140,7 +141,7 @@ export class MiningBurningSubsystem {
 
     if (burning) {
       // A body on fire sets alight what it is standing in
-      this.world.ignition.emit(box.x, box.y, Math.max(box.halfWidth, box.halfHeight) + 0.2, BURNING_BODY_IGNITION_STRENGTH);
+      this.world.ignition.emit(box.x, box.y, Math.max(box.halfWidth, box.halfHeight) + 0.2 * BLOCK_SCALE, BURNING_BODY_IGNITION_STRENGTH);
       state.remaining = Math.max(0, state.remaining - dt);
     }
     return state.remaining > 0;

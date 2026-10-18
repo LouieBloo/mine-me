@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import {
   MiningTileType,
   MINING_CONFIG,
@@ -19,7 +20,7 @@ import { MiningDataManager } from './mining/subsystems/MiningDataManager';
 // ============================================================================
 // Mining Map Generator
 //
-// Generates a seeded 45×45 mining grid with procedural caverns, tunnels,
+// Generates a seeded mining grid (90×90 half-size blocks) with procedural caverns, tunnels,
 // mineral veins, and structural rock formations. Uses a deterministic PRNG so
 // maps can be reproduced identically from the same seed.
 // ============================================================================
@@ -34,6 +35,8 @@ export interface ServerTile {
   revealed: boolean;
   /** Accumulated damage dealt to this block (remaining HP = maxHealth - damage). */
   damage?: number;
+  /** Set on a cell of a multi-cell piece (ladder, torch, bridge): [column, row] inside the piece, from its top-left cell. */
+  piece?: [ox: number, oy: number];
 }
 
 /**
@@ -114,6 +117,15 @@ export interface GeneratedGasCell {
 
 /** Salt for the gases' own random stream, so gas pockets never change fluid pockets or the rest of the map. */
 const GAS_SEED_SALT = 0x6a5c0de5;
+
+/** The widest a generated tunnel may be, in cells. */
+const MAX_TUNNEL_WIDTH = 6;
+
+/** Cells either side of the entrance that stay plain ground (solid footing at spawn, no ore or rock right at the exit). */
+const ENTRANCE_CLEAR_RADIUS = BLOCK_SCALE;
+
+/** Ore clusters keep the world size they had with blocks twice as big: a quarter of the area per cell, so 4x the cells. */
+const ORE_CLUSTER_AREA_SCALE = BLOCK_SCALE * BLOCK_SCALE;
 
 /** Salt for the fluids' own random stream, so pocket placement never depends on how much the other steps drew. */
 const FLUID_SEED_SALT = 0x0f1d51ed;
@@ -209,7 +221,7 @@ export class MiningMapGenerator {
     const averageSide = (gen.minSize + gen.maxSize) / 2;
     const target = Math.round((diggable * gen.percentage) / 100 / (averageSide * averageSide));
     let placed = 0;
-    for (let attempt = 0; attempt < target * 30 && placed < target; attempt++) {
+    for (let attempt = 0; attempt < target * 30 * BLOCK_SCALE * BLOCK_SCALE && placed < target; attempt++) {
       const outline = generatePocketOutline(pickPocketShape(gen.shapes, rng), gen.minSize, gen.maxSize, rng);
       const x = 1 + Math.floor(rng() * Math.max(1, this.width - 2 - outline.width));
       const y = first + Math.floor(rng() * Math.max(1, last - first + 2 - outline.height));
@@ -291,24 +303,32 @@ export class MiningMapGenerator {
     }
   }
 
+  /**
+   * Carves the caves. The shape is worked out on a coarse grid, one coarse cell per original-size block, so caves are as
+   * big as they were before blocks got smaller (smoothing small cells directly gives tiny pockets), then redrawn on the
+   * real grid and smoothed a little so the edges are rounded instead of stepped.
+   */
   private carveCaverns(): void {
     if (this.config.cavernDensity <= 0) return;
 
-    const minDepth = Math.max(1, this.config.cavernMinDepth);
-    let openMap: boolean[][] = Array.from({ length: this.height }, () =>
-      Array.from({ length: this.width }, () => false)
+    const scale = BLOCK_SCALE;
+    const coarseWidth = Math.ceil(this.width / scale);
+    const coarseHeight = Math.ceil(this.height / scale);
+    const minDepth = Math.max(1, Math.ceil(this.config.cavernMinDepth / scale));
+    let openMap: boolean[][] = Array.from({ length: coarseHeight }, () =>
+      Array.from({ length: coarseWidth }, () => false)
     );
 
     const baseDensity = Math.min(100, Math.max(0, this.config.cavernDensity)) / 100;
     // Map cavernDensity [0, 1] to cellular automata seed probability [0.38, 0.58]
     const initialOpenProb = 0.38 + baseDensity * 0.20;
 
-    for (let y = minDepth; y < this.height; y++) {
-      const depthProgress = (y - minDepth) / Math.max(1, this.height - minDepth);
+    for (let y = minDepth; y < coarseHeight; y++) {
+      const depthProgress = (y - minDepth) / Math.max(1, coarseHeight - minDepth);
       const depthScale = 0.85 + 0.15 * depthProgress;
       const cellThreshold = initialOpenProb * depthScale;
 
-      for (let x = 0; x < this.width; x++) {
+      for (let x = 0; x < coarseWidth; x++) {
         openMap[y][x] = this.rng() < cellThreshold;
       }
     }
@@ -316,50 +336,61 @@ export class MiningMapGenerator {
     // Cellular automata smoothing iterations (classic 4-5 rule)
     const iterations = Math.max(1, Math.min(6, this.config.cavernIterations));
     for (let it = 0; it < iterations; it++) {
-      const nextOpenMap: boolean[][] = Array.from({ length: this.height }, () =>
-        Array.from({ length: this.width }, () => false)
-      );
+      openMap = this.smoothOpenMap(openMap, minDepth, coarseWidth, coarseHeight);
+    }
 
-      for (let y = minDepth; y < this.height; y++) {
-        for (let x = 0; x < this.width; x++) {
-          let solidNeighbors = 0;
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              if (dx === 0 && dy === 0) continue;
-              const nx = x + dx;
-              const ny = y + dy;
-              if (nx < 0 || nx >= this.width || ny < minDepth || ny >= this.height) {
-                solidNeighbors++;
-              } else if (!openMap[ny][nx]) {
-                solidNeighbors++;
-              }
-            }
-          }
-
-          // Classic 4-5 rule:
-          // If solid neighbors >= 5 -> become solid
-          // If solid neighbors <= 3 -> become open
-          // If solid neighbors == 4 -> preserve current state
-          if (solidNeighbors >= 5) {
-            nextOpenMap[y][x] = false;
-          } else if (solidNeighbors <= 3) {
-            nextOpenMap[y][x] = true;
-          } else {
-            nextOpenMap[y][x] = openMap[y][x];
-          }
-        }
-      }
-      openMap = nextOpenMap;
+    // Redraw on the real grid (every coarse cell becomes scale x scale cells), then round the corners
+    const fineMinDepth = Math.max(1, this.config.cavernMinDepth);
+    let fine: boolean[][] = Array.from({ length: this.height }, (_, y) =>
+      Array.from({ length: this.width }, (_, x) => y >= fineMinDepth && (openMap[Math.floor(y / scale)]?.[Math.floor(x / scale)] ?? false))
+    );
+    if (scale > 1) {
+      for (let pass = 0; pass < 2; pass++) fine = this.smoothOpenMap(fine, fineMinDepth, this.width, this.height);
     }
 
     // Apply carved caverns to grid
-    for (let y = minDepth; y < this.height; y++) {
+    for (let y = fineMinDepth; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        if (openMap[y][x]) {
+        if (fine[y][x]) {
           this.grid[y][x] = { type: MiningTileType.EMPTY, revealed: false };
         }
       }
     }
+  }
+
+  /** One pass of the classic 4-5 cave rule over an open/solid map (rows above `minDepth` and the edges count as solid). */
+  private smoothOpenMap(openMap: boolean[][], minDepth: number, width: number, height: number): boolean[][] {
+    const next: boolean[][] = Array.from({ length: height }, () => Array.from({ length: width }, () => false));
+    for (let y = minDepth; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let solidNeighbors = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || nx >= width || ny < minDepth || ny >= height) {
+              solidNeighbors++;
+            } else if (!openMap[ny][nx]) {
+              solidNeighbors++;
+            }
+          }
+        }
+
+        // Classic 4-5 rule:
+        // If solid neighbors >= 5 -> become solid
+        // If solid neighbors <= 3 -> become open
+        // If solid neighbors == 4 -> preserve current state
+        if (solidNeighbors >= 5) {
+          next[y][x] = false;
+        } else if (solidNeighbors <= 3) {
+          next[y][x] = true;
+        } else {
+          next[y][x] = openMap[y][x];
+        }
+      }
+    }
+    return next;
   }
 
   private carveTunnels(): void {
@@ -369,7 +400,8 @@ export class MiningMapGenerator {
     const wormCount = this.config.tunnelCount;
     const minLength = Math.max(5, this.config.tunnelMinLength);
     const maxLength = Math.max(minLength, this.config.tunnelMaxLength);
-    const tunnelWidth = Math.max(1, Math.min(2, this.config.tunnelWidth));
+    // A tunnel is a square brush this many cells wide and tall, so the character (1.25 x 1.75 cells) fits at width 2
+    const tunnelWidth = Math.max(1, Math.min(MAX_TUNNEL_WIDTH, this.config.tunnelWidth));
 
     for (let i = 0; i < wormCount; i++) {
       let curX = Math.floor(this.rng() * (this.width - 4)) + 2;
@@ -380,10 +412,13 @@ export class MiningMapGenerator {
       let dy = this.rng() > 0.4 ? 1 : 0;
 
       for (let step = 0; step < steps; step++) {
-        if (curY >= 1 && curY < this.height && curX >= 0 && curX < this.width) {
-          this.grid[curY][curX] = { type: MiningTileType.EMPTY, revealed: false };
-          if (tunnelWidth > 1 && curX + 1 < this.width) {
-            this.grid[curY][curX + 1] = { type: MiningTileType.EMPTY, revealed: false };
+        for (let by = 0; by < tunnelWidth; by++) {
+          for (let bx = 0; bx < tunnelWidth; bx++) {
+            const cx = curX + bx;
+            const cy = curY + by;
+            if (cy >= 1 && cy < this.height && cx >= 0 && cx < this.width) {
+              this.grid[cy][cx] = { type: MiningTileType.EMPTY, revealed: false };
+            }
           }
         }
 
@@ -416,7 +451,7 @@ export class MiningMapGenerator {
     }
 
     // Keep ground directly under entrance solid dirt so player has footing at spawn
-    for (let dx = -1; dx <= 1; dx++) {
+    for (let dx = -ENTRANCE_CLEAR_RADIUS; dx <= ENTRANCE_CLEAR_RADIUS; dx++) {
       const nx = ENTRANCE_X + dx;
       if (nx >= 0 && nx < this.width && this.height > 1) {
         this.grid[1][nx] = { type: MiningTileType.DIRT, revealed: false };
@@ -437,18 +472,18 @@ export class MiningMapGenerator {
     this.spawnOreType({
       tileType: MiningTileType.COPPERIUM,
       percentage: this.config.copperiumPercentage ?? 4,
-      minDepth: 2,
+      minDepth: 2 * BLOCK_SCALE,
       clusterChance,
-      maxClusterSize: 5,
+      maxClusterSize: 5 * ORE_CLUSTER_AREA_SCALE,
     });
 
     // 2. Place Silverium Veins (rarer, strictly deep)
     this.spawnOreType({
       tileType: MiningTileType.SILVERIUM,
       percentage: this.config.silveriumPercentage ?? 2,
-      minDepth: this.config.silveriumMinDepth ?? 12,
+      minDepth: this.config.silveriumMinDepth ?? DEFAULT_MINING_MAP_CONFIG.silveriumMinDepth,
       clusterChance: Math.min(0.8, clusterChance * 1.1),
-      maxClusterSize: 4,
+      maxClusterSize: 4 * ORE_CLUSTER_AREA_SCALE,
     });
   }
 
@@ -466,7 +501,7 @@ export class MiningMapGenerator {
       for (let x = 0; x < this.width; x++) {
         if (this.grid[y][x].type === MiningTileType.DIRT) {
           // Avoid entrance corridor
-          if (y <= 2 && Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= 1) continue;
+          if (y <= 2 * BLOCK_SCALE && Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= ENTRANCE_CLEAR_RADIUS) continue;
           eligibleDirt.push({ x, y });
         }
       }
@@ -570,7 +605,7 @@ export class MiningMapGenerator {
     let idx = 0;
     while (placed < targetCount && idx < candidateDirt.length) {
       const pos = candidateDirt[idx++];
-      if (pos.y === 1 && Math.abs(pos.x - MINING_CONFIG.ENTRANCE_X) <= 1) continue;
+      if (pos.y <= BLOCK_SCALE && Math.abs(pos.x - MINING_CONFIG.ENTRANCE_X) <= ENTRANCE_CLEAR_RADIUS) continue;
       if (this.grid[pos.y][pos.x].type !== MiningTileType.DIRT) continue;
 
       // Re-verify support in case a neighbor/below changed
@@ -639,7 +674,7 @@ export class MiningMapGenerator {
 }
 
 /**
- * Generate a 45×45 mining grid with procedural caverns, tunnels, and resources.
+ * Generate a mining grid (90×90 by default) with procedural caverns, tunnels, and resources.
  */
 export function generateMiningMap(options: MapGeneratorOptions): ServerMiningGrid {
   const generator = new MiningMapGenerator(options);
@@ -778,6 +813,7 @@ export function toClientGrid(grid: ServerMiningGrid): import('@mine-me/shared').
       type: tile.revealed ? tile.type : MiningTileType.DIRT,
       revealed: tile.revealed,
       damageStage: tile.revealed ? getDamageStage(tile) : 0,
+      ...(tile.revealed && tile.piece ? { piece: tile.piece } : {}),
     }))
   );
 }

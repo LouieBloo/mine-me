@@ -1,5 +1,6 @@
 import { BaseMobAI, type MobAIContext, type MobActionIntent } from './BaseMobAI';
 import { ChaseAndMineAI } from './ChaseAndMineAI';
+import { BLOCK_SCALE, MINING_CONFIG } from '../../types/mining';
 
 /**
  * Patrol AI behavior.
@@ -21,8 +22,8 @@ export class PatrolAI extends BaseMobAI {
       this.originX = context.position.x;
     }
 
-    const aggroRange = context.config?.aggroRange ?? 10.0;
-    const patrolRadius = context.config?.patrolRadius ?? 6.0;
+    const aggroRange = context.config?.aggroRange ?? MINING_CONFIG.MOB_DEFAULT_AGGRO_RANGE / 2;
+    const patrolRadius = context.config?.patrolRadius ?? 6.0 * BLOCK_SCALE;
 
     // Check if any player is within aggro range
     let playerInAggro = false;
@@ -49,7 +50,7 @@ export class PatrolAI extends BaseMobAI {
     }
 
     // Reverse if hitting a wall
-    const nextTileX = Math.floor(context.position.x + this.direction * 0.6);
+    const nextTileX = Math.floor(context.position.x + this.direction * 0.6 * BLOCK_SCALE);
     const currentTileY = Math.floor(context.position.y);
     const tileAhead = context.grid[currentTileY]?.[nextTileX];
     if (tileAhead && tileAhead.type !== 0 && tileAhead.type !== 1) { // Not empty or entrance

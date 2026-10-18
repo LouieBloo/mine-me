@@ -65,8 +65,14 @@ describe('MiningGameEngine', () => {
       socket: mockSocket,
     });
 
-    // Make tile directly to the right a solid DIRT block
-    engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
+    // A short corridor (rows 1..3, floor on row 4) ending in a solid DIRT wall at x = 46
+    for (let x = 40; x <= 46; x++) {
+      for (let y = 1; y <= 3; y++) engine.grid[y][x] = { type: x === 46 ? MiningTileType.DIRT : MiningTileType.EMPTY, revealed: true };
+      engine.grid[4][x] = { type: MiningTileType.DIRT, revealed: true };
+    }
+    const body = engine.getPlayer('char-1')!.playerBody;
+    body.position = { x: 44.5, y: 4 - body.halfHeight };
+    body.isGrounded = true;
 
     // Try moving right into solid dirt block
     engine.handleInput('char-1', {
@@ -78,10 +84,11 @@ describe('MiningGameEngine', () => {
       sequence: 2,
     });
 
-    (engine as any).tick(0.1);
+    for (let i = 0; i < 9; i++) (engine as any).tick(1 / 30);
 
-    // Position should be stopped by tile boundary collision
-    expect(engine.getPlayer('char-1')!.playerBody.position.x).toBeLessThan(MINING_CONFIG.ENTRANCE_X + 0.6);
+    // Position should be stopped flush against the wall by tile boundary collision (it would be past it after 0.3 s of running)
+    expect(body.position.x).toBeLessThanOrEqual(46 - body.halfWidth + 1e-6);
+    expect(body.position.x).toBeGreaterThan(46 - body.halfWidth - 0.1);
   });
 
   it('picks up dropped items when player overlaps item position', () => {
@@ -145,7 +152,7 @@ describe('MiningGameEngine', () => {
       left: false,
       right: false,
       miningKey: true,
-      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 }, preciseMining: true,
       sequence: 2,
     });
 
@@ -191,7 +198,7 @@ describe('MiningGameEngine', () => {
       left: false,
       right: false,
       miningKey: true,
-      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 }, preciseMining: true,
       sequence: 1,
     });
 
@@ -206,7 +213,7 @@ describe('MiningGameEngine', () => {
       left: false,
       right: false,
       miningKey: true,
-      miningTarget: { x: MINING_CONFIG.ENTRANCE_X - 1, y: 0 },
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X - 1, y: 0 }, preciseMining: true,
       sequence: 2,
     });
 
@@ -272,8 +279,10 @@ describe('MiningGameEngine', () => {
       miningSpeed: 100,
       socket: mockSocket,
     });
-    engine.getPlayer('char-1')!.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: 1.0 - engine.getPlayer('char-1')!.playerBody.radius };
-    engine.grid[0][MINING_CONFIG.ENTRANCE_X] = { type: MiningTileType.EMPTY, revealed: true };
+    // Standing in a pocket in row 0 (the player is 1.25 tiles wide, so it spans three cells), a dirt block to its right
+    const playerBody = engine.getPlayer('char-1')!.playerBody;
+    playerBody.position = { x: MINING_CONFIG.ENTRANCE_X - 0.5, y: 1.0 - playerBody.halfHeight };
+    for (const dx of [-2, -1, 0]) engine.grid[0][MINING_CONFIG.ENTRANCE_X + dx] = { type: MiningTileType.EMPTY, revealed: true };
     engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
 
     // Target right tile with left-click to start mining while grounded
@@ -283,7 +292,7 @@ describe('MiningGameEngine', () => {
       left: false,
       right: false,
       miningKey: true,
-      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 }, preciseMining: true,
       sequence: 1,
     });
 
@@ -298,7 +307,7 @@ describe('MiningGameEngine', () => {
       right: false,
       jump: true,
       miningKey: true,
-      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 }, preciseMining: true,
       sequence: 2,
     });
 
@@ -331,7 +340,7 @@ describe('MiningGameEngine', () => {
       left: false,
       right: false,
       miningKey: true,
-      miningTarget: { x: 11, y: 1 },
+      miningTarget: { x: 11, y: 1 }, preciseMining: true,
       sequence: 1,
     });
 
@@ -346,7 +355,7 @@ describe('MiningGameEngine', () => {
       left: false,
       right: false,
       miningKey: true,
-      miningTarget: { x: 9, y: 1 },
+      miningTarget: { x: 9, y: 1 }, preciseMining: true,
       sequence: 2,
     });
 
@@ -365,32 +374,31 @@ describe('MiningGameEngine', () => {
 
     engine.getPlayer('char-1')!.playerBody.position = { x: 12.5, y: 5.5 };
     // Ladders only go into empty space
-    engine.grid[5][12] = { type: MiningTileType.EMPTY, revealed: true };
-    engine.grid[6][12] = { type: MiningTileType.EMPTY, revealed: true };
+    for (let y = 3; y <= 12; y++) for (let x = 9; x <= 15; x++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
 
-    // Place ladder at player position
+    // Place ladder at player position: a piece centred on the cell the player is in
     const placed = engine.placeLadder('char-1');
     expect(placed).toBe(true);
     expect(engine.grid[5][12].type).toBe(MiningTileType.LADDER);
     expect(engine.grid[5][12].revealed).toBe(true);
+    expect(engine.grid[4][11].piece).toEqual([0, 0]);
 
-    // Place ladder at explicit coordinate
-    const placedTarget = engine.placeLadder('char-1', { x: 12, y: 6 });
+    // Place ladder at explicit coordinate (below the first, which covers rows 4-6)
+    const placedTarget = engine.placeLadder('char-1', { x: 12, y: 9 });
     expect(placedTarget).toBe(true);
-    expect(engine.grid[6][12].type).toBe(MiningTileType.LADDER);
+    expect(engine.grid[9][12].type).toBe(MiningTileType.LADDER);
   });
 
   it('clears leftover block damage when a ladder or torch is placed on a tile', () => {
     const engine = new MiningGameEngine({ characterId: 'char-1', cityId: 'city-1', seed: 12345, socket: mockSocket });
     engine.getPlayer('char-1')!.playerBody.position = { x: 12.5, y: 5.5 };
-    engine.grid[5][12] = { type: MiningTileType.EMPTY, revealed: true, damage: 40 };
-    engine.grid[5][13] = { type: MiningTileType.EMPTY, revealed: true, damage: 40 };
+    for (let y = 3; y <= 12; y++) for (let x = 9; x <= 17; x++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true, damage: 40 };
 
-    expect(engine.placeLadder('char-1')).toBe(true);
-    expect(engine.placeTorch('char-1', { x: 13, y: 5 })).toBe(true);
+    expect(engine.placeLadder('char-1')).toBe(true); // covers x 11-13, rows 4-6
+    expect(engine.placeTorch('char-1', { x: 15, y: 5 })).toBe(true); // covers x 14-16
 
     expect(engine.grid[5][12].damage).toBe(0);
-    expect(engine.grid[5][13].damage).toBe(0);
+    expect(engine.grid[5][15].damage).toBe(0);
   });
 
   it('clears block damage on tiles an explosion destroys', () => {
@@ -433,7 +441,7 @@ describe('MiningGameEngine', () => {
       left: false,
       right: false,
       miningKey: true,
-      miningTarget: { x: 11, y: 5 },
+      miningTarget: { x: 11, y: 5 }, preciseMining: true,
       sequence: 1,
     });
 
@@ -495,7 +503,7 @@ describe('MiningGameEngine', () => {
       left: false,
       right: false,
       miningKey: true,
-      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 }, preciseMining: true,
       sequence: 1,
     });
 
@@ -535,7 +543,7 @@ describe('MiningGameEngine', () => {
       left: false,
       right: false,
       miningKey: true,
-      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 }, preciseMining: true,
       sequence: 1,
     });
 
@@ -592,7 +600,7 @@ describe('MiningGameEngine', () => {
       left: false,
       right: false,
       miningKey: true,
-      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 },
+      miningTarget: { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 }, preciseMining: true,
       sequence: 1,
     });
 
@@ -605,7 +613,7 @@ describe('MiningGameEngine', () => {
     expect(engine.getPlayer('char-1')!.miningProgress).toBeCloseTo(2.0, 1);
   });
 
-  it('places a torch tile within 1 tile distance and verifies non-solid collision', () => {
+  it('places a torch tile within reach and verifies non-solid collision', () => {
     const engine = new MiningGameEngine({
       characterId: 'char-1',
       cityId: 'city-1',
@@ -613,18 +621,20 @@ describe('MiningGameEngine', () => {
       socket: mockSocket,
     });
 
-    engine.grid[5][10] = { type: MiningTileType.EMPTY, revealed: true };
-    engine.grid[6][10] = { type: MiningTileType.DIRT, revealed: true };
-    engine.grid[6][11] = { type: MiningTileType.DIRT, revealed: true };
-    engine.getPlayer('char-1')!.playerBody.position = { x: 10.5, y: 5.5 };
-    engine.getPlayer('char-1')!.playerBody.isGrounded = true;
+    // An open pocket (x 8..14, y 2..5) over a dirt floor; the player is 1.25 x 1.75 tiles, so it needs room
+    for (let x = 8; x <= 14; x++) {
+      for (let y = 2; y <= 5; y++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+      engine.grid[6][x] = { type: MiningTileType.DIRT, revealed: true };
+    }
+    const walker = engine.getPlayer('char-1')!.playerBody;
+    walker.position = { x: 10.5, y: 6 - walker.halfHeight };
+    walker.isGrounded = true;
 
-    // Place torch at adjacent tile (11, 5)
-    engine.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
-    const placed = engine.placeTorch('char-1', { x: 11, y: 5 });
+    // Place torch at a tile within reach, ahead of the player (12, 5)
+    const placed = engine.placeTorch('char-1', { x: 12, y: 5 });
     expect(placed).toBe(true);
-    expect(engine.grid[5][11].type).toBe(MiningTileType.TORCH);
-    expect(engine.grid[5][11].revealed).toBe(true);
+    expect(engine.grid[5][12].type).toBe(MiningTileType.TORCH);
+    expect(engine.grid[5][12].revealed).toBe(true);
 
     // Player should walk right through the torch tile without collision blocking
     engine.handleInput('char-1', {
@@ -639,7 +649,7 @@ describe('MiningGameEngine', () => {
     expect(engine.getPlayer('char-1')!.playerBody.position.x).toBeGreaterThan(10.5);
   });
 
-  it('rejects torch placement if target is more than 1 tile away from player', () => {
+  it('rejects torch placement if target is out of reach of the player', () => {
     const engine = new MiningGameEngine({
       characterId: 'char-1',
       cityId: 'city-1',
@@ -649,11 +659,11 @@ describe('MiningGameEngine', () => {
 
     engine.getPlayer('char-1')!.playerBody.position = { x: 10.5, y: 5.5 };
 
-    // Target 2 tiles away (13, 5)
-    engine.grid[5][13] = { type: MiningTileType.EMPTY, revealed: true };
-    const placedTooFar = engine.placeTorch('char-1', { x: 13, y: 5 });
+    // Target 8 tiles away (18, 5): well past the 3.7 reach
+    engine.grid[5][18] = { type: MiningTileType.EMPTY, revealed: true };
+    const placedTooFar = engine.placeTorch('char-1', { x: 18, y: 5 });
     expect(placedTooFar).toBe(false);
-    expect(engine.grid[5][13].type).toBe(MiningTileType.EMPTY);
+    expect(engine.grid[5][18].type).toBe(MiningTileType.EMPTY);
   });
 
   it('allows torch placement when player is on the edge of a block to reach adjacent block', () => {
@@ -666,7 +676,7 @@ describe('MiningGameEngine', () => {
 
     // Player standing on the far right edge of tile 10 (x = 10.8, y = 5.5)
     engine.getPlayer('char-1')!.playerBody.position = { x: 10.8, y: 5.5 };
-    engine.grid[5][9] = { type: MiningTileType.EMPTY, revealed: true };
+    for (let y = 3; y <= 8; y++) for (let x = 6; x <= 12; x++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
 
     // Placing on tile 9 (immediately to the left of tile 10)
     const placed = engine.placeTorch('char-1', { x: 9, y: 5 });
@@ -1049,6 +1059,9 @@ describe('MiningGameEngine', () => {
       }));
 
       engine.grid[2][5] = { type: MiningTileType.CHEST, revealed: true };
+      // Open air under the block, so the item (one tile across) has room to fall
+      engine.grid[3][5] = { type: MiningTileType.EMPTY, revealed: true };
+      engine.rigidWorld.removeTileCollider(5, 3);
       engine.blockSubsystem.completeMiningBlock({ x: 5, y: 2 });
 
       expect(engine.droppedItems).toHaveLength(1);
@@ -1095,6 +1108,9 @@ describe('MiningGameEngine', () => {
       }));
 
       engine.grid[2][5] = { type: MiningTileType.ROCK, revealed: true };
+      // Open air under the block, so the item (one tile across) has room to fall
+      engine.grid[3][5] = { type: MiningTileType.EMPTY, revealed: true };
+      engine.rigidWorld.removeTileCollider(5, 3);
       engine.blockSubsystem.completeMiningBlock({ x: 5, y: 2 });
 
       expect(engine.droppedItems).toHaveLength(1);
@@ -1359,18 +1375,25 @@ describe('MiningGameEngine', () => {
         socket: mockSocket,
       });
 
-      for (let y = 6; y <= 10; y++) {
-        for (let x = 6; x <= 16; x++) {
+      // A cave (rows 0..13 open over a floor on row 14) wide enough for the whole scene
+      const FLOOR = 14;
+      for (let y = 0; y < FLOOR; y++) {
+        for (let x = 3; x <= 40; x++) {
           engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
         }
       }
+      for (let x = 3; x <= 40; x++) engine.grid[FLOOR][x] = { type: MiningTileType.DIRT, revealed: true };
 
       const session = (engine as any).players.get('char-1');
-      session.playerBody.position = { x: 10, y: 10 };
+      const px = 20;
+      const py = FLOOR - session.playerBody.halfHeight;
+      session.playerBody.position = { x: px, y: py };
+      session.playerBody.isGrounded = true;
 
-      const near = engine.spawnMob({ id: 'mob_near', name: 'Mole Person', health: 40 }, { x: 11.2, y: 10 });
-      const far = engine.spawnMob({ id: 'mob_far', name: 'Mole Person', health: 40 }, { x: 14, y: 10 });
-      const above = engine.spawnMob({ id: 'mob_above', name: 'Mole Person', health: 40 }, { x: 10, y: 8.5 });
+      const reach = MINING_CONFIG.MELEE_WEAPON_OFFSET; // how far in front of the shoulder the weapon is
+      const near = engine.spawnMob({ id: 'mob_near', name: 'Mole Person', health: 40 }, { x: px + reach + 1, y: FLOOR });
+      const far = engine.spawnMob({ id: 'mob_far', name: 'Mole Person', health: 40 }, { x: px + 4 * reach + 4, y: FLOOR });
+      const above = engine.spawnMob({ id: 'mob_above', name: 'Mole Person', health: 40 }, { x: px, y: FLOOR - 12 });
 
       // Swing to the right: only the mob next to the weapon is struck
       session.inputs = { miningKey: true, isFacingLeft: false };
@@ -1385,7 +1408,9 @@ describe('MiningGameEngine', () => {
       // Swing straight up (after cooldown): the weapon moves with the aim direction
       session.swingCooldown = 0;
       session.aimDirection = { x: 0, y: -1 };
-      above.mobBody.position = { x: 10, y: 8.8 };
+      // (hanging in the air just above the player's head, where the weapon is)
+      above.mobBody.hasGravity = false;
+      above.mobBody.position = { x: px, y: py - session.playerBody.halfHeight - above.mobBody.halfHeight - 0.5 };
       (engine as any).tick(0.033);
 
       expect(above.health).toBeLessThan(40);
@@ -1445,10 +1470,10 @@ describe('MiningGameEngine', () => {
       const session = (engine as any).players.get('char-1');
       session.playerBody.position = { x: 10, y: 10 };
 
-      // Mob is to the right at x=11.5, y=10
+      // Mob is to the right at x=13 (just outside the weapon's reach), y=10
       const mob = engine.spawnMob(
         { id: 'mob_right', name: 'Mole Person', health: 40 },
-        { x: 11.5, y: 10 }
+        { x: 13, y: 10 }
       );
 
       // Player points directly upward and swings
@@ -1469,23 +1494,28 @@ describe('MiningGameEngine', () => {
         socket: mockSocket,
       });
 
-      // Player is at (10, 10.5)
+      // A cave (rows 0..13 open over a floor on row 14)
+      const FLOOR = 14;
+      for (let y = 0; y < FLOOR; y++) for (let x = 3; x <= 40; x++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
+      for (let x = 3; x <= 40; x++) engine.grid[FLOOR][x] = { type: MiningTileType.DIRT, revealed: true };
+
       const session = (engine as any).players.get('char-1');
-      session.playerBody.position = { x: 10, y: 10.5 };
+      session.playerBody.position = { x: 20, y: FLOOR - session.playerBody.halfHeight };
+      session.playerBody.isGrounded = true;
 
-      // Set solid DIRT block at (11, 10) in front of player
-      engine.grid[10][11] = { type: MiningTileType.DIRT, revealed: true };
+      // A solid DIRT wall (x = 23, four cells high) in front of the player
+      for (let y = FLOOR - 4; y < FLOOR; y++) engine.grid[y][23] = { type: MiningTileType.DIRT, revealed: true };
 
-      // Mob is behind the solid block at (12.2, 10.5)
+      // Mob is behind the wall, within the weapon's reach
       const mob = engine.spawnMob(
         { id: 'mob_behind_wall', name: 'Mole Person', health: 50 },
-        { x: 12.2, y: 10.5 }
+        { x: 25.5, y: FLOOR }
       );
 
-      // Player is mining the solid dirt block at (11, 10)
+      // Player is mining the wall
       session.inputs = {
         miningKey: true,
-        miningTarget: { x: 11, y: 10 },
+        miningTarget: { x: 23, y: FLOOR - 2 }, preciseMining: true,
       };
       session.aimDirection = { x: 1, y: 0 };
 
@@ -1495,7 +1525,7 @@ describe('MiningGameEngine', () => {
       expect(mob.health).toBe(50);
     });
 
-    it('hits an adjacent mob regardless of cursor distance, but not mobs ~2 tiles away', () => {
+    it('hits an adjacent mob regardless of cursor distance, but not mobs ~5 tiles away', () => {
       const engine = new MiningGameEngine({
         characterId: 'char-1',
         cityId: 'city-1',
@@ -1504,27 +1534,27 @@ describe('MiningGameEngine', () => {
         mapConfig: { mobSpawnCount: 0 },
       });
 
-      for (let y = 8; y <= 10; y++) {
-        for (let x = 8; x <= 16; x++) {
+      for (let y = 7; y <= 10; y++) {
+        for (let x = 8; x <= 17; x++) {
           engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
         }
       }
-      for (let x = 8; x <= 16; x++) {
+      for (let x = 8; x <= 17; x++) {
         engine.grid[11][x] = { type: MiningTileType.DIRT, revealed: true };
       }
 
       const session = (engine as any).players.get('char-1');
-      session.playerBody.position = { x: 10, y: 10.5 };
+      session.playerBody.position = { x: 10, y: 11 - session.playerBody.halfHeight };
       session.playerBody.velocity = { x: 0, y: 0 };
       session.playerBody.isGrounded = true;
 
       const near = engine.spawnMob(
         { id: 'mob_near', name: 'Mole Person', health: 50, moveSpeed: 0 },
-        { x: 11.2, y: 10.5 }
+        { x: 12.4, y: 11 }
       );
       const far = engine.spawnMob(
         { id: 'mob_far', name: 'Mole Person', health: 50, moveSpeed: 0 },
-        { x: 12.6, y: 10.5 }
+        { x: 15.2, y: 11 }
       );
 
       // Weapon points right; the hit box follows the weapon, not the cursor distance
@@ -1696,25 +1726,25 @@ describe('MiningGameEngine', () => {
         mapConfig: { mobSpawnCount: 0 },
       });
 
-      // Carve out an open cavern corridor at y=10 with floor at y=11
+      // Carve out an open cavern corridor (rows 8..10, tall enough for the 1.75 tile player) with floor at y=11
       for (let x = 8; x <= 16; x++) {
-        engine.grid[10][x] = { type: MiningTileType.EMPTY, revealed: true };
+        for (let y = 8; y <= 10; y++) engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
         engine.grid[11][x] = { type: MiningTileType.DIRT, revealed: true };
       }
 
-      // Position player at (10, 10.5) and ensure grounded stance
-      engine.getPlayer('char-1')!.playerBody.position = { x: 10, y: 10.5 };
+      // Position player standing on the floor (row 11) and ensure grounded stance
+      engine.getPlayer('char-1')!.playerBody.position = { x: 10, y: 11 - engine.getPlayer('char-1')!.playerBody.halfHeight };
       engine.getPlayer('char-1')!.playerBody.velocity = { x: 0, y: 0 };
       engine.getPlayer('char-1')!.playerBody.isGrounded = true;
 
-      // Spawn mob right next to player at (10.8, 10.5)
+      // Spawn mob right next to player (their bodies just touch), feet on the floor
       const mob = engine.spawnMob(
         {
           id: 'mob_close',
           name: 'Mole Person',
           health: 50,
         },
-        { x: 10.8, y: 10.5 }
+        { x: 11.4, y: 11 }
       );
 
       // Player swings pickaxe with miningKey

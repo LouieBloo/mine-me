@@ -9,6 +9,12 @@ export interface ActiveFallingRock {
   angle?: number;
 }
 
+/** A dropped item or a stick of dynamite is drawn this many pixels across, whatever the block size. */
+const ITEM_SPRITE_PX = 32;
+
+/** A bullet sprite's size in pixels. */
+const BULLET_SPRITE_PX = { width: 35, height: 15 };
+
 export class MiningEntityRenderer {
   public static updateDroppedItems(
     droppedItemsContainer: Container,
@@ -33,7 +39,8 @@ export class MiningEntityRenderer {
       const existing = droppedSpritesMap.get(key);
 
       const itemScale = typeof item.inGameScale === 'number' && item.inGameScale > 0 ? item.inGameScale : 1.0;
-      const targetSize = tileSize * 0.5 * itemScale;
+      // A dropped item is drawn 32px across, whatever the block size
+      const targetSize = ITEM_SPRITE_PX * itemScale;
 
       if (existing) {
         existing.x = itemX;
@@ -175,7 +182,7 @@ export class MiningEntityRenderer {
       let view = dynamiteGraphicsMap.get(dynamite.id);
 
       const dynamiteScale = typeof dynamite.inGameScale === 'number' && dynamite.inGameScale > 0 ? dynamite.inGameScale : 1.0;
-      const targetSize = tileSize * 0.5 * dynamiteScale;
+      const targetSize = ITEM_SPRITE_PX * dynamiteScale;
 
       if (dynamiteTexture) {
         if (!view || !(view instanceof Sprite)) {
@@ -204,9 +211,9 @@ export class MiningEntityRenderer {
             view.destroy();
           }
           const graphics = new Graphics();
-          // Fallback matching the configured hotdog dimensions (32px x 10px in 64px tile space)
-          const w = (dynamite.physicsConfig?.colliderWidth ?? 32) * (tileSize / 64) * dynamiteScale;
-          const h = (dynamite.physicsConfig?.colliderHeight ?? 10) * (tileSize / 64) * dynamiteScale;
+          // Fallback matching the configured hotdog dimensions (32px x 10px: collider sizes are in pixels, whatever the tile size)
+          const w = (dynamite.physicsConfig?.colliderWidth ?? 32) * dynamiteScale;
+          const h = (dynamite.physicsConfig?.colliderHeight ?? 10) * dynamiteScale;
           graphics.roundRect(-w / 2, -h / 2, w, h, 2);
           graphics.fill(0xdc2626);
           graphics.rect(w / 2, -2 * dynamiteScale, 4 * dynamiteScale, 4 * dynamiteScale);
@@ -274,8 +281,8 @@ export class MiningEntityRenderer {
         if (bulletTexture) {
           const sprite = new Sprite(bulletTexture);
           sprite.anchor.set(0.5);
-          sprite.width = tileSize * 0.55;
-          sprite.height = tileSize * 0.24;
+          sprite.width = BULLET_SPRITE_PX.width;
+          sprite.height = BULLET_SPRITE_PX.height;
           sprite.x = 4;
           bulletCompound.addChild(sprite);
         } else {

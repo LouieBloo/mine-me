@@ -174,7 +174,7 @@ export class MiningRemotePlayerRenderer {
               await sprite.setGearLayers(gearLayers);
             }
 
-            const targetHeight = TILE_SIZE * 1.08;
+            const targetHeight = TILE_SIZE * MINING_CONFIG.CHARACTER_HEIGHT_TILES;
             sprite.scaleToHeight(targetHeight);
 
             const unscaledFootDepth = 426;

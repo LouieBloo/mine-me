@@ -1,5 +1,6 @@
 import * as planck from 'planck';
 import {
+  BLOCK_SCALE,
   MINING_CONFIG,
   MiningTileType,
   rollDropTable,
@@ -11,10 +12,24 @@ import {
 import type { MiningPlayerSession } from './MiningPlayerManager';
 import type { MiningWorld } from '../MiningWorld';
 
+/** How close (tiles, either axis) a player's centre must be to a dropped item to pick it up. */
+const PICKUP_REACH = 0.95 * BLOCK_SCALE;
+
+/**
+ * An item that moves slower than this (tiles/s) for REST_TICKS ticks in a row is put to sleep. Box2D would do it itself,
+ * but at the game's gravity (56) a body resting on a block keeps a steady push-out speed of about 0.3 and sinks about
+ * 0.02 tiles into it, which is past Box2D's own sleep limits, so every item would otherwise stay awake for ever. A
+ * sleeping body wakes by itself when anything it rests on is removed or something hits it.
+ */
+const REST_SPEED = 0.3 * BLOCK_SCALE;
+const REST_TICKS = 10;
+
 export class MiningDropSubsystem {
   public droppedItems: MiningDroppedItem[] = [];
   public activeItemBodies: Map<string, planck.Body> = new Map();
   public droppedItemCounter = 0;
+  /** For each item, how many ticks in a row it has hardly moved. */
+  private readonly restTicks = new Map<string, number>();
   public droppedItemsDirty: boolean = true;
   private lastLimitWarningAt = -Infinity;
   private pendingPickups: MiningItemPickupEvent[] = [];
@@ -64,14 +79,14 @@ export class MiningDropSubsystem {
       const id = `drop_${Date.now()}_${this.droppedItemCounter}_${idx}`;
       const itemData = this.world.data.getItemData(drop.itemId);
 
-      const posX = origin.x + (N > 1 ? (idx - (N - 1) / 2) * 0.25 : 0);
+      const posX = origin.x + (N > 1 ? (idx - (N - 1) / 2) * 0.25 * BLOCK_SCALE : 0);
       const posY = origin.y;
 
       const vx =
         N > 1
-          ? (idx - (N - 1) / 2) * 1.5 + (Math.random() - 0.5) * 0.4
-          : (Math.random() - 0.5) * 0.5;
-      const vy = N > 1 ? -2.2 - Math.random() * 1.0 : -1.8 - Math.random() * 0.6;
+          ? (idx - (N - 1) / 2) * 1.5 * BLOCK_SCALE + (Math.random() - 0.5) * 0.4 * BLOCK_SCALE
+          : (Math.random() - 0.5) * 0.5 * BLOCK_SCALE;
+      const vy = N > 1 ? (-2.2 - Math.random() * 1.0) * BLOCK_SCALE : (-1.8 - Math.random() * 0.6) * BLOCK_SCALE;
 
       const rigidBody = this.world.rigidWorld.createItemBody(id, { x: posX, y: posY }, { x: vx, y: vy });
       this.activeItemBodies.set(id, rigidBody);
@@ -117,12 +132,27 @@ export class MiningDropSubsystem {
         item.position.x = pos.x;
         item.position.y = pos.y;
         item.velocity = { x: vel.x, y: vel.y };
+        // (a body put to sleep stands still: report that, not the small speed it had a moment ago)
+        if (this.putToRestWhenStill(item.id, body, Math.hypot(vel.x, vel.y))) item.velocity = { x: 0, y: 0 };
       }
     }
 
     if (anyMoved) {
       this.droppedItemsDirty = true;
     }
+  }
+
+  /** Counts the ticks an item has been (nearly) still and lets its body sleep once it has been for REST_TICKS in a row. True when it just went to sleep. */
+  private putToRestWhenStill(id: string, body: planck.Body, speed: number): boolean {
+    if (!body.isAwake()) {
+      this.restTicks.set(id, 0); // asleep; if it is woken it has to be still for a while again before it sleeps
+      return false;
+    }
+    const still = speed < REST_SPEED ? (this.restTicks.get(id) ?? 0) + 1 : 0;
+    this.restTicks.set(id, still);
+    if (still < REST_TICKS) return false;
+    body.setAwake(false);
+    return true;
   }
 
   public checkItemPickupsForPlayer(session: MiningPlayerSession): void {
@@ -137,7 +167,7 @@ export class MiningDropSubsystem {
       const dy = Math.abs(item.position.y - playerPos.y);
 
       // AABB overlap check for pickup
-      if (dx <= 0.95 && dy <= 0.95) {
+      if (dx <= PICKUP_REACH && dy <= PICKUP_REACH) {
         // Collect into player temporaryBackpack
         const existing = session.temporaryBackpack.find((b) => b.itemId === item.itemId);
         if (existing) {
@@ -160,6 +190,7 @@ export class MiningDropSubsystem {
           if (body) {
             this.world.rigidWorld.destroyBody(body);
             this.activeItemBodies.delete(item.id);
+            this.restTicks.delete(item.id);
           }
         }
       } else {

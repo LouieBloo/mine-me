@@ -93,7 +93,7 @@ describe('handlers: race & failure behaviour', () => {
     const socket = mkSocket('race-ladder');
     const engine = miningSessionManager.createSession('race-ladder', 'city', socket, true);
     engine.getPlayer('race-ladder')!.playerBody.position = { x: 10.5, y: 5.5 };
-    engine.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
+    for (let gy = 2; gy <= 9; gy++) for (let gx = 8; gx <= 16; gx++) engine.grid[gy][gx] = { type: MiningTileType.EMPTY, revealed: true }; // room for a 3x3 piece
     inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'ladder-id', quantity: 1, item: { subType: 'LADDER' } });
     inv.updateMany.mockResolvedValue({ count: 0 });
 
@@ -122,7 +122,7 @@ describe('handlers: race & failure behaviour', () => {
     const socket = mkSocket('refund-torch');
     const engine = miningSessionManager.createSession('refund-torch', 'city', socket, true);
     engine.getPlayer('refund-torch')!.playerBody.position = { x: 10.5, y: 5.5 };
-    engine.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
+    for (let gy = 2; gy <= 9; gy++) for (let gx = 8; gx <= 16; gx++) engine.grid[gy][gx] = { type: MiningTileType.EMPTY, revealed: true }; // room for a 3x3 piece
     inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'torch-id', quantity: 1, item: { subType: 'TORCH' } });
     vi.spyOn(engine, 'placeTorch').mockReturnValue(false);
 
@@ -149,14 +149,14 @@ describe('handlers: race & failure behaviour', () => {
     const socket = mkSocket('ok-bridge');
     const engine = miningSessionManager.createSession('ok-bridge', 'city', socket, true);
     engine.getPlayer('ok-bridge')!.playerBody.position = { x: 10.5, y: 5.5 };
-    engine.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
+    for (let gy = 2; gy <= 9; gy++) for (let gx = 8; gx <= 16; gx++) engine.grid[gy][gx] = { type: MiningTileType.EMPTY, revealed: true }; // room for a 3x3 piece
     inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'bridge-id', quantity: 1, item: { subType: 'BRIDGE' } });
 
-    const res = await handleMiningPlaceBridge(io, socket, { target: { x: 11, y: 5 } });
+    const res = await handleMiningPlaceBridge(io, socket, { target: { x: 13, y: 5 } });
 
     expect(res.success).toBe(true);
     expect(inv.findFirst.mock.calls[0][0].where.item).toEqual({ subType: { equals: 'BRIDGE', mode: 'insensitive' } });
-    expect(engine.grid[5][11].type).toBe(MiningTileType.BRIDGE);
+    expect(engine.grid[5][13].type).toBe(MiningTileType.BRIDGE);
     expect(inv.updateMany).toHaveBeenCalledTimes(1); // consumed once
     miningSessionManager.cancelSession('ok-bridge');
   });
@@ -169,11 +169,11 @@ describe('handlers: race & failure behaviour', () => {
     expect(inv.findFirst).not.toHaveBeenCalled();
 
     inv.findFirst.mockResolvedValue(null);
-    expect(await handleMiningPlaceBridge(io, socket, { target: { x: 11, y: 5 } })).toEqual({ success: false, error: 'You do not have a bridge to place.' });
+    expect(await handleMiningPlaceBridge(io, socket, { target: { x: 13, y: 5 } })).toEqual({ success: false, error: 'You do not have a bridge to place.' });
 
     inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'bridge-id', quantity: 1, item: { subType: 'BRIDGE' } });
-    engine.grid[5][11] = { type: MiningTileType.DIRT, revealed: true };
-    expect((await handleMiningPlaceBridge(io, socket, { target: { x: 11, y: 5 } })).success).toBe(false);
+    engine.grid[5][13] = { type: MiningTileType.DIRT, revealed: true };
+    expect((await handleMiningPlaceBridge(io, socket, { target: { x: 13, y: 5 } })).success).toBe(false);
     expect(inv.updateMany).not.toHaveBeenCalled();
     miningSessionManager.cancelSession('bad-bridge');
   });
@@ -182,11 +182,11 @@ describe('handlers: race & failure behaviour', () => {
     const socket = mkSocket('refund-bridge');
     const engine = miningSessionManager.createSession('refund-bridge', 'city', socket, true);
     engine.getPlayer('refund-bridge')!.playerBody.position = { x: 10.5, y: 5.5 };
-    engine.grid[5][11] = { type: MiningTileType.EMPTY, revealed: true };
+    for (let gy = 2; gy <= 9; gy++) for (let gx = 8; gx <= 16; gx++) engine.grid[gy][gx] = { type: MiningTileType.EMPTY, revealed: true }; // room for a 3x3 piece
     inv.findFirst.mockResolvedValue({ id: 'row', itemId: 'bridge-id', quantity: 1, item: { subType: 'BRIDGE' } });
     vi.spyOn(engine, 'placeBridge').mockReturnValue(false);
 
-    const res = await handleMiningPlaceBridge(io, socket, { target: { x: 11, y: 5 } });
+    const res = await handleMiningPlaceBridge(io, socket, { target: { x: 13, y: 5 } });
 
     expect(res.success).toBe(false);
     expect(inv.updateMany).toHaveBeenCalledWith({ where: { characterId: 'refund-bridge', itemId: 'bridge-id' }, data: { quantity: { increment: 1 } } });

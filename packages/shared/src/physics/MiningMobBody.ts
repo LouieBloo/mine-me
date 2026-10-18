@@ -26,8 +26,8 @@ export class MiningMobBody extends MiningPhysicsBody {
   public collisionX: boolean = false;
 
   constructor(options: MiningMobBodyOptions) {
-    const colliderWidth = options.width ?? (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE);
-    const colliderHeight = options.height ?? (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE);
+    const colliderWidth = options.width ?? MINING_CONFIG.PLAYER_COLLIDER_WIDTH_TILES;
+    const colliderHeight = options.height ?? MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES;
 
     super({
       position: options.position,
@@ -38,9 +38,9 @@ export class MiningMobBody extends MiningPhysicsBody {
       mass: options.mass ?? 1.0,
     });
 
-    this.moveSpeed = options.moveSpeed ?? 3.2;
-    this.jumpForce = options.jumpForce ?? 8.8;
-    this.climbSpeed = options.climbSpeed ?? 3.0;
+    this.moveSpeed = options.moveSpeed ?? MINING_CONFIG.MOB_DEFAULT_MOVE_SPEED;
+    this.jumpForce = options.jumpForce ?? MINING_CONFIG.MOB_DEFAULT_JUMP_FORCE;
+    this.climbSpeed = options.climbSpeed ?? MINING_CONFIG.MOB_DEFAULT_CLIMB_SPEED;
   }
 
   /**

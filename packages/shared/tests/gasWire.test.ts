@@ -111,14 +111,15 @@ describe('a body in a gas', () => {
   });
 
   it('reads the gas it stands in, and clear air once the gas is gone, with no effect on its movement', () => {
-    gasGrid.setCell(3, 6, 1, 0.8);
+    // (the body is about two cells wide and nearly three tall, so the gas has to fill the cells around it)
+    for (let x = 2; x <= 4; x++) for (let y = 5; y <= 6; y++) gasGrid.setCell(x, y, 1, 0.8);
     const body = new MiningPlayerBody({ x: 3.5, y: 6.4 });
     body.gasEnvironment = environment;
     body.update(1 / 30, grid as any);
     expect(body.gasContact?.gasId).toBe(1);
     expect(body.gasContact?.concentration).toBeGreaterThan(0.3);
     expect(body.movementFactor).toBe(1);
-    gasGrid.setCell(3, 6, 0, 0);
+    for (let x = 2; x <= 4; x++) for (let y = 5; y <= 6; y++) gasGrid.setCell(x, y, 0, 0);
     body.update(1 / 30, grid as any);
     expect(body.gasContact).toBeNull();
   });

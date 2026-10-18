@@ -1,8 +1,9 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { MiningPhysicsBody, type MiningCollisionGrid } from './MiningPhysicsBody';
 import { type Vector2D, MINING_CONFIG, raycastSolidTiles, getGridDimensions } from '@mine-me/shared';
 
 /** A bullet does not hit the tiles right at its muzzle, so a shooter pressed against a wall can still fire. */
-const MUZZLE_CLEARANCE = 0.35;
+const MUZZLE_CLEARANCE = 0.35 * BLOCK_SCALE;
 
 export interface ProjectileEntityOptions {
   /** Fraction of world gravity applied to the bullet (0 = flies straight). */
@@ -40,7 +41,7 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
   /** Where the bullet was at the start of its last update; with `position` it is the segment it swept. */
   public previousPosition: Vector2D;
   /** Collision radius of the bullet itself when tested against mobs. */
-  public readonly hitRadius = 0.12;
+  public readonly hitRadius = 0.12 * BLOCK_SCALE;
   public hitTile?: { x: number; y: number };
   public hitMobId?: string;
   /** Mobs already damaged by this bullet; a piercing bullet never hits the same one twice. */
@@ -74,7 +75,7 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
   ) {
     super({
       position: { ...initialPosition },
-      radius: 0.15,
+      radius: 0.15 * BLOCK_SCALE,
       hasGravity: (options?.gravityScale ?? 0) > 0,
       gravityScale: options?.gravityScale ?? 0,
       mass: 0.2,

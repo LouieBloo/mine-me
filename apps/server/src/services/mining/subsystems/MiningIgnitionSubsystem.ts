@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { MiningTileType, isTileSolid, type DamageEvent, type Flammability } from '@mine-me/shared';
 import { isInBounds } from '../../miningMap.service';
 import { getIgnitionStrength, ignitionChance } from '../ignition';
@@ -13,12 +14,12 @@ export interface IgnitedCell {
 /** Radius (tiles) of the sparks from a tool or bullet hitting something: the cell hit and the ones touching it. */
 const HIT_IGNITION_RADIUS = 1.01;
 
-/** Radius (tiles) a placed torch reaches: the cell it is in and the ones touching it. */
 /** How far an igniting fluid's sparks reach from the middle of a cell of it (its neighbours, diagonals too). */
 export const FLUID_IGNITION_RADIUS = 1.5;
-const TORCH_IGNITION_RADIUS = 1.01;
+/** Radius (tiles) a placed torch reaches from its middle cell: its whole piece and the cells touching it. */
+const TORCH_IGNITION_RADIUS = BLOCK_SCALE / 2 + 1.01;
 /** Radius (tiles) around a player's centre that a carried item reaches: the cells their body is in. */
-const HELD_IGNITION_RADIUS = 0.9;
+const HELD_IGNITION_RADIUS = 0.9 * BLOCK_SCALE;
 
 /**
  * Where fire starts. Anything that emits sparks (an item with the Ignites effect striking, shooting or

@@ -1,4 +1,4 @@
-import type { MiningInputState, Vector2D } from '../types/mining';
+import { BLOCK_SCALE, type MiningInputState, type Vector2D } from '../types/mining';
 import type { MiningCollisionGrid } from './MiningPhysicsBody';
 import type { MiningPlayerBody } from './MiningPlayerBody';
 
@@ -133,9 +133,9 @@ export class PlayerPredictor {
     this.body = body;
     this.fixedDt = options.fixedDt ?? 1 / 30;
     this.historySteps = options.historySteps ?? 180;
-    this.positionTolerance = options.positionTolerance ?? 0.02;
-    this.velocityTolerance = options.velocityTolerance ?? 0.25;
-    this.snapDistance = options.snapDistance ?? 1.5;
+    this.positionTolerance = options.positionTolerance ?? 0.02 * BLOCK_SCALE;
+    this.velocityTolerance = options.velocityTolerance ?? 0.25 * BLOCK_SCALE;
+    this.snapDistance = options.snapDistance ?? 1.5 * BLOCK_SCALE;
     this.input = { ...initialInput };
     this.firstStepOfSequence.set(this.input.sequence, 1);
   }
@@ -195,7 +195,8 @@ export class PlayerPredictor {
     const saved = snapshotPlayerBody(this.body);
     this.body.processInputs(this.input, grid);
     this.body.update(seconds, grid);
-    const moved = { x: this.body.position.x - saved.x, y: this.body.position.y - saved.y };
+    // (a step up is eased by the render offset when the step really runs, so it is left out of the look-ahead)
+    const moved = { x: this.body.position.x - saved.x, y: this.body.position.y - saved.y + this.body.stepUpLift };
     restorePlayerBody(this.body, saved);
     return moved;
   }
@@ -270,6 +271,8 @@ export class PlayerPredictor {
     this.pendingImpulses = [];
     this.body.processInputs(this.input, grid);
     this.body.update(this.fixedDt, grid);
+    // Stepping up a ledge moves the body at once; the drawn player eases up it instead of popping
+    if (this.body.stepUpLift > 0) this.renderOffset.y += this.body.stepUpLift;
     this.stepCount++;
     this.records.push({ step: this.stepCount, input: this.input, impulses, after: snapshotPlayerBody(this.body) });
     if (this.records.length > this.historySteps) this.records.shift();

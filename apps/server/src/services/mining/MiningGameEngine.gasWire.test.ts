@@ -32,7 +32,7 @@ describe('gases on the wire', () => {
         setTile(x, y, open ? MiningTileType.EMPTY : MiningTileType.DIRT, false);
       }
     }
-    engine.players.get(cid)!.playerBody.position = { x: 5.5, y: 5.5 };
+    engine.players.get(cid)!.playerBody.position = { x: 130.5, y: 5.5 };
   });
 
   it('never sends gas in cells the fog of war has not revealed', () => {
@@ -44,6 +44,7 @@ describe('gases on the wire', () => {
   it('sends changed cells once they are revealed, as [x, y, gasId, concentration]', () => {
     for (let x = 30; x <= 34; x++) engine.grid[30][x].revealed = true;
     engine.gasSubsystem.placeGas(32, 30, 'HYDROGEN');
+    vi.spyOn(engine.gasSubsystem, 'update').mockImplementation(() => {}); // (the wire format of the placed cell, before it starts to spread)
     tick(1);
     expect(lastTick().gasCells).toEqual([[32, 30, 1, quantizeGasConcentration(1)]]);
   });

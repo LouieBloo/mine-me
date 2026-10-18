@@ -1,0 +1,12 @@
+.performance-overlay {
+  user-select: text;
+  font-variant-numeric: tabular-nums;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+.performance-overlay-bar {
+  height: 3px;
+  background: #38bdf8;
+  border-radius: 2px;
+}

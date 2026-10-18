@@ -1,3 +1,4 @@
+import { BLOCK_SCALE } from '@mine-me/shared';
 import { Assets, Container, Graphics, Sprite } from 'pixi.js';
 import { FloatingTextManager, ModularEntitySprite } from '../../../../../components/game/sprites';
 import {
@@ -154,7 +155,7 @@ export class MiningMobRenderer {
         if (spriteUrl) {
           // Single-sprite entity (e.g. Target Dummy, static objects)
           const staticSprite = new Sprite();
-          const colPixelH = (mobData.colliderHeight ?? 1.25) * TILE_SIZE;
+          const colPixelH = (mobData.colliderHeight ?? MINING_CONFIG.MOB_DEFAULT_DRAW_COLLIDER_HEIGHT) * TILE_SIZE;
           staticSprite.anchor.set(0.5, 1.0);
           staticSprite.y = colPixelH / 2;
           staticSprite.visible = false;
@@ -191,7 +192,8 @@ export class MiningMobRenderer {
             .then((texture) => {
               if (!this.mobs.has(mobData.id)) return;
               staticSprite.texture = texture;
-              const targetHeight = (mobData.colliderHeight ?? 1.25) * TILE_SIZE * 1.05;
+              const targetHeight =
+                (mobData.colliderHeight ?? MINING_CONFIG.MOB_DEFAULT_DRAW_COLLIDER_HEIGHT) * TILE_SIZE * MINING_CONFIG.MOB_DRAW_HEIGHT_FACTOR;
               const texW = texture?.width || 64;
               const texH = texture?.height || 64;
               const aspectRatio = texW / texH;
@@ -244,7 +246,7 @@ export class MiningMobRenderer {
             .load()
             .then(() => {
               if (!this.mobs.has(mobData.id)) return;
-              const targetHeight = TILE_SIZE * 1.05;
+              const targetHeight = MINING_CONFIG.MOB_DEFAULT_DRAW_COLLIDER_HEIGHT * TILE_SIZE * MINING_CONFIG.MOB_DRAW_HEIGHT_FACTOR;
               sprite.scaleToHeight(targetHeight);
 
               const unscaledFootDepth = 426;
@@ -286,7 +288,7 @@ export class MiningMobRenderer {
           // Spawn floating damage text via standardized FloatingTextManager
           if (this.floatingTextManager) {
             const spawnX = instance.currentPos.x * TILE_SIZE;
-            const spawnY = (instance.currentPos.y - 0.7) * TILE_SIZE;
+            const spawnY = (instance.currentPos.y - 0.7 * BLOCK_SCALE) * TILE_SIZE;
             this.floatingTextManager.spawnDamage(spawnX, spawnY, damageTaken);
           }
 
@@ -415,8 +417,8 @@ export class MiningMobRenderer {
    * Render debug hitboxes, collision boxes, and reach indicators for all active mobs.
    */
   public renderDebugHitboxes(debugGraphics: Graphics, tileSize: number = TILE_SIZE): void {
-    const defaultW = (MINING_CONFIG.PLAYER_COLLIDER_WIDTH / MINING_CONFIG.TILE_SIZE) * tileSize;
-    const defaultH = (MINING_CONFIG.PLAYER_COLLIDER_HEIGHT / MINING_CONFIG.TILE_SIZE) * tileSize;
+    const defaultW = MINING_CONFIG.PLAYER_COLLIDER_WIDTH_TILES * tileSize;
+    const defaultH = MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES * tileSize;
 
     for (const instance of this.mobs.values()) {
       const colliderPixelW = instance.colliderWidth ? instance.colliderWidth * tileSize : defaultW;

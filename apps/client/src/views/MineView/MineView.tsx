@@ -9,7 +9,7 @@ import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
 import { MiningLoadingScreen } from './components/MiningLoadingScreen/MiningLoadingScreen';
 import { notificationService } from '../../services/notificationService';
-import { type MiningBackpackItem, type MiningGameMode, MINING_CONFIG } from '@mine-me/shared';
+import { type MiningBackpackItem, type MiningGameMode, isOnEntrance } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
 import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
 import { ExpeditionModeModal } from './components/ExpeditionModeModal/ExpeditionModeModal';
@@ -223,7 +223,7 @@ export const MineView: React.FC = () => {
   useEffect(() => {
     // (the sandbox has no exit ladder to confirm: it has a Leave button)
     if (!miningSession || miningSession.gameMode === 'sandbox') return;
-    const isAtEntrance = miningSession.position.x === MINING_CONFIG.ENTRANCE_X && miningSession.position.y === MINING_CONFIG.ENTRANCE_Y;
+    const isAtEntrance = isOnEntrance(miningSession.position.x, miningSession.position.y);
     if (!isAtEntrance) {
       setHasMovedOffEntrance(true);
     } else if (hasMovedOffEntrance && isAtEntrance) {

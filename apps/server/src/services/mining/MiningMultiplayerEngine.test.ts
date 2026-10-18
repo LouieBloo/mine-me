@@ -151,6 +151,7 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
       right: false,
       miningKey: true,
       miningTarget: target,
+      preciseMining: true,
       sequence: 1,
     });
 
@@ -161,6 +162,7 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
       right: false,
       miningKey: true,
       miningTarget: target,
+      preciseMining: true,
       sequence: 1,
     });
 
