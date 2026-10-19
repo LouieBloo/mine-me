@@ -10,6 +10,7 @@ import {
   findPieceAnchor,
   selectMiningTargets,
   getTileFootprint,
+  pieceFootprint,
   pieceAnchorOf,
   pieceCells,
   pieceCentre,
@@ -64,9 +65,6 @@ export class MiningBlockSubsystem {
     const playerSpeed =
       typeof session.miningSpeed === 'function' ? session.miningSpeed() : session.miningSpeed;
     if (playerSpeed <= 0) return false;
-
-    const canMineStance = session.playerBody.isGrounded || session.playerBody.isOnLadder;
-    if (!canMineStance) return false;
 
     const tile = grid[target.y][target.x];
     if (!isTileMineable(tile.type)) return false;
@@ -218,7 +216,7 @@ export class MiningBlockSubsystem {
     const tile = this.world.grid[y]?.[x];
     if (!tile?.piece) return [];
     const anchor = pieceAnchorOf(x, y, tile.piece);
-    return pieceCells(anchor, getTileFootprint(tile.type))
+    return pieceCells(anchor, pieceFootprint(tile.type, tile.piece))
       .filter((c) => (c.x !== x || c.y !== y) && this.world.grid[c.y]?.[c.x]?.type === tile.type)
       .filter((c) => {
         const other = this.world.grid[c.y][c.x].piece;
@@ -267,7 +265,6 @@ export class MiningBlockSubsystem {
 
     // 1. Validate & trigger mining actions for each player
     for (const session of playerList) {
-      const canMineStance = session.playerBody.isGrounded || session.playerBody.isOnLadder;
       // The client sends the cell under its cursor; which block that means is decided here, by the same rule the
       // client's reticle uses (see selectMiningTargets): the next block along the line toward the cursor, or the
       // cursor's own block while Ctrl is held
@@ -286,12 +283,12 @@ export class MiningBlockSubsystem {
         const dy = Math.abs(tileCenterY - session.playerBody.position.y);
         const inReach = isWithinMiningReach(dx, dy);
 
-        if (!isTargeting || !isSameTarget || !canMineStance || !inReach) {
+        if (!isTargeting || !isSameTarget || !inReach) {
           this.stopMining(session);
         }
       }
 
-      if (!session.isMining && isTargeting && target && canMineStance && playerSpeed > 0) {
+      if (!session.isMining && isTargeting && target && playerSpeed > 0) {
         if (isInBounds(target.x, target.y, this.world.grid)) {
           const tile = grid[target.y][target.x];
           if (isTileMineable(tile.type)) {

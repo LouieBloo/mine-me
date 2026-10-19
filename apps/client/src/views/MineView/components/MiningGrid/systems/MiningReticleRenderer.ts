@@ -4,11 +4,9 @@ import type { MiningPosition } from '@mine-me/shared';
 import type { MiningMouseController } from '../input/MiningMouseController';
 import { MiningTileRenderer, TILE_SIZE } from '../renderers/MiningTileRenderer';
 
-/**
- * Whether the pickaxe's whole queue of lined-up blocks is highlighted. Off for now: only the block under the
- * cursor is. The queue is still worked out and kept on the reticle style, so turning this on is all it takes.
- */
-export const SHOW_MINING_QUEUE_PREVIEW = false;
+/** The faint white square drawn over each block the pickaxe has lined up besides the one under the cursor. */
+export const QUEUED_BLOCK_COLOR = 0xffffff;
+export const QUEUED_BLOCK_ALPHA = 0.12;
 
 export interface MiningReticleContext {
   reticleGraphics: Graphics | null;
@@ -104,24 +102,14 @@ export class MiningReticleRenderer {
       reticleGraphics.beginPath();
       reticleGraphics.circle(rx, ry, 2);
       reticleGraphics.fill({ color: aimColor, alpha: aimAlpha });
-    } else if (SHOW_MINING_QUEUE_PREVIEW && reticleState.style.miningQueue) {
-      // A pickaxe's reticle: every block lined up, the one being mined first and brightest
-      const queue = reticleState.style.miningQueue;
-      queue.forEach((cell, index) => {
-        const qx = cell.x * TILE_SIZE;
-        const qy = cell.y * TILE_SIZE;
-        reticleGraphics.rect(qx, qy, TILE_SIZE, TILE_SIZE);
-        reticleGraphics.fill({ color: reticleState.style!.color, alpha: reticleState.style!.alpha + (index === 0 ? 0.12 : 0) });
-        reticleGraphics.stroke({ width: index === 0 ? 2 : 1, color: reticleState.style!.strokeColor, alpha: index === 0 ? 0.95 : 0.5 });
-      });
-      const head = queue[0];
-      const isMiningHead = isMining && miningTarget && head && miningTarget.x === head.x && miningTarget.y === head.y;
-      if (isMiningHead) {
-        const pulse = 0.5 + Math.sin(animTime * 15) * 0.5;
-        reticleGraphics.rect(head.x * TILE_SIZE + 3, head.y * TILE_SIZE + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-        reticleGraphics.stroke({ width: 1.5, color: 0xf59e0b, alpha: 0.4 + pulse * 0.5 });
-      }
     } else {
+      // The blocks lined up behind the cursor's block (auto targeting) get a light white square; the cursor's own block keeps its normal look
+      for (const cell of reticleState.style.miningQueue ?? []) {
+        if (cell.x === reticleState.target.x && cell.y === reticleState.target.y) continue;
+        reticleGraphics.rect(cell.x * TILE_SIZE, cell.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        reticleGraphics.fill({ color: QUEUED_BLOCK_COLOR, alpha: QUEUED_BLOCK_ALPHA });
+      }
+
       // A multi-cell placement's reticle covers the whole piece, wherever it was nudged to
       const area = reticleState.style.pieceArea;
       const px = area ? area.x * TILE_SIZE : rx;

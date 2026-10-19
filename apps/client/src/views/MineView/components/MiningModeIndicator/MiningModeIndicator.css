@@ -1,0 +1,7 @@
+.mining-mode-indicator {
+  position: absolute;
+  left: 1.5rem;
+  bottom: 1.5rem;
+  pointer-events: auto;
+  user-select: none;
+}

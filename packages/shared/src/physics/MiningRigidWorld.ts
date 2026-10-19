@@ -31,6 +31,9 @@ export interface DynamiteBodyOptions {
 }
 
 export interface RockBodyOptions {
+  /** Cells wide and high (1 x 1 when omitted). A rock bigger than one cell is a box that never spins or rolls. */
+  width?: number;
+  height?: number;
   gravityScale?: number;
   restitution?: number;
   friction?: number;
@@ -293,20 +296,25 @@ export class MiningRigidWorld {
     position: Vector2D,
     options?: RockBodyOptions
   ): planck.Body {
+    const width = options?.width ?? 1;
+    const height = options?.height ?? 1;
+    const isBig = width > 1 || height > 1;
     const body = this.world.createBody({
       type: 'dynamic',
       position: planck.Vec2(position.x, position.y),
       linearVelocity: planck.Vec2(0, 0),
-      angularVelocity: (Math.random() - 0.5) * 2.0,
+      angularVelocity: isBig ? 0 : (Math.random() - 0.5) * 2.0,
+      fixedRotation: isBig,
       bullet: true,
       gravityScale: options?.gravityScale ?? this.config.rockGravityScale,
       linearDamping: 0.1,
       angularDamping: 0.5,
     });
 
-    // Circle shape for rock rolling and falling
+    // A single cell is a circle (rolls and falls down a one-cell shaft); a bigger rock is a box, a little
+    // narrower than its footprint so it slips past the walls of the gap it falls through
     body.createFixture({
-      shape: planck.Circle(0.42),
+      shape: isBig ? planck.Box(width / 2 - 0.02, height / 2 - 0.02) : planck.Circle(0.42),
       density: options?.density ?? 4.0, // Heavy rock mass
       restitution: options?.restitution ?? this.config.rockRestitution,
       friction: options?.friction ?? 0.6,

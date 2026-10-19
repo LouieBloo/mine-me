@@ -13,6 +13,7 @@ vi.mock('../../../../../components/game/sprites', () => {
   class MockModularEntitySprite {
     load = vi.fn().mockResolvedValue(undefined);
     scaleToHeight = vi.fn();
+    getFootDepth = vi.fn().mockReturnValue(270);
     setPosition = vi.fn();
     setFlipped = vi.fn();
     setState = vi.fn();
@@ -93,6 +94,41 @@ describe('MiningMobRenderer', () => {
     expect(mario?.name).toBe('Mario');
     expect(mario?.isFacingLeft).toBe(true);
     expect(mario?.animationState).toBe('mine');
+  });
+
+  describe('standing on the ground', () => {
+    const TILE = 21;
+    const HEIGHT = 82.7; // how tall the sprite is drawn, px
+
+    it('puts the feet on the bottom of the collider: pelvis + feet depth (scaled) = half the collider height', () => {
+      for (const [footDepth, colliderTiles] of [[421, 2.67], [270, 2.67], [270, 3.75], [150, 1.2]] as const) {
+        const pelvis = MiningMobRenderer.pelvisY(footDepth, HEIGHT, colliderTiles);
+        const feet = pelvis + footDepth * (HEIGHT / 880);
+        // a pixel of sink, no more
+        expect(feet - (colliderTiles / 2) * TILE).toBeCloseTo(1, 5);
+      }
+    });
+
+    it('a rig with shorter legs hangs lower from the pelvis than one with long legs, so the feet still reach the ground', () => {
+      expect(MiningMobRenderer.pelvisY(270, HEIGHT, 2.67)).toBeGreaterThan(MiningMobRenderer.pelvisY(421, HEIGHT, 2.67));
+    });
+
+    it('uses the player-sized collider when the mob does not say', () => {
+      expect(MiningMobRenderer.pelvisY(270, HEIGHT, undefined)).toBeCloseTo(MiningMobRenderer.pelvisY(270, HEIGHT, 56 / 21));
+    });
+
+    it('plants a loaded skeletal mob using its own rig depth and its own collider height', async () => {
+      const mob: MiningActiveMob = {
+        id: 'mole', mobId: 'cmn_mole_person_001', name: 'Mole Person', position: { x: 5, y: 10 }, velocity: { x: 0, y: 0 },
+        health: 40, maxHealth: 40, defense: 2, isFacingLeft: false, isMining: false, animationState: 'idle', colliderHeight: 2.67,
+      };
+      renderer.updateMobs([mob]);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const sprite = renderer.getMob('mole')!.sprite as any;
+      const drawn = 3.75 * TILE * 1.05;
+      expect(sprite.getFootDepth).toHaveBeenCalled();
+      expect(sprite.setPosition).toHaveBeenCalledWith(0, MiningMobRenderer.pelvisY(270, drawn, 2.67));
+    });
   });
 
   it('shows a killed mob in the death state with no health bar until the server removes it', () => {

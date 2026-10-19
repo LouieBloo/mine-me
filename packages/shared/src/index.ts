@@ -5,6 +5,7 @@ export * from './gameLogic/damage';
 export * from './gameLogic/dropTable';
 export * from './gameLogic/itemRoles';
 export * from './gameLogic/pieces';
+export * from './gameLogic/rockShapes';
 export * from './gameLogic/miningTargeting';
 export * from './gameLogic/combatStats';
 export * from './gameLogic/entityStats';

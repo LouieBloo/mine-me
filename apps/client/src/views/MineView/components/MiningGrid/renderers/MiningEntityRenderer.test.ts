@@ -64,6 +64,17 @@ describe('MiningEntityRenderer', () => {
     expect((sprite as Sprite).rotation).toBe(1.25);
   });
 
+  it('draws a falling rock across all the cells it covers', () => {
+    const viewsMap = new Map<string, Sprite | Graphics>();
+    MiningEntityRenderer.updateFallingRocks(container, [{ id: 'big', x: 2.5, y: 3.5, width: 3, height: 2 }], viewsMap, 64, Texture.WHITE);
+    expect((viewsMap.get('big') as Sprite).width).toBe(192);
+    expect((viewsMap.get('big') as Sprite).height).toBe(128);
+
+    const plain = new Map<string, Sprite | Graphics>();
+    MiningEntityRenderer.updateFallingRocks(new Container(), [{ id: 'big', x: 2.5, y: 3.5, width: 3, height: 2 }], plain, 64);
+    expect((plain.get('big') as Graphics).getLocalBounds().width).toBeGreaterThan(64 * 2);
+  });
+
   it('updates dropped items and removes vanished items', () => {
     const droppedItems: MiningDroppedItem[] = [
       {

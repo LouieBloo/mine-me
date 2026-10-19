@@ -337,6 +337,9 @@ export class MiningMobSubsystem {
         pathBudget: this.pathBudget,
         // The mob is planned for as the block of cells its body fills, and as high as its jump goes
         body: { width: mob.mobBody.halfWidth * 2, height: mob.mobBody.halfHeight * 2 },
+        canBreakTile: (type) => canBreakBlock(mob.stats.pickPower, this.world.data.getBlockRequiredPickPower(type)),
+        // Up in the air for 2 x force / gravity, moving sideways at walking speed the whole time (a little less, to be safe)
+        jumpReach: 0.8 * mob.mobBody.moveSpeed * ((2 * mob.mobBody.jumpForce) / (MINING_CONFIG.GRAVITY * mob.mobBody.gravityScale)),
         jumpTiles: Math.floor((mob.mobBody.jumpForce * mob.mobBody.jumpForce) / (2 * MINING_CONFIG.GRAVITY * mob.mobBody.gravityScale)),
         config: {
           canMine: mob.canMine,

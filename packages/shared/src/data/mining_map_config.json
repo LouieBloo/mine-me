@@ -10,7 +10,7 @@
   "tunnelMaxLength": 90,
   "tunnelWidth": 3,
   "tunnelMinDepth": 6,
-  "rockPercentage": 12,
+  "rockPercentage": 6,
   "mineralPercentage": 10,
   "chestCount": 4,
   "copperiumPercentage": 4,

@@ -10,8 +10,12 @@ export interface TileFootprint {
  * A cell's place inside its piece: [column, row] counted from the piece's top-left cell (the anchor). Only
  * cells of a piece carry one; it is how the client knows which slice of the art a cell shows, and how the
  * server finds the rest of a piece when any one cell is destroyed.
+ *
+ * A type with one fixed size (ladder, torch, bridge) takes it from `getTileFootprint`. A type whose pieces come
+ * in several sizes (rocks) records the size on every cell as two more numbers, [ox, oy, width, height], so any
+ * type can have bigger or smaller objects without a table entry per size. Read it with `pieceFootprint`.
  */
-export type PieceOffset = [ox: number, oy: number];
+export type PieceOffset = [ox: number, oy: number, width?: number, height?: number];
 
 /**
  * Placeables keep the size they had before blocks were shrunk: one original block, which is BLOCK_SCALE
@@ -35,11 +39,23 @@ export function isPieceType(type: MiningTileType): boolean {
   return type in PIECE_FOOTPRINTS;
 }
 
-/** Every cell a piece covers when its top-left cell is `anchor`, with each cell's offset. */
-export function pieceCells(anchor: MiningPosition, footprint: TileFootprint): (MiningPosition & { offset: PieceOffset })[] {
+/** The footprint of the piece a cell belongs to: the size recorded on its offset, else the type's own. */
+export function pieceFootprint(type: MiningTileType, offset: PieceOffset | undefined): TileFootprint {
+  if (offset && offset[2] !== undefined && offset[3] !== undefined) return { width: offset[2], height: offset[3] };
+  return getTileFootprint(type);
+}
+
+/**
+ * Every cell a piece covers when its top-left cell is `anchor`, with each cell's offset. With `recordSize` the
+ * offsets also carry the footprint's size (for types whose pieces vary in size, see PieceOffset).
+ */
+export function pieceCells(anchor: MiningPosition, footprint: TileFootprint, recordSize = false): (MiningPosition & { offset: PieceOffset })[] {
   const cells: (MiningPosition & { offset: PieceOffset })[] = [];
   for (let oy = 0; oy < footprint.height; oy++) {
-    for (let ox = 0; ox < footprint.width; ox++) cells.push({ x: anchor.x + ox, y: anchor.y + oy, offset: [ox, oy] });
+    for (let ox = 0; ox < footprint.width; ox++) {
+      const offset: PieceOffset = recordSize ? [ox, oy, footprint.width, footprint.height] : [ox, oy];
+      cells.push({ x: anchor.x + ox, y: anchor.y + oy, offset });
+    }
   }
   return cells;
 }

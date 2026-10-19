@@ -3,7 +3,7 @@ import {
   MINING_TILE_PIXELS,
   MiningTileType,
   canTileBeDamaged,
-  getTileFootprint,
+  pieceFootprint,
   type MiningClientTile,
   type PieceOffset,
 } from '@mine-me/shared';
@@ -29,7 +29,7 @@ export class MiningTileRenderer {
       slices = new Map();
       pieceSlices.set(texture, slices);
     }
-    const key = `${offset[0]},${offset[1]}`;
+    const key = `${offset[0]},${offset[1]},${footprint.width}x${footprint.height}`;
     let slice = slices.get(key);
     if (!slice) {
       const frame = texture.frame;
@@ -73,13 +73,13 @@ export class MiningTileRenderer {
     }
   }
 
-  public static drawFallbackTile(graphics: Graphics, type: MiningTileType, tileSize: number = TILE_SIZE): void {
+  public static drawFallbackTile(graphics: Graphics, type: MiningTileType, tileSize: number = TILE_SIZE, tileHeight: number = tileSize): void {
     switch (type) {
       case MiningTileType.EMPTY:
         // Empty space shows background
         break;
       case MiningTileType.DIRT:
-        graphics.rect(0, 0, tileSize, tileSize);
+        graphics.rect(0, 0, tileSize, tileHeight);
         graphics.fill(0x451a03);
         graphics.circle(16, 20, 2);
         graphics.circle(48, 12, 1.5);
@@ -87,11 +87,11 @@ export class MiningTileRenderer {
         graphics.fill(0x78350f);
         break;
       case MiningTileType.ROCK:
-        graphics.rect(0, 0, tileSize, tileSize);
+        graphics.rect(0, 0, tileSize, tileHeight);
         graphics.fill(0x334155);
         break;
       case MiningTileType.MINERAL:
-        graphics.rect(0, 0, tileSize, tileSize);
+        graphics.rect(0, 0, tileSize, tileHeight);
         graphics.fill(0x312e81);
         graphics.circle(20, 20, 3);
         graphics.circle(44, 24, 4);
@@ -102,7 +102,7 @@ export class MiningTileRenderer {
         graphics.fill(0xd97706);
         break;
       case MiningTileType.ENTRANCE:
-        graphics.rect(0, 0, tileSize, tileSize);
+        graphics.rect(0, 0, tileSize, tileHeight);
         graphics.fill(0x064e3b);
         break;
       case MiningTileType.LADDER:
@@ -116,7 +116,7 @@ export class MiningTileRenderer {
         break;
       case MiningTileType.LAVAROCK:
         // Cooled lava: near-black basalt with dull orange cracks (stands in until a texture is uploaded)
-        graphics.rect(0, 0, tileSize, tileSize);
+        graphics.rect(0, 0, tileSize, tileHeight);
         graphics.fill(0x1c1917);
         graphics.moveTo(6, 18);
         graphics.lineTo(24, 28);
@@ -126,7 +126,7 @@ export class MiningTileRenderer {
         break;
       case MiningTileType.COPPERIUM:
         // Dark shale with warm copper nuggets and cyan energy flecks
-        graphics.rect(0, 0, tileSize, tileSize);
+        graphics.rect(0, 0, tileSize, tileHeight);
         graphics.fill(0x1e1b18);
         graphics.circle(20, 22, 5);
         graphics.circle(42, 38, 6);
@@ -144,7 +144,7 @@ export class MiningTileRenderer {
         break;
       case MiningTileType.SILVERIUM:
         // Deep granite with lustrous silver facets and cyan energy fissures
-        graphics.rect(0, 0, tileSize, tileSize);
+        graphics.rect(0, 0, tileSize, tileHeight);
         graphics.fill(0x0f172a);
         graphics.circle(18, 20, 5);
         graphics.circle(44, 26, 6);
@@ -313,7 +313,7 @@ export class MiningTileRenderer {
     let graphics = tileGraphicsMap.get(key);
     let tileSprite = tileSpritesMap.get(key);
 
-    const footprint = getTileFootprint(tile.type);
+    const footprint = pieceFootprint(tile.type, tile.piece);
     const wholeTexture = tile.revealed ? blockTextures.get(tile.type) : undefined;
     // A cell of a piece shows its slice of the piece's art
     const blockTexture = wholeTexture && tile.piece ? this.pieceSlice(wholeTexture, tile.piece, footprint) : wholeTexture;
@@ -363,7 +363,7 @@ export class MiningTileRenderer {
     if (needsFallback) {
       // A piece with no art is drawn whole by its top-left cell; the other cells have nothing to add
       if (!tile.piece) this.drawFallbackTile(graphics, tile.type, tileSize);
-      else if (tile.piece[0] === 0 && tile.piece[1] === 0) this.drawFallbackTile(graphics, tile.type, tileSize * footprint.width);
+      else if (tile.piece[0] === 0 && tile.piece[1] === 0) this.drawFallbackTile(graphics, tile.type, tileSize * footprint.width, tileSize * footprint.height);
     }
     // Render crack overlay if block is partially mined and tile can be damaged
     if (needsCracks) this.drawDamageCracks(graphics, tile.damageStage as number, tileSize);

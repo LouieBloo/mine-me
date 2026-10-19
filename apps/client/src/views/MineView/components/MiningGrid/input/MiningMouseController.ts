@@ -38,8 +38,9 @@ export class MiningMouseController {
   private hoverListeners: Set<(tile: MiningPosition | null) => void> = new Set();
   private actionListeners: Set<(action: IMouseAction, target: MiningPosition | Vector2D, success: boolean) => void> = new Set();
   private miningListeners: Set<(isMining: boolean, target: MiningPosition | null, precise: boolean) => void> = new Set();
-  /** Ctrl is held: mining targets only the block under the cursor instead of the next blocks along the line to it. */
+  /** Single-block mode (toggled with Ctrl): mining targets only the block under the cursor instead of the next blocks along the line to it. */
   private preciseHeld = false;
+  private preciseModeListeners: Set<(precise: boolean) => void> = new Set();
 
   constructor(options?: MouseControllerOptions) {
     this.tileSize = options?.tileSize ?? TILE_SIZE;
@@ -411,7 +412,6 @@ export class MiningMouseController {
       return;
     }
 
-    this.preciseHeld = e.ctrlKey;
     this.isMouseDown = true;
     this.screenMousePos = { x: e.clientX, y: e.clientY };
     const tile = this.targetTileAt(e.clientX, e.clientY) || this.hoveredTile;
@@ -549,7 +549,6 @@ export class MiningMouseController {
 
   /** Releases any held mouse state: window blur, pointer cancel, or a drag-and-drop starting. */
   private handleBlur = (): void => {
-    this.preciseHeld = false;
     if (this.activeAction instanceof ThrowableItemAction && this.activeAction.isCharging) {
       this.activeAction.cancelCharging();
     }
@@ -596,16 +595,28 @@ export class MiningMouseController {
     return this.preciseHeld;
   }
 
-  /** Ctrl going down or up switches between auto-target and the single block under the cursor, even mid-swing. */
+  /** Pressing Ctrl switches between auto-target and single-block mining (holding it down does not repeat the switch). */
   private handleKey = (e: KeyboardEvent): void => {
-    if (e.key !== 'Control') return;
-    this.setPreciseHeld(e.type === 'keydown');
+    if (e.key !== 'Control' || e.type !== 'keydown' || e.repeat) return;
+    this.togglePreciseMode();
   };
 
-  private setPreciseHeld(held: boolean): void {
-    if (this.preciseHeld === held) return;
-    this.preciseHeld = held;
+  public togglePreciseMode(): void {
+    this.setPreciseMode(!this.preciseHeld);
+  }
+
+  /** Sets single-block mining on or off, even mid-swing, and tells the server if the button is held. */
+  public setPreciseMode(precise: boolean): void {
+    if (this.preciseHeld === precise) return;
+    this.preciseHeld = precise;
+    this.preciseModeListeners.forEach((cb) => cb(precise));
     if (this.isMouseDown && !this.activeAction) this.notifyMiningListeners(true, this.hoveredTile);
+  }
+
+  /** Called whenever the mining mode changes; returns an unsubscribe function. */
+  public onPreciseModeChange(callback: (precise: boolean) => void): () => void {
+    this.preciseModeListeners.add(callback);
+    return () => this.preciseModeListeners.delete(callback);
   }
 
   public destroy(): void {
@@ -613,6 +624,7 @@ export class MiningMouseController {
     this.hoverListeners.clear();
     this.actionListeners.clear();
     this.miningListeners.clear();
+    this.preciseModeListeners.clear();
     this.activeAction = null;
   }
 }

@@ -1,6 +1,6 @@
 import { BaseMobAI, type MobAIContext, type MobActionIntent, type PlayerTargetInfo } from './BaseMobAI';
 import { MiningPathfinder, footprintOf } from '../pathfinding/MiningPathfinder';
-import { isTileSolid, BLOCK_SCALE, MINING_CONFIG, type MiningPathWaypoint } from '../../types/mining';
+import { isTileMineable, isTileSolid, BLOCK_SCALE, MINING_CONFIG, type MiningPathWaypoint } from '../../types/mining';
 
 const MIN_PATH_INTERVAL = 1.0;
 const PATH_INTERVAL_JITTER = 0.5;
@@ -62,15 +62,21 @@ export class ChaseAndMineAI extends BaseMobAI {
       for (let r = ny - fp.height + 1; r <= ny; r++) for (let c = nx; c < nx + fp.width; c++) if (isObstacle(c, r)) return true;
       return false;
     };
+    /** Whether the cell is a solid block this mob can actually break (a rock, or an ore harder than its pick, is a wall to it). */
+    const isDiggable = (tx: number, ty: number): boolean => {
+      if (!isObstacle(tx, ty)) return false;
+      const tile = context.grid[ty]?.[tx];
+      return !tile || (isTileMineable(tile.type) && (context.canBreakTile?.(tile.type) ?? true));
+    };
     /** The solid cell of the footprint at a waypoint to dig next: the one the pathfinder chose if it is still there, else the nearest. */
     const cellToMine = (wp: MiningPathWaypoint): { x: number; y: number } | null => {
-      if (!bodyMode) return isObstacle(wp.x, wp.y) ? { x: wp.x, y: wp.y } : null;
-      if (wp.mineTarget && isObstacle(wp.mineTarget.x, wp.mineTarget.y)) return wp.mineTarget;
+      if (!bodyMode) return isDiggable(wp.x, wp.y) ? { x: wp.x, y: wp.y } : null;
+      if (wp.mineTarget && isDiggable(wp.mineTarget.x, wp.mineTarget.y)) return wp.mineTarget;
       let best: { x: number; y: number } | null = null;
       let bestDist = Infinity;
       for (let r = wp.y - fp.height + 1; r <= wp.y; r++) {
         for (let c = wp.x; c < wp.x + fp.width; c++) {
-          if (!isObstacle(c, r)) continue;
+          if (!isDiggable(c, r)) continue;
           const d = Math.hypot(c + 0.5 - context.position.x, r + 0.5 - context.position.y);
           if (d < bestDist) { best = { x: c, y: r }; bestDist = d; }
         }
@@ -79,10 +85,20 @@ export class ChaseAndMineAI extends BaseMobAI {
     };
     /** The world x a body should walk to to stand on waypoint `wp`: the middle of its footprint. */
     const centreX = (wp: { x: number }): number => wp.x + (bodyMode ? fp.width / 2 : 0.5);
+    /**
+     * Steering that settles on the middle of the footprint instead of stopping short of it: full speed until the last
+     * half cell, then slower in proportion to how far is left. A body only a hair narrower than its footprint (the mole
+     * is 1.9 cells in 2) that stops 0.1 short still overhangs the next column, so it keeps resting on a ledge edge it
+     * meant to step off and bumps its head on a ceiling its footprint says is clear.
+     */
     const steer = (wp: { x: number }): number => {
       const diff = centreX(wp) - context.position.x;
-      return bodyMode && Math.abs(diff) < 0.15 ? 0 : Math.sign(diff);
+      if (!bodyMode) return Math.sign(diff);
+      if (Math.abs(diff) < 0.01) return 0;
+      return Math.abs(diff) >= 0.5 ? Math.sign(diff) : Math.max(-1, Math.min(1, diff * 2.5));
     };
+    /** Whether the body is lined up with the middle of the footprint at waypoint `wp` (close enough not to overhang its neighbours). */
+    const alignedWith = (wp: { x: number }): boolean => !bodyMode || Math.abs(centreX(wp) - context.position.x) < 0.04;
 
     // 1. Locate nearest living player
     let nearestPlayer: PlayerTargetInfo | null = null;
@@ -163,7 +179,7 @@ export class ChaseAndMineAI extends BaseMobAI {
         bodyMode ? { x: mobNode.x + 0.5, y: mobNode.y + 0.5 } : { x: context.position.x, y: context.position.y },
         bodyMode ? { x: targetTile.x + 0.5, y: targetTile.y + 0.5 } : targetTile,
         context.grid,
-        { canMine, maxJumpTiles, bodyWidth: fp.width, bodyHeight: fp.height, maxSearchDepth: 500 * BLOCK_SCALE }
+        { canMine, canBreakTile: context.canBreakTile, maxJumpReach: context.jumpReach, maxJumpTiles, bodyWidth: fp.width, bodyHeight: fp.height, maxSearchDepth: 500 * BLOCK_SCALE }
       );
       this.currentWaypointIndex = 0;
       this.pathTimer = this.pathInterval;
@@ -304,7 +320,8 @@ export class ChaseAndMineAI extends BaseMobAI {
       case 'JUMP':
         return {
           moveX: steer(currentWp),
-          jump: context.isGrounded,
+          // Straight up, the body first lines up with its footprint so it does not catch its head on the column beside it
+          jump: context.isGrounded && (currentWp.x !== mobNode.x || alignedWith(currentWp)),
           climbUp: false,
           climbDown: false,
           isMining: false,

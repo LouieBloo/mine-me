@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BLOCK_SCALE, MiningTileType } from '../types/mining';
-import { findPieceAnchor, getTileFootprint, isPieceType, pieceAnchorOf, isPieceCentreCell, pieceCells, pieceCentre, pieceOrigin, pieceCentreCell } from './pieces';
+import { findPieceAnchor, getTileFootprint, pieceFootprint, isPieceType, pieceAnchorOf, isPieceCentreCell, pieceCells, pieceCentre, pieceOrigin, pieceCentreCell } from './pieces';
 
 const S = BLOCK_SCALE;
 const square = { width: S, height: S };
@@ -62,5 +62,24 @@ describe('piece owners', () => {
   it('a tile with no offset is its own origin and owns its own effects', () => {
     expect(pieceOrigin(4, 5, undefined)).toEqual({ x: 4, y: 5 });
     expect(isPieceCentreCell(undefined, square)).toBe(true);
+  });
+});
+
+describe('pieces whose size is recorded on each cell', () => {
+  it('pieceCells records the size only when asked, so fixed-size pieces keep their two-number offsets', () => {
+    expect(pieceCells({ x: 5, y: 5 }, { width: 2, height: 1 })[1].offset).toEqual([1, 0]);
+    expect(pieceCells({ x: 5, y: 5 }, { width: 2, height: 1 }, true).map((c) => c.offset)).toEqual([[0, 0, 2, 1], [1, 0, 2, 1]]);
+  });
+
+  it('pieceFootprint reads the recorded size, else the type\'s own', () => {
+    expect(pieceFootprint(MiningTileType.ROCK, [1, 0, 3, 2])).toEqual({ width: 3, height: 2 });
+    expect(pieceFootprint(MiningTileType.ROCK, undefined)).toEqual({ width: 1, height: 1 });
+    expect(pieceFootprint(MiningTileType.LADDER, [1, 1])).toEqual(getTileFootprint(MiningTileType.LADDER));
+  });
+
+  it('the anchor of a sized piece comes from any of its cells', () => {
+    for (const cell of pieceCells({ x: 7, y: 9 }, { width: 3, height: 3 }, true)) {
+      expect(pieceOrigin(cell.x, cell.y, cell.offset)).toEqual({ x: 7, y: 9 });
+    }
   });
 });

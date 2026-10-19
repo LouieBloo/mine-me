@@ -47,6 +47,12 @@ describe('selectMiningTargets (auto): the face in front of the player', () => {
     for (const c of result) expect(c.x + c.y).toBe(42);
   });
 
+  it('the hovered block outranks the block being mined now', () => {
+    const grid = room(40, (x) => x >= 22 && x <= 24);
+    expect(keys(selectMiningTargets(grid, player, { x: 22, y: 19 }, { keep: { x: 22, y: 20 } }))[0]).toBe('22,19');
+    expect(keys(selectMiningTargets(grid, player, { x: 22, y: 21 }, { keep: { x: 22, y: 19 } }))[0]).toBe('22,21');
+  });
+
   it('starts with the block the cursor is closest to, not always the middle', () => {
     const grid = room(40, (x) => x >= 22 && x <= 24);
     expect(keys(selectMiningTargets(grid, player, { x: 22, y: 19 }))[0]).toBe('22,19');
@@ -95,8 +101,8 @@ describe('selectMiningTargets (auto): direction, reach and what is in the way', 
   });
 
   it('takes what is in front through open air with a gap before the wall', () => {
-    const grid = room(40, (x) => x >= 24);
-    expect(keys(selectMiningTargets(grid, player, { x: 36, y: 20 }))).toEqual(['24,20', '24,19', '24,21']);
+    const grid = room(40, (x) => x >= 23);
+    expect(keys(selectMiningTargets(grid, player, { x: 36, y: 20 }))).toEqual(['23,20', '23,19', '23,21']);
   });
 
   it('does not take blocks behind the player', () => {
@@ -125,6 +131,27 @@ describe('selectMiningTargets (auto): direction, reach and what is in the way', 
     expect(base[0]).toEqual({ x: 22, y: 20 });
     expect(selectMiningTargets(grid, player, { x: 30, y: 20 }, { keep: { x: 22, y: 21 } })[0]).toEqual({ x: 22, y: 21 });
     expect(selectMiningTargets(grid, player, { x: 30, y: 20 }, { keep: { x: 30, y: 30 } })).toEqual(base);
+  });
+
+  it('lines up three blocks in each direction, including straight down from where the player stands', () => {
+    const feet = 22;
+    const floor = room(40, (_x, y) => y >= feet);
+    const standing = { x: 20.5, y: feet - 1.35 };
+    expect(selectMiningTargets(floor, standing, { x: 20, y: feet + 1 })).toHaveLength(3);
+    const wall = room(40, (x) => x >= 22);
+    expect(selectMiningTargets(wall, player, { x: 30, y: 20 })).toHaveLength(3);
+    // three blocks deep straight down is within reach
+    const shaft = room(40, (x, y) => y >= feet && y <= feet + 2 && x === 20);
+    expect(selectMiningTargets(shaft, standing, { x: 20, y: feet + 2 }, { count: 1 })).toEqual([{ x: 20, y: feet }]);
+    expect(isWithinMiningReach(0, 3 * 1 + 0.85)).toBe(true);
+    expect(isWithinMiningReach(0, 4.5)).toBe(false);
+  });
+
+  it('works for a player standing on the surface, above the first row of the map', () => {
+    const grid = room(40, (_x, y) => y >= 0).slice(0, 10);
+    const standing = { x: 20.5, y: -1.35 };
+    expect(keys(selectMiningTargets(grid, standing, { x: 20, y: 1 }))).toHaveLength(3);
+    expect(keys(selectMiningTargets(grid, standing, { x: 20, y: 1 }))).toContain('20,0');
   });
 
   it('a block in the player\'s own cell is mined', () => {

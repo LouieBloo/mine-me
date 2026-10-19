@@ -255,7 +255,7 @@ describe('MiningGameEngine', () => {
     expect(onTimeoutMock).toHaveBeenCalledWith('solo_char-1');
   });
 
-  it('prevents starting mining while jumping or airborne', () => {
+  it('allows starting mining while jumping or airborne', () => {
     const engine = new MiningGameEngine({
       characterId: 'char-1',
       cityId: 'city-1',
@@ -267,11 +267,11 @@ describe('MiningGameEngine', () => {
     engine.grid[0][MINING_CONFIG.ENTRANCE_X + 1] = { type: MiningTileType.DIRT, revealed: true };
 
     const started = engine.startMining('char-1', { x: MINING_CONFIG.ENTRANCE_X + 1, y: 0 });
-    expect(started).toBe(false);
-    expect(engine.getPlayer('char-1')!.isMining).toBe(false);
+    expect(started).toBe(true);
+    expect(engine.getPlayer('char-1')!.isMining).toBe(true);
   });
 
-  it('cancels active mining immediately when player jumps or becomes airborne', () => {
+  it('keeps mining when player jumps or becomes airborne', () => {
     const engine = new MiningGameEngine({
       characterId: 'char-1',
       cityId: 'city-1',
@@ -312,10 +312,9 @@ describe('MiningGameEngine', () => {
     });
 
     (engine as any).tick(0.033);
-    // Player is now airborne with upward velocity, mining should be stopped
+    // Player is now airborne with upward velocity, mining carries on
     expect(engine.getPlayer('char-1')!.playerBody.isGrounded).toBe(false);
-    expect(engine.getPlayer('char-1')!.isMining).toBe(false);
-    expect(engine.getPlayer('char-1')!.miningTarget).toBeNull();
+    expect(engine.getPlayer('char-1')!.isMining).toBe(true);
   });
 
   it('allows mining in diagonal directions (NE, NW, SE, SW)', () => {

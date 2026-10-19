@@ -5,6 +5,7 @@ import {
   isTileSolid,
   type MiningPathWaypoint,
   type MiningPosition,
+  type MiningTileType,
 } from '../../types/mining';
 import type { MiningCollisionGrid } from '../../physics/MiningPhysicsBody';
 import { getGridDimensions } from '../../physics/gridDimensions';
@@ -13,8 +14,15 @@ import { MinHeap } from '../../utils/MinHeap';
 export interface MiningPathfinderOptions {
   /** Whether the entity can mine through solid destructible blocks */
   canMine?: boolean;
+  /** Narrows `canMine` to the block types the entity can actually break (e.g. its pick power is high enough). Default: all mineable ones. */
+  canBreakTile?: (type: MiningTileType) => boolean;
   /** Maximum vertical jump height in tile units (default 2) */
   maxJumpTiles?: number;
+  /**
+   * How far (cells) the body travels sideways in one jump (its walking speed times its time in the air). A jump over a
+   * pit is only planned when the far side is within this reach. Default: unlimited.
+   */
+  maxJumpReach?: number;
   /** Whether entity can climb ladders (default true) */
   canClimbLadders?: boolean;
   /** Maximum number of node evaluations before aborting */
@@ -89,7 +97,7 @@ export class MiningPathfinder {
       }
       const row = grid[y];
       const tile = row ? row[x] : undefined;
-      return tile ? isTileMineable(tile.type) : false;
+      return tile ? isTileMineable(tile.type) && (options?.canBreakTile?.(tile.type) ?? true) : false;
     };
 
     const getMineCost = (x: number, y: number): number => {
@@ -223,8 +231,8 @@ export class MiningPathfinder {
           // Empty space
           if (supported(nx, ny)) {
             neighbors.push({ x: nx, y: ny, cost: 1.0, action: 'WALK' });
-          } else {
-            // Ledge step-off / fall
+          } else if (isSupportedHere) {
+            // Ledge step-off / fall. A body already in the air does not drift sideways at the same height (it falls, below)
             neighbors.push({ x: nx, y: ny, cost: 1.2, action: 'FALL' });
           }
         } else {
@@ -283,6 +291,7 @@ export class MiningPathfinder {
         for (const sign of [-1, 1]) {
           const landX = current.x + sign * (fw + 1);
           if (landX < 0 || landX + fw > gridWidth) continue;
+          if (landX !== current.x && Math.abs(landX - current.x) > (options?.maxJumpReach ?? Infinity)) continue;
           let isPit = false;
           let clear = true;
           for (let step = 1; step <= fw; step++) {
@@ -298,6 +307,14 @@ export class MiningPathfinder {
 
       // 3. Falling / Downward Movement
       const downY = current.y + 1;
+      if (downY < gridHeight && !isSupportedHere) {
+        // In the air, a body also drifts one cell sideways as it drops one
+        for (const dx of [-1, 1]) {
+          const nx = current.x + dx;
+          if (nx < 0 || nx + fw > gridWidth) continue;
+          if (!blocked(nx, current.y) && !blocked(nx, downY)) neighbors.push({ x: nx, y: downY, cost: 1.2, action: 'FALL' });
+        }
+      }
       if (downY < gridHeight) {
         if (!blocked(current.x, downY)) {
           neighbors.push({ x: current.x, y: downY, cost: 1.0, action: 'FALL' });

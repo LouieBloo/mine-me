@@ -138,6 +138,13 @@ describe('applyEntities', () => {
     expect(world.activeFallingRocksRef.current).toEqual([]);
   });
 
+  it('keeps the size of a falling rock bigger than one cell', () => {
+    const world = makeWorld();
+    const ctx = makeCtx(world);
+    applyEntities(payload({ fallingRocks: [{ id: 'r', position: { x: 1, y: 2 }, width: 3, height: 3 } as any] }), ctx);
+    expect(world.activeFallingRocksRef.current).toEqual([{ id: 'r', x: 1, y: 2, width: 3, height: 3 }]);
+  });
+
   it('drops the server copy of my own projectiles but keeps ones I fired locally', () => {
     const world = makeWorld({
       activeProjectilesRef: ref([{ id: 'client_proj_1', characterId: 'me' }, { id: 'old', characterId: 'other' }]),

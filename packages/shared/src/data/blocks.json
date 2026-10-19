@@ -149,13 +149,13 @@
     "textureUrl": "/assets/mining/block_dirt-block.jpg",
     "soundEffectUrl": "/assets/sounds/blocks/block_dirt_sfx.mp3",
     "soundEffectVolume": 1,
-    "health": 100,
+    "health": 10,
     "requiredPickPower": 0,
     "staminaCost": 1,
     "idleParticleEffectId": null,
     "flammability": null,
     "createdAt": "2026-08-17T03:27:35.305Z",
-    "updatedAt": "2026-10-08T01:04:34.524Z",
+    "updatedAt": "2026-10-18T16:11:41.069Z",
     "idleParticleEffect": null,
     "dropTable": {
       "id": "cmundelw90000bumvlrgt1wha",
@@ -166,17 +166,17 @@
       "characterLevelId": null,
       "miningBlockId": "block_dirt",
       "createdAt": "2026-09-30T00:31:58.810Z",
-      "updatedAt": "2026-09-30T01:12:33.169Z",
+      "updatedAt": "2026-10-18T16:11:41.069Z",
       "items": [
         {
-          "id": "cmuneus9d0004z2yg3he79gq5",
+          "id": "cmve0weq50006fojnlhzwq755",
           "dropTableId": "cmundelw90000bumvlrgt1wha",
           "itemId": "cmund29qj0000qr3nw7owbynf",
           "chance": 10,
           "minQuantity": 1,
           "maxQuantity": 15,
-          "createdAt": "2026-09-30T01:12:33.169Z",
-          "updatedAt": "2026-09-30T01:12:33.169Z"
+          "createdAt": "2026-10-18T16:11:41.069Z",
+          "updatedAt": "2026-10-18T16:11:41.069Z"
         }
       ]
     }

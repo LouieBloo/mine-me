@@ -895,6 +895,8 @@ export class MiningGameEngine {
         position: { x: roundWire(r.position.x), y: roundWire(r.position.y) },
         velocity: { x: roundWire(r.velocity.x), y: roundWire(r.velocity.y) },
         angle: roundWire(r.angle),
+        // Only a rock bigger than one cell says its size
+        ...(r.cellsWide > 1 || r.cellsHigh > 1 ? { width: r.cellsWide, height: r.cellsHigh } : {}),
       }));
       const dynamitePayloads = dynamitesNear.map(dynamiteDynamic);
       const projectilePayloads = projectilesNear.map(projectileDynamic);

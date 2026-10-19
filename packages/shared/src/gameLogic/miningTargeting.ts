@@ -44,7 +44,7 @@ function isExposed(grid: TargetableTile[][], from: Vector2D, cell: MiningPositio
   return SIGHT_POINTS.some(([ox, oy]) => lineIsClear(grid, from, cell, cell.x + 0.5 + ox, cell.y + 0.5 + oy));
 }
 
-/** Whether every cell the straight line from `from` to (tx, ty) crosses before reaching `cell` is revealed and not solid. */
+/** Whether every cell (rows above the map count as open air) the straight line from `from` to (tx, ty) crosses before reaching `cell` is revealed and not solid. */
 function lineIsClear(grid: TargetableTile[][], from: Vector2D, cell: MiningPosition, tx: number, ty: number): boolean {
   const length = Math.hypot(tx - from.x, ty - from.y);
   if (length < 1e-6) return true;
@@ -60,8 +60,9 @@ function lineIsClear(grid: TargetableTile[][], from: Vector2D, cell: MiningPosit
   let maxY = dirY === 0 ? Infinity : ((dirY > 0 ? y + 1 : y) - from.y) / dirY;
   for (let guard = 0; guard < 4 * (Math.ceil(length) + 2); guard++) {
     if (x === cell.x && y === cell.y) return true;
+    // Above the top row is open sky (the player can stand on the surface, outside the grid), not a wall
     const tile = tileAt(grid, x, y);
-    if (!tile || !tile.revealed || isTileSolid(tile.type)) return false;
+    if (y >= 0 && (!tile || !tile.revealed || isTileSolid(tile.type))) return false;
     if (maxX < maxY) {
       x += stepX;
       maxX += deltaX;
@@ -152,9 +153,12 @@ export function selectMiningTargets(
     }
   }
   const chosen = ordered.slice(0, count);
-  const keep = options.keep;
-  if (keep) {
-    const at = chosen.findIndex((c) => c.x === keep.x && c.y === keep.y);
+  // The block under the cursor outranks everything: it is hit directly, and the cursor cell is discrete so it
+  // cannot flicker. Otherwise the block being mined now stays first so the pick does not flicker between
+  // neighbours (e.g. while the cursor is over air or past reach). Block damage persists, so switching loses nothing.
+  const first = ordered.find((c) => c.x === cursor.x && c.y === cursor.y) ?? options.keep;
+  if (first) {
+    const at = chosen.findIndex((c) => c.x === first.x && c.y === first.y);
     if (at > 0) chosen.unshift(...chosen.splice(at, 1));
   }
   return chosen;

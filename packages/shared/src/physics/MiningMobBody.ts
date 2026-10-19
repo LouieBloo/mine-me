@@ -96,7 +96,8 @@ export class MiningMobBody extends MiningPhysicsBody {
     const jumpFactor = Math.sqrt(fluid);
 
     // Set horizontal velocity
-    this.velocity.x = Math.sign(moveX) * this.moveSpeed * fluid;
+    // moveX is -1..1: a fraction walks slower, which lets a mob settle exactly on the spot it is aiming for
+    this.velocity.x = Math.max(-1, Math.min(1, moveX)) * this.moveSpeed * fluid;
 
     // Check ladders
     if (grid) {

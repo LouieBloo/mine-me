@@ -1,3 +1,4 @@
+import type { PieceOffset } from '../gameLogic/pieces';
 import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig, HeldLightConfig, CharacterSoundEffectsConfig, FluidSoundEffectsConfig } from './index';
 import type { ParticleEffect, ParticleEffectConfig } from './particles';
 import type { Flammability, FluidAppearance } from './fluid';
@@ -132,7 +133,7 @@ export const MINING_CONFIG = {
   TREASURE_CHEST_COUNT: 4,
 
   /** Approximate percentage of tiles that are rocks */
-  ROCK_PERCENTAGE: 12,
+  ROCK_PERCENTAGE: 6,
 
   /** Approximate percentage of tiles that are minerals */
   MINERAL_PERCENTAGE: 10,
@@ -147,7 +148,7 @@ export const MINING_CONFIG = {
   MOB_DRAW_HEIGHT_FACTOR: 1.05,
   /** Height (tiles) a mob is drawn at when its data gives no collider height */
   MOB_DEFAULT_DRAW_COLLIDER_HEIGHT: 1.25 * S,
-  PLAYER_MINING_REACH: 1.85 * S, // Mining interaction reach radius in tiles (allows adjacent tiles regardless of player sub-tile position)
+  PLAYER_MINING_REACH: 4, // Mining reach radius in blocks, from the player centre: about three blocks past the body, so three blocks fit in every direction (the third block down is ~3.85 from the centre)
   MOVE_SPEED: 4.5 * S, // Grid tiles per second
   GRAVITY: 28.0 * S, // Grid tiles per second squared (snappy natural 2D gravity)
   MAX_ENTITY_SPEED: 60.0 * S, // Hard cap on any body's speed per axis (tiles/s); keeps knockback/blasts sane
@@ -540,8 +541,8 @@ export interface MiningClientTile {
   revealed: boolean;
   /** Crack damage stage (0 = undamaged, 1 = 25%, 2 = 50%, 3 = 75%, 4 = 90% cracked) */
   damageStage?: number;
-  /** Set on a cell of a multi-cell piece (ladder, torch, bridge): [column, row] inside the piece, from its top-left cell. */
-  piece?: [ox: number, oy: number];
+  /** Set on a cell of a multi-cell piece (ladder, torch, bridge, rock): [column, row] inside the piece, from its top-left cell, plus its size when pieces of the type vary. */
+  piece?: PieceOffset;
 }
 
 
@@ -579,6 +580,9 @@ export interface MiningBackpackItem {
  */
 export interface MiningFallingRock {
   id: string;
+  /** Cells wide and high; omitted for a 1x1 rock. */
+  width?: number;
+  height?: number;
   position: Vector2D;
   velocity: Vector2D;
   angle?: number;
@@ -903,7 +907,7 @@ export interface MiningStateTickPayload {
   explosions?: MiningExplosionEvent[];
   /** Block damage hit events (e.g. tool swing hits dealing damage) triggered during this tick. */
   blockHits?: MiningBlockHitEvent[];
-  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; piece?: [ox: number, oy: number]; fluid?: [fluidId: number, level: number, falling?: number]; gas?: [gasId: number, concentration: number]; fire?: 1 }[];
+  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; piece?: PieceOffset; fluid?: [fluidId: number, level: number, falling?: number]; gas?: [gasId: number, concentration: number]; fire?: 1 }[];
   /**
    * Fluid cells that changed this tick, as [x, y, fluidId, level]. Only cells the fog of war has revealed
    * are ever sent (a newly revealed tile carries its fluid in `revealedTiles`).

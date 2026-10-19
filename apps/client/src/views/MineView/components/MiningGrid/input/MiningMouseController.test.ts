@@ -982,33 +982,74 @@ describe('MiningMouseController pickaxe auto-target and Ctrl', () => {
     expect(spy).toHaveBeenCalledWith(true, { x: 14, y: 10 }, false);
   });
 
-  it('Ctrl narrows the queue to the block under the cursor and tells the server, even while the button is held', () => {
+  const ctrl = (type: 'keydown' | 'keyup' = 'keydown', repeat = false) =>
+    window.dispatchEvent(new KeyboardEvent(type, { key: 'Control', repeat }));
+
+  it('Ctrl switches to single-block mining and tells the server, even while the button is held', () => {
     const spy = vi.fn();
     controller.onMiningStateChange(spy);
     window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: px(17), clientY: px(10) }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control' }));
+    ctrl();
     expect(controller.isPreciseMining()).toBe(true);
     expect(spy).toHaveBeenLastCalledWith(true, { x: 17, y: 10 }, true);
     expect(controller.miningQueue({ x: 17, y: 10 })).toEqual([{ x: 17, y: 10 }]);
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control' }));
+  });
+
+  it('the mode stays after Ctrl is released, and the next Ctrl press switches back to auto-target', () => {
+    const spy = vi.fn();
+    controller.onMiningStateChange(spy);
+    window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: px(17), clientY: px(10) }));
+    ctrl();
+    ctrl('keyup');
+    expect(controller.isPreciseMining()).toBe(true);
+    expect(controller.miningQueue({ x: 17, y: 10 })).toHaveLength(1);
+    ctrl();
+    expect(controller.isPreciseMining()).toBe(false);
     expect(spy).toHaveBeenLastCalledWith(true, { x: 17, y: 10 }, false);
     expect(controller.miningQueue({ x: 17, y: 10 }).length).toBeGreaterThan(1);
   });
 
-  it('a click made with Ctrl already down is precise, and losing focus lets go of Ctrl', () => {
+  it('holding Ctrl down (key repeat) switches only once', () => {
+    ctrl();
+    ctrl('keydown', true);
+    ctrl('keydown', true);
+    expect(controller.isPreciseMining()).toBe(true);
+  });
+
+  it('a click does not change the mode, with Ctrl down or not, and losing focus keeps the mode', () => {
     const spy = vi.fn();
     controller.onMiningStateChange(spy);
     window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: px(17), clientY: px(10), ctrlKey: true }));
-    expect(spy).toHaveBeenCalledWith(true, { x: 17, y: 10 }, true);
+    expect(spy).toHaveBeenCalledWith(true, { x: 17, y: 10 }, false);
+    window.dispatchEvent(new PointerEvent('pointerup', { button: 0, clientX: px(17), clientY: px(10) }));
+    ctrl();
     window.dispatchEvent(new Event('blur'));
-    expect(controller.isPreciseMining()).toBe(false);
+    expect(controller.isPreciseMining()).toBe(true);
+    window.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: px(17), clientY: px(10) }));
+    expect(spy).toHaveBeenLastCalledWith(true, { x: 17, y: 10 }, true);
   });
 
-  it('pressing Ctrl with the button up changes nothing to send', () => {
+  it('pressing Ctrl with the button up changes nothing to send, but tells mode listeners', () => {
     const spy = vi.fn();
+    const modeSpy = vi.fn();
     controller.onMiningStateChange(spy);
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control' }));
+    const unsubscribe = controller.onPreciseModeChange(modeSpy);
+    ctrl();
     expect(spy).not.toHaveBeenCalled();
+    expect(modeSpy).toHaveBeenCalledWith(true);
+    unsubscribe();
+    ctrl();
+    expect(modeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('setPreciseMode sets the mode directly, for the on-screen button', () => {
+    const modeSpy = vi.fn();
+    controller.onPreciseModeChange(modeSpy);
+    controller.setPreciseMode(true);
+    controller.setPreciseMode(true);
+    expect(modeSpy).toHaveBeenCalledTimes(1);
+    controller.togglePreciseMode();
+    expect(controller.isPreciseMining()).toBe(false);
   });
 
   it('shows no queue and the blocked colour for a block with nothing minable in the way within reach', () => {

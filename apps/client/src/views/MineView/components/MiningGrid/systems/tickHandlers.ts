@@ -101,7 +101,7 @@ export function applySelfState(payload: MiningStateTickPayload, ctx: TickHandler
 export function applyEntities(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
   const { world, entityDefs: defs } = ctx;
   world.activeFallingRocksRef.current = payload.fallingRocks
-    ? payload.fallingRocks.map((r) => ({ id: r.id, x: r.position.x, y: r.position.y }))
+    ? payload.fallingRocks.map((r) => ({ id: r.id, x: r.position.x, y: r.position.y, width: r.width, height: r.height }))
     : [];
 
   defs.applySpawned(payload.spawned);

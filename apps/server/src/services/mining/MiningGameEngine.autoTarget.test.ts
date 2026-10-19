@@ -49,7 +49,7 @@ describe('pickaxe auto-target', () => {
 
   it('with the cursor far to the left, mines the blocks along the line one after another, nearest first, with no cursor movement', () => {
     hold({ x: 8, y: 19 });
-    expect(mineOrder(5)).toEqual(['19,19', '18,19', '17,19', '16,19', '15,19']);
+    expect(mineOrder(3)).toEqual(['19,19', '18,19', '17,19']);
   });
 
   it('lines up the face in front of the player: the middle block first, then the blocks above and below it, and nothing behind', () => {

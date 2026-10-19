@@ -1,21 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { distanceToSegment } from './MiningRockSubsystem';
+import { sweptBoxContains } from './MiningRockSubsystem';
 
-describe('distanceToSegment', () => {
+describe('sweptBoxContains', () => {
   const a = { x: 0, y: 0 };
   const b = { x: 0, y: 10 };
 
-  it('measures to the nearest point on the segment', () => {
-    expect(distanceToSegment({ x: 1, y: 5 }, a, b)).toBe(1);
-    expect(distanceToSegment({ x: 0, y: 5 }, a, b)).toBe(0);
+  it('is true for a point the box passes over', () => {
+    expect(sweptBoxContains({ x: 0.5, y: 5 }, a, b, 1, 1)).toBe(true);
+    expect(sweptBoxContains({ x: 0, y: 5 }, a, b, 0.1, 0.1)).toBe(true);
   });
 
-  it('measures to the nearest end when beyond the segment', () => {
-    expect(distanceToSegment({ x: 0, y: 13 }, a, b)).toBe(3);
-    expect(distanceToSegment({ x: 4, y: -3 }, a, b)).toBe(5);
+  it('is false for a point beside the path, further than the box is wide', () => {
+    expect(sweptBoxContains({ x: 1.6, y: 5 }, a, b, 1.5, 1.5)).toBe(false);
+    expect(sweptBoxContains({ x: 1.4, y: 5 }, a, b, 1.5, 1.5)).toBe(true);
   });
 
-  it('handles a zero-length segment', () => {
-    expect(distanceToSegment({ x: 3, y: 4 }, a, a)).toBe(5);
+  it('reaches the box size beyond each end of the path', () => {
+    expect(sweptBoxContains({ x: 0, y: 11.4 }, a, b, 1.5, 1.5)).toBe(true);
+    expect(sweptBoxContains({ x: 0, y: 11.6 }, a, b, 1.5, 1.5)).toBe(false);
+    expect(sweptBoxContains({ x: 0, y: -1.4 }, a, b, 1.5, 1.5)).toBe(true);
+  });
+
+  it('handles a path of zero length', () => {
+    expect(sweptBoxContains({ x: 0.3, y: 0.3 }, a, a, 0.5, 0.5)).toBe(true);
+    expect(sweptBoxContains({ x: 0.6, y: 0 }, a, a, 0.5, 0.5)).toBe(false);
   });
 });

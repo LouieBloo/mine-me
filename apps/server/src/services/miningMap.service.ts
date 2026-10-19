@@ -14,6 +14,11 @@ import {
   type FluidGeneration,
   type MiningMapConfigData,
   getGridDimensions,
+  pickRockShape,
+  pieceCells,
+  ROCK_SHAPES,
+  type PieceOffset,
+  type RockShape,
 } from '@mine-me/shared';
 import { MiningDataManager } from './mining/subsystems/MiningDataManager';
 
@@ -36,7 +41,7 @@ export interface ServerTile {
   /** Accumulated damage dealt to this block (remaining HP = maxHealth - damage). */
   damage?: number;
   /** Set on a cell of a multi-cell piece (ladder, torch, bridge): [column, row] inside the piece, from its top-left cell. */
-  piece?: [ox: number, oy: number];
+  piece?: PieceOffset;
 }
 
 /**
@@ -569,53 +574,70 @@ export class MiningMapGenerator {
     }
   }
 
+  /**
+   * Scatters rocks over the solid ground. `rockPercentage` is the share of solid cells that end up rock; the
+   * rocks come in the sizes of ROCK_SHAPES (a few cells wide or high), picked by weight, so one big rock uses up
+   * as much of the budget as the small ones it replaces. Every rock rests on solid ground along its whole bottom
+   * edge, so none starts out about to fall, and none sits near the entrance. A rock bigger than one cell is a
+   * piece: each of its cells records its place and the rock's size (see PieceOffset).
+   */
   private placeRocks(): void {
-    // Collect candidate positions: solid dirt tiles where y >= 1
-    // CRITICAL REQUIREMENT: A rock must NOT have an EMPTY tile directly beneath it at spawn
-    const candidateDirt: MiningPosition[] = [];
-    for (let y = 1; y < this.height; y++) {
-      for (let x = 0; x < this.width; x++) {
-        if (this.grid[y][x].type === MiningTileType.DIRT) {
-          const belowY = y + 1;
-          const isSupported = belowY >= this.height || isTileSolid(this.grid[belowY][x].type);
-          if (isSupported) {
-            candidateDirt.push({ x, y });
-          }
-        }
-      }
-    }
-
-    if (candidateDirt.length === 0) return;
-
+    const anchors: MiningPosition[] = [];
     let totalSolid = 0;
     for (let y = 1; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        if (isTileSolid(this.grid[y][x].type)) totalSolid++;
+        const type = this.grid[y][x].type;
+        if (isTileSolid(type)) totalSolid++;
+        if (type === MiningTileType.DIRT) anchors.push({ x, y });
       }
     }
 
-    const targetCount = Math.floor((totalSolid * this.config.rockPercentage) / 100);
+    let budget = Math.floor((totalSolid * this.config.rockPercentage) / 100);
+    if (budget <= 0 || anchors.length === 0) return;
 
-    for (let i = candidateDirt.length - 1; i > 0; i--) {
+    for (let i = anchors.length - 1; i > 0; i--) {
       const j = Math.floor(this.rng() * (i + 1));
-      [candidateDirt[i], candidateDirt[j]] = [candidateDirt[j], candidateDirt[i]];
+      [anchors[i], anchors[j]] = [anchors[j], anchors[i]];
     }
 
-    let placed = 0;
-    let idx = 0;
-    while (placed < targetCount && idx < candidateDirt.length) {
-      const pos = candidateDirt[idx++];
-      if (pos.y <= BLOCK_SCALE && Math.abs(pos.x - MINING_CONFIG.ENTRANCE_X) <= ENTRANCE_CLEAR_RADIUS) continue;
-      if (this.grid[pos.y][pos.x].type !== MiningTileType.DIRT) continue;
+    for (const anchor of anchors) {
+      if (budget <= 0) break;
+      const picked = pickRockShape(this.rng(), (shape) => shape.width * shape.height <= budget);
+      if (!picked) break;
+      // The picked size if it fits here, else the biggest smaller one that does
+      const shape = this.rockShapesToTry(picked).find((candidate) => this.canPlaceRock(anchor, candidate));
+      if (!shape) continue;
 
-      // Re-verify support in case a neighbor/below changed
-      const belowY = pos.y + 1;
-      const isSupported = belowY >= this.height || isTileSolid(this.grid[belowY][pos.x].type);
-      if (!isSupported) continue;
-
-      this.grid[pos.y][pos.x] = { type: MiningTileType.ROCK, revealed: false };
-      placed++;
+      const isBig = shape.width > 1 || shape.height > 1;
+      for (const cell of pieceCells(anchor, shape, true)) {
+        this.grid[cell.y][cell.x] = { type: MiningTileType.ROCK, revealed: false, ...(isBig ? { piece: cell.offset } : {}) };
+      }
+      budget -= shape.width * shape.height;
     }
+  }
+
+  /** The picked shape first, then every smaller one, biggest first (what to fall back to where the picked one does not fit). */
+  private rockShapesToTry(picked: RockShape): RockShape[] {
+    const area = (s: RockShape) => s.width * s.height;
+    const smaller = ROCK_SHAPES.filter((s) => area(s) < area(picked)).sort((a, b) => area(b) - area(a));
+    return [picked, ...smaller];
+  }
+
+  /** Whether a rock of `shape` with its top-left cell at `anchor` fits: all dirt, clear of the entrance, resting on solid ground. */
+  private canPlaceRock(anchor: MiningPosition, shape: RockShape): boolean {
+    const bottom = anchor.y + shape.height; // the row under the rock
+    if (anchor.x + shape.width > this.width || bottom > this.height) return false;
+    for (let y = anchor.y; y < bottom; y++) {
+      for (let x = anchor.x; x < anchor.x + shape.width; x++) {
+        if (this.grid[y][x].type !== MiningTileType.DIRT) return false;
+        if (y <= BLOCK_SCALE && Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= ENTRANCE_CLEAR_RADIUS) return false;
+      }
+    }
+    if (bottom >= this.height) return true; // standing on the floor of the map
+    for (let x = anchor.x; x < anchor.x + shape.width; x++) {
+      if (!isTileSolid(this.grid[bottom][x].type)) return false;
+    }
+    return true;
   }
 
   private placeChests(): void {

@@ -7,6 +7,9 @@ export interface ActiveFallingRock {
   x: number;
   y: number;
   angle?: number;
+  /** Cells wide and high; a single-cell rock when omitted. */
+  width?: number;
+  height?: number;
 }
 
 /** A dropped item or a stick of dynamite is drawn this many pixels across, whatever the block size. */
@@ -126,8 +129,8 @@ export class MiningEntityRenderer {
           }
           const sprite = new Sprite(rockTexture);
           sprite.anchor.set(0.5);
-          sprite.width = tileSize;
-          sprite.height = tileSize;
+          sprite.width = tileSize * (rock.width ?? 1);
+          sprite.height = tileSize * (rock.height ?? 1);
           fallingRocksContainer.addChild(sprite);
           rockView = sprite;
           fallingRockGraphicsMap.set(rock.id, rockView);
@@ -142,7 +145,9 @@ export class MiningEntityRenderer {
             rockView.destroy();
           }
           const graphics = new Graphics();
-          graphics.roundRect(-tileSize * 0.45, -tileSize * 0.45, tileSize * 0.9, tileSize * 0.9, 4);
+          const w = tileSize * (rock.width ?? 1);
+          const h = tileSize * (rock.height ?? 1);
+          graphics.roundRect(-w * 0.45, -h * 0.45, w * 0.9, h * 0.9, 4);
           graphics.fill(0x475569);
           fallingRocksContainer.addChild(graphics);
           rockView = graphics;

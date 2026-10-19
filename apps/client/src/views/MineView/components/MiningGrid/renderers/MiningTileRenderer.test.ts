@@ -103,6 +103,42 @@ describe('MiningTileRenderer', () => {
       expect(sprites.get('1,0')!.texture).toBe(texture);
     });
 
+    it('cuts a piece that records its own size by that size, so rocks of different sizes share one picture', () => {
+      const texture = art();
+      const wide = MiningTileRenderer.pieceSlice(texture, [2, 0, 3, 1], { width: 3, height: 1 });
+      expect(wide.frame.width).toBeCloseTo(10);
+      expect(wide.frame.height).toBeCloseTo(30);
+      expect(wide.frame.x).toBeCloseTo(20);
+      const square = MiningTileRenderer.pieceSlice(texture, [2, 0, 3, 3], { width: 3, height: 3 });
+      expect(square.frame.height).toBeCloseTo(10);
+      expect(square).not.toBe(wide);
+    });
+
+    it('shows a cell of a rock with the slice for the rock\'s own size', () => {
+      const texture = art();
+      const sprites = new Map<string, Sprite>();
+      const grid: MiningClientTile[][] = [[
+        { type: MiningTileType.ROCK, revealed: true, piece: [0, 0, 3, 1] },
+        { type: MiningTileType.ROCK, revealed: true, piece: [1, 0, 3, 1] },
+        { type: MiningTileType.ROCK, revealed: true },
+      ]];
+      MiningTileRenderer.renderGrid(container, grid, new Map([[MiningTileType.ROCK, texture]]), new Map(), sprites, 21);
+      expect(sprites.get('1,0')!.texture.frame.width).toBeCloseTo(10);
+      expect(sprites.get('2,0')!.texture).toBe(texture);
+    });
+
+    it('draws a rock with no art once, as a rectangle over its whole footprint', () => {
+      const spy = vi.spyOn(MiningTileRenderer, 'drawFallbackTile');
+      const grid: MiningClientTile[][] = [[
+        { type: MiningTileType.ROCK, revealed: true, piece: [0, 0, 3, 2] },
+        { type: MiningTileType.ROCK, revealed: true, piece: [1, 0, 3, 2] },
+      ]];
+      MiningTileRenderer.renderGrid(container, grid, new Map(), new Map(), new Map(), 21);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(expect.anything(), MiningTileType.ROCK, 63, 42);
+      spy.mockRestore();
+    });
+
     it('draws a piece with no art once, whole, from its top-left cell', () => {
       const spy = vi.spyOn(MiningTileRenderer, 'drawFallbackTile');
       const grid: MiningClientTile[][] = [[
@@ -111,7 +147,7 @@ describe('MiningTileRenderer', () => {
       ]];
       MiningTileRenderer.renderGrid(container, grid, new Map(), new Map(), new Map(), 21);
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith(expect.anything(), MiningTileType.BRIDGE, 21 * footprint.width);
+      expect(spy).toHaveBeenCalledWith(expect.anything(), MiningTileType.BRIDGE, 21 * footprint.width, 21 * footprint.height);
       spy.mockRestore();
     });
   });

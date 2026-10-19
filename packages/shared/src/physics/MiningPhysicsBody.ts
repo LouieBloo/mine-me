@@ -194,6 +194,13 @@ export abstract class MiningPhysicsBody {
       if (!this.checkTileCollision(this.position.x, targetY, grid)) {
         this.position.y = targetY;
         this.isGrounded = false;
+        // The bottom edge of the map is bedrock: a body that reaches it is standing on it, not still falling
+        if (this.velocity.y > 0 && targetY >= height - this.halfHeight) {
+          this.isGrounded = true;
+          const impactSpeed = this.velocity.y;
+          this.velocity.y = 0;
+          this.onGroundHit(impactSpeed);
+        }
       } else {
         if (this.velocity.y > 0) {
           // Hitting the floor -> ground the body and snap cleanly to the top surface of floor tile

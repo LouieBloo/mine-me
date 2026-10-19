@@ -1,3 +1,4 @@
+import { MiningModeIndicator } from '../MiningModeIndicator/MiningModeIndicator';
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { usePixiStage } from '../../../../components/game/PixiStageContext/PixiStageContext';
 import { type GearLayerDescriptor } from '../../../../components/game/sprites';
@@ -32,6 +33,7 @@ import type { SandboxViewState } from '../../sandbox/sandboxTool';
 import { ReloadSoundTrigger } from './systems/ReloadSoundTrigger';
 import { CharacterSoundPlayer } from './systems/CharacterSoundPlayer';
 import { usePlayerDamageEvents } from './hooks/usePlayerDamageEvents';
+import { useMiningModeToast } from './hooks/useMiningModeToast';
 import { useMiningTicker } from './hooks/useMiningTicker';
 import { TILE_SIZE } from './renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from './renderers/DynamiteVisualManager';
@@ -470,6 +472,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   });
 
   // Hit knockback from the server is applied to the predicted player body; the damage shows as a floating number
+  useMiningModeToast(mouseControllerRef, playerBodyRef, floatingTextManagerRef);
   usePlayerDamageEvents({ onEvent, playerBodyRef, predictorRef: predictionRef, floatingTextManagerRef, characterSoundsRef });
 
   // Real-time 30 Hz server ticks subscription (updates refs & graphics incrementally with ZERO React re-renders)
@@ -540,5 +543,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     miningSwingSpeed: effectiveMiningSwingSpeed,
   });
 
-  return <div className="mining-grid-container" />;
+  return (
+    <div className="mining-grid-container">
+      <MiningModeIndicator controller={mouseControllerRef.current} />
+    </div>
+  );
 };

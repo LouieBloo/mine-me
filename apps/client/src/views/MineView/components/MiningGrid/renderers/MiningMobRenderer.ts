@@ -42,6 +42,9 @@ export interface MobInstance {
   sounds?: MiningActiveMob['sounds'];
 }
 
+/** How far (pixels) a mob's feet sink into the ground line, so they never look like they hover. */
+const FEET_SINK_PX = 1;
+
 const SLOT_SPATIAL: Record<MobSoundSlot, (typeof MINING_SPATIAL_AUDIO_PRESETS)[keyof typeof MINING_SPATIAL_AUDIO_PRESETS]> = {
   dig: MINING_SPATIAL_AUDIO_PRESETS.MOB_DIGGING,
   idle: MINING_SPATIAL_AUDIO_PRESETS.MOB_IDLE,
@@ -101,6 +104,16 @@ export class MiningMobRenderer {
   private preloadMobSounds(sounds: MiningActiveMob['sounds']): void {
     const urls = Object.values(sounds ?? {}).flatMap((slot) => (slot?.url ? [slot.url] : []));
     if (urls.length > 0) this.soundManager?.preloadSfx?.(urls);
+  }
+
+  /**
+   * Where a skeletal mob's pelvis goes (pixels below the middle of its collider) so its feet stand on the bottom of the
+   * collider: the feet hang `footDepth` rig pixels below the pelvis, scaled by how big the sprite is drawn, and the
+   * bottom of the collider is half its height below the middle. A pixel of overlap keeps the feet planted, not hovering.
+   */
+  public static pelvisY(footDepth: number, drawnHeight: number, colliderHeightTiles?: number): number {
+    const colliderHalfPx = ((colliderHeightTiles ?? MINING_CONFIG.PLAYER_COLLIDER_HEIGHT_TILES) / 2) * TILE_SIZE;
+    return colliderHalfPx - footDepth * (drawnHeight / ModularEntitySprite.REFERENCE_HEIGHT) + FEET_SINK_PX;
   }
 
   public getMobCount(): number {
@@ -249,13 +262,7 @@ export class MiningMobRenderer {
               const targetHeight = MINING_CONFIG.MOB_DEFAULT_DRAW_COLLIDER_HEIGHT * TILE_SIZE * MINING_CONFIG.MOB_DRAW_HEIGHT_FACTOR;
               sprite.scaleToHeight(targetHeight);
 
-              const unscaledFootDepth = 426;
-              const visualGroundOffset = 15;
-              const footOffset =
-                MINING_CONFIG.PLAYER_RADIUS -
-                unscaledFootDepth * (targetHeight / ModularEntitySprite.REFERENCE_HEIGHT) +
-                visualGroundOffset;
-              sprite.setPosition(0, footOffset);
+              sprite.setPosition(0, MiningMobRenderer.pelvisY(sprite.getFootDepth(), targetHeight, mobData.colliderHeight));
 
               sprite.setFlipped(instance!.isFacingLeft);
               sprite.setVisible(true);

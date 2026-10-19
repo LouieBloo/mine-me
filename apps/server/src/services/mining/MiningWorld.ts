@@ -1,4 +1,4 @@
-import type { MiningMapConfigData, MiningPosition, MiningRigidWorld, MiningTileType } from '@mine-me/shared';
+import type { MiningMapConfigData, MiningPosition, MiningRigidWorld, MiningTileType, PieceOffset } from '@mine-me/shared';
 import type { ServerMiningGrid } from '../miningMap.service';
 import type { MiningDamageSystem } from './MiningDamageSystem';
 import type { MiningBlockSubsystem } from './subsystems/MiningBlockSubsystem';
@@ -22,7 +22,7 @@ export interface PendingTileUpdate {
   type: MiningTileType;
   damageStage?: number;
   /** Set when the cell is part of a multi-cell piece: [column, row] inside it. */
-  piece?: [ox: number, oy: number];
+  piece?: PieceOffset;
 }
 
 /**

@@ -7,7 +7,7 @@ import type {
   SkeletonToolSocketDef,
   ModularAnimationState,
 } from '@mine-me/shared';
-import { MINER_SKELETON_PATH, getAssetUrl } from '@mine-me/shared';
+import { MINER_SKELETON_PATH, getAssetUrl, rigFootDepth } from '@mine-me/shared';
 
 export type {
   SkeletonManifest,
@@ -134,6 +134,11 @@ export class ModularEntitySprite extends BaseSprite {
     if (!this.destroyed && this.wrapper) {
       this.wrapper.visible = visible;
     }
+  }
+
+  /** How far below the pelvis this rig's feet reach, in unscaled rig pixels (see rigFootDepth). */
+  public getFootDepth(): number {
+    return rigFootDepth(this.manifest);
   }
 
   /**

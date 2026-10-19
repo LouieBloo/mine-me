@@ -1,4 +1,4 @@
-import { MINING_CONFIG, type MiningPosition, type Vector2D, type MobAIConfig } from '../../types/mining';
+import { MINING_CONFIG, type MiningPosition, type MiningTileType, type Vector2D, type MobAIConfig } from '../../types/mining';
 import type { MiningCollisionGrid } from '../../physics/MiningPhysicsBody';
 
 export interface PlayerTargetInfo {
@@ -50,8 +50,12 @@ export interface MobAIContext {
    * footprint free, steps up one-cell ledges, digs a gap its own size). Absent, the mob is treated as one cell.
    */
   body?: { width: number; height: number };
+  /** Whether the mob can break blocks of this type (its pick power meets the block's requirement). Absent: any mineable block. */
+  canBreakTile?: (type: MiningTileType) => boolean;
   /** How many cells high the mob can jump (from its jump force and gravity). Absent: 1. */
   jumpTiles?: number;
+  /** How far sideways (cells) one jump carries the mob: its speed times its time in the air. Absent: unlimited. */
+  jumpReach?: number;
   /** Shared per-tick limit on path searches; absent means unlimited. */
   pathBudget?: PathRequestBudget;
 }
