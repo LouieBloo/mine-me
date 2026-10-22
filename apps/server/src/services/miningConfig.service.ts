@@ -1,5 +1,6 @@
 import { prisma } from '../index';
 import { DEFAULT_MINING_MAP_CONFIG, type MiningMapConfigData } from '@mine-me/shared';
+import { Prisma } from '@prisma/client';
 import { syncJson } from './admin.service';
 
 let cachedConfig: MiningMapConfigData | null = null;
@@ -55,6 +56,7 @@ export async function getActiveMiningConfig(): Promise<MiningMapConfigData> {
         heatRadius: (config as any).heatRadius ?? DEFAULT_MINING_MAP_CONFIG.heatRadius,
         heatDamagePerSecond: (config as any).heatDamagePerSecond ?? DEFAULT_MINING_MAP_CONFIG.heatDamagePerSecond,
         burningEffectId: (config as any).burningEffectId ?? null,
+        autotileStyle: (config as any).autotileStyle ?? null,
         mobSpawnCount: (config as any).mobSpawnCount ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnCount,
         mobSpawnMinDepth: (config as any).mobSpawnMinDepth ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnMinDepth,
         allowedMobIds: ((config as any).allowedMobIds as string[]) ?? DEFAULT_MINING_MAP_CONFIG.allowedMobIds,
@@ -114,6 +116,8 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     heatDamagePerSecond: data.heatDamagePerSecond ?? (existing as any)?.heatDamagePerSecond ?? DEFAULT_MINING_MAP_CONFIG.heatDamagePerSecond ?? 1.5,
     // null is meaningful here ("no effect"), so only fall back when the field was not supplied at all
     burningEffectId: data.burningEffectId !== undefined ? data.burningEffectId : ((existing as any)?.burningEffectId ?? null),
+    // null is meaningful here ("the built-in look"), so only fall back when the field was not supplied at all
+    autotileStyle: data.autotileStyle !== undefined ? data.autotileStyle : ((existing as any)?.autotileStyle ?? null),
     mobSpawnCount: data.mobSpawnCount ?? (existing as any)?.mobSpawnCount ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnCount ?? 3,
     mobSpawnMinDepth: data.mobSpawnMinDepth ?? (existing as any)?.mobSpawnMinDepth ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnMinDepth ?? 5,
     allowedMobIds: data.allowedMobIds ?? ((existing as any)?.allowedMobIds as string[]) ?? DEFAULT_MINING_MAP_CONFIG.allowedMobIds ?? [],
@@ -129,11 +133,11 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
   if (existing) {
     saved = await prisma.miningMapConfig.update({
       where: { id: existing.id },
-      data: payload,
+      data: { ...payload, autotileStyle: payload.autotileStyle ?? Prisma.JsonNull },
     });
   } else {
     saved = await prisma.miningMapConfig.create({
-      data: payload,
+      data: { ...payload, autotileStyle: payload.autotileStyle ?? Prisma.JsonNull },
     });
   }
 
@@ -176,6 +180,7 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     heatRadius: (saved as any).heatRadius,
     heatDamagePerSecond: (saved as any).heatDamagePerSecond,
     burningEffectId: (saved as any).burningEffectId ?? null,
+    autotileStyle: (saved as any).autotileStyle ?? null,
     mobSpawnCount: (saved as any).mobSpawnCount,
     mobSpawnMinDepth: (saved as any).mobSpawnMinDepth,
     allowedMobIds: ((saved as any).allowedMobIds as string[]) ?? undefined,

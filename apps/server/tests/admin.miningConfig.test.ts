@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
+import { Prisma } from '@prisma/client';
 import { adminRouter } from '../src/routes/admin';
 import { DEFAULT_MINING_MAP_CONFIG, MINING_CONFIG } from '@mine-me/shared';
 
@@ -16,17 +17,19 @@ vi.mock('../src/middleware/auth', () => ({
 }));
 
 let mockActiveConfig: any = null;
+// A database returns a real null for a column that was set to Prisma.JsonNull
+const asStored = (data: any) => Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v === Prisma.JsonNull ? null : v]));
 
 vi.mock('../src/index', () => ({
   prisma: {
     miningMapConfig: {
       findFirst: vi.fn().mockImplementation(() => Promise.resolve(mockActiveConfig)),
       create: vi.fn().mockImplementation(({ data }) => {
-        mockActiveConfig = { id: 'cfg_1', ...data };
+        mockActiveConfig = { id: 'cfg_1', ...asStored(data) };
         return Promise.resolve(mockActiveConfig);
       }),
       update: vi.fn().mockImplementation(({ data }) => {
-        mockActiveConfig = { ...mockActiveConfig, ...data };
+        mockActiveConfig = { ...mockActiveConfig, ...asStored(data) };
         return Promise.resolve(mockActiveConfig);
       }),
     },
@@ -215,5 +218,22 @@ describe('Admin Mining Config API Routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.cavernDensity).toBe(DEFAULT_MINING_MAP_CONFIG.cavernDensity);
     expect(res.body.tunnelCount).toBe(DEFAULT_MINING_MAP_CONFIG.tunnelCount);
+  });
+
+  it('PUT /admin/mining-config saves the default edge look of terrain blocks, and null clears it', async () => {
+    const look = { radius: 0.35, rimStrength: 0.4 };
+    const saved = await request(app).put('/admin/mining-config').send({ autotileStyle: look });
+    expect(saved.status).toBe(200);
+    expect(saved.body.autotileStyle).toEqual(look);
+    const kept = await request(app).put('/admin/mining-config').send({ cavernDensity: 44 });
+    expect(kept.body.autotileStyle).toEqual(look);
+    const cleared = await request(app).put('/admin/mining-config').send({ autotileStyle: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.autotileStyle).toBeNull();
+  });
+
+  it('PUT /admin/mining-config rejects an edge look that is out of range', async () => {
+    const res = await request(app).put('/admin/mining-config').send({ autotileStyle: { rimWidth: 3 } });
+    expect(res.status).toBe(400);
   });
 });

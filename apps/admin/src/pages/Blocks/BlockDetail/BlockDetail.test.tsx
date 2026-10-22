@@ -53,6 +53,9 @@ describe('BlockDetail Page', () => {
           json: async () => blockData,
         });
       }
+      if (url.includes('/api/admin/mining-config')) {
+        return Promise.resolve({ ok: true, json: async () => ({ autotileStyle: { radius: 0.4 } }) });
+      }
       if (url.includes('/api/admin/particle-effects')) {
         return Promise.resolve({
           ok: true,
@@ -320,6 +323,59 @@ describe('BlockDetail Page', () => {
       fireEvent.change(screen.getByLabelText('Burn Duration (s)'), { target: { value: '9' } });
       fireEvent.click(screen.getByRole('button', { name: /save block properties/i }));
       await waitFor(() => expect(putBody().flammability).toMatchObject({ burnDuration: 9, ignitionChance: 0.5 }));
+    });
+  });
+
+  describe('edge look (ticket 094)', () => {
+    const renderPage = () =>
+      render(
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/blocks/block_copperium']}>
+            <Routes>
+              <Route path="/blocks/:id" element={<BlockDetail />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      );
+
+    it('shows the map look as the fallback for a block with no look of its own', async () => {
+      setupMockData();
+      renderPage();
+      expect(await screen.findByText('Map default')).toBeInTheDocument();
+      expect(screen.getByLabelText('Custom look')).not.toBeChecked();
+    });
+
+    it('saves the block\'s own look, and null when it has none', async () => {
+      setupMockData();
+      renderPage();
+      fireEvent.click(await screen.findByLabelText('Custom look'));
+      fireEvent.change(screen.getByLabelText('Corner Radius'), { target: { value: '0.2' } });
+      fireEvent.click(screen.getByRole('button', { name: /save/i }));
+      await waitFor(() => {
+        const put = mockFetchWithAuth.mock.calls.find(([, opts]) => opts?.method === 'PUT');
+        expect(JSON.parse(put![1].body).autotile).toEqual({ radius: 0.2 });
+      });
+    });
+
+    it('loads a saved look and clears it when switched back to the map default', async () => {
+      setupMockData({ autotile: { rimStrength: 0.9 } });
+      renderPage();
+      const toggle = await screen.findByLabelText('Custom look');
+      expect(toggle).toBeChecked();
+      expect(screen.getByLabelText('Rim Strength')).toHaveValue(0.9);
+      fireEvent.click(toggle);
+      fireEvent.click(screen.getByRole('button', { name: /save/i }));
+      await waitFor(() => {
+        const put = mockFetchWithAuth.mock.calls.find(([, opts]) => opts?.method === 'PUT');
+        expect(JSON.parse(put![1].body).autotile).toBeNull();
+      });
+    });
+
+    it('is not offered for a block an item places (a ladder is not terrain)', async () => {
+      setupMockData({ id: 'block_copperium', typeKey: 'LADDER' });
+      renderPage();
+      await screen.findByDisplayValue('Copperium Ore');
+      expect(screen.queryByTestId('autotile-panel')).not.toBeInTheDocument();
     });
   });
 });

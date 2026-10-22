@@ -9,6 +9,7 @@ import MiningConfigCaverns from './components/MiningConfigCaverns/MiningConfigCa
 import MiningConfigResources from './components/MiningConfigResources/MiningConfigResources';
 import MiningConfigMobs from './components/MiningConfigMobs/MiningConfigMobs';
 import MiningConfigDamage from './components/MiningConfigDamage/MiningConfigDamage';
+import MiningConfigAutotile from './components/MiningConfigAutotile/MiningConfigAutotile';
 import MiningConfigBurningEffect from './components/MiningConfigBurningEffect/MiningConfigBurningEffect';
 import MiningConfigPreview, { type PreviewResponse } from './components/MiningConfigPreview/MiningConfigPreview';
 import './MiningConfig.css';
@@ -165,6 +166,7 @@ export default function MiningConfig() {
           <MiningConfigMobs config={config} onFieldChange={handleFieldChange} />
           <MiningConfigDamage config={config} onFieldChange={handleFieldChange} />
           <MiningConfigBurningEffect config={config} onFieldChange={handleFieldChange} />
+          <MiningConfigAutotile config={config} onFieldChange={handleFieldChange} />
         </div>
 
         {/* Right Column: Live Visual Mini-Map Preview */}

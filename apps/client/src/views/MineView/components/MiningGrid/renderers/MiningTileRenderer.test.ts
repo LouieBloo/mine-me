@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { MiningTileRenderer, TILE_CHUNK_CELLS } from './MiningTileRenderer';
+import { autotileVariants } from './AutotileVariants';
+import { AUTOTILE_BOTTOM, AUTOTILE_LEFT, AUTOTILE_TOP } from '@mine-me/shared';
 import { MiningTileType, getTileFootprint, type MiningClientTile } from '@mine-me/shared';
 
 describe('MiningTileRenderer', () => {
@@ -242,17 +244,10 @@ describe('MiningTileRenderer', () => {
       64
     );
 
-    expect(renderSingleSpy).toHaveBeenCalledTimes(1);
-    expect(renderSingleSpy).toHaveBeenCalledWith(
-      container,
-      1,
-      0,
-      grid[0][1],
-      blockTextures,
-      tileGraphicsMap,
-      tileSpritesMap,
-      64
-    );
+    // The revealed tile and the neighbours inside the grid (their edges depend on it), nothing else
+    const drawn = renderSingleSpy.mock.calls.map((call) => `${call[1]},${call[2]}`).sort();
+    expect(drawn).toEqual(['0,0', '1,0', '1,1']);
+    expect(renderSingleSpy).toHaveBeenCalledWith(container, 1, 0, grid[0][1], blockTextures, tileGraphicsMap, tileSpritesMap, 64, grid);
 
     renderSingleSpy.mockRestore();
   });
@@ -309,5 +304,84 @@ describe('MiningTileRenderer chunks and cost', () => {
     expect(sprite.tint).toBe(0xffffff);
     expect(sprite.width).toBe(21);
     expect(sprite.height).toBe(21);
+  });
+});
+
+describe('MiningTileRenderer autotiling (ticket 094)', () => {
+  const dirt = (revealed = true): MiningClientTile => ({ type: MiningTileType.DIRT, revealed });
+  const air = (): MiningClientTile => ({ type: MiningTileType.EMPTY, revealed: true });
+  const base = new Texture();
+  const edged = new Texture();
+  let container: Container;
+
+  const draw = (grid: MiningClientTile[][], x: number, y: number, withGrid = true) => {
+    const sprites = new Map<string, Sprite>();
+    MiningTileRenderer.renderSingleTile(container, x, y, grid[y][x], new Map([[MiningTileType.DIRT, base], [MiningTileType.LADDER, base]]), new Map(), sprites, 21, withGrid ? grid : undefined);
+    return sprites.get(`${x},${y}`);
+  };
+
+  beforeEach(() => {
+    container = new Container();
+    vi.restoreAllMocks();
+  });
+
+  it('asks for the picture of the exposed sides and draws the sprite with it', () => {
+    const spy = vi.spyOn(autotileVariants, 'textureFor').mockReturnValue(edged);
+    const grid = [[dirt(), air()], [dirt(), dirt()]];
+    // (0,0) has air to its right
+    expect(draw(grid, 0, 0)?.texture).toBe(edged);
+    expect(spy).toHaveBeenCalledWith(MiningTileType.DIRT, base, 2);
+  });
+
+  it('passes the mask of every exposed side', () => {
+    const spy = vi.spyOn(autotileVariants, 'textureFor').mockReturnValue(edged);
+    const grid = [[air(), air(), air()], [air(), dirt(), dirt()], [dirt(), dirt(), dirt()]];
+    draw(grid, 1, 1);
+    expect(spy).toHaveBeenCalledWith(MiningTileType.DIRT, base, AUTOTILE_TOP | AUTOTILE_LEFT);
+    draw([[dirt(), dirt(), dirt()], [dirt(), air(), dirt()], [dirt(), air(), dirt()]], 0, 0);
+    expect(spy).toHaveBeenLastCalledWith(MiningTileType.DIRT, base, 0);
+    draw([[dirt()], [air()]], 0, 0);
+    expect(spy).toHaveBeenLastCalledWith(MiningTileType.DIRT, base, AUTOTILE_BOTTOM);
+  });
+
+  it('draws the plain texture when it is not given the grid', () => {
+    const spy = vi.spyOn(autotileVariants, 'textureFor').mockReturnValue(edged);
+    expect(draw([[dirt(), air()]], 0, 0, false)?.texture).toBe(base);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('leaves pieces and their art alone', () => {
+    const spy = vi.spyOn(autotileVariants, 'textureFor').mockReturnValue(edged);
+    const ladder: MiningClientTile = { type: MiningTileType.LADDER, revealed: true, piece: [0, 0] };
+    const sprite = draw([[ladder, air()]], 0, 0);
+    expect(spy).not.toHaveBeenCalled();
+    expect(sprite?.texture).not.toBe(edged);
+  });
+
+  it('redraws a neighbour when a cell next to it changes, so a mined block exposes the edge behind it', () => {
+    const spy = vi.spyOn(autotileVariants, 'textureFor').mockImplementation((_t, plain, mask) => (mask ? edged : plain));
+    const grid = [[dirt(), dirt(), dirt()]];
+    const sprites = new Map<string, Sprite>();
+    const textures = new Map([[MiningTileType.DIRT, base]]);
+    MiningTileRenderer.renderGrid(container, grid, textures, new Map(), sprites, 21);
+    expect(sprites.get('2,0')?.texture).toBe(base);
+    // The middle block is mined away
+    grid[0][1] = air();
+    MiningTileRenderer.updateRevealedTiles(container, [{ x: 1, y: 0, type: MiningTileType.EMPTY }], grid, textures, new Map(), sprites, 21);
+    expect(sprites.get('0,0')?.texture).toBe(edged);
+    expect(sprites.get('2,0')?.texture).toBe(edged);
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('draws a cell next to fog without an edge, and gives it one when the fog is revealed', () => {
+    vi.spyOn(autotileVariants, 'textureFor').mockImplementation((_t, plain, mask) => (mask ? edged : plain));
+    const grid = [[dirt(), { type: MiningTileType.EMPTY, revealed: false } as MiningClientTile]];
+    const sprites = new Map<string, Sprite>();
+    const textures = new Map([[MiningTileType.DIRT, base]]);
+    MiningTileRenderer.renderGrid(container, grid, textures, new Map(), sprites, 21);
+    expect(sprites.get('0,0')?.texture).toBe(base);
+    grid[0][1].revealed = true;
+    MiningTileRenderer.updateRevealedTiles(container, [{ x: 1, y: 0, type: MiningTileType.EMPTY }], grid, textures, new Map(), sprites, 21);
+    expect(sprites.get('0,0')?.texture).toBe(edged);
   });
 });

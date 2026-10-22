@@ -7,7 +7,8 @@ import BlockTextureUpload from './BlockTextureUpload';
 import BlockSoundEffectUpload from './BlockSoundEffectUpload/BlockSoundEffectUpload';
 import { DropTableEditor } from '../../../components/DropTableEditor/DropTableEditor';
 import FlammabilityPanel from '../../../components/FlammabilityPanel/FlammabilityPanel';
-import { isItemPlacedBlockKey, type MiningBlockConfig, type DropTable, type Flammability } from '@mine-me/shared';
+import AutotilePanel from '../../../components/AutotilePanel/AutotilePanel';
+import { isItemPlacedBlockKey, isAutotileTerrain, MiningTileType, type AutotileConfig, type MiningBlockConfig, type DropTable, type Flammability } from '@mine-me/shared';
 import './BlockDetail.css';
 
 export default function BlockDetail() {
@@ -22,6 +23,9 @@ export default function BlockDetail() {
   const [particleEffectsList, setParticleEffectsList] = useState<any[]>([]);
   const [dropTable, setDropTable] = useState<Omit<DropTable, 'id'> | null>(null);
   const [flammability, setFlammability] = useState<Flammability | null>(null);
+  // This block's own edge look (null: the map's), and the map's, which fills in whatever the block leaves out
+  const [autotile, setAutotile] = useState<AutotileConfig | null>(null);
+  const [mapAutotile, setMapAutotile] = useState<AutotileConfig | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -43,9 +47,14 @@ export default function BlockDetail() {
       fetchWithAuth('/api/admin/particle-effects')
         .then((res) => (res.ok ? res.json() : []))
         .catch(() => []),
+      fetchWithAuth('/api/admin/mining-config')
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
     ])
-      .then(([data, particleEffectsJson]: [MiningBlockConfig, any[]]) => {
+      .then(([data, particleEffectsJson, mapConfig]: [MiningBlockConfig, any[], { autotileStyle?: AutotileConfig | null } | null]) => {
         setBlock(data);
+        setAutotile(data.autotile ?? null);
+        setMapAutotile(mapConfig?.autotileStyle ?? null);
         setParticleEffectsList(Array.isArray(particleEffectsJson) ? particleEffectsJson : []);
         setDropTable(data.dropTable || null);
         setFlammability(data.flammability ?? null);
@@ -83,6 +92,7 @@ export default function BlockDetail() {
         idleParticleEffectId: formData.idleParticleEffectId || null,
         dropTable,
         flammability,
+        autotile,
       };
       const res = await fetchWithAuth(`/api/admin/blocks/${block.id}`, {
         method: 'PUT',
@@ -270,6 +280,20 @@ export default function BlockDetail() {
                   Continuous ambient sparkles/effects emitted from this block in-game (no light)
                 </span>
               </div>
+
+              {isAutotileTerrain({ type: MiningTileType[block.typeKey as keyof typeof MiningTileType] ?? MiningTileType.EMPTY }) && (
+                <div className="pt-4 border-t border-slate-100">
+                  <AutotilePanel
+                    value={autotile}
+                    onChange={setAutotile}
+                    inherited={mapAutotile}
+                    textureUrl={block.textureUrl}
+                    title="Edge Look"
+                    description="How this block's edges are drawn where it meets open space. Fields left on default follow the Mine Generator page."
+                    inheritLabel="Map default"
+                  />
+                </div>
+              )}
 
               <div className="pt-4 border-t border-slate-100">
                 <FlammabilityPanel

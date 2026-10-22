@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { getSoundsDir, resolveAssetUrl } from '../../config/assetPaths';
 import { Prisma } from '@prisma/client';
-import { validateFlammability } from '@mine-me/shared';
+import { validateFlammability, validateAutotileConfig } from '@mine-me/shared';
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -106,6 +106,16 @@ export const updateBlock = async (req: Request, res: Response) => {
         return;
       }
       dataToUpdate.flammability = req.body.flammability === null ? Prisma.JsonNull : req.body.flammability;
+    }
+
+    // The block's own edge look (null: use the map's). Same Json rule as flammability.
+    if (req.body.autotile !== undefined) {
+      const errors = validateAutotileConfig(req.body.autotile);
+      if (errors.length > 0) {
+        res.status(400).json({ error: errors.join('; '), errors });
+        return;
+      }
+      dataToUpdate.autotile = req.body.autotile === null ? Prisma.JsonNull : req.body.autotile;
     }
 
     const block = await prisma.miningBlock.update({

@@ -97,4 +97,4 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [091](done/091-pickaxe-auto-target.md) | Pickaxe auto-target: mine the next blocks along the line to the cursor, Ctrl for 1x1 | P1 (Done) |
 | [092](done/092-big-rocks.md) | Rocks of several sizes (variable-size pieces) | P2 (Done) |
 | [093](done/093-mob-navigation-and-feet.md) | Mob navigation fixes and mob feet on the ground (3x blocks) | P1 (Done; judge the new mole size) |
-| [094](094-autotiling-from-one-texture.md) | Autotiling: edges and rounded corners from one texture | P2 (Open; design agreed) |
+| [094](094-autotiling-from-one-texture.md) | Autotiling: edges and rounded corners from one texture | P2 (Built, not yet played) |

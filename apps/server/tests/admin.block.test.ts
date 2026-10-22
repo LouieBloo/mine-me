@@ -196,3 +196,37 @@ describe('Mining Block flammability', () => {
     expect(mockBlocks[0].flammability).toBeUndefined();
   });
 });
+
+describe('Mining Block edge look (autotile, ticket 094)', () => {
+  const LOOK = { radius: 0.3, rimColor: '#112233' };
+
+  beforeEach(() => {
+    mockBlocks = [{ id: 'block_dirt', typeKey: 'DIRT', name: 'Dirt', staminaCost: 1, idleParticleEffectId: null, idleParticleEffect: null }];
+  });
+
+  it('saves the block\'s own edge look', async () => {
+    const res = await request(app).put('/admin/blocks/block_dirt').send({ autotile: LOOK });
+    expect(res.status).toBe(200);
+    expect(mockBlocks[0].autotile).toEqual(LOOK);
+  });
+
+  it('clears it with a database null, so the block falls back to the map look', async () => {
+    mockBlocks[0].autotile = LOOK;
+    const res = await request(app).put('/admin/blocks/block_dirt').send({ autotile: null });
+    expect(res.status).toBe(200);
+    expect(mockBlocks[0].autotile).toBe(Prisma.JsonNull);
+  });
+
+  it('leaves it alone when the request does not mention it', async () => {
+    mockBlocks[0].autotile = LOOK;
+    await request(app).put('/admin/blocks/block_dirt').send({ name: 'Soil' });
+    expect(mockBlocks[0].autotile).toEqual(LOOK);
+  });
+
+  it('rejects values out of range, listing the problems, and changes nothing', async () => {
+    const res = await request(app).put('/admin/blocks/block_dirt').send({ autotile: { radius: 2, rimColor: 'red' } });
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toHaveLength(2);
+    expect(mockBlocks[0].autotile).toBeUndefined();
+  });
+});

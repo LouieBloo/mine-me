@@ -160,6 +160,14 @@ describe('fluids on the wire', () => {
       expect(oilDefinition().sounds).toBeUndefined();
     });
 
+    it('a joining client also gets the map\'s default edge look for terrain blocks', () => {
+      const look = { radius: 0.2, rimColor: '#222222' };
+      engine.mapConfig = { ...engine.mapConfig, autotileStyle: look };
+      expect(MiningSessionManager.getInstance().buildClientState(engine, cid).autotileStyle).toEqual(look);
+      engine.mapConfig = { ...engine.mapConfig, autotileStyle: null };
+      expect(MiningSessionManager.getInstance().buildClientState(engine, cid).autotileStyle).toBeNull();
+    });
+
     it('a joining client also gets the effect drawn on burning bodies, from the map config', () => {
       engine.mapConfig = { ...engine.mapConfig, burningEffectId: 'pe_burning' };
       vi.spyOn(engine.dataManager, 'getParticleEffect').mockImplementation((id) => (id === 'pe_burning' ? ({ id, config: FLAME } as any) : undefined));

@@ -2,11 +2,14 @@ import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import {
   MINING_TILE_PIXELS,
   MiningTileType,
+  autotileMask,
+  isAutotileTerrain,
   canTileBeDamaged,
   pieceFootprint,
   type MiningClientTile,
   type PieceOffset,
 } from '@mine-me/shared';
+import { autotileVariants } from './AutotileVariants';
 
 /** One block on screen, in pixels (shared with the server's pixel-sized colliders and the admin previews). */
 export const TILE_SIZE = MINING_TILE_PIXELS;
@@ -16,6 +19,8 @@ const pieceSlices = new WeakMap<Texture, Map<string, Texture>>();
 
 /** Cells along one side of a chunk of tiles (see MiningTileRenderer.chunkFor). */
 export const TILE_CHUNK_CELLS = 16;
+/** The cell itself and the four around it: everything a change can alter the edge picture of. */
+const NEIGHBOUR_REDRAW: ReadonlyArray<readonly [number, number]> = [[0, 0], [0, -1], [1, 0], [0, 1], [-1, 0]];
 const tileChunks = new WeakMap<Container, Map<string, Container>>();
 
 export class MiningTileRenderer {
@@ -306,7 +311,8 @@ export class MiningTileRenderer {
     blockTextures: Map<number, Texture>,
     tileGraphicsMap: Map<string, Graphics>,
     tileSpritesMap: Map<string, Sprite>,
-    tileSize: number = TILE_SIZE
+    tileSize: number = TILE_SIZE,
+    grid?: MiningClientTile[][]
   ): void {
     const key = `${x},${y}`;
     const chunk = this.chunkFor(tilesContainer, x, y, tileSize);
@@ -316,7 +322,11 @@ export class MiningTileRenderer {
     const footprint = pieceFootprint(tile.type, tile.piece);
     const wholeTexture = tile.revealed ? blockTextures.get(tile.type) : undefined;
     // A cell of a piece shows its slice of the piece's art
-    const blockTexture = wholeTexture && tile.piece ? this.pieceSlice(wholeTexture, tile.piece, footprint) : wholeTexture;
+    let blockTexture = wholeTexture && tile.piece ? this.pieceSlice(wholeTexture, tile.piece, footprint) : wholeTexture;
+    // Terrain takes the picture for the sides that face open space (ticket 094); it needs the grid to know them
+    if (blockTexture && grid && isAutotileTerrain(tile)) {
+      blockTexture = autotileVariants.textureFor(tile.type, blockTexture, autotileMask(grid, x, y));
+    }
 
     // 1. The sprite: fog, or the block's art
     const spriteTexture = !tile.revealed ? Texture.WHITE : blockTexture;
@@ -388,7 +398,8 @@ export class MiningTileRenderer {
           blockTextures,
           tileGraphicsMap,
           tileSpritesMap,
-          tileSize
+          tileSize,
+          grid
         );
       });
     });
@@ -403,20 +414,18 @@ export class MiningTileRenderer {
     tileSpritesMap: Map<string, Sprite>,
     tileSize: number = TILE_SIZE
   ): void {
+    // A changed cell also changes the edges of the four cells around it (a mined block exposes its neighbours, a
+    // revealed cell stops being fog), so those redraw too, each once
+    const cells = new Map<string, { x: number; y: number }>();
     for (const rt of revealedTiles) {
-      const tile = grid[rt.y]?.[rt.x];
-      if (tile) {
-        this.renderSingleTile(
-          tilesContainer,
-          rt.x,
-          rt.y,
-          tile,
-          blockTextures,
-          tileGraphicsMap,
-          tileSpritesMap,
-          tileSize
-        );
+      for (const [dx, dy] of NEIGHBOUR_REDRAW) {
+        const x = rt.x + dx;
+        const y = rt.y + dy;
+        if (grid[y]?.[x]) cells.set(`${x},${y}`, { x, y });
       }
+    }
+    for (const { x, y } of cells.values()) {
+      this.renderSingleTile(tilesContainer, x, y, grid[y][x], blockTextures, tileGraphicsMap, tileSpritesMap, tileSize, grid);
     }
   }
 }

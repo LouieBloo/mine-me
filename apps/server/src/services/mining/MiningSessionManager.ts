@@ -158,6 +158,7 @@ export class MiningSessionManager {
       gasCells: engine.gasSubsystem.visibleSnapshot(),
       fireCells: engine.fireSubsystem.visibleSnapshot(),
       blockFlames: engine.fluidSubsystem.blockFlameDefinitions(),
+      autotileStyle: engine.mapConfig?.autotileStyle ?? null,
       burningEffect: MiningDataManager.getInstance().getParticleEffect(engine.mapConfig?.burningEffectId)?.config ?? null,
       position: {
         x: Math.round(pos.x),

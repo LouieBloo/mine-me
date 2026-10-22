@@ -257,6 +257,8 @@ model MiningBlock {
   idleParticleEffect   ParticleEffect? @relation(fields: [idleParticleEffectId], references: [id], onDelete: SetNull)
   // Shared Flammability shape (null = the block does not burn)
   flammability         Json?
+  // Edge look overrides (radius, rimWidth, rimStrength, rimColor; any may be left out). null = the map's autotileStyle.
+  autotile             Json?
   dropTable            DropTable?      @relation("MiningBlockDrops")
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
@@ -374,6 +376,8 @@ model MiningMapConfig {
   heatDamagePerSecond Float    @default(1.5)
   // ParticleEffect drawn on a burning player or mob (null = none)
   burningEffectId     String?
+  // Default edge look of terrain blocks (autotile, ticket 094); null = the built-in default
+  autotileStyle       Json?
   // Hostile NPC / Mob Spawning Settings
   mobSpawnCount       Int      @default(3)
   mobSpawnMinDepth    Int      @default(15)

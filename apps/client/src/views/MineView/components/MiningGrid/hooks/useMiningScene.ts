@@ -1,5 +1,5 @@
 import { miningProfiler } from '../utils/MiningProfiler';
-import { BLOCK_SCALE } from '@mine-me/shared';
+import { BLOCK_SCALE, type AutotileConfig } from '@mine-me/shared';
 import { useEffect, useRef, useState } from 'react';
 import { Application, Container, Graphics, Sprite, TilingSprite, Assets, Texture } from 'pixi.js';
 import { ModularCharacterSprite, FloatingTextManager, type GearLayerDescriptor } from '../../../../../components/game/sprites';
@@ -28,6 +28,7 @@ import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from '../renderers/DynamiteVisualManager';
 import { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
 import { FluidRenderer } from '../renderers/FluidRenderer';
+import { autotileVariants } from '../renderers/AutotileVariants';
 import { GasRenderer } from '../renderers/GasRenderer';
 import { FireRenderer } from '../renderers/FireRenderer';
 import { FluidGlow } from '../renderers/FluidGlow';
@@ -361,6 +362,13 @@ export function useMiningScene({
           const blocks = await res.json();
           publicBlocks = blocks;
           report(0.1);
+          // Each block's own edge look; fields it leaves out come from the map's (ticket 094)
+          const autotileOverrides = new Map<number, AutotileConfig | null>();
+          for (const blk of blocks) {
+            const type = MiningTileType[blk.typeKey as keyof typeof MiningTileType];
+            if (type !== undefined) autotileOverrides.set(type, blk.autotile ?? null);
+          }
+          autotileVariants.configure(initialSessionState.autotileStyle, autotileOverrides);
           for (const blk of blocks) {
             const tileType = MiningTileType[blk.typeKey as keyof typeof MiningTileType];
             if (tileType !== undefined) {
@@ -399,6 +407,7 @@ export function useMiningScene({
         }
       } catch (err) {
         console.warn('[MiningGrid] Could not fetch public blocks, falling back to default textures:', err);
+        autotileVariants.configure(initialSessionState.autotileStyle);
         // Fallback for default dirt texture
         const dirtTileUrl = getAssetUrl('/assets/mining/dirt-block.jpg');
         const fallbackPromise = Assets.load(dirtTileUrl)

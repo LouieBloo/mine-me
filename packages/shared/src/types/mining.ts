@@ -1,4 +1,5 @@
 import type { PieceOffset } from '../gameLogic/pieces';
+import type { AutotileConfig } from '../gameLogic/autotile';
 import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig, HeldLightConfig, CharacterSoundEffectsConfig, FluidSoundEffectsConfig } from './index';
 import type { ParticleEffect, ParticleEffectConfig } from './particles';
 import type { Flammability, FluidAppearance } from './fluid';
@@ -225,6 +226,8 @@ export interface MiningBlockConfig {
   idleParticleEffect?: ParticleEffect | null;
   /** How the block burns; null/absent means it does not. */
   flammability?: Flammability | null;
+  /** Edge look overrides for this block (fields left out use the map's); null/absent: the map's look (ticket 094). */
+  autotile?: AutotileConfig | null;
   dropTable?: DropTable | null;
   createdAt?: string | Date;
   updatedAt?: string | Date;
@@ -665,6 +668,8 @@ export interface MiningSessionClientState {
   fireCells?: [x: number, y: number, burning: 0 | 1][];
   /** The particle effect drawn on anything that is on fire (a player or a mob). Absent: none. */
   burningEffect?: ParticleEffectConfig | null;
+  /** The map's default edge look for terrain blocks, sent once. Absent: the built-in default. */
+  autotileStyle?: AutotileConfig | null;
   /** How burning blocks look, by tile type, for the block types that can burn. */
   blockFlames?: { tileType: number; flame: { effect: ParticleEffectConfig | null; light: ItemLightConfig | null } }[];
   /** Current player position on the grid. */
@@ -1099,6 +1104,8 @@ export interface MiningMapConfigData {
   heatDamagePerSecond?: number;
   /** The ParticleEffect (by id) drawn on a burning player or mob. None: nothing drawn. */
   burningEffectId?: string | null;
+  /** The default edge look of terrain blocks (a block's own `autotile` overrides it field by field). Absent: the built-in default. */
+  autotileStyle?: AutotileConfig | null;
   /** Hostile NPC / Mob Spawning */
   mobSpawnCount?: number;
   mobSpawnMinDepth?: number;
@@ -1147,6 +1154,7 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   heatRadius: 2.5 * S,
   heatDamagePerSecond: 1.5,
   burningEffectId: null,
+  autotileStyle: null,
   mobSpawnCount: 3,
   mobSpawnMinDepth: 5 * S,
   // No built-in mobs: the active map config (database) says which mobs live in the mine

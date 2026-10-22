@@ -329,6 +329,7 @@ export function useMiningTicker({
         isMining,
         miningTarget,
         blockTextures: blockTexturesRef?.current,
+        grid: grid ?? undefined,
       });
 
       // 8. Debug Graphics

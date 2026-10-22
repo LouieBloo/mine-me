@@ -1,4 +1,4 @@
-import { BLOCK_SCALE } from '@mine-me/shared';
+import { BLOCK_SCALE, validateAutotileConfig } from '@mine-me/shared';
 import { body } from 'express-validator';
 import { ITEM_TYPES, ITEM_SUBTYPES, ITEM_RARITIES } from '@mine-me/shared';
 
@@ -150,6 +150,11 @@ export const miningConfigValidation = [
   body('heatRadius').optional().isFloat({ min: 0, max: 20 * BLOCK_SCALE }).withMessage(`Heat Radius must be between 0 and ${20 * BLOCK_SCALE}`),
   body('heatDamagePerSecond').optional().isFloat({ min: 0, max: 1000 }).withMessage('Heat Damage Per Second must be between 0 and 1000'),
   body('burningEffectId').optional({ nullable: true }).isString().withMessage('Burning Effect ID must be a string or null'),
+  body('autotileStyle').optional({ nullable: true }).custom((value) => {
+    const errors = validateAutotileConfig(value);
+    if (errors.length > 0) throw new Error(errors.join('; '));
+    return true;
+  }),
   body('mobSpawnCount').optional().isInt({ min: 0, max: 20 }).withMessage('Mob Spawn Count must be between 0 and 20'),
   body('mobSpawnMinDepth').optional().isInt({ min: 1, max: 40 * BLOCK_SCALE }).withMessage(`Mob Spawn Min Depth must be between 1 and ${40 * BLOCK_SCALE}`),
   body('allowedMobIds').optional().isArray().withMessage('Allowed Mob IDs must be an array of strings'),

@@ -60,3 +60,4 @@ export * from './physics/fluidForces';
 export * from './gameLogic/fire/FireGrid';
 export * from './gameLogic/fire/fireWire';
 export * from './gameLogic/fire/heat';
+export * from './gameLogic/autotile';

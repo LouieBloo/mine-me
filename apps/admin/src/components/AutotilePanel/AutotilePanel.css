@@ -1,0 +1,6 @@
+.autotile-panel input[type='number']::-webkit-inner-spin-button {
+  opacity: 1;
+}
+.autotile-panel canvas {
+  image-rendering: pixelated;
+}
