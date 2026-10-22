@@ -126,6 +126,7 @@ describe('MiningMobRenderer', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       const sprite = renderer.getMob('mole')!.sprite as any;
       const drawn = 3.75 * TILE * 1.05;
+      expect(sprite.scaleToHeight).toHaveBeenCalledWith(drawn);
       expect(sprite.getFootDepth).toHaveBeenCalled();
       expect(sprite.setPosition).toHaveBeenCalledWith(0, MiningMobRenderer.pelvisY(270, drawn, 2.67));
     });

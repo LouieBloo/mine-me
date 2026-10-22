@@ -259,6 +259,7 @@ export class MiningMobRenderer {
             .load()
             .then(() => {
               if (!this.mobs.has(mobData.id)) return;
+              // Rigged mobs are drawn at the default size; the feet are planted on the mob's own collider (pelvisY)
               const targetHeight = MINING_CONFIG.MOB_DEFAULT_DRAW_COLLIDER_HEIGHT * TILE_SIZE * MINING_CONFIG.MOB_DRAW_HEIGHT_FACTOR;
               sprite.scaleToHeight(targetHeight);
 

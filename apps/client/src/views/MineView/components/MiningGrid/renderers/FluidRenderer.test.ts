@@ -160,6 +160,19 @@ describe('FluidRenderer', () => {
     expect(renderer.render()).toBe(2); // the water's chunk and the chunk holding the top of the stack resting on it
   });
 
+  it('redraws the fluid stacked above a changed cell, because it rests on that cell\'s surface', () => {
+    const { renderer } = make();
+    const water = { ...OIL };
+    renderer.setDefinitions([OIL, { ...water, id: 2, typeKey: 'WATER' }]);
+    const stack: Array<[number, number, number, number]> = [];
+    for (let y = 2; y < FLUID_CHUNK_SIZE + 2; y++) stack.push([2, y, 1, q(1)]);
+    stack.push([2, FLUID_CHUNK_SIZE + 2, 2, q(0.25)]);
+    renderer.apply(stack);
+    renderer.render();
+    renderer.apply([[2, FLUID_CHUNK_SIZE + 2, 2, q(0.5)]]);
+    expect(renderer.render()).toBe(2); // the water's chunk and the chunk holding the top of the stack resting on it
+  });
+
   describe('falling fluid', () => {
     afterEach(() => vi.restoreAllMocks());
     const look = (extra: object = {}) => ({ ...OIL, appearance: { ...DEFAULT_FLUID_APPEARANCE, waveAmplitude: 0, waveSpeed: 0, ...extra } });

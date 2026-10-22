@@ -1,6 +1,6 @@
 # 092 - Rocks of several sizes (and variable-size pieces)
 
-**Priority:** P2 - **Status:** Built, not yet played (2026-10-18) - **Depends on:** 089 (pieces)
+**Priority:** P2 - **Status:** Done (played, looks good, 2026-10-21) - **Depends on:** 089 (pieces)
 
 ## Problem
 Every generated rock was one cell, which at 3x blocks is tiny, and there were too many of them. The owner wants variety: 3x3, 3x1, 2x2 and so on, with bigger rocks hurting more, and the mechanism reusable for other objects that are not 1x1.
@@ -22,8 +22,10 @@ Every generated rock was one cell, which at 3x blocks is tiny, and there were to
 
 ## Open points / not done
 - The size table and weights are code (`ROCK_SHAPES`), not in the Mine Generator page or the database. Add them to the map config if the owner wants to tune weights in the admin.
+  - **Decision 2026-10-21 (owner): leave in code.**
 - 3x3 damage is 9x a 1x1 and kills a 100 HP player outright at moderate speed. If that is too harsh, lower `ROCK_MASS_DAMAGE_EXPONENT` (0.75 makes it about 5x).
+  - **Decision 2026-10-21 (owner, after playing): keep as is.**
 - A big rock held up by even one cell stays up; the player has to clear the whole row under it. Rocks are not mineable, as before.
 - Falling-rock size is sent every tick for big rocks only; it could move to a once-per-rock description if the payload matters.
 - Sandbox rocks stay 1x1 (its layout is hand-built).
-- The 21 server tests that assume dirt health 100 fail because the dirt `health` in `packages/shared/src/data/blocks.json` was changed to 10 (an admin save). Unrelated to this ticket.
+- Server tests pin dirt health to 100 in `tests/setup/definitions.ts`, so admin balance edits to `blocks.json` no longer break them (all green, 2026-10-21).

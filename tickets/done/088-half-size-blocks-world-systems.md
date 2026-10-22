@@ -1,6 +1,6 @@
 # 088 - Small blocks (3x): generation, fluids, fire, gas and profiling at 135x135
 
-**Priority:** P1 - **Status:** In progress (stepping and profiling done 2026-10-17; cave smoothing, light cost and the by-eye checks remain) - **Part of:** small blocks epic (085-090) - **Depends on:** 085, 086, 087 (done; the owner chose 3x) - **Phase 2: next (088-090)**
+**Priority:** P1 - **Status:** Done (2026-10-21) - **Part of:** small blocks epic (085-090) - **Depends on:** 085, 086, 087 (done; the owner chose 3x) - **Phase 2: next (088-090)**
 
 ## Problem
 After phase 1 (085-087) the numbers are right, but the systems that work cell by cell (map generation, fluid, fire, gas, sandbox) were tuned for big cells. They need to produce the same world with finer detail, and the 9x cell count (135x135 = 18k cells) has to stay playable.
@@ -35,5 +35,7 @@ After phase 1 (085-087) the numbers are right, but the systems that work cell by
 - **Server cost measured at 135x135 (idle mine with 8 mobs: mean 0.9 ms per tick, max 5 ms; budget 33 ms).** Sandbox stress: 600 cells of water poured into the sky, mean 1.7 ms and a 17 ms worst tick while they fall; settling 1.1 ms; oil poured and set alight 1.2 ms. So the simulation, even stepping every tick, is nowhere near the budget. The expensive thing is **dropped-item physics** (see the notes above) and still-unmeasured **client light/fog/draw cost**: that needs a browser, so it is the owner's to judge.
 - **Map generation:** at 135x135 caves look like decent caverns at 3 smoothing passes; 5 gives rounder, larger ones. Left at 3 (it is one number in the Mine Generator page); decide by eye.
 - **Gas pockets:** pocket sizes triple, so a pocket rarely finds a place that is all dirt with a solid ring. The generator tries `BLOCK_SCALE^2` times as often (it tried 30 times per wanted pocket).
-- **Not done:** the by-eye checks of the sandbox, fluid scenes and a pour at 3x; client frame time and join snapshot size (full-map payload is 135x135 tiles).
+- **Closed 2026-10-21 (owner):** the sandbox, fluid scenes and a pour look fine at 3x (played).
+- **Join snapshot size (measured 2026-10-21):** 805 KB as JSON (the 135x135 `grid` is 801 KB, about 44 bytes a cell; everything else is under 4 KB). It gzips to about 5 KB, but the server has no socket compression set, so the full size goes out once per join and per sandbox reset. **Decision (owner): leave it.** Cheapest fixes later: compress only large messages, or send a compact grid.
+- **Client frame time (owner, 2026-10-21):** smooth at 60 fps with F3 open, lights included.
 - **Cave shape (done, see 090's notes):** caves are generated on a coarse grid and redrawn at full size, so they keep their original size with rounded edges.

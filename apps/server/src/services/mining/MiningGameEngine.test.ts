@@ -260,6 +260,7 @@ describe('MiningGameEngine', () => {
       characterId: 'char-1',
       cityId: 'city-1',
       seed: 12345,
+      miningSpeed: 100,
       socket: mockSocket,
     });
     engine.getPlayer('char-1')!.playerBody.position = { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: MINING_CONFIG.ENTRANCE_Y + 0.5 };

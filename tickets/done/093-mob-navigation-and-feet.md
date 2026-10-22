@@ -1,6 +1,6 @@
 # 093 - Mob navigation fixes and mob feet on the ground (3x blocks)
 
-**Priority:** P1 - **Status:** Built, not yet played (2026-10-18) - **Depends on:** 085-090 (3x blocks), 090 (body-sized pathing)
+**Priority:** P1 - **Status:** Done (played 2026-10-21; judge the new mole size) - **Depends on:** 085-090 (3x blocks), 090 (body-sized pathing)
 
 ## Problem
 At 3x the Mole Person (a 1.9 x 2.67 cell body) barely moved: in a probe of random scenarios (the mole in one cave, a player in another 15-30 cells away, 60-90 s) it reached the player in 2 of 12. Its sprite also hovered above the ground.
@@ -21,7 +21,12 @@ At 3x the Mole Person (a 1.9 x 2.67 cell body) barely moved: in a probe of rando
 - Server: `MiningGameEngine.mobNavigation.test.ts` (drops into a 2-wide well, jumps out of one, grounded on the map edge). Client: `MiningMobRenderer.test.ts` (feet on the collider bottom for different rigs and collider heights).
 - Mutation checks: the old dead zone fails the well test and three unit tests; unaligned jumps, no map-bottom grounding, no hover rule, no jump reach, no pick-power check, and a diggable rock each fail a test.
 
+## Played 2026-10-21: mole "jumping" at a 1x1 block
+- Cause: a `FALL` step (walking off the far side of a 1-cell ledge it had stepped up onto) always reported the `jump` pose, even on the ground. It was not a real jump (`jump: false`). Now `FALL` shows `walk` until the feet leave the ground. A mole that can mine already mines a raised lone block instead of jumping (tested, `MiningGameEngine.moleLedge.test.ts`).
+
 ## Not done / open
 - In the probe the mole still only reaches the player in about half the scenarios (8 of 16 after the fixes, with the probe's scenarios changed between runs so the 2-of-12 start is not a strict before/after). Most of the rest are the player in a cave only reachable by digging a long way (slow at speed 3), or a route that goes away from the player past the 36-cell aggro range so the mole gives up. A search that returns the "closest node" when it runs out of nodes (1500) can lead a mole into a dead end in a big cave; raising the budget to 4000-8000 only changed 7 of 16 to 8 of 16.
+  - **Decision 2026-10-21 (owner): accepted as is.** Giving up past the aggro range and slow digging are fine; no change.
 - A rock that falls in front of a mole mid-route is handled by re-planning, but not predicted.
 - The mole's drawn size is still `MOB_DEFAULT_DRAW_COLLIDER_HEIGHT` (3.75 cells) whatever its collider is (2.67); only its feet were fixed.
+  - **Tried and reverted 2026-10-21:** drawing the rig at its collider height (2.67) made moles too small, so they are drawn at the default 3.75 again. Collider is still 1.9 x 2.67 (the player default); the feet sit on it. **Decision (owner): keep the collider at 1.9 x 2.67.**

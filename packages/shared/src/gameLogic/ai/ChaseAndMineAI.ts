@@ -351,7 +351,8 @@ export class ChaseAndMineAI extends BaseMobAI {
           isMining: false,
           miningTarget: null,
           isAttacking: false,
-          animationState: 'jump',
+          // Walking off a ledge is a walk until the feet leave the ground
+          animationState: context.isGrounded ? 'walk' : 'jump',
         };
 
       case 'WALK':
