@@ -1,4 +1,5 @@
 import { prisma } from '../index';
+import type { Prisma } from '@prisma/client';
 import { CharacterService } from './character.service';
 import { LootResult } from './loot.service';
 import { CharacterModEngine } from '@mine-me/shared';
@@ -84,6 +85,31 @@ export class InventoryService {
   }
 
   /**
+   * The writes of `giveItemsToCharacter`, inside a transaction the caller owns (so other writes, such as emptying the
+   * run stash, can commit or fail together with them). `merged` is item id to a positive whole quantity.
+   */
+  public static async applyGrantsInTransaction(
+    tx: Prisma.TransactionClient,
+    characterId: string,
+    merged: ReadonlyMap<string, number>,
+    skipped: { itemId: string; quantity: number; reason: string }[]
+  ): Promise<{ granted: { itemId: string; quantity: number }[]; experienceGranted: number }> {
+    const granted: { itemId: string; quantity: number }[] = [];
+    let xp = 0;
+    for (const [itemId, quantity] of merged) {
+      const item = await tx.item.findUnique({ where: { id: itemId } });
+      if (!item) {
+        skipped.push({ itemId, quantity, reason: 'item not found' });
+        continue;
+      }
+      await InventoryService.applyItemGrant(tx, characterId, item, quantity);
+      xp += (item.experience || 0) * quantity;
+      granted.push({ itemId, quantity });
+    }
+    return { granted, experienceGranted: xp };
+  }
+
+  /**
    * Awards several items atomically: every inventory/wallet write happens in one
    * transaction (all or nothing). Items are matched by database ID only; unknown IDs and
    * non-positive / non-integer quantities are skipped and reported. Experience is granted
@@ -108,21 +134,9 @@ export class InventoryService {
       merged.set(g.itemId, (merged.get(g.itemId) ?? 0) + g.quantity);
     }
 
-    const { granted, experienceGranted } = await prisma.$transaction(async (tx) => {
-      const granted: { itemId: string; quantity: number }[] = [];
-      let xp = 0;
-      for (const [itemId, quantity] of merged) {
-        const item = await tx.item.findUnique({ where: { id: itemId } });
-        if (!item) {
-          skipped.push({ itemId, quantity, reason: 'item not found' });
-          continue;
-        }
-        await InventoryService.applyItemGrant(tx, characterId, item, quantity);
-        xp += (item.experience || 0) * quantity;
-        granted.push({ itemId, quantity });
-      }
-      return { granted, experienceGranted: xp };
-    });
+    const { granted, experienceGranted } = await prisma.$transaction((tx) =>
+      InventoryService.applyGrantsInTransaction(tx, characterId, merged, skipped)
+    );
 
     let levelUpLoot: LootResult | undefined;
     if (experienceGranted > 0) {

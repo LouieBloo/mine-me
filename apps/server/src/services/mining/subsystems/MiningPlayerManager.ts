@@ -45,6 +45,17 @@ export interface MiningPlayerSession {
   /** Backpack weight limit (Carry Capacity effects on the equipped gear). */
   carryCapacity: number;
   temporaryBackpack: MiningBackpackItem[];
+  /** What the player has handed to the extractor this run (safe: kept on death and timeout). */
+  stash: MiningBackpackItem[];
+  /** The stash changed since it was last sent. */
+  stashDirty: boolean;
+  /** Deposits not yet written to the database (item id to quantity), and the sim time the oldest of them landed. */
+  unsavedStash: Map<string, number>;
+  unsavedStashSince: number;
+  /** Fraction of a unit already earned towards the next one handed to the extractor. */
+  depositCarry: number;
+  /** The same for putting items on the belt. */
+  unloadCarry: number;
   /** Seconds before another "backpack full" notice may be sent. */
   backpackFullCooldown: number;
   /** A "backpack full" notice is due on the next state tick. */
@@ -190,6 +201,12 @@ export class MiningPlayerManager {
       noticeCooldown: 0,
       temporaryBackpack: [],
       backpackFullCooldown: 0,
+      stash: [],
+      stashDirty: false,
+      unsavedStash: new Map(),
+      unsavedStashSince: 0,
+      depositCarry: 0,
+      unloadCarry: 0,
       backpackFullPending: false,
       gearLayers: options.gearLayers || [],
       gearVersion: 0,
@@ -442,6 +459,11 @@ export class MiningPlayerManager {
     this.respawnPlayer(session);
     session.known = createKnownEntities();
     session.temporaryBackpack = [];
+    session.stash = [];
+    session.stashDirty = true;
+    session.unsavedStash = new Map();
+    session.depositCarry = 0;
+    session.unloadCarry = 0;
     session.backpackDirty = true;
     session.isMining = false;
     session.miningTarget = null;

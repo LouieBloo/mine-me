@@ -83,3 +83,16 @@ describe('TemporaryBackpack weight bar', () => {
     expect(backpackFillRatio(5, undefined)).toBe(1);
   });
 });
+
+describe('TemporaryBackpack stash', () => {
+  it('lists what is stored in the extractor, and shows nothing when the stash is empty', () => {
+    const { rerender } = render(<TemporaryBackpack items={[]} stash={[{ itemId: 'a', itemName: 'Copperium', iconUrl: null, quantity: 4 }]} />);
+    expect(screen.getByTestId('stash-section')).toBeInTheDocument();
+    expect(screen.getByText('Copperium x4')).toBeInTheDocument();
+    expect(screen.getByText('4 items')).toBeInTheDocument();
+    rerender(<TemporaryBackpack items={[]} stash={[]} />);
+    expect(screen.queryByTestId('stash-section')).not.toBeInTheDocument();
+    rerender(<TemporaryBackpack items={[]} />);
+    expect(screen.queryByTestId('stash-section')).not.toBeInTheDocument();
+  });
+});

@@ -23,7 +23,7 @@ export type SocketEventMap = {
   // The server ended this player's run (e.g. they died in the mine)
   mining_session_ended: MiningSessionEndedEvent;
   // The sandbox was reset: a fresh full state for everyone in it
-  mining_sandbox_reset: { sessionState: MiningSessionClientState };
+  mining_sandbox_reset: { sessionState: MiningSessionClientState; title?: string; message?: string };
   // This player took damage in the mine (health itself arrives via character_stat_update)
   player_damaged: MiningPlayerDamagedEvent;
   // A short message about the player's tool/action (e.g. their pickaxe is too weak for a block)

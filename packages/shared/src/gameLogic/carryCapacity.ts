@@ -64,3 +64,22 @@ export function carryRoom(contents: readonly WeighedStack[], itemId: string, cap
 export function canCarry(contents: readonly WeighedStack[], itemId: string, quantity: number, capacity: number, itemDefs: WeightDefinitions): boolean {
   return quantity <= 0 || carryRoom(contents, itemId, capacity, itemDefs) >= quantity;
 }
+
+/**
+ * Which stack to hand over next when emptying a backpack (to the extractor or onto the belt): the heaviest item per unit
+ * first, since that empties the weight fastest, and the earliest picked up among equals. Returns an index into
+ * `contents`, or -1 when nothing is left.
+ */
+export function nextUnloadIndex(contents: readonly WeighedStack[], itemDefs: WeightDefinitions): number {
+  let best = -1;
+  let bestWeight = -1;
+  contents.forEach((stack, index) => {
+    if (!(stack.quantity > 0)) return;
+    const weight = weightOf(itemDefs, stack.itemId);
+    if (weight > bestWeight) {
+      best = index;
+      bestWeight = weight;
+    }
+  });
+  return best;
+}

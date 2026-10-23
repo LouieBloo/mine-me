@@ -15,7 +15,8 @@ describe('a mine with a non-default grid size', () => {
 
   it('builds the grid at the configured size', () => {
     const e = start();
-    expect(e.grid).toHaveLength(30);
+    // the configured size is the mine itself; the sky rows sit on top of it
+    expect(e.grid).toHaveLength(30 + e.surfaceRow);
     expect(e.grid[0]).toHaveLength(30);
   });
 

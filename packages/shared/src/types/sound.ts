@@ -3,9 +3,9 @@ import { BLOCK_SCALE } from './mining';
 export type SoundType = 'BGM' | 'SFX';
 
 /** Where a library sound is used. Music is `type: 'BGM'`; sound effects are grouped by what plays them. */
-export type SoundCategory = 'GENERAL' | 'ITEM' | 'BLOCK' | 'MOB' | 'CHARACTER' | 'FLUID' | 'GAS';
+export type SoundCategory = 'GENERAL' | 'ITEM' | 'BLOCK' | 'MOB' | 'CHARACTER' | 'FLUID' | 'GAS' | 'EXTRACTOR';
 
-export const SOUND_CATEGORIES: readonly SoundCategory[] = ['GENERAL', 'ITEM', 'BLOCK', 'MOB', 'CHARACTER', 'FLUID', 'GAS'];
+export const SOUND_CATEGORIES: readonly SoundCategory[] = ['GENERAL', 'ITEM', 'BLOCK', 'MOB', 'CHARACTER', 'FLUID', 'GAS', 'EXTRACTOR'];
 
 export interface SoundTrack {
   id: string;
@@ -139,6 +139,26 @@ export interface GasSoundSlotResolved extends SoundEffectSlotConfig {
 
 export type GasSoundEffectsConfig = Partial<Record<GasSoundSlot, GasSoundSlotResolved>>;
 
+export type ExtractorSoundSlot = 'landing' | 'loop' | 'unload' | 'beltBreak';
+
+/** What the admin stores for one extractor slot: a library sound by id (the url is resolved at load). */
+export interface ExtractorSoundSlotRef {
+  soundId?: string | null;
+  loop?: boolean;
+  /** Volume of this sound on this extractor, 0 to 1 (1 when absent). */
+  volume?: number;
+}
+
+export type ExtractorSoundSlotRefs = Partial<Record<ExtractorSoundSlot, ExtractorSoundSlotRef>>;
+
+/** An extractor slot after its library sound has been resolved to something the client can play. */
+export interface ExtractorSoundSlotResolved extends SoundEffectSlotConfig {
+  soundId?: string | null;
+  volume?: number;
+}
+
+export type ExtractorSoundEffectsConfig = Partial<Record<ExtractorSoundSlot, ExtractorSoundSlotResolved>>;
+
 export type AudioFalloffModel = 'linear' | 'quadratic' | 'smoothstep' | 'exponential';
 
 export interface SpatialAudioConfig {
@@ -174,6 +194,14 @@ export const DEFAULT_SPATIAL_AUDIO_CONFIG: Required<SpatialAudioConfig> = {
 };
 
 export const MINING_SPATIAL_AUDIO_PRESETS = {
+  /** A big machine: heard from further off than a pickup. */
+  EXTRACTOR: {
+    maxDistance: 36 * BLOCK_SCALE,
+    minDistance: 6 * BLOCK_SCALE,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 24 * BLOCK_SCALE,
+    enablePanning: true,
+  },
   ITEM_PICKUP: {
     maxDistance: 14 * BLOCK_SCALE,
     minDistance: 2 * BLOCK_SCALE,

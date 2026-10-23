@@ -17,6 +17,8 @@ import * as FluidController from '../controllers/admin/fluid.controller';
 import * as FluidSoundController from '../controllers/admin/fluidSound.controller';
 import * as GasController from '../controllers/admin/gas.controller';
 import * as GasSoundController from '../controllers/admin/gasSound.controller';
+import * as ExtractorController from '../controllers/admin/extractor.controller';
+import * as ExtractorSoundController from '../controllers/admin/extractorSound.controller';
 import * as MiningConfigController from '../controllers/admin/miningConfig.controller';
 import * as ParticleEffectController from '../controllers/admin/particleEffect.controller';
 import * as SoundController from '../controllers/admin/sound.controller';
@@ -48,6 +50,7 @@ adminRouter.get('/item-enums', ItemController.getItemEnums);
 adminRouter.get('/items/:id', ItemController.getItem);
 adminRouter.post('/items', runValidation(AdminValidation.itemValidation), ItemController.createItem);
 adminRouter.put('/items/:id', runValidation(AdminValidation.itemValidation), ItemController.updateItem);
+adminRouter.patch('/items/:id/weight', ItemController.setItemWeight);
 adminRouter.post('/items/:id/icon', ItemController.itemIconUpload, ItemController.uploadItemIcon);
 adminRouter.post('/items/:id/gear-image', ItemController.itemGearImageUpload, ItemController.uploadItemGearImage);
 adminRouter.post('/items/:id/in-game-sprite', ItemController.itemInGameSpriteUpload, ItemController.uploadItemInGameSprite);
@@ -110,6 +113,15 @@ adminRouter.post('/gases', GasController.createGas);
 adminRouter.put('/gases/:id', GasController.updateGas);
 adminRouter.delete('/gases/:id', GasController.deleteGas);
 adminRouter.patch('/gases/:id/sound-effects/:slot', GasSoundController.requireGasSoundSlot, GasSoundController.setGasSoundSlot);
+
+// EXTRACTORS
+adminRouter.get('/extractors', ExtractorController.getExtractors);
+adminRouter.get('/extractors/:id', ExtractorController.getExtractor);
+adminRouter.post('/extractors', ExtractorController.createExtractor);
+adminRouter.put('/extractors/:id', ExtractorController.updateExtractor);
+adminRouter.delete('/extractors/:id', ExtractorController.deleteExtractor);
+adminRouter.post('/extractors/:id/texture/:part', ExtractorController.requireTexturePart, ExtractorController.extractorTextureUpload, ExtractorController.uploadExtractorTexture);
+adminRouter.patch('/extractors/:id/sound-effects/:slot', ExtractorSoundController.requireExtractorSoundSlot, ExtractorSoundController.setExtractorSoundSlot);
 
 // MINING BLOCKS
 adminRouter.get('/blocks', BlockController.getBlocks);

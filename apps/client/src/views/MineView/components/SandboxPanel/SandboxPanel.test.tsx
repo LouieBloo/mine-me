@@ -168,3 +168,61 @@ describe('SandboxPanel', () => {
     expect(screen.getByText('Reset sandbox')).toBeInTheDocument();
   });
 });
+
+describe('SandboxPanel extractor tools', () => {
+  const tools = () => ({
+    scenes: [{ id: 'belt-blocked-by-fluid', name: 'Belt blocked by fluid' }, { id: 'full-pack-at-belt', name: 'Full pack at the belt' }],
+    onSpawn: vi.fn(),
+    onDigBelt: vi.fn(),
+    onSetCapacity: vi.fn(),
+    onFillBackpack: vi.fn(),
+    onLoadScene: vi.fn(),
+  });
+
+  it('is hidden when the room has no extractor tools', () => {
+    render(<SandboxPanel {...props()} />);
+    expect(screen.queryByRole('region', { name: 'Extractor' })).not.toBeInTheDocument();
+  });
+
+  it('spawns the extractor, digs the belt, fills the pack and sets the capacity', () => {
+    const extractor = tools();
+    render(<SandboxPanel {...props({ extractor })} />);
+    fireEvent.click(screen.getByText('Spawn extractor'));
+    expect(extractor.onSpawn).toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Dig belt +10'));
+    expect(extractor.onDigBelt).toHaveBeenLastCalledWith(10);
+    fireEvent.click(screen.getByText('Dig belt to end'));
+    expect(extractor.onDigBelt).toHaveBeenLastCalledWith(100);
+    fireEvent.click(screen.getByText('Fill pack'));
+    expect(extractor.onFillBackpack).toHaveBeenCalledWith(50);
+    fireEvent.change(screen.getByLabelText('Carry capacity'), { target: { value: '250' } });
+    fireEvent.click(screen.getByText('Set'));
+    expect(extractor.onSetCapacity).toHaveBeenCalledWith(250);
+  });
+
+  it('will not set a capacity that is empty or negative', () => {
+    render(<SandboxPanel {...props({ extractor: tools() })} />);
+    const set = screen.getByText('Set');
+    fireEvent.change(screen.getByLabelText('Carry capacity'), { target: { value: '' } });
+    expect(set).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Carry capacity'), { target: { value: '-5' } });
+    expect(set).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Carry capacity'), { target: { value: '0' } });
+    expect(set).toBeEnabled();
+  });
+
+  it('loads the chosen scene, and not before one is chosen', () => {
+    const extractor = tools();
+    render(<SandboxPanel {...props({ extractor })} />);
+    expect(screen.getByText('Load')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Extractor scene'), { target: { value: 'full-pack-at-belt' } });
+    fireEvent.click(screen.getByText('Load'));
+    expect(extractor.onLoadScene).toHaveBeenCalledWith('full-pack-at-belt');
+  });
+
+  it('waits while a command is running', () => {
+    render(<SandboxPanel {...props({ extractor: tools(), busy: true })} />);
+    expect(screen.getByText('Spawn extractor')).toBeDisabled();
+    expect(screen.getByText('Dig belt +10')).toBeDisabled();
+  });
+});

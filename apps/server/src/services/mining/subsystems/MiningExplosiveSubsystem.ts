@@ -181,6 +181,16 @@ export class MiningExplosiveSubsystem {
       if (blast) this.world.damage.applyDamage({ kind: 'player', id: session.characterId }, { ...blast, type: 'explosive', source });
     }
 
+    // A blast also hurts the belt segments it reaches, by distance, like anything else alive in it
+    const belt = this.world.belt;
+    if (belt) {
+      belt.segments.forEach((segment, index) => {
+        if (!segment) return;
+        const blast = hurt({ x: belt.shaftX + belt.shaftWidth / 2, y: belt.startRow + index + 0.5 });
+        if (blast) this.world.damage.applyDamage({ kind: 'belt', id: String(index) }, { amount: blast.amount, type: 'explosive', source });
+      });
+    }
+
     const droppedPieces = new Set<string>();
     // 2. Excavate the blocks in the radius, except blast-proof ones (the entrance)
     for (let dy = -radius; dy <= radius; dy++) {

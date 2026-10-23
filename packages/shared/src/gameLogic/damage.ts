@@ -37,7 +37,8 @@ export interface DamageEvent {
   noStun?: boolean;
 }
 
-export type DamageTarget = { kind: 'mob'; id: string } | { kind: 'player'; id: string };
+/** What a hit can land on. A belt target's id is the segment's index down the shaft, as a string. */
+export type DamageTarget = { kind: 'mob'; id: string } | { kind: 'player'; id: string } | { kind: 'belt'; id: string };
 
 export interface DamageResult {
   /** The hit landed (target exists, is alive, and wasn't immune). */

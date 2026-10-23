@@ -34,4 +34,9 @@ export {
   handleSandboxSetGodMode,
   handleSandboxSetSim,
   handleSandboxReset,
+  handleSandboxSpawnExtractor,
+  handleSandboxDigBelt,
+  handleSandboxSetCapacity,
+  handleSandboxFillBackpack,
+  handleSandboxLoadExtractorScene,
 } from './mining/handlers/sandboxHandlers';

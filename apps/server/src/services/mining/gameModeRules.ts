@@ -15,6 +15,8 @@ export interface GameModeRules {
   readonly endsRunOnDeath: boolean;
   /** Starting a new run in the same mode throws the old room away (private rooms only). */
   readonly restartsOnEntry: boolean;
+  /** An extractor lands on the surface and takes the player's loot (tickets 119-125). */
+  readonly hasExtractor: boolean;
   /** The test tools (pour fluid, spawn mobs, god mode, reset...) are available. */
   readonly hasSandboxTools: boolean;
 }
@@ -30,6 +32,7 @@ const RULES: Readonly<Record<MiningGameMode, GameModeRules>> = {
     endsRunOnDeath: true,
     restartsOnEntry: true,
     hasSandboxTools: false,
+    hasExtractor: true,
   },
   multiplayer: {
     sharedRoomId: DEFAULT_MULTIPLAYER_ROOM_ID,
@@ -38,6 +41,7 @@ const RULES: Readonly<Record<MiningGameMode, GameModeRules>> = {
     endsRunOnDeath: true,
     restartsOnEntry: false,
     hasSandboxTools: false,
+    hasExtractor: true,
   },
   sandbox: {
     sharedRoomId: SANDBOX_ROOM_ID,
@@ -46,6 +50,7 @@ const RULES: Readonly<Record<MiningGameMode, GameModeRules>> = {
     endsRunOnDeath: false,
     restartsOnEntry: false,
     hasSandboxTools: true,
+    hasExtractor: false,
   },
 };
 

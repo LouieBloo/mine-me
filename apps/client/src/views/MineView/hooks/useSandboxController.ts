@@ -67,6 +67,12 @@ export function useSandboxController(sendGameEvent: SendGameEvent, session: Mini
     },
     [run, applyStatus],
   );
+  /** The server answers these with a fresh state for everyone, which the view handles. */
+  const spawnExtractor = useCallback(() => run({ type: 'sandbox_spawn_extractor' }, 'Extractor'), [run]);
+  const digBelt = useCallback((rows: number) => run({ type: 'sandbox_dig_belt', rows }, 'Belt'), [run]);
+  const setCapacity = useCallback((capacity: number) => run({ type: 'sandbox_set_capacity', capacity }, 'Capacity'), [run]);
+  const fillBackpack = useCallback((quantity: number) => run({ type: 'sandbox_fill_backpack', quantity }, 'Backpack'), [run]);
+  const loadExtractorScene = useCallback((sceneId: string) => run({ type: 'sandbox_load_extractor_scene', sceneId }, 'Scene'), [run]);
   const clearHazards = useCallback(() => run({ type: 'sandbox_clear_hazards' }, 'Clear'), [run]);
   /** The server answers a reset with a fresh state for everyone, which the view handles. */
   const reset = useCallback(() => run({ type: 'sandbox_reset' }, 'Reset'), [run]);
@@ -89,5 +95,10 @@ export function useSandboxController(sendGameEvent: SendGameEvent, session: Mini
     setSpeed,
     clearHazards,
     reset,
+    spawnExtractor,
+    digBelt,
+    setCapacity,
+    fillBackpack,
+    loadExtractorScene,
   };
 }

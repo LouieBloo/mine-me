@@ -2,16 +2,18 @@ import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds, attachFluidSounds, attachGasSounds } from './definitionLoaders';
+import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds, attachFluidSounds, attachGasSounds, attachExtractorSounds } from './definitionLoaders';
+import { validateExtractor } from '@mine-me/shared';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 
-const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
+const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; extractors?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
   ({
     item: { findMany: vi.fn().mockResolvedValue(data.items ?? [{ id: 'i1', name: 'Thing' }]) },
     mob: { findMany: vi.fn().mockResolvedValue(data.mobs ?? [{ id: 'm1', name: 'Mole' }]) },
     miningBlock: { findMany: vi.fn().mockResolvedValue(data.blocks ?? [{ id: 'b1', typeKey: 'DIRT' }]) },
     fluid: { findMany: vi.fn().mockResolvedValue(data.fluids ?? []) },
     gas: { findMany: vi.fn().mockResolvedValue(data.gases ?? []) },
+    extractor: { findMany: vi.fn().mockResolvedValue(data.extractors ?? []) },
     particleEffect: { findMany: vi.fn().mockResolvedValue(data.particleEffects ?? []) },
     sound: { findMany: vi.fn().mockResolvedValue(data.sounds ?? []) },
     characterSoundConfig: { findUnique: vi.fn().mockResolvedValue(data.characterSounds ?? null) },
@@ -251,7 +253,7 @@ describe('loadDefinitionsFromFiles', () => {
     write('items.json', [{ id: 'a' }]);
     write('mobs.json', []);
     write('blocks.json', [{ typeKey: 'DIRT' }]);
-    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], particleEffects: [], characterSounds: {} });
+    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], extractors: [], particleEffects: [], characterSounds: {} });
   });
 
   it('reads fluids.json when it exists', () => {
@@ -304,5 +306,62 @@ describe('character sounds', () => {
     );
     expect(MiningDataManager.getInstance().getCharacterSounds().death?.url).toBe('/assets/sounds/ouch.mp3');
     MiningDataManager.reset();
+  });
+});
+
+describe('extractors', () => {
+  const basic = { id: 'e1', key: 'basic_extractor', name: 'Basic', isDefault: true };
+
+  it('loads the extractor table, oldest first', async () => {
+    const prisma = fakePrisma({ extractors: [basic] });
+    const defs = await loadDefinitionsFromDatabase(prisma);
+    expect(defs.extractors).toEqual([basic]);
+    expect(prisma.extractor.findMany).toHaveBeenCalledWith({ orderBy: { createdAt: 'asc' } });
+  });
+
+  it('allows an empty table, and a database client without one', async () => {
+    await expect(loadDefinitionsFromDatabase(fakePrisma({ extractors: [] }))).resolves.toMatchObject({ extractors: [] });
+    const prisma = fakePrisma({});
+    delete prisma.extractor;
+    await expect(loadDefinitionsFromDatabase(prisma)).resolves.toMatchObject({ extractors: [] });
+  });
+
+  it('propagates database errors from the extractor table', async () => {
+    const prisma = fakePrisma({});
+    prisma.extractor.findMany.mockRejectedValue(new Error('no such table'));
+    await expect(loadDefinitionsFromDatabase(prisma)).rejects.toThrow('no such table');
+  });
+
+  it('installs extractors for lookup by key or id; the first of a duplicated key wins', async () => {
+    await installDefinitionsFromDatabase(fakePrisma({ extractors: [basic, { ...basic, id: 'e2', name: 'Copy' }, { id: 'e3', name: 'No key' }] }));
+    const data = MiningDataManager.getInstance();
+    expect(data.getExtractor('basic_extractor')?.name).toBe('Basic');
+    expect(data.getExtractor('e1')?.name).toBe('Basic');
+    expect(data.getExtractors()).toHaveLength(1);
+    expect(data.getExtractor('nope')).toBeUndefined();
+  });
+
+  it('falls back to the built-in extractor when none are defined, and prefers the default one when they are', async () => {
+    await installDefinitionsFromDatabase(fakePrisma({ extractors: [] }));
+    expect(MiningDataManager.getInstance().getDefaultExtractor().key).toBe('basic_extractor');
+    expect(MiningDataManager.getInstance().getExtractors()).toEqual([]);
+    await installDefinitionsFromDatabase(fakePrisma({ extractors: [{ id: 'a', key: 'a', name: 'A' }, { id: 'b', key: 'b', name: 'B', isDefault: true }] }));
+    expect(MiningDataManager.getInstance().getDefaultExtractor().id).toBe('b');
+  });
+
+  it('reads the dev seed mirror, which has the basic extractor', () => {
+    const defs = loadDefinitionsFromFiles(path.resolve(__dirname, '../../../../../packages/shared/src/data'));
+    expect(defs.extractors?.map((e) => e.key)).toEqual(['basic_extractor']);
+    expect(defs.extractors?.flatMap((e) => validateExtractor(e))).toEqual([]);
+  });
+
+  it('resolves sound references to urls at the volume set on this extractor', async () => {
+    const library = [{ id: 's1', url: '/assets/sounds/land.mp3', volume: 0.7, isActive: true }];
+    const [extractor] = attachExtractorSounds([{ ...basic, soundEffects: { landing: { soundId: 's1', volume: 0.4 } } } as any], library);
+    expect(extractor.sounds?.landing).toMatchObject({ url: '/assets/sounds/land.mp3', volume: 0.4 });
+    const plain = { ...basic } as any;
+    expect(attachExtractorSounds([plain], library)[0]).toBe(plain);
+    const defs = await loadDefinitionsFromDatabase(fakePrisma({ extractors: [{ ...basic, soundEffects: { loop: { soundId: 's1' } } }], sounds: library }));
+    expect(defs.extractors?.[0].sounds?.loop).toMatchObject({ url: '/assets/sounds/land.mp3', volume: 1 });
   });
 });

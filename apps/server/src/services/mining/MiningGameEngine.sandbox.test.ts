@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MiningGameEngine } from './MiningGameEngine';
-import { MINING_CONFIG, MiningTileType } from '@mine-me/shared';
+import { MINING_CONFIG, MiningTileType, DEFAULT_SKY_ROWS } from '@mine-me/shared';
 import { SANDBOX_BLOCK_SCALE, SANDBOX_SKY_ROWS } from './sandbox/SandboxLayout';
 
 const SKY = SANDBOX_SKY_ROWS;
@@ -64,10 +64,11 @@ describe('a sandbox room', () => {
 
   it('makes the generated modes unchanged: random size and cavern mobs', () => {
     const e = new MiningGameEngine({ characterId: 'n', cityId: 'c', seed: 1, socket: { connected: true, emit: vi.fn() } as any, mapConfig: { mobSpawnCount: 2, allowedMobIds: ['cmn_mole_person_001'], surfaceDummyMobId: 'mob_target_dummy' } });
-    expect(e.grid).toHaveLength(MINING_CONFIG.GRID_HEIGHT);
+    expect(e.grid).toHaveLength(MINING_CONFIG.GRID_HEIGHT + DEFAULT_SKY_ROWS);
     expect(e.getActiveMobs().length).toBeGreaterThan(1);
-    expect(e.grid[0][0].type).toBe(MiningTileType.DIRT);
-    expect(e.surfaceRow).toBe(0);
-    expect(Math.round(e.players.get('n')!.playerBody.position.y)).toBe(0);
+    expect(e.grid[0][0].type).toBe(MiningTileType.EMPTY);
+    expect(e.grid[DEFAULT_SKY_ROWS][0].type).toBe(MiningTileType.DIRT);
+    expect(e.surfaceRow).toBe(DEFAULT_SKY_ROWS);
+    expect(Math.round(e.players.get("n")!.playerBody.position.y)).toBe(DEFAULT_SKY_ROWS);
   });
 });

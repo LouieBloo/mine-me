@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../index', () => ({ prisma: { character: { update: vi.fn() } } }));
-vi.mock('../inventory.service', () => ({
-  InventoryService: { giveItemsToCharacter: vi.fn().mockResolvedValue({ granted: [], skipped: [], experienceGranted: 0 }) },
+vi.mock('../runStash.service', () => ({
+  RunStashService: { bank: vi.fn().mockResolvedValue({ banked: [], stash: [], skipped: [] }), add: vi.fn().mockResolvedValue(undefined) },
 }));
 vi.mock('../characterBroadcast', () => ({ broadcastStatUpdate: vi.fn() }));
 
 import { prisma } from '../../index';
 import { broadcastStatUpdate } from '../characterBroadcast';
-import { InventoryService } from '../inventory.service';
+import { RunStashService } from '../runStash.service';
 import { miningSessionManager } from './MiningSessionManager';
 import { hitMob, hitPlayer } from './testHelpers';
 
@@ -44,7 +44,7 @@ describe('MiningSessionManager health handling', () => {
     const engine = miningSessionManager.createSession(cid, 'c', mkSocket(), true);
     hitPlayer(engine, cid, 40);
     engine.getPlayer(cid)!.temporaryBackpack.push({ itemId: 'i', itemName: 'x', quantity: 1, iconUrl: null });
-    vi.mocked(InventoryService.giveItemsToCharacter).mockRejectedValueOnce(new Error('db down'));
+    vi.mocked(RunStashService.bank).mockRejectedValueOnce(new Error('db down'));
 
     await expect(miningSessionManager.endSession(cid)).rejects.toThrow('db down');
 
@@ -89,7 +89,7 @@ describe('MiningSessionManager health handling', () => {
       await flush();
 
       expect(socket.emit).toHaveBeenCalledWith('mining_session_ended', expect.objectContaining({ reason: 'death' }));
-      expect(InventoryService.giveItemsToCharacter).not.toHaveBeenCalled();
+      expect(RunStashService.bank).not.toHaveBeenCalledWith(cid, expect.anything()); // the backpack is lost
       expect(update).toHaveBeenCalledWith({ where: { id: cid }, data: { health: 1 } });
       expect(broadcastStatUpdate).toHaveBeenLastCalledWith(cid, { health: 1 });
       expect(miningSessionManager.getSession(cid)).toBeUndefined();

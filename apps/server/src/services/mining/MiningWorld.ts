@@ -5,6 +5,9 @@ import type { MiningBlockSubsystem } from './subsystems/MiningBlockSubsystem';
 import type { MiningDataManager } from './subsystems/MiningDataManager';
 import type { MiningDropSubsystem } from './subsystems/MiningDropSubsystem';
 import type { MiningFluidSubsystem } from './subsystems/MiningFluidSubsystem';
+import type { MiningBurningSubsystem } from './subsystems/MiningBurningSubsystem';
+import type { MiningBeltSubsystem } from './subsystems/MiningBeltSubsystem';
+import type { MiningExtractorSubsystem } from './subsystems/MiningExtractorSubsystem';
 import type { MiningGasSubsystem } from './subsystems/MiningGasSubsystem';
 import type { MiningGasExplosionSubsystem } from './subsystems/MiningGasExplosionSubsystem';
 import type { MiningIgnitionSubsystem } from './subsystems/MiningIgnitionSubsystem';
@@ -40,6 +43,8 @@ export interface MiningWorld {
   readonly data: MiningDataManager;
   readonly mapConfig?: Partial<MiningMapConfigData>;
   readonly players: ReadonlyMap<string, MiningPlayerSession>;
+  /** First ground row: rows above it are open sky. Depths (mob spawning, the entrance zone) are counted from here. */
+  readonly surfaceRow: number;
   /** Where players start and respawn: the entrance, on the ground surface. */
   readonly spawnPoint: { x: number; y: number };
   /** Simulation time in seconds (advances one fixed step per tick). */
@@ -64,6 +69,12 @@ export interface MiningWorld {
   readonly ignition: MiningIgnitionSubsystem;
   /** Fire burning through the mine's fuel. */
   readonly fire: MiningFireSubsystem;
+  /** Fire hurting bodies (and the belt). */
+  readonly burning: MiningBurningSubsystem;
+  /** The conveyor belt going down from the extractor; absent in modes without an extractor. */
+  readonly belt: MiningBeltSubsystem | null;
+  /** The extractor on the surface; absent in modes without one. */
+  readonly extractor: MiningExtractorSubsystem | null;
   /** The one place hits are applied (see MiningDamageSystem). */
   readonly damage: MiningDamageSystem;
 

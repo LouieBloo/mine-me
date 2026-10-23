@@ -9,7 +9,7 @@ import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
 import { MiningLoadingScreen } from './components/MiningLoadingScreen/MiningLoadingScreen';
 import { notificationService } from '../../services/notificationService';
-import { type MiningBackpackItem, type MiningGameMode, isOnEntrance } from '@mine-me/shared';
+import { type BeltBlockedReason, type MiningBackpackItem, type MiningGameMode, isOnEntrance } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
 import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
 import { ExpeditionModeModal } from './components/ExpeditionModeModal/ExpeditionModeModal';
@@ -121,6 +121,14 @@ export const MineView: React.FC = () => {
     });
   }, [setMiningSession]);
 
+  const handleStashChange = useCallback((stash: MiningBackpackItem[]) => {
+    setMiningSession((prev) => (prev ? { ...prev, stash } : prev));
+  }, [setMiningSession]);
+
+  const handleBeltChange = useCallback((update: { rows: number; blockedBy: BeltBlockedReason | null }) => {
+    setMiningSession((prev) => (prev?.belt ? { ...prev, belt: { ...prev.belt, rows: update.rows, blockedBy: update.blockedBy } } : prev));
+  }, [setMiningSession]);
+
   const handleBackpackFull = useCallback(() => {
     notificationService.info('Backpack Full', 'That does not fit. Empty your backpack at the entrance, then come back for it.');
   }, []);
@@ -178,7 +186,7 @@ export const MineView: React.FC = () => {
       setIsAssetsLoaded(false);
       setMiningSession(payload.sessionState);
       setSessionKey((prev) => prev + 1);
-      notificationService.info('Sandbox reset', 'The sandbox is back to its starting state.');
+      notificationService.info(payload.title ?? 'Sandbox reset', payload.message ?? 'The sandbox is back to its starting state.');
     });
   }, [onEvent, setMiningSession]);
 
@@ -358,6 +366,8 @@ export const MineView: React.FC = () => {
             onVisionChange={handleVisionChange}
             onBackpackChange={handleBackpackChange}
             onBackpackFull={handleBackpackFull}
+            onStashChange={handleStashChange}
+            onBeltChange={handleBeltChange}
             sandbox={sandbox.view}
           />
         </PixiStageProvider>
@@ -395,6 +405,14 @@ export const MineView: React.FC = () => {
           onStep={sandbox.step}
           onSpeedChange={sandbox.setSpeed}
           onClearHazards={sandbox.clearHazards}
+          extractor={{
+            scenes: sandbox.info.extractorScenes ?? [],
+            onSpawn: sandbox.spawnExtractor,
+            onDigBelt: sandbox.digBelt,
+            onSetCapacity: sandbox.setCapacity,
+            onFillBackpack: sandbox.fillBackpack,
+            onLoadScene: sandbox.loadExtractorScene,
+          }}
           onReset={sandbox.reset}
           onLeave={handleExit}
           busy={sandbox.busy}

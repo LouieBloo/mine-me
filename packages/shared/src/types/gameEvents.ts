@@ -239,6 +239,33 @@ export interface SandboxClearHazardsPayload extends GameEventBase {
   type: 'sandbox_clear_hazards';
 }
 
+export interface SandboxSpawnExtractorPayload extends GameEventBase {
+  type: 'sandbox_spawn_extractor';
+}
+
+export interface SandboxDigBeltPayload extends GameEventBase {
+  type: 'sandbox_dig_belt';
+  /** How many belt segments to lay at once. */
+  rows: number;
+}
+
+export interface SandboxSetCapacityPayload extends GameEventBase {
+  type: 'sandbox_set_capacity';
+  capacity: number;
+}
+
+export interface SandboxFillBackpackPayload extends GameEventBase {
+  type: 'sandbox_fill_backpack';
+  /** The item to add; the heaviest item the room knows when absent. */
+  itemId?: string;
+  quantity: number;
+}
+
+export interface SandboxLoadSceneEventPayload extends GameEventBase {
+  type: 'sandbox_load_extractor_scene';
+  sceneId: string;
+}
+
 export interface SandboxIgnitePayload extends GameEventBase {
   type: 'sandbox_ignite';
   x: number;
@@ -278,6 +305,11 @@ export type GameEventPayload =
   | SandboxSetSimPayload
   | SandboxClearHazardsPayload
   | SandboxIgnitePayload
+  | SandboxSpawnExtractorPayload
+  | SandboxDigBeltPayload
+  | SandboxSetCapacityPayload
+  | SandboxFillBackpackPayload
+  | SandboxLoadSceneEventPayload
   | EquipItemPayload
   | UnequipItemPayload
   | ConsumeItemPayload;

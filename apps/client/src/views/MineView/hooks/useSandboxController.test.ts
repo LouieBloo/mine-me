@@ -126,4 +126,26 @@ describe('useSandboxController', () => {
     rerender({ s: sandboxSession() });
     expect(result.current.view).toEqual({ tool: { kind: 'mine' }, freeCamera: false });
   });
+
+  it('sends the extractor commands', async () => {
+    const send = vi.fn().mockResolvedValue({ success: true, data: {} });
+    const { result } = render(send, sandboxSession());
+    await act(() => result.current.spawnExtractor());
+    expect(send).toHaveBeenLastCalledWith({ type: 'sandbox_spawn_extractor' });
+    await act(() => result.current.digBelt(10));
+    expect(send).toHaveBeenLastCalledWith({ type: 'sandbox_dig_belt', rows: 10 });
+    await act(() => result.current.setCapacity(300));
+    expect(send).toHaveBeenLastCalledWith({ type: 'sandbox_set_capacity', capacity: 300 });
+    await act(() => result.current.fillBackpack(50));
+    expect(send).toHaveBeenLastCalledWith({ type: 'sandbox_fill_backpack', quantity: 50 });
+    await act(() => result.current.loadExtractorScene('full-pack-at-belt'));
+    expect(send).toHaveBeenLastCalledWith({ type: 'sandbox_load_extractor_scene', sceneId: 'full-pack-at-belt' });
+  });
+
+  it('shows why an extractor command was refused', async () => {
+    const send = vi.fn().mockResolvedValue({ success: false, error: 'Spawn the extractor first.' });
+    const { result } = render(send, sandboxSession());
+    await act(() => result.current.digBelt(5));
+    expect(notificationService.error).toHaveBeenCalledWith('Belt', 'Spawn the extractor first.');
+  });
 });

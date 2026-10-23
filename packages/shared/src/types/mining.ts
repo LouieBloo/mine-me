@@ -1,6 +1,6 @@
 import type { PieceOffset } from '../gameLogic/pieces';
 import type { AutotileConfig } from '../gameLogic/autotile';
-import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig, HeldLightConfig, CharacterSoundEffectsConfig, FluidSoundEffectsConfig } from './index';
+import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig, HeldLightConfig, CharacterSoundEffectsConfig, FluidSoundEffectsConfig, ExtractorSoundEffectsConfig } from './index';
 import type { ParticleEffect, ParticleEffectConfig } from './particles';
 import type { Flammability, FluidAppearance } from './fluid';
 import type { GasClientDefinition, GasEvent, GasExplosionCell, GasWireCell } from '../gameLogic/gas/gasWire';
@@ -530,6 +530,8 @@ export interface SandboxStatus {
 /** What a sandbox client needs to build its tool panel (fluids come with the session's `fluids`). */
 export interface SandboxClientInfo {
   mobs: SandboxMobOption[];
+  /** The named extractor test scenes that can be loaded. */
+  extractorScenes?: SandboxMobOption[];
   status: SandboxStatus;
 }
 
@@ -567,6 +569,83 @@ export interface MiningDroppedItem {
   particleEffectId?: string | null;
   lightConfig?: ItemLightConfig | null;
   inGameScale?: number;
+}
+
+/**
+ * The extractor as a client needs it, sent once with the run (the join state). Its changes after that are
+ * `MiningExtractorUpdate`s in the tick. A client that joins late is told how long is left of the landing (usually none),
+ * so it never replays an intro that already happened.
+ */
+export interface MiningExtractorClientState {
+  id: string;
+  key: string;
+  name: string;
+  /** `/assets/...` art, or null for the placeholder. */
+  textureUrl: string | null;
+  /** Top-left cell of the footprint and its size in cells. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** How long the landing intro takes, and how much of it is left now (0: already landed). */
+  landingSeconds: number;
+  landingRemaining: number;
+  landingEffect?: ParticleEffectConfig | null;
+  /** Landing and running sounds, resolved to urls, each with its own volume. */
+  sounds?: ExtractorSoundEffectsConfig | null;
+}
+
+/** Why the belt is not growing right now (it carries on by itself when this clears, except at the bottom). */
+export type BeltBlockedReason = 'fluid' | 'gas' | 'fire' | 'rock' | 'solid' | 'bottom';
+
+/** The belt as a client draws it: a shaft of `rows` segments going down from the ground, `shaftWidth` cells wide. */
+export interface MiningBeltClientState {
+  shaftX: number;
+  shaftWidth: number;
+  /** The first row of the shaft (the ground row). */
+  startRow: number;
+  /** Segments laid so far; segment `i` is on row `startRow + i`. */
+  rows: number;
+  blockedBy: BeltBlockedReason | null;
+  /** Damage stage of each segment: 0 whole to 4 nearly gone, -1 broken (a gap the belt rebuilds). Absent: all whole. */
+  stages?: number[];
+  /** How fast things ride the belt, in cells per second (the belt's stripes move at this speed). */
+  beltSpeed: number;
+  /** Art for one segment, or null for the placeholder. */
+  textureUrl: string | null;
+}
+
+/** An item riding the belt. It moves up at the belt's speed, so only where it starts is sent. */
+export interface MiningBeltItem {
+  id: string;
+  itemId: string;
+  itemName: string;
+  iconUrl: string | null;
+  /** The player who loaded it (it goes to their stash when it arrives). */
+  ownerId: string;
+  /** Distance from the top of the belt (the extractor) in cells when it was sent; 0 is the top. */
+  pos: number;
+}
+
+/** The belt's changes since the last tick (sent only on the tick it changes). */
+export interface MiningBeltUpdate {
+  rows: number;
+  blockedBy: BeltBlockedReason | null;
+  /** Damage stage of every segment, sent when any changes (see `MiningBeltClientState.stages`). */
+  stages?: number[];
+  /** Segments that broke since the last update (for the break sound and dust). */
+  broke?: number[];
+}
+
+/** Items that went onto the belt and items that reached the top (or were lost), since the last tick. */
+export interface MiningBeltItemsUpdate {
+  added?: MiningBeltItem[];
+  removed?: string[];
+}
+
+/** What changed about the extractor since the last tick (sent only on the tick it changes). */
+export interface MiningExtractorUpdate {
+  landed: boolean;
 }
 
 /**
@@ -679,6 +758,14 @@ export interface MiningSessionClientState {
   droppedItems: MiningDroppedItem[];
   /** Items collected during this mining session. */
   temporaryBackpack: MiningBackpackItem[];
+  /** What this player has handed to the extractor so far (kept if they die). */
+  stash?: MiningBackpackItem[];
+  /** The belt going down from the extractor (absent in modes without one). */
+  belt?: MiningBeltClientState;
+  /** What is riding the belt right now. */
+  beltItems?: MiningBeltItem[];
+  /** The extractor standing on the surface (absent in modes without one). */
+  extractor?: MiningExtractorClientState;
   /** Total weight of the backpack and the most it can hold (Carry Capacity effects). */
   backpackWeight?: number;
   backpackCapacity?: number;
@@ -898,6 +985,14 @@ export interface MiningStateTickPayload {
   miningTarget?: MiningPosition;
   miningProgress?: number;
   temporaryBackpack?: MiningBackpackItem[];
+  /** What this player has handed to the extractor so far; sent whenever it changes. */
+  stash?: MiningBackpackItem[];
+  /** Items put on the belt or taken off it (arrived or lost). */
+  beltItems?: MiningBeltItemsUpdate;
+  /** The belt grew, or stopped or started (absent on ticks where nothing changed). */
+  belt?: MiningBeltUpdate;
+  /** The extractor's changes (it has landed). Absent on ticks where nothing changed. */
+  extractor?: MiningExtractorUpdate;
   /** Sent with `temporaryBackpack` whenever it (or the capacity) changed. */
   backpackWeight?: number;
   backpackCapacity?: number;
@@ -970,6 +1065,8 @@ export interface MobAIConfig {
   fleeHealthThreshold?: number;
   /** Telegraph time before an attack lands, in ms (0 = instant). Defaults to MOB_ATTACK_WINDUP_SECONDS. */
   attackWindupMs?: number;
+  /** The mob attacks the conveyor belt when it is within attack range of it and no player is. */
+  attacksBelt?: boolean;
   /** Collider size in tiles (overrides the player-sized default). */
   colliderWidth?: number;
   colliderHeight?: number;
@@ -1115,6 +1212,8 @@ export interface MiningMapConfigData {
   burningEffectId?: string | null;
   /** The default edge look of terrain blocks (a block's own `autotile` overrides it field by field). Absent: the built-in default. */
   autotileStyle?: AutotileConfig | null;
+  /** Open-air rows above the ground in the generated mine (small blocks; see `DEFAULT_SKY_ROWS`). 0 = the ground is the top row. */
+  skyRows?: number;
   /** Hostile NPC / Mob Spawning */
   mobSpawnCount?: number;
   mobSpawnMinDepth?: number;
@@ -1122,6 +1221,9 @@ export interface MiningMapConfigData {
   /** Mob that stands on the surface as a target dummy; empty/absent means none. */
   surfaceDummyMobId?: string | null;
 }
+
+/** Sky above the ground in the generated mine: about one screen, 8 of the original blocks. */
+export const DEFAULT_SKY_ROWS = 8 * BLOCK_SCALE;
 
 export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   gridWidth: MINING_CONFIG.GRID_WIDTH,
@@ -1164,6 +1266,7 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   heatDamagePerSecond: 1.5,
   burningEffectId: null,
   autotileStyle: null,
+  skyRows: DEFAULT_SKY_ROWS,
   mobSpawnCount: 3,
   mobSpawnMinDepth: 5 * S,
   // No built-in mobs: the active map config (database) says which mobs live in the mine

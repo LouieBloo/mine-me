@@ -57,6 +57,7 @@ export async function getActiveMiningConfig(): Promise<MiningMapConfigData> {
         heatDamagePerSecond: (config as any).heatDamagePerSecond ?? DEFAULT_MINING_MAP_CONFIG.heatDamagePerSecond,
         burningEffectId: (config as any).burningEffectId ?? null,
         autotileStyle: (config as any).autotileStyle ?? null,
+        skyRows: (config as any).skyRows ?? DEFAULT_MINING_MAP_CONFIG.skyRows,
         mobSpawnCount: (config as any).mobSpawnCount ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnCount,
         mobSpawnMinDepth: (config as any).mobSpawnMinDepth ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnMinDepth,
         allowedMobIds: ((config as any).allowedMobIds as string[]) ?? DEFAULT_MINING_MAP_CONFIG.allowedMobIds,
@@ -118,6 +119,7 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     burningEffectId: data.burningEffectId !== undefined ? data.burningEffectId : ((existing as any)?.burningEffectId ?? null),
     // null is meaningful here ("the built-in look"), so only fall back when the field was not supplied at all
     autotileStyle: data.autotileStyle !== undefined ? data.autotileStyle : ((existing as any)?.autotileStyle ?? null),
+    skyRows: data.skyRows ?? (existing as any)?.skyRows ?? DEFAULT_MINING_MAP_CONFIG.skyRows ?? 0,
     mobSpawnCount: data.mobSpawnCount ?? (existing as any)?.mobSpawnCount ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnCount ?? 3,
     mobSpawnMinDepth: data.mobSpawnMinDepth ?? (existing as any)?.mobSpawnMinDepth ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnMinDepth ?? 5,
     allowedMobIds: data.allowedMobIds ?? ((existing as any)?.allowedMobIds as string[]) ?? DEFAULT_MINING_MAP_CONFIG.allowedMobIds ?? [],
@@ -181,6 +183,7 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     heatDamagePerSecond: (saved as any).heatDamagePerSecond,
     burningEffectId: (saved as any).burningEffectId ?? null,
     autotileStyle: (saved as any).autotileStyle ?? null,
+    skyRows: (saved as any).skyRows,
     mobSpawnCount: (saved as any).mobSpawnCount,
     mobSpawnMinDepth: (saved as any).mobSpawnMinDepth,
     allowedMobIds: ((saved as any).allowedMobIds as string[]) ?? undefined,

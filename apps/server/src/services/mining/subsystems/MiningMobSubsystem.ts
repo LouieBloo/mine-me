@@ -64,6 +64,8 @@ export interface MiningActiveMobSession extends SwingState {
   canMine: boolean;
   aggroRange: number;
   attackRange: number;
+  /** Attacks the conveyor belt when in reach of it and no player is (from the mob's aiConfig). */
+  attacksBelt: boolean;
   /** Telegraph time between starting an attack and it landing, in seconds (0 = instant). */
   attackWindupSeconds: number;
   /** Seconds left in the current attack wind-up (0 = not winding up). */
@@ -178,6 +180,7 @@ export class MiningMobSubsystem {
       canMine: aiConfig.canMine !== false,
       aggroRange: MiningMobSubsystem.nonNegative(aiConfig.aggroRange, MINING_CONFIG.MOB_DEFAULT_AGGRO_RANGE),
       attackRange: MiningMobSubsystem.nonNegative(aiConfig.attackRange, MINING_CONFIG.MOB_DEFAULT_ATTACK_RANGE),
+      attacksBelt: aiConfig.attacksBelt === true,
       attackWindupSeconds: MiningMobSubsystem.nonNegative(
         aiConfig.attackWindupMs !== undefined ? aiConfig.attackWindupMs / 1000 : undefined,
         MINING_CONFIG.MOB_ATTACK_WINDUP_SECONDS
@@ -244,11 +247,13 @@ export class MiningMobSubsystem {
   public findValidCavernSpawnPosition(minDepth = 5 * BLOCK_SCALE): Vector2D {
     const grid = this.world.grid;
     const candidates: Vector2D[] = [];
-    const startY = Math.max(2, minDepth);
+    // Depth is below the ground surface; the rows above it are sky
+    const surfaceRow = this.world.surfaceRow ?? 0;
+    const startY = surfaceRow + Math.max(2, minDepth);
     const { width, height } = getGridDimensions(grid);
     for (let y = startY; y < height - 3; y++) {
       for (let x = 2; x < width - 2; x++) {
-        if (Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= 3 * BLOCK_SCALE && y <= 5 * BLOCK_SCALE) continue;
+        if (Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= 3 * BLOCK_SCALE && y <= surfaceRow + 5 * BLOCK_SCALE) continue;
         // Stood on the edge between two cells, a mob 1.25 tiles wide covers two of them; it needs two rows of height too
         if (this.bodyFitsAt(x, y + 1.0)) candidates.push({ x, y: y + 1.0 });
       }
@@ -259,7 +264,7 @@ export class MiningMobSubsystem {
       return candidates[idx];
     }
 
-    return { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: Math.max(15 * BLOCK_SCALE, minDepth + 5 * BLOCK_SCALE) };
+    return { x: MINING_CONFIG.ENTRANCE_X + 0.5, y: surfaceRow + Math.max(15 * BLOCK_SCALE, minDepth + 5 * BLOCK_SCALE) };
   }
 
   public populateCavernMobs(options?: { count?: number; minDepth?: number; mobIds?: string[] }): void {
@@ -372,14 +377,28 @@ export class MiningMobSubsystem {
           ? intent.miningTarget
           : null;
 
-      // One swing timer for both (the same Mining Speed stat players use).
-      advanceSwing(mob, dt, canAttack || mineTarget !== null, mob.stats.miningSpeed);
+      // No player or block to hit: a mob that goes for the belt hits the nearest segment in reach
+      const beltSegment = !canAttack && mineTarget === null && mob.attacksBelt ? this.nearestBeltSegment(mob) : null;
+
+      // One swing timer for all of them (the same Mining Speed stat players use).
+      advanceSwing(mob, dt, canAttack || mineTarget !== null || beltSegment !== null, mob.stats.miningSpeed);
 
       if (canAttack && targetPlayer) {
         this.stopMobMining(mob);
         this.faceToward(mob, targetPlayer.playerBody.position.x);
         mob.animationState = mob.swungThisTick ? 'attack' : 'idle';
         if (mob.swungThisTick) this.beginAttack(mob, targetPlayer);
+      } else if (beltSegment !== null) {
+        this.stopMobMining(mob);
+        this.faceToward(mob, this.world.belt!.shaftX + this.world.belt!.shaftWidth / 2);
+        mob.animationState = mob.swungThisTick ? 'attack' : 'idle';
+        if (mob.swungThisTick) {
+          // Hits like it hits a player: the Damage effect, through the one damage pipeline
+          this.world.damage.applyDamage(
+            { kind: 'belt', id: String(beltSegment) },
+            { amount: mob.stats.weaponDamage, type: 'melee', source: { kind: 'mob', id: mob.id, name: mob.name } }
+          );
+        }
       } else if (mineTarget) {
         mob.isMining = true;
         mob.miningTarget = mineTarget;
@@ -454,6 +473,28 @@ export class MiningMobSubsystem {
       player.playerBody.position.x - mob.mobBody.position.x,
       player.playerBody.position.y - mob.mobBody.position.y
     );
+  }
+
+  /** The index of the belt segment nearest a mob that is within its attack range of it, or null. */
+  private nearestBeltSegment(mob: MiningActiveMobSession): number | null {
+    const belt = this.world.belt;
+    if (!belt || belt.segments.length === 0) return null;
+    const cx = belt.shaftX + belt.shaftWidth / 2;
+    const { x, y } = mob.mobBody.position;
+    const reach = mob.attackRange + Math.max(mob.mobBody.halfWidth, mob.mobBody.halfHeight);
+    let best: number | null = null;
+    let bestDistance = Infinity;
+    belt.segments.forEach((segment, index) => {
+      if (!segment) return;
+      const dx = Math.max(0, Math.abs(x - cx) - belt.shaftWidth / 2);
+      const dy = Math.max(0, Math.abs(y - (belt.startRow + index + 0.5)) - 0.5);
+      const distance = Math.hypot(dx, dy);
+      if (distance <= reach && distance < bestDistance) {
+        best = index;
+        bestDistance = distance;
+      }
+    });
+    return best;
   }
 
   /** Soft collision so mobs spread out instead of stacking on each other or on a player. */
@@ -636,7 +677,7 @@ export class MiningMobSubsystem {
     if (!dummyMobId) return null;
     const dummyDef = this.world.data.getMobData(dummyMobId);
     if (!dummyDef) return null;
-    const spawnPos = position ?? { x: MINING_CONFIG.ENTRANCE_X + 2.5 * BLOCK_SCALE, y: 0.0 };
+    const spawnPos = position ?? { x: MINING_CONFIG.ENTRANCE_X + 2.5 * BLOCK_SCALE, y: this.world.surfaceRow ?? 0 };
     return this.spawnMob(dummyDef, spawnPos);
   }
 

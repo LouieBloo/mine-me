@@ -36,6 +36,9 @@ export class MiningDamageSystem {
     const amount = this.modifyDamage(target, event);
     if (!isValidDamageAmount(amount)) return NO_DAMAGE;
 
+    // A belt segment is hit through the same door as everything else (it has health, and breaks)
+    if (target.kind === 'belt') return this.world.belt?.damageSegment(Number(target.id), amount) ?? NO_DAMAGE;
+
     const result =
       target.kind === 'mob'
         ? this.damageMob(target.id, amount, event)

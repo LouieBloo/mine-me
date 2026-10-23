@@ -26,6 +26,9 @@ import Fluids from './pages/Fluids/Fluids';
 import FluidDetail from './pages/Fluids/FluidDetail/FluidDetail';
 import Gases from './pages/Gases/Gases';
 import GasDetail from './pages/Gases/GasDetail/GasDetail';
+import Extractors from './pages/Extractors/Extractors';
+import ExtractorDetail from './pages/Extractors/ExtractorDetail/ExtractorDetail';
+import ItemWeights from './pages/ItemWeights/ItemWeights';
 import MiningConfig from './pages/MiningConfig/MiningConfig';
 import Music from './pages/Music/Music';
 import { ProtectedRoute } from './components/ProtectedRoute/ProtectedRoute';
@@ -101,6 +104,18 @@ const router = createBrowserRouter([
       {
         path: "gases/:id",
         element: <GasDetail />
+      },
+      {
+        path: "extractors",
+        element: <Extractors />
+      },
+      {
+        path: "extractors/:id",
+        element: <ExtractorDetail />
+      },
+      {
+        path: "item-weights",
+        element: <ItemWeights />
       },
       {
         path: "mining-config",

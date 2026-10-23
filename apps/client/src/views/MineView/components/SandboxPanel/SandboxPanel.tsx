@@ -14,6 +14,17 @@ export interface SandboxGasOption {
   name: string;
 }
 
+/** What the sandbox can do with the extractor and its belt. */
+export interface SandboxExtractorTools {
+  /** Named test scenes. */
+  scenes: SandboxMobOption[];
+  onSpawn: () => void;
+  onDigBelt: (rows: number) => void;
+  onSetCapacity: (capacity: number) => void;
+  onFillBackpack: (quantity: number) => void;
+  onLoadScene: (sceneId: string) => void;
+}
+
 export interface SandboxPanelProps {
   fluids: SandboxFluidOption[];
   /** The gases that can be released (absent or empty hides the gas tool). */
@@ -29,6 +40,8 @@ export interface SandboxPanelProps {
   onStep: () => void;
   onSpeedChange: (speed: number) => void;
   onClearHazards: () => void;
+  /** The extractor tools (absent hides the section). */
+  extractor?: SandboxExtractorTools;
   onReset: () => void;
   onLeave: () => void;
   /** A command is in flight: the shared spinner shows and the buttons wait. */
@@ -57,6 +70,7 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   onStep,
   onSpeedChange,
   onClearHazards,
+  extractor,
   onReset,
   onLeave,
   busy = false,
@@ -65,6 +79,8 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   const [fluidKey, setFluidKey] = useState(fluids[0]?.typeKey ?? '');
   const [gasKey, setGasKey] = useState(gases[0]?.typeKey ?? '');
   const [mobId, setMobId] = useState(mobs[0]?.id ?? '');
+  const [sceneId, setSceneId] = useState('');
+  const [capacity, setCapacityText] = useState('100');
 
   const selectedFluid = fluids.some((f) => f.typeKey === fluidKey) ? fluidKey : fluids[0]?.typeKey ?? '';
   const selectedGas = gases.some((g) => g.typeKey === gasKey) ? gasKey : gases[0]?.typeKey ?? '';
@@ -239,6 +255,59 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
               {status.godMode ? 'God mode on' : 'God mode'}
             </button>
           </section>
+
+          {extractor && (
+            <section aria-label="Extractor" className="flex flex-col gap-1.5">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Extractor and belt</h3>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button type="button" className={`${BUTTON} ${IDLE}`} onClick={extractor.onSpawn} disabled={busy}>
+                  Spawn extractor
+                </button>
+                <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => extractor.onDigBelt(10)} disabled={busy}>
+                  Dig belt +10
+                </button>
+                <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => extractor.onFillBackpack(50)} disabled={busy}>
+                  Fill pack
+                </button>
+                <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => extractor.onDigBelt(100)} disabled={busy}>
+                  Dig belt to end
+                </button>
+              </div>
+              <div className="flex gap-1.5">
+                <input
+                  type="number"
+                  min={0}
+                  aria-label="Carry capacity"
+                  className={SELECT}
+                  value={capacity}
+                  onChange={(e) => setCapacityText(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className={`${BUTTON} ${IDLE}`}
+                  onClick={() => extractor.onSetCapacity(Number(capacity))}
+                  disabled={busy || capacity.trim() === '' || !Number.isFinite(Number(capacity)) || Number(capacity) < 0}
+                >
+                  Set
+                </button>
+              </div>
+              {extractor.scenes.length > 0 && (
+                <div className="flex gap-1.5">
+                  <select aria-label="Extractor scene" className={SELECT} value={sceneId} onChange={(e) => setSceneId(e.target.value)}>
+                    <option value="">Test scene...</option>
+                    {extractor.scenes.map((scene) => (
+                      <option key={scene.id} value={scene.id}>
+                        {scene.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => extractor.onLoadScene(sceneId)} disabled={busy || sceneId === ''}>
+                    Load
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
 
           <section aria-label="Sandbox" className="flex flex-col gap-1.5 border-t border-slate-700/60 pt-2">
             <button

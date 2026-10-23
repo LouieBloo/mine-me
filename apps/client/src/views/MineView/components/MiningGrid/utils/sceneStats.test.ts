@@ -33,6 +33,15 @@ describe('sampleSceneGauges', () => {
     });
   });
 
+  it('publishes the belt\'s segments and items so the cost of a long belt shows next to the frame time', () => {
+    const profiler = new MiningProfiler(1000, true);
+    sampleSceneGauges(profiler, { belt: { segments: 40, items: 12 } });
+    expect(profiler.getStats().gauges).toEqual({ 'Belt segments': 40, 'Belt items': 12 });
+    const none = new MiningProfiler(1000, true);
+    sampleSceneGauges(none, { belt: null });
+    expect(none.getStats().gauges).toEqual({});
+  });
+
   it('does nothing while profiling is off', () => {
     const profiler = new MiningProfiler(1000, false);
     sampleSceneGauges(profiler, { stage: node(), gridCells: 5 });

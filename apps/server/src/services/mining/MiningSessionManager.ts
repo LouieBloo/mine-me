@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
 import { MiningGameEngine } from './MiningGameEngine';
 import { prisma } from '../../index';
-import { InventoryService } from '../inventory.service';
+import { RunStashService } from '../runStash.service';
 import { broadcastStatUpdate } from '../characterBroadcast';
 import type { MiningPlayerSession } from './subsystems/MiningPlayerManager';
 import {
@@ -16,12 +16,42 @@ import {
   MINING_CONFIG,
   type MiningGameMode,
 } from '@mine-me/shared';
+import { EXTRACTOR_SCENE_OPTIONS } from './sandbox/extractorScenes';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 import { toClientGrid } from '../miningMap.service';
 import { getGameModeRules, roomIdFor } from './gameModeRules';
 import { dynamiteDefinition, toRemotePlayer } from './MiningEntitySync';
 
 export { DEFAULT_MULTIPLAYER_ROOM_ID } from './gameModeRules';
+
+/** What leaving the mine at the exit hands back: everything banked, and where it came from. */
+export interface ExitResult {
+  /** Backpack and stash together. */
+  extractedItems: MiningBackpackItem[];
+  backpackItems: MiningBackpackItem[];
+  stashItems: MiningBackpackItem[];
+}
+
+const EMPTY_EXIT: ExitResult = { extractedItems: [], backpackItems: [], stashItems: [] };
+
+/** Stash rows (item id and quantity) as backpack-style stacks with names and icons from the item definitions. */
+function describeStash(stash: { itemId: string; quantity: number }[], engine: MiningGameEngine): MiningBackpackItem[] {
+  return stash.map((s) => {
+    const def = engine.dataManager.getItemData(s.itemId);
+    return { itemId: s.itemId, itemName: def?.name ?? s.itemId, iconUrl: def?.iconUrl ?? null, quantity: s.quantity };
+  });
+}
+
+/** Backpack and stash as one list, a stack per item. */
+function combineLoot(backpack: MiningBackpackItem[], stash: { itemId: string; quantity: number }[], engine: MiningGameEngine): MiningBackpackItem[] {
+  const merged = new Map<string, MiningBackpackItem>();
+  for (const item of [...backpack, ...describeStash(stash, engine)]) {
+    const held = merged.get(item.itemId);
+    if (held) held.quantity += item.quantity;
+    else merged.set(item.itemId, { ...item });
+  }
+  return [...merged.values()];
+}
 
 export class MiningSessionManager {
   private static instance: MiningSessionManager;
@@ -100,10 +130,15 @@ export class MiningSessionManager {
         onRoomEmpty: (roomId) => {
           this.cleanupRoom(roomId);
         },
+        // What a player hands to the extractor is written to the database as it lands (modes that save to the character)
+        writeStash: rules.persistsCharacter ? (charId, items) => RunStashService.add(charId, items) : undefined,
       });
       this.activeRooms.set(targetRoomId, engine);
       engine.start();
     }
+
+    // A stash left over from a run that never reached the exit (a crash) is banked before this one begins
+    if (rules.persistsCharacter && !prevRoomId) this.bankStash(characterId, 'left over from an earlier run');
 
     // Add or reconnect the player in the room
     engine.addPlayer({
@@ -170,6 +205,10 @@ export class MiningSessionManager {
       temporaryBackpack: session.temporaryBackpack,
       backpackWeight: backpackWeight(session.temporaryBackpack, (id) => MiningDataManager.getInstance().getItemData(id)),
       backpackCapacity: session.carryCapacity,
+      extractor: engine.extractorSubsystem?.clientState(),
+      belt: engine.beltSubsystem?.clientState(),
+      beltItems: engine.beltSubsystem?.itemsSnapshot(),
+      stash: session.stash,
       visionRange: session.visionRange,
       canExtract: isAtEntrance,
       isMining: session.isMining,
@@ -178,7 +217,7 @@ export class MiningSessionManager {
       gameMode: engine.gameMode,
       surfaceRow: engine.surfaceRow || undefined,
       sandbox: engine.sandbox
-        ? { mobs: engine.sandbox.mobOptions(), status: engine.sandbox.status(characterId) }
+        ? { mobs: engine.sandbox.mobOptions(), extractorScenes: [...EXTRACTOR_SCENE_OPTIONS], status: engine.sandbox.status(characterId) }
         : undefined,
       otherPlayers,
       activeDynamites: engine.activeDynamites.length > 0 ? engine.activeDynamites.map(dynamiteDefinition) : undefined,
@@ -195,12 +234,29 @@ export class MiningSessionManager {
     const engine = this.getSession(characterId);
     if (!engine?.sandbox || !engine.getPlayer(characterId)) return false;
     engine.sandbox.reset();
+    this.sendSandboxState(engine);
+    return true;
+  }
+
+  /**
+   * Hands everyone in a sandbox room a fresh full state to rebuild their view from. Used after a reset, and after a tool that
+   * adds something the clients have no picture of yet (the extractor), with a `message` saying what happened.
+   */
+  public sendSandboxState(engine: MiningGameEngine, message?: { title: string; message: string }): void {
     for (const [id, session] of engine.players) {
       if (session.socket?.connected) {
-        session.socket.emit('mining_sandbox_reset', { sessionState: this.buildClientState(engine, id) });
+        session.socket.emit('mining_sandbox_reset', { sessionState: this.buildClientState(engine, id), ...(message ?? {}) });
       }
     }
-    return true;
+  }
+
+  /** Banks a character's stash into their inventory without their backpack; failures are logged and never block leaving. */
+  private bankStash(characterId: string, why: string): void {
+    void RunStashService.bank(characterId)
+      .then(({ stash }) => {
+        if (stash.length > 0) console.log(`[Mining] Banked ${stash.length} stashed item type(s) for ${characterId} (${why})`);
+      })
+      .catch((err) => console.error(`[Mining] Could not bank the stash for ${characterId} (${why}):`, err));
   }
 
   /** Health a character keeps when a run ends: dying leaves 1 HP, otherwise at least 1. */
@@ -238,16 +294,16 @@ export class MiningSessionManager {
   /**
    * End session and persist temporary loot to character inventory via Prisma.
    */
-  public async endSession(characterId: string): Promise<{ extractedItems: MiningBackpackItem[] }> {
+  public async endSession(characterId: string): Promise<ExitResult> {
     const roomId = this.playerToRoom.get(characterId);
     if (!roomId) {
-      return { extractedItems: [] };
+      return EMPTY_EXIT;
     }
 
     const engine = this.activeRooms.get(roomId);
     if (!engine) {
       this.playerToRoom.delete(characterId);
-      return { extractedItems: [] };
+      return EMPTY_EXIT;
     }
 
     const finalHealth = MiningSessionManager.finalHealth(engine.getPlayer(characterId));
@@ -261,26 +317,22 @@ export class MiningSessionManager {
     }
 
     // A mode that does not save to the character (the sandbox) leaves loot and health behind
-    if (!engine.rules.persistsCharacter) return { extractedItems: [] };
+    if (!engine.rules.persistsCharacter) return EMPTY_EXIT;
 
-    const extractedItems = removeResult?.extractedItems ?? [];
+    const backpackItems = removeResult?.extractedItems ?? [];
 
     await this.persistHealth(characterId, finalHealth);
 
-    // Persist items to database via Prisma in a single transaction (matched by item ID only)
-    if (extractedItems.length > 0) {
-      const { skipped } = await InventoryService.giveItemsToCharacter(
-        characterId,
-        extractedItems.map((i) => ({ itemId: i.itemId, quantity: i.quantity }))
-      );
-      for (const s of skipped) {
-        console.warn(
-          `[Mining] Could not save extracted item ${s.itemId} x${s.quantity} for ${characterId}: ${s.reason}`
-        );
-      }
+    // The backpack and the extractor's stash are banked together, in one transaction (matched by item ID only)
+    const { stash, skipped } = await RunStashService.bank(
+      characterId,
+      backpackItems.map((i) => ({ itemId: i.itemId, quantity: i.quantity }))
+    );
+    for (const s of skipped) {
+      console.warn(`[Mining] Could not save extracted item ${s.itemId} x${s.quantity} for ${characterId}: ${s.reason}`);
     }
 
-    return { extractedItems };
+    return { extractedItems: combineLoot(backpackItems, stash, engine), backpackItems, stashItems: describeStash(stash, engine) };
   }
 
   /**
@@ -301,6 +353,8 @@ export class MiningSessionManager {
       if (options.persistHealth !== false && engine.rules.persistsCharacter) {
         void this.persistHealth(characterId, finalHealth);
       }
+      // The backpack is lost; what was handed to the extractor is kept
+      if (engine.rules.persistsCharacter) this.bankStash(characterId, 'kept after the run ended early');
     }
     this.playerToRoom.delete(characterId);
   }
@@ -315,6 +369,9 @@ export class MiningSessionManager {
       for (const [charId, session] of engine.players) {
         if (engine.rules.persistsCharacter) {
           void this.persistHealth(charId, MiningSessionManager.finalHealth(session));
+          // Timeout or a collapsed room: the backpack is lost, the stash is kept
+          engine.flushStashes();
+          this.bankStash(charId, 'kept after the room closed');
         }
         this.playerToRoom.delete(charId);
       }

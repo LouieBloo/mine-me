@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { type MiningSessionClientState, type PlayerState, MINING_CONFIG } from '@mine-me/shared';
 import { ZoomControl } from '../ZoomControl/ZoomControl';
 import { QuickAccessBar } from '../../../../components/QuickAccessBar/QuickAccessBar';
+import { BeltStatus } from '../BeltStatus/BeltStatus';
 import { TemporaryBackpack } from '../TemporaryBackpack/TemporaryBackpack';
 import { PerformanceOverlay } from '../PerformanceOverlay/PerformanceOverlay';
 import './MiningHUD.css';
@@ -90,8 +91,15 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
               items={sessionState.temporaryBackpack || []}
               weight={sessionState.backpackWeight}
               capacity={sessionState.backpackCapacity}
+              stash={sessionState.stash}
             />
           </div>
+
+          {sessionState.belt && sessionState.belt.rows + (sessionState.belt.blockedBy ? 1 : 0) > 0 && (
+            <div className="pointer-events-auto">
+              <BeltStatus rows={sessionState.belt.rows} blockedBy={sessionState.belt.blockedBy} />
+            </div>
+          )}
 
           {/* Camera Zoom Control (appears on zoom, fades after a few seconds) */}
           {onZoomChange && (

@@ -335,6 +335,62 @@ model Gas {
   updatedAt        DateTime @updatedAt
 }
 
+/// The extractor that lands on the surface at the start of a run (tickets 119-127). Lengths and speeds are in small
+/// blocks (original value x BLOCK_SCALE). Rates are data so an upgrade is a different row, never a code change.
+model Extractor {
+  id                      String         @id @default(cuid())
+  // Open key, e.g. basic_extractor
+  key                     String         @unique
+  name                    String
+  description             String?
+  // /assets/... art for the machine (null = placeholder)
+  textureUrl              String?
+  // /assets/... art for one belt segment (null = placeholder)
+  beltTextureUrl          String?
+  // Footprint in cells
+  width                   Int            @default(12)
+  height                  Int            @default(9)
+  // Cells from the entrance to the middle of the machine (negative = left side)
+  entranceOffset          Float          @default(24)
+  // Seconds the landing intro takes
+  landingSeconds          Float          @default(3)
+  // Width of the shaft dug for the belt, in cells
+  shaftWidth              Int            @default(3)
+  buildSecondsPerSegment  Float          @default(1.5)
+  // Cells per second
+  beltSpeed               Float          @default(6)
+  unloadItemsPerSecond    Float          @default(4)
+  // Units per second the extractor takes from a player standing at its deposit zone
+  depositItemsPerSecond   Float          @default(20)
+  beltSegmentHealth       Float          @default(100)
+  // Least gap between two items on the belt, in cells (a full belt refuses more)
+  beltItemSpacing         Float          @default(1.5)
+  health                  Float          @default(500)
+  // Played where it lands (null = none)
+  landingParticleEffectId String?
+  landingParticleEffect   ParticleEffect? @relation("ExtractorLanding", fields: [landingParticleEffectId], references: [id], onDelete: SetNull)
+  // The one a run lands when it does not pick
+  isDefault               Boolean        @default(false)
+  // Sound slots (landing, loop): library sounds by id, each with its own volume
+  soundEffects            Json?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+}
+
+/// Items a player has handed to the extractor during a run (ticket 121). Written as they land so a crash or a death
+/// keeps them; banked into the inventory (and the rows deleted, in one transaction) when the run ends.
+model RunStash {
+  id          String   @id @default(cuid())
+  characterId String
+  itemId      String
+  quantity    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([characterId, itemId])
+  @@index([characterId])
+}
+
 model MiningMapConfig {
   id                String   @id @default(cuid())
   name              String   @default("Default")
@@ -382,6 +438,8 @@ model MiningMapConfig {
   burningEffectId     String?
   // Default edge look of terrain blocks (autotile, ticket 094); null = the built-in default
   autotileStyle       Json?
+  // Open-air rows above the ground in the generated mine (small blocks; 24 = 8 original blocks)
+  skyRows             Int      @default(24)
   // Hostile NPC / Mob Spawning Settings
   mobSpawnCount       Int      @default(3)
   mobSpawnMinDepth    Int      @default(15)
@@ -412,6 +470,7 @@ model ParticleEffect {
   items        Item[]          @relation("ItemGroundParticle")
   heldByItems  Item[]          @relation("ItemHeldParticle")
   miningBlocks MiningBlock[]
+  extractorsLanding Extractor[] @relation("ExtractorLanding")
 }
 
 enum CharacterStatus {
@@ -458,6 +517,7 @@ enum SoundCategory {
   CHARACTER
   FLUID
   GAS
+  EXTRACTOR
 }
 
 /// The player character's sounds (hurt, jump...). One row (id "default"); `soundEffects` maps a slot to a library sound id.

@@ -36,6 +36,7 @@
   "heatRadius": 7.5,
   "heatDamagePerSecond": 1.5,
   "burningEffectId": null,
+  "skyRows": 24,
   "mobSpawnCount": 3,
   "mobSpawnMinDepth": 15,
   "allowedMobIds": [

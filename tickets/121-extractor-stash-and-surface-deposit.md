@@ -1,6 +1,6 @@
 # 121 - Extractor stash, surface deposit and persistence
 
-**Priority:** P1 - **Status:** Open - **Depends on:** 117, 120
+**Priority:** P1 - **Status:** Done in code (judge the feel in the game) - **Depends on:** 117, 120
 
 ## Decisions (2026-10-22, from the owner)
 - The extractor **takes the player's items and saves them for when they leave.**
@@ -18,3 +18,11 @@
 
 ## Tests
 Deposit empties pack into the stash, persists per deposit, death keeps stash and loses pack and belt, exit banks both once (idempotent), per-player separation, interplay with mission reward.
+
+## Progress (2026-10-22)
+- `RunStash` table (characterId + itemId, quantity) and `RunStashService`: `add` writes each deposit (in order per character), `bank` adds the stash and the backpack to the inventory and deletes the rows in ONE transaction, safe to call twice. Nothing in the live room is the only copy of a deposit.
+- Deposit: `MiningExtractorSubsystem.updateDeposits` moves units from the backpack to the player's stash at the extractor's new `depositItemsPerSecond` (default 20; separate from the belt's `unloadItemsPerSecond`), heaviest item first (`nextUnloadIndex`, shared, reused by 123), only after landing and only while standing in the footprint. Writes follow within 1 s, or at once when they stop or leave; a failed write is kept and retried.
+- Exit (`endSession`): backpack + stash banked together in one transaction; the result lists `extractedItems` (both), `backpackItems` and `stashItems`. Death, timeout, abandon, disconnect: the backpack is lost and the stash is banked on its own. A stash left by a crash is banked when the character next starts a run.
+- Client: "Stored in extractor" section in the backpack panel.
+- Co-op: each player has their own stash and deposits and exits separately.
+- Mission reward interplay is ticket 125 (missions do not exist yet).

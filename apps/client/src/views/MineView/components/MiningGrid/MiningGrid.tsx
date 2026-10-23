@@ -17,6 +17,7 @@ import {
   type GameItem,
   CharacterModEngine,
   calculateEffectiveSwingSpeed,
+  type MiningStateTickPayload,
 } from '@mine-me/shared';
 import type { EmitterHandle } from '../../../../components/game/particles/ParticleEngine';
 import { useSocket } from '../../../../contexts/SocketContext';
@@ -43,6 +44,8 @@ import { DroppedItemVisualManager } from './renderers/DroppedItemVisualManager';
 import { ProjectileVisualManager } from './renderers/ProjectileVisualManager';
 import { MiningPredictionState } from './systems/MiningPredictionState';
 import type { MiningClientWorld } from './systems/MiningClientWorld';
+import { ExtractorSounds } from './renderers/ExtractorSounds';
+import { withVolume } from '../../../../services/sound/sfxVolume';
 import './MiningGrid.css';
 
 interface MiningGridProps {
@@ -67,6 +70,8 @@ interface MiningGridProps {
   onVisionChange?: (newVision: number) => void;
   onBackpackChange?: (newBackpack: MiningBackpackItem[], load: { weight?: number; capacity?: number }) => void;
   onBackpackFull?: () => void;
+  onStashChange?: (newStash: MiningBackpackItem[]) => void;
+  onBeltChange?: (update: NonNullable<MiningStateTickPayload['belt']>) => void;
   /** Sandbox tool and camera settings (only in a sandbox). */
   sandbox?: SandboxViewState;
 }
@@ -92,6 +97,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onVisionChange,
   onBackpackChange,
   onBackpackFull,
+  onStashChange,
+  onBeltChange,
   sandbox,
 }) => {
   const { app } = usePixiStage();
@@ -277,6 +284,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     tilesContainerRef,
     fluidRendererRef,
     gasRendererRef,
+    extractorRendererRef,
+    beltRendererRef,
+    beltItemRendererRef,
     fireFieldRef,
     fireRendererRef,
     fluidGlowRef,
@@ -351,6 +361,29 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       fluidSoundsRef.current = null;
     };
   }, [containersReady, fluidRendererRef, fireFieldRef, soundManager]);
+
+  // The extractor's landing sound (the renderer is built with the scene, before the sound manager is at hand)
+  useEffect(() => {
+    const extractor = extractorRendererRef?.current;
+    if (!containersReady || !extractor) return;
+    extractor.setSoundPlayer((sound, position, spatial) => {
+      soundManager.playSfx?.(sound.url, withVolume(sound.volume, { position, spatial }));
+    });
+    return () => extractor.setSoundPlayer(undefined);
+  }, [containersReady, extractorRendererRef, soundManager]);
+
+  // The extractor's belt sounds (the items put on the belt, and the running loop)
+  const extractorSoundsRef = useRef<ExtractorSounds | null>(null);
+  useEffect(() => {
+    const extractor = initialSessionState.extractor;
+    if (!containersReady || !extractor) return;
+    const sounds = new ExtractorSounds(soundManager, extractor.sounds, { x: extractor.x + extractor.width / 2, y: extractor.y + extractor.height / 2 });
+    extractorSoundsRef.current = sounds;
+    return () => {
+      sounds.destroy();
+      extractorSoundsRef.current = null;
+    };
+  }, [containersReady, initialSessionState.extractor, soundManager]);
 
   // What gases sound like (needs the scene's gas renderer, so it is made once that exists)
   const gasSoundsRef = useRef<GasSounds | null>(null);
@@ -498,6 +531,10 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     cameraRef,
     fluidRendererRef,
     gasRendererRef,
+    extractorRendererRef,
+    beltRendererRef,
+    beltItemRendererRef,
+    extractorSoundsRef,
     fireFieldRef,
     fireRendererRef,
     fluidGlowRef,
@@ -536,6 +573,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     onVisionChange,
     onBackpackChange,
     onBackpackFull,
+    onStashChange,
+    onBeltChange,
   });
 
   // 60+ FPS Frame Ticker Loop Hook

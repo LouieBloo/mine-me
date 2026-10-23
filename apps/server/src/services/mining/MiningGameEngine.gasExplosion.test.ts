@@ -24,7 +24,7 @@ describe('explosive gas going off', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     socket = { connected: true, emit: vi.fn() };
     engine = new MiningGameEngine({
-      characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0 }, socket: socket as any,
+      characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0, skyRows: 0 }, socket: socket as any,
     });
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
     // Forget the generated fluid while its cells are still open (a cell that is solid cannot be emptied)

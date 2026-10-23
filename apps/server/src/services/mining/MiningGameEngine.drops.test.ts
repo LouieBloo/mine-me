@@ -19,7 +19,7 @@ describe('dropped items are only re-sent when something changes', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     ticks = [];
     engine = new MiningGameEngine({
-      characterId: cid, cityId: 'c', seed: 4, mapConfig: { mobSpawnCount: 0 },
+      characterId: cid, cityId: 'c', seed: 4, mapConfig: { mobSpawnCount: 0, skyRows: 0 },
       socket: { connected: true, emit: (e: string, p: any) => e === 'mining_state_tick' && ticks.push(p) } as any,
     });
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);

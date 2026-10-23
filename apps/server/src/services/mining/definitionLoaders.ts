@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { PrismaClient } from '@prisma/client';
-import { resolveCharacterSounds, resolveFluidSounds, resolveGasSounds, resolveMobSounds, type CharacterSoundEffectsConfig, type FluidDefinition, type GasDefinition, type ParticleEffect, type GameItem, type Mob, type MiningBlockConfig, type SoundTrack } from '@mine-me/shared';
+import { resolveCharacterSounds, resolveExtractorSounds, resolveFluidSounds, resolveGasSounds, resolveMobSounds, type CharacterSoundEffectsConfig, type ExtractorDefinition, type FluidDefinition, type GasDefinition, type ParticleEffect, type GameItem, type Mob, type MiningBlockConfig, type SoundTrack } from '@mine-me/shared';
 import { CHARACTER_SOUND_CONFIG_ID } from '../characterSounds.service';
 import { MiningDataManager, type GameDefinitions } from './subsystems/MiningDataManager';
 
@@ -36,7 +36,17 @@ export function attachGasSounds<G extends GasDefinition>(gases: G[], library: So
   return gases.map((gas) => (gas.soundEffects ? { ...gas, sounds: resolveGasSounds(gas.soundEffects, byId) } : gas));
 }
 
-type LoaderPrisma = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'fluid' | 'gas' | 'particleEffect' | 'sound' | 'characterSoundConfig'>;
+/**
+ * Gives each extractor its playable `sounds`, resolved from its stored `soundEffects` references. An extractor with no
+ * references keeps any `sounds` it already carries.
+ */
+export function attachExtractorSounds<E extends ExtractorDefinition>(extractors: E[], library: SoundLibraryEntry[]): E[] {
+  const byId = new Map(library.map((s) => [s.id, s]));
+  return extractors.map((extractor) => (extractor.soundEffects ? { ...extractor, sounds: resolveExtractorSounds(extractor.soundEffects, byId) } : extractor));
+}
+
+type LoaderPrisma = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'fluid' | 'gas' | 'particleEffect' | 'sound' | 'characterSoundConfig'> &
+  Partial<Pick<PrismaClient, 'extractor'>>;
 
 /** The player character's playable sounds, resolved from the stored slot references. */
 export function buildCharacterSounds(refs: unknown, library: SoundLibraryEntry[]): CharacterSoundEffectsConfig {
@@ -52,7 +62,7 @@ export function buildCharacterSounds(refs: unknown, library: SoundLibraryEntry[]
 export async function loadDefinitionsFromDatabase(
   prisma: LoaderPrisma
 ): Promise<GameDefinitions> {
-  const [items, mobs, blocks, fluids, gases, particleEffects, sounds, characterSoundConfig] = await Promise.all([
+  const [items, mobs, blocks, fluids, gases, particleEffects, sounds, characterSoundConfig, extractors] = await Promise.all([
     prisma.item.findMany({
       include: { itemEffects: { include: { effect: true } }, particleEffect: true },
     }),
@@ -67,6 +77,7 @@ export async function loadDefinitionsFromDatabase(
     prisma.particleEffect.findMany(),
     prisma.sound.findMany({ select: { id: true, url: true, volume: true, isActive: true } }),
     prisma.characterSoundConfig.findUnique({ where: { id: CHARACTER_SOUND_CONFIG_ID } }),
+    prisma.extractor?.findMany({ orderBy: { createdAt: 'asc' } }) ?? [],
   ]);
 
   if (items.length === 0 || blocks.length === 0) {
@@ -78,10 +89,11 @@ export async function loadDefinitionsFromDatabase(
 
   // Prisma rows carry plain strings and JSON columns where the shared definitions use unions and
   // typed configs; the admin app writes them in the shared shape, so this is the one boundary cast.
-  const definitions = { items, mobs, blocks, fluids, gases, particleEffects } as unknown as GameDefinitions;
+  const definitions = { items, mobs, blocks, fluids, gases, particleEffects, extractors } as unknown as GameDefinitions;
   definitions.mobs = attachMobSounds(definitions.mobs, sounds);
   definitions.fluids = attachFluidSounds(definitions.fluids ?? [], sounds);
   definitions.gases = attachGasSounds(definitions.gases ?? [], sounds);
+  definitions.extractors = attachExtractorSounds(definitions.extractors ?? [], sounds);
   definitions.characterSounds = buildCharacterSounds(characterSoundConfig?.soundEffects, sounds);
   return definitions;
 }
@@ -105,6 +117,7 @@ export function loadDefinitionsFromFiles(dataDir: string): GameDefinitions {
     blocks: read<MiningBlockConfig>('blocks.json'),
     fluids: fs.existsSync(path.join(dataDir, 'fluids.json')) ? read<FluidDefinition>('fluids.json') : [],
     gases: fs.existsSync(path.join(dataDir, 'gases.json')) ? read<GasDefinition>('gases.json') : [],
+    extractors: fs.existsSync(path.join(dataDir, 'extractors.json')) ? read<ExtractorDefinition>('extractors.json') : [],
     particleEffects: fs.existsSync(path.join(dataDir, 'particle_effects.json')) ? read<ParticleEffect>('particle_effects.json') : [],
   };
 }
@@ -116,6 +129,6 @@ export async function installDefinitionsFromDatabase(
   const definitions = await loadDefinitionsFromDatabase(prisma);
   MiningDataManager.initialize(definitions);
   console.log(
-    `[Definitions] Loaded ${definitions.items.length} items, ${definitions.mobs.length} mobs, ${definitions.blocks.length} blocks, ${definitions.fluids?.length ?? 0} fluids, ${definitions.gases?.length ?? 0} gases from the database`
+    `[Definitions] Loaded ${definitions.items.length} items, ${definitions.mobs.length} mobs, ${definitions.blocks.length} blocks, ${definitions.fluids?.length ?? 0} fluids, ${definitions.gases?.length ?? 0} gases, ${definitions.extractors?.length ?? 0} extractors from the database`
   );
 }

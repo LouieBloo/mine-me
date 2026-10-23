@@ -101,3 +101,44 @@ export const handleSandboxReset = async (_io: Server, socket: Socket): Promise<G
   if (!miningSessionManager.resetSandbox(ctx.characterId)) return { success: false, error: 'Could not reset the sandbox.' };
   return { success: true };
 };
+
+/** Puts the extractor in the room and lets everyone's view rebuild so they can see it. */
+export const handleSandboxSpawnExtractor = async (_io: Server, socket: Socket): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  const res = ctx.tools.spawnExtractor();
+  if (res.ok) miningSessionManager.sendSandboxState(ctx.engine, { title: 'Extractor', message: 'An extractor is landing.' });
+  return toResult(res);
+};
+
+export const handleSandboxDigBelt = async (_io: Server, socket: Socket, payload: { rows?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  const res = ctx.tools.digBelt(payload?.rows);
+  return toResult(res, res.ok ? { laid: res.laid } : undefined);
+};
+
+export const handleSandboxSetCapacity = async (_io: Server, socket: Socket, payload: { capacity?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.setCapacity(ctx.characterId, payload?.capacity));
+};
+
+export const handleSandboxFillBackpack = async (
+  _io: Server,
+  socket: Socket,
+  payload: { itemId?: unknown; quantity?: unknown },
+): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.fillBackpack(ctx.characterId, payload?.itemId, payload?.quantity));
+};
+
+/** Loads a named extractor test scene; the view is rebuilt so the new belt shows. */
+export const handleSandboxLoadExtractorScene = async (_io: Server, socket: Socket, payload: { sceneId?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  const res = ctx.tools.loadExtractorScene(ctx.characterId, payload?.sceneId);
+  if (res.ok) miningSessionManager.sendSandboxState(ctx.engine, { title: 'Scene loaded', message: 'The extractor scene is ready.' });
+  return toResult(res);
+};

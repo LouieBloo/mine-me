@@ -23,7 +23,7 @@ describe('flammable blocks', () => {
   beforeEach(() => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     socket = { connected: true, emit: vi.fn() };
-    engine = new MiningGameEngine({ characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0 }, socket: socket as any });
+    engine = new MiningGameEngine({ characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0, skyRows: 0 }, socket: socket as any });
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
     for (let y = 0; y < engine.fluidSubsystem.grid.height; y++) for (let x = 0; x < engine.fluidSubsystem.grid.width; x++) engine.fluidSubsystem.grid.setCell(x, y, 0, 0);
     for (let x = 10; x <= 24; x++) {

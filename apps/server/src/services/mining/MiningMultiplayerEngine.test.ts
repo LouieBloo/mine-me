@@ -119,6 +119,7 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
 
   it('combines mining speeds when both players mine the same target block (cooperative mining)', () => {
     const engine = new MiningGameEngine({
+      mapConfig: { skyRows: 0 },
       roomId: 'test_multiplayer_room',
       gameMode: 'multiplayer',
       cityId: 'city-1',
@@ -191,6 +192,7 @@ describe('MiningGameEngine - Multiplayer & Cooperative Mining', () => {
 
   it('handles item pickups separately into the collecting player temporary backpack', () => {
     const engine = new MiningGameEngine({
+      mapConfig: { skyRows: 0 },
       roomId: 'test_multiplayer_room',
       gameMode: 'multiplayer',
       cityId: 'city-1',

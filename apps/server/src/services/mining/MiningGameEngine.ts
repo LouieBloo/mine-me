@@ -49,6 +49,8 @@ import {
 } from './MiningEntitySync';
 
 // Subsystems
+import { MiningBeltSubsystem } from './subsystems/MiningBeltSubsystem';
+import { MiningExtractorSubsystem, type StashWriter } from './subsystems/MiningExtractorSubsystem';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 import {
   MiningPlayerManager,
@@ -93,6 +95,8 @@ export interface MiningEngineOptions extends Partial<MiningCombatStats & CarrySt
   onPlayerHealthChanged?: (characterId: string, health: number, maxHealth: number) => void;
   /** A player died. Called after the tick finishes, so it is safe to remove them from the room. */
   onPlayerDeath?: (characterId: string) => void;
+  /** Writes a player's deposits to the extractor's stash in the database (only modes that save to the character). */
+  writeStash?: StashWriter;
   /** Called when the room is shut down after too many consecutive failing ticks. */
   onFatalError?: (roomId: string) => void;
   mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>;
@@ -125,6 +129,7 @@ export class MiningGameEngine {
   private onFatalError?: (roomId: string) => void;
   private onPlayerHealthChanged?: MiningEngineOptions['onPlayerHealthChanged'];
   private onPlayerDeath?: MiningEngineOptions['onPlayerDeath'];
+  private writeStash?: StashWriter;
   private pendingDeaths: string[] = [];
   /** The test tools, in a sandbox room (null elsewhere). */
   public readonly sandbox: SandboxTools | null;
@@ -158,6 +163,12 @@ export class MiningGameEngine {
   public mobSubsystem!: MiningMobSubsystem;
   public fluidSubsystem!: MiningFluidSubsystem;
   public gasSubsystem!: MiningGasSubsystem;
+  /** The extractor on the surface (null in modes without one). */
+  public extractorSubsystem: MiningExtractorSubsystem | null = null;
+  /** The sandbox asked for an extractor (a mode without one has none until it is spawned; a reset takes it away). */
+  public extractorRequested = false;
+  /** The conveyor belt going down from the extractor (null in modes without one). */
+  public beltSubsystem: MiningBeltSubsystem | null = null;
   public gasExplosionSubsystem!: MiningGasExplosionSubsystem;
   public ignitionSubsystem!: MiningIgnitionSubsystem;
   public fireSubsystem!: MiningFireSubsystem;
@@ -178,6 +189,7 @@ export class MiningGameEngine {
     this.onRoomEmpty = options.onRoomEmpty;
     this.onFatalError = options.onFatalError;
     this.onPlayerHealthChanged = options.onPlayerHealthChanged;
+    this.writeStash = options.writeStash;
     this.onPlayerDeath = options.onPlayerDeath;
     this.mapConfig = options.mapConfig;
 
@@ -250,6 +262,9 @@ export class MiningGameEngine {
     this.ignitionSubsystem = new MiningIgnitionSubsystem(world);
     this.fireSubsystem = new MiningFireSubsystem(world);
     this.burningSubsystem = new MiningBurningSubsystem(world);
+    this.extractorSubsystem = this.rules.hasExtractor || this.extractorRequested ? new MiningExtractorSubsystem(world) : null;
+    if (this.extractorSubsystem) this.extractorSubsystem.writeStash = this.writeStash ?? null;
+    this.beltSubsystem = this.extractorSubsystem ? new MiningBeltSubsystem(world) : null;
     for (const cell of built.fluidCells) this.fluidSubsystem.placeFluid(cell.x, cell.y, cell.typeKey, cell.level);
     for (const cell of built.gasCells ?? []) this.gasSubsystem.placeGas(cell.x, cell.y, cell.typeKey, cell.concentration);
     this.damageSystem = new MiningDamageSystem(world);
@@ -327,11 +342,21 @@ export class MiningGameEngine {
     maxHealth?: number;
   } & Partial<MiningCombatStats & CarryStats>): MiningPlayerSession {
     const session = this.playerManager.addPlayer(options);
+    this.extractorSubsystem?.begin();
     this.revealAndTrackTiles(session.playerBody.position, session.visionRange);
     return session;
   }
 
+  /** Writes every player's unsaved deposits to the database now (the run is ending). */
+  public flushStashes(): void {
+    for (const session of this.players.values()) this.extractorSubsystem?.flushStash(session);
+  }
+
   public removePlayer(characterId: string): { extractedItems: MiningBackpackItem[] } | null {
+    const leaving = this.players.get(characterId);
+    if (leaving) this.extractorSubsystem?.flushStash(leaving);
+    // Items still on the belt never reached the extractor: they go with the player
+    this.beltSubsystem?.removeItemsOf(characterId);
     const res = this.playerManager.removePlayer(characterId);
     this.projectileSubsystem.magazines.removeCharacter(characterId);
     if (this.playerManager.playerCount === 0 && this.onRoomEmpty) {
@@ -344,6 +369,20 @@ export class MiningGameEngine {
    * Rebuilds the map and everything on it from scratch and sends every player back to the start
    * (sandbox reset). Nothing but the players survives, so a reset always matches a fresh room.
    */
+  /**
+   * Puts an extractor (and its belt) in a room whose mode does not have one, landing now (sandbox tool). Returns false if
+   * the room already has one. The extractor's first player-joined clock starts at once.
+   */
+  public spawnExtractorNow(): boolean {
+    if (this.extractorSubsystem) return false;
+    this.extractorRequested = true;
+    this.extractorSubsystem = new MiningExtractorSubsystem(this.worldView);
+    this.extractorSubsystem.writeStash = this.writeStash ?? null;
+    this.beltSubsystem = new MiningBeltSubsystem(this.worldView);
+    this.extractorSubsystem.begin();
+    return true;
+  }
+
   public resetWorld(): void {
     this.pendingRevealedTiles = [];
     this.pendingDeaths = [];
@@ -505,6 +544,15 @@ export class MiningGameEngine {
     // 1. Process physics, animations, FoW, and item pickups for all players
     this.runStep('players', () => this.playerManager.updatePlayerPhysicsAndFoW(dt));
 
+    // 1.1 The extractor lands on the clock (nothing of it works before)
+    this.runStep('extractor', () => {
+      this.extractorSubsystem?.update();
+      this.extractorSubsystem?.updateDeposits(dt);
+    });
+
+    // 1.2 The belt digs and lays its next segment once the extractor is down
+    this.runStep('belt', () => this.beltSubsystem?.update(dt));
+
     // 1.5 Fluids push and brake loose bodies, then the rigid world steps
     this.runStep('fluidForces', () => this.fluidSubsystem.applyBodyForces());
 
@@ -582,6 +630,8 @@ export class MiningGameEngine {
     for (const characterId of dead) {
       const session = this.players.get(characterId);
       if (!session) continue;
+      // Whatever they had on the belt never reached the extractor, however the run goes on from here
+      this.beltSubsystem?.removeItemsOf(characterId);
       if (!this.rules.endsRunOnDeath) {
         this.playerManager.respawnPlayer(session);
         continue;
@@ -746,6 +796,9 @@ export class MiningGameEngine {
       get tick() {
         return engine.tickCount;
       },
+      get surfaceRow() {
+        return engine.surfaceRow;
+      },
       get spawnPoint() {
         return { x: MINING_CONFIG.ENTRANCE_X, y: engine.surfaceRow + MINING_CONFIG.ENTRANCE_Y };
       },
@@ -778,6 +831,15 @@ export class MiningGameEngine {
       },
       get gases() {
         return engine.gasSubsystem;
+      },
+      get extractor() {
+        return engine.extractorSubsystem;
+      },
+      get burning() {
+        return engine.burningSubsystem;
+      },
+      get belt() {
+        return engine.beltSubsystem;
       },
       get gasExplosions() {
         return engine.gasExplosionSubsystem;
@@ -869,6 +931,9 @@ export class MiningGameEngine {
     const fireChanges = this.fireSubsystem.takeVisibleChanges();
     const splashesToSend = this.fluidSubsystem.takeSplashes();
     const pickupsToSend = this.dropSubsystem.takePickups();
+    const extractorUpdate = this.extractorSubsystem?.takeUpdate();
+    const beltUpdate = this.beltSubsystem?.takeUpdate();
+    const beltItemChanges = this.beltSubsystem?.takeItemChanges();
 
     // About once a second every player is also told what the server is spending on this room
     const sendPerf = this.tickCount % MiningGameEngine.PERF_REPORT_TICKS === 0;
@@ -953,6 +1018,9 @@ export class MiningGameEngine {
         fireCells: fireChanges.length > 0 ? fireChanges : undefined,
         fluidSplashes: splashesNear.length > 0 ? splashesNear : undefined,
         itemPickups: pickupsNear.length > 0 ? pickupsNear : undefined,
+        ...(extractorUpdate ? { extractor: extractorUpdate } : {}),
+        ...(beltUpdate ? { belt: beltUpdate } : {}),
+        ...(beltItemChanges ? { beltItems: beltItemChanges } : {}),
         fallingRocks: fallingRockPayloads.length > 0 ? fallingRockPayloads : undefined,
         activeDynamites: dynamitePayloads.length > 0 ? dynamitePayloads : undefined,
         activeProjectiles: projectilePayloads.length > 0 ? projectilePayloads : undefined,
@@ -970,6 +1038,7 @@ export class MiningGameEngine {
           ? { backpackWeight: backpackWeight(session.temporaryBackpack, (id) => this.dataManager.getItemData(id)), backpackCapacity: session.carryCapacity }
           : {}),
         ...(session.backpackFullPending ? { backpackFull: true } : {}),
+        ...(session.stashDirty ? { stash: session.stash } : {}),
       };
 
       if (sendPerf) payload.perf = perf;
@@ -979,6 +1048,7 @@ export class MiningGameEngine {
       if (sendPerf) this.profiler.notePayloadBytes(JSON.stringify(payload).length);
       session.backpackDirty = false;
       session.backpackFullPending = false;
+      session.stashDirty = false;
     }
 
     this.profiler.recordStep('broadcast (socket emit)', emitMs);
@@ -992,6 +1062,8 @@ export class MiningGameEngine {
       players: this.players.size,
       mobs: this.activeMobs.size,
       droppedItems: this.droppedItems.length,
+      beltSegments: this.beltSubsystem?.rows ?? 0,
+      beltItems: this.beltSubsystem?.items.length ?? 0,
       fallingRocks: this.rockSubsystem.activeRocks.length,
       projectiles: this.projectileSubsystem.activeProjectiles.length,
       dynamites: this.explosiveSubsystem.activeDynamites.length,

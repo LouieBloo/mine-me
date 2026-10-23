@@ -49,4 +49,18 @@ describe.skipIf(!process.env.PROFILE_SANDBOX)('sandbox server cost', () => {
     );
     print('items falling', run(e));
   });
+
+  it('the extractor with a full belt and a busy unload', () => {
+    const e = start();
+    e.sandbox!.loadExtractorScene('sbx', 'full-pack-at-belt');
+    e.sandbox!.setCapacity('sbx', 100000);
+    e.sandbox!.fillBackpack('sbx', undefined, 5000);
+    print('extractor belt busy', run(e));
+  });
+
+  it('the extractor with a mob chewing the belt', () => {
+    const e = start();
+    e.sandbox!.loadExtractorScene('sbx', 'mob-attacking-segment');
+    print('extractor belt attacked', run(e));
+  });
 });

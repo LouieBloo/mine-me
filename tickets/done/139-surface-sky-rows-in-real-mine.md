@@ -1,6 +1,6 @@
 # 139 - Sky rows above the ground in the real mine
 
-**Priority:** P1 - **Status:** Open - **Depends on:** none (blocks 120, 130, 135; found in the 2026-10-22 audit)
+**Priority:** P1 - **Status:** Done (exit sign waits for doodads) - **Depends on:** none (blocks 120, 130, 135; found in the 2026-10-22 audit)
 
 ## Problem
 The real mine's grid is 135x135 with the ground starting at row 0 (`ENTRANCE_Y` = 0, `surfaceRow` = 0); only the sandbox has open sky rows above the ground (`SandboxMapBuilder` returns `surfaceRow: skyRows`, and `LightingEngine` and `useMiningScene` already honour `surfaceRow`). Several new tickets assume there is sky above the ground: the extractor lands on the surface (120), the belt starts there (122), trees, birds and mountains stand on it (130, 135), and clouds and weather fill the space above it (131-134). There is currently nowhere to put them.
@@ -20,3 +20,10 @@ The real mine's grid is 135x135 with the ground starting at row 0 (`ENTRANCE_Y` 
 
 ## Tests
 Entrance/exit still works with `surfaceRow` > 0; generation depth rules are relative to `surfaceRow`; sky rows are empty and not simulated; client camera bounds; mission depth uses depth below the surface. Mutation: treat row 0 as the surface -> a depth test fails.
+
+## Progress (2026-10-22)
+- `MiningMapConfig.skyRows` (Prisma, default 24 = `DEFAULT_SKY_ROWS`, 8 x `BLOCK_SCALE`), shared type, service, validation, JSON mirror, and a "Sky Above the Ground" card on the Mine Generator page.
+- `addSkyRows` in `mapSources.ts`: the generator is untouched (it works from the ground row); its output is shifted down under N empty, revealed sky rows, with fluid, gas and mob positions moved too, and `surfaceRow` = N. The exit, spawn and sunlight already used `surfaceRow` (from the sandbox).
+- Depth rules made relative: `MiningWorld.surfaceRow`; mob spawn depth, the entrance no-spawn zone, the fallback spot and the surface dummy are counted from the ground. Generation depths need no change (they run before the shift).
+- Tests that used absolute row numbers in the real mine now set `skyRows: 0` (they test mechanics, not the sky); new `MiningGameEngine.skyRows.test.ts` covers the shift, spawn, exit and depth (mutation checked), plus the admin card test.
+- Not done: the exit sign (needs doodads, 099+; add its sprite to 137). Camera top bound, no-fog and minimap exclusion are unchanged (the sandbox already draws sky this way); judge it in the game. Sky rows are still in the network grid and the physics world.

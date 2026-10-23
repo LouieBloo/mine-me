@@ -51,7 +51,8 @@ describe('MiningGameEngine - Target Dummy', () => {
     expect(dummy?.health).toBe(1000000);
     expect(dummy?.maxHealth).toBe(1000000);
     expect(dummy?.position.x).toBeCloseTo(MINING_CONFIG.ENTRANCE_X + 2.5 * BLOCK_SCALE, 0.1);
-    expect(dummy?.position.y).toBeLessThanOrEqual(1.0);
+    expect(dummy?.position.y).toBeLessThanOrEqual(engine.surfaceRow + 1.0);
+    expect(dummy?.position.y).toBeGreaterThan(engine.surfaceRow - 5);
   });
 
   it('allows damaging the target dummy and registers health decrease without dying', () => {

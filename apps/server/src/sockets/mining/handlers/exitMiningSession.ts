@@ -17,7 +17,7 @@ export const handleMiningExit = async (
   if (!characterId) return { success: false, error: 'No character selected.' };
 
   try {
-    const { extractedItems } = await miningSessionManager.endSession(characterId);
+    const { extractedItems, backpackItems, stashItems } = await miningSessionManager.endSession(characterId);
 
     const characterWithInventory = await prisma.character.findUnique({
       where: { id: characterId },
@@ -49,6 +49,8 @@ export const handleMiningExit = async (
       success: true,
       data: {
         extractedItems,
+        backpackItems,
+        stashItems,
         message: extractedItems.length > 0
           ? `Successfully extracted with ${extractedItems.reduce((sum, i) => sum + i.quantity, 0)} items!`
           : 'You left the mine with nothing.',

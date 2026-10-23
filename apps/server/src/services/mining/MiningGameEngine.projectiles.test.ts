@@ -16,6 +16,7 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
       characterId: 'char-shooter-1',
       cityId: 'city-1',
       gameMode: 'singleplayer',
+      mapConfig: { skyRows: 0 },
       socket: mockSocket,
       equippedWeaponId: 'cmn_revolver_6shooter',
     });

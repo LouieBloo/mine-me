@@ -418,3 +418,25 @@ export const updateItemSoundEffectSlot = async (req: Request, res: Response) => 
   }
 };
 
+
+/** Sets just an item's weight (the bulk weights screen), leaving everything else, effects included, as it is. */
+export const setItemWeight = async (req: Request, res: Response) => {
+  try {
+    const weight = req.body?.weight;
+    if (typeof weight !== 'number' || !Number.isFinite(weight) || weight < 0) {
+      res.status(400).json({ error: 'weight must be a number of 0 or more' });
+      return;
+    }
+    const existing = await prisma.item.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!existing) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+    const item = await prisma.item.update({ where: { id: existing.id }, data: { weight }, select: { id: true, name: true, weight: true } });
+    const allItems = await prisma.item.findMany({ include: { itemEffects: { include: { effect: true } }, particleEffect: true } });
+    syncJson('items.json', allItems);
+    res.json(item);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to set the item weight' });
+  }
+};

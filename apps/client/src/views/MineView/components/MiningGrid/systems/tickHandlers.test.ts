@@ -7,6 +7,9 @@ import {
   applyBurning,
   applyFluidSounds,
   applyItemPickupSounds,
+  applyExtractorUpdate,
+  applyBeltUpdate,
+  applyBeltItems,
   applyFireUpdates,
   applyFluidUpdates,
   applyGasUpdates,
@@ -199,6 +202,17 @@ describe('applySessionData', () => {
     expect(onBackpackChange).toHaveBeenLastCalledWith([], { weight: 12, capacity: 100 });
     applySessionData(payload({ visionRange: 0 }), ctx); // zero is a real value
     expect(onVisionChange).toHaveBeenCalledWith(0);
+  });
+
+  it('reports the stash when the tick carries it', () => {
+    const onStashChange = vi.fn();
+    const ctx = makeCtx(makeWorld(), { onStashChange });
+    applySessionData(payload(), ctx);
+    expect(onStashChange).not.toHaveBeenCalled();
+    applySessionData(payload({ stash: [{ itemId: 'a', itemName: 'A', iconUrl: null, quantity: 2 }] }), ctx);
+    expect(onStashChange).toHaveBeenCalledWith([{ itemId: 'a', itemName: 'A', iconUrl: null, quantity: 2 }]);
+    applySessionData(payload({ stash: [] }), ctx); // an empty stash is a real value
+    expect(onStashChange).toHaveBeenLastCalledWith([]);
   });
 
   it('on a "backpack full" tick shows the notice and plays the character sound, once per flag', () => {
@@ -730,5 +744,87 @@ describe('applyItemPickupSounds', () => {
     applyItemPickupSounds(tick({}), makeCtx(makeWorld({ characterSoundsRef: ref({ onPickups }) })));
     expect(onPickups).toHaveBeenCalledTimes(1);
     expect(() => applyItemPickupSounds(tick({ itemPickups: pickups }), makeCtx(makeWorld()))).not.toThrow();
+  });
+});
+
+describe('applyExtractorUpdate', () => {
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+
+  it('tells the extractor it has landed, only on the tick that says so', () => {
+    const markLanded = vi.fn();
+    const ctx = makeCtx(makeWorld({ extractorRendererRef: ref({ markLanded }) }));
+    applyExtractorUpdate(tick({}), ctx);
+    expect(markLanded).not.toHaveBeenCalled();
+    applyExtractorUpdate(tick({ extractor: { landed: true } }), ctx);
+    expect(markLanded).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing in a mode without an extractor', () => {
+    expect(() => applyExtractorUpdate(tick({ extractor: { landed: true } }), makeCtx(makeWorld()))).not.toThrow();
+  });
+});
+
+describe('applyBeltUpdate', () => {
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+
+  it('hands the belt length and wait reason to the renderer and the HUD, only when the tick carries them', () => {
+    const setRows = vi.fn();
+    const onBeltChange = vi.fn();
+    const ctx = makeCtx(makeWorld({ beltRendererRef: ref({ setRows }) }), { onBeltChange });
+    applyBeltUpdate(tick({}), ctx);
+    expect(setRows).not.toHaveBeenCalled();
+    applyBeltUpdate(tick({ belt: { rows: 5, blockedBy: 'fluid' } }), ctx);
+    expect(setRows).toHaveBeenCalledWith(5, 'fluid');
+    expect(onBeltChange).toHaveBeenCalledWith({ rows: 5, blockedBy: 'fluid' });
+  });
+
+  it('does nothing in a mode without a belt', () => {
+    expect(() => applyBeltUpdate(tick({ belt: { rows: 1, blockedBy: null } }), makeCtx(makeWorld()))).not.toThrow();
+  });
+});
+
+describe('applyBeltItems', () => {
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+  const item = { id: 'i1', itemId: 'ore', itemName: 'Ore', iconUrl: null, ownerId: 'p', pos: 3 };
+
+  it('adds and removes items, plays the sound for new ones, and keeps the loop in step with what is on the belt', () => {
+    const renderer = { add: vi.fn(), remove: vi.fn(), count: 1, cellPosition: vi.fn((pos: number) => ({ x: 1, y: pos })) };
+    const sounds = { onItemsAdded: vi.fn(), syncLoop: vi.fn() };
+    const ctx = makeCtx(makeWorld({ beltItemRendererRef: ref(renderer), extractorSoundsRef: ref(sounds) }));
+    applyBeltItems(tick({}), ctx);
+    expect(renderer.add).not.toHaveBeenCalled();
+    applyBeltItems(tick({ beltItems: { added: [item], removed: ['old'] } }), ctx);
+    expect(renderer.add).toHaveBeenCalledWith([item]);
+    expect(renderer.remove).toHaveBeenCalledWith(['old']);
+    expect(sounds.onItemsAdded).toHaveBeenCalledTimes(1);
+    expect(sounds.syncLoop).toHaveBeenLastCalledWith(true);
+    renderer.count = 0;
+    applyBeltItems(tick({ beltItems: { removed: ['i1'] } }), ctx);
+    expect(sounds.syncLoop).toHaveBeenLastCalledWith(false);
+  });
+
+  it('does nothing in a mode without a belt', () => {
+    expect(() => applyBeltItems(tick({ beltItems: { added: [item] } }), makeCtx(makeWorld()))).not.toThrow();
+  });
+});
+
+describe('applyBeltUpdate damage', () => {
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+
+  it('passes the damage stages on, and plays the break sound where segments broke', () => {
+    const setRows = vi.fn();
+    const setStages = vi.fn();
+    const onBeltBroke = vi.fn();
+    const world = makeWorld({
+      beltRendererRef: ref({ setRows, setStages }),
+      beltItemRendererRef: ref({ cellPosition: (pos: number) => ({ x: 1, y: pos }) }),
+      extractorSoundsRef: ref({ onBeltBroke }),
+    });
+    applyBeltUpdate(tick({ belt: { rows: 4, blockedBy: null, stages: [0, -1, 2], broke: [1] } }), makeCtx(world));
+    expect(setStages).toHaveBeenCalledWith([0, -1, 2]);
+    expect(onBeltBroke).toHaveBeenCalledWith([{ x: 1, y: 1.5 }]);
+    applyBeltUpdate(tick({ belt: { rows: 4, blockedBy: null } }), makeCtx(world));
+    expect(setStages).toHaveBeenCalledTimes(1);
+    expect(onBeltBroke).toHaveBeenCalledTimes(1);
   });
 });

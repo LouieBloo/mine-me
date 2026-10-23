@@ -280,6 +280,10 @@ export function useMiningTicker({
       miningProfiler.startSection('Fluid & Gas Draw');
       world.fluidRendererRef?.current?.update(nowMs / 1000);
       world.gasRendererRef?.current?.update(nowMs / 1000);
+      miningProfiler.startSection('Extractor & Belt');
+      world.extractorRendererRef?.current?.update(dt);
+      world.beltRendererRef?.current?.update(dt);
+      world.beltItemRendererRef?.current?.update(dt);
 
       // 5. Remote Players & Active Mobs
       miningProfiler.startSection('Remote Players');
@@ -429,6 +433,9 @@ export function useMiningTicker({
           tileGraphics: world.tileGraphicsMap?.current,
           renderer: app.renderer,
           gridCells: grid ? grid.length * (grid[0]?.length ?? 0) : undefined,
+          belt: world.beltRendererRef?.current
+            ? { segments: world.beltRendererRef.current.segmentCount, items: world.beltItemRendererRef?.current?.count ?? 0 }
+            : null,
         });
       }
 

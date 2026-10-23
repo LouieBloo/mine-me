@@ -157,6 +157,7 @@ export const miningConfigValidation = [
     if (errors.length > 0) throw new Error(errors.join('; '));
     return true;
   }),
+  body('skyRows').optional().isInt({ min: 0, max: 40 * BLOCK_SCALE }).withMessage(`Sky Height must be between 0 and ${40 * BLOCK_SCALE}`),
   body('mobSpawnCount').optional().isInt({ min: 0, max: 20 }).withMessage('Mob Spawn Count must be between 0 and 20'),
   body('mobSpawnMinDepth').optional().isInt({ min: 1, max: 40 * BLOCK_SCALE }).withMessage(`Mob Spawn Min Depth must be between 1 and ${40 * BLOCK_SCALE}`),
   body('allowedMobIds').optional().isArray().withMessage('Allowed Mob IDs must be an array of strings'),

@@ -8,6 +8,8 @@ interface TemporaryBackpackProps {
   /** Current weight and the most the backpack can hold; no bar when the capacity is unknown. */
   weight?: number;
   capacity?: number;
+  /** What has been handed to the extractor (kept even if the run ends early). */
+  stash?: MiningBackpackItem[];
 }
 
 /** How full the backpack is, 0 to 1 (a full or over-full pack is 1). */
@@ -18,8 +20,9 @@ export function backpackFillRatio(weight: number | undefined, capacity: number |
 
 const formatWeight = (value: number): string => (Number.isInteger(value) ? String(value) : value.toFixed(1));
 
-export const TemporaryBackpack: React.FC<TemporaryBackpackProps> = ({ items, weight, capacity }) => {
+export const TemporaryBackpack: React.FC<TemporaryBackpackProps> = ({ items, weight, capacity, stash }) => {
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const stashCount = (stash ?? []).reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <div className="temporary-backpack-container bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 shadow-2xl backdrop-blur-md w-72 pointer-events-auto">
@@ -84,6 +87,26 @@ export const TemporaryBackpack: React.FC<TemporaryBackpackProps> = ({ items, wei
               </div>
             );
           })}
+        </div>
+      )}
+
+      {stashCount > 0 && (
+        <div className="mt-2 border-t border-slate-800 pt-2" data-testid="stash-section">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">Stored in extractor</span>
+            <span className="text-[10px] font-bold text-slate-400">{stashCount} {stashCount === 1 ? 'item' : 'items'}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {(stash ?? []).map((item) => (
+              <span
+                key={item.itemId}
+                className="text-[10px] font-bold text-slate-200 bg-slate-950/80 border border-slate-800 rounded px-1.5 py-0.5"
+                title={`${item.itemName} (x${item.quantity}): safe even if the run ends early`}
+              >
+                {item.itemName} x{item.quantity}
+              </span>
+            ))}
+          </div>
         </div>
       )}
     </div>

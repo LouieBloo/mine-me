@@ -6,7 +6,9 @@ import {
   isThrowableItem,
   type CharacterSoundEffectsConfig,
   type FluidDefinition,
+  type ExtractorDefinition,
   type GasDefinition,
+  pickDefaultExtractor,
   type GameItem,
   type Mob,
   type MiningBlockConfig,
@@ -24,6 +26,8 @@ export interface GameDefinitions {
   fluids?: FluidDefinition[];
   /** Gases (hydrogen...). Absent means none are defined. */
   gases?: GasDefinition[];
+  /** Extractors. Absent means none are defined (the built-in default is used). */
+  extractors?: ExtractorDefinition[];
   /** The particle effect library, so fluids and fire can name an effect by id. Absent means none. */
   particleEffects?: ParticleEffect[];
   /** The player character's resolved sounds (hurt, jump...). Missing means none are set. */
@@ -64,6 +68,9 @@ export class MiningDataManager {
   private readonly gases: GasDefinition[] = [];
   private readonly gasesByTypeKey = new Map<string, GasDefinition>();
   private readonly gasesById = new Map<string, GasDefinition>();
+  private readonly extractors: ExtractorDefinition[] = [];
+  private readonly extractorsByKey = new Map<string, ExtractorDefinition>();
+  private readonly extractorsById = new Map<string, ExtractorDefinition>();
   private readonly particleEffectsById = new Map<string, ParticleEffect>();
 
   private readonly itemsById = new Map<string, GameItem>();
@@ -100,6 +107,12 @@ export class MiningDataManager {
       this.gases.push(gas);
       this.gasesByTypeKey.set(gas.typeKey, gas);
       MiningDataManager.putFirst(this.gasesById, gas.id, gas);
+    }
+    for (const extractor of definitions.extractors ?? []) {
+      if (!extractor?.key || this.extractorsByKey.has(extractor.key)) continue;
+      this.extractors.push(extractor);
+      this.extractorsByKey.set(extractor.key, extractor);
+      MiningDataManager.putFirst(this.extractorsById, extractor.id, extractor);
     }
     for (const item of this.items) {
       MiningDataManager.putFirst(this.itemsById, item.id, item);
@@ -188,6 +201,22 @@ export class MiningDataManager {
   public getFluid(keyOrId: string): FluidDefinition | undefined {
     if (typeof keyOrId !== 'string') return undefined;
     return this.fluidsByTypeKey.get(keyOrId) ?? this.fluidsById.get(keyOrId);
+  }
+
+  /** All extractor definitions, in load order (the first of any duplicated key wins). */
+  public getExtractors(): ExtractorDefinition[] {
+    return this.extractors;
+  }
+
+  /** Extractor definition by key (e.g. 'basic_extractor') or by database id. */
+  public getExtractor(keyOrId: string): ExtractorDefinition | undefined {
+    if (typeof keyOrId !== 'string') return undefined;
+    return this.extractorsByKey.get(keyOrId) ?? this.extractorsById.get(keyOrId);
+  }
+
+  /** The extractor a run lands: the one marked default, else the first, else the built-in one. Never undefined. */
+  public getDefaultExtractor(): ExtractorDefinition {
+    return pickDefaultExtractor(this.extractors);
   }
 
   /** All gas definitions, in load order (the first of any duplicated typeKey wins). */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BASE_CARRY_CAPACITY, backpackWeight, canCarry, carryCapacityOfInventory, carryRoom, deriveCarryCapacity } from '../src';
+import { BASE_CARRY_CAPACITY, backpackWeight, canCarry, nextUnloadIndex, carryCapacityOfInventory, carryRoom, deriveCarryCapacity } from '../src';
 
 const bag = (value: number) => [{ value, effect: { carryCapacityModifier: true } }];
 const defs = new Map([['dirt', { weight: 1 }], ['ore', { weight: 4 }], ['feather', { weight: 0 }]]);
@@ -50,5 +50,19 @@ describe('backpackWeight / canCarry', () => {
     expect(canCarry(pack, 'ore', 3, 38, defs)).toBe(false);
     expect(canCarry(pack, 'feather', 1000, 0, defs)).toBe(true);
     expect(canCarry(pack, 'ore', 0, 0, defs)).toBe(true);
+  });
+});
+
+describe('nextUnloadIndex', () => {
+  it('takes the heaviest item per unit first, the earliest among equals, and skips empty stacks', () => {
+    const stacks = [{ itemId: 'dirt', quantity: 3 }, { itemId: 'ore', quantity: 1 }, { itemId: 'ore', quantity: 2 }];
+    expect(nextUnloadIndex(stacks, defs)).toBe(1);
+    expect(nextUnloadIndex([{ itemId: 'dirt', quantity: 0 }, { itemId: 'dirt', quantity: 2 }], defs)).toBe(1);
+    expect(nextUnloadIndex([{ itemId: 'feather', quantity: 2 }, { itemId: 'ghost', quantity: 1 }], defs)).toBe(0);
+  });
+
+  it('is -1 for an empty backpack', () => {
+    expect(nextUnloadIndex([], defs)).toBe(-1);
+    expect(nextUnloadIndex([{ itemId: 'dirt', quantity: 0 }], defs)).toBe(-1);
   });
 });

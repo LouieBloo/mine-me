@@ -147,6 +147,20 @@ export class MiningBurningSubsystem {
     return state.remaining > 0;
   }
 
+  /**
+   * How much damage per second a box takes from its surroundings right now: standing in fire, the heat of a fire nearby, and
+   * a harmful fluid it is in. For things that are hurt like a body but are not one (the conveyor belt).
+   */
+  public hazardRate(box: BodyBox): number {
+    const rule = fireDamageRule(this.world.mapConfig);
+    const hasFire = this.world.fire.grid.burningCount > 0;
+    const wet = this.fluidContactOf(box);
+    const fluid = (wet?.definition.contact?.damagePerSecond ?? 0) * (wet?.submerged ?? 0);
+    const direct = hasFire && this.touchesFire(box) ? rule.burnDamagePerSecond : 0;
+    const heat = hasFire ? this.heatRateAt(box, rule) : 0;
+    return direct + heat + fluid;
+  }
+
   /** The fluid a body is standing in (the deepest one) with its definition, or null when dry. */
   private fluidContactOf(box: BodyBox): { definition: FluidDefinition; submerged: number } | null {
     const fluids = this.world.fluids;

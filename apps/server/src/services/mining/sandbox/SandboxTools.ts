@@ -1,6 +1,7 @@
 import { isTileSolid, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
 import type { MiningGameEngine } from '../MiningGameEngine';
 import { WorldSimClock } from './WorldSimClock';
+import { findExtractorScene, heaviestItemId } from './extractorScenes';
 
 export type SandboxResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -123,8 +124,58 @@ export class SandboxTools {
     return { ok: true };
   }
 
+  /** Puts the extractor and its belt in the room, landing now. False (with a reason) if it is already there. */
+  public spawnExtractor(): SandboxResult {
+    if (!this.engine.spawnExtractorNow()) return fail('The extractor is already here.');
+    return { ok: true };
+  }
+
+  /** Digs `rows` belt segments at once (stops where the belt would wait). */
+  public digBelt(rows: unknown): SandboxResult<{ laid: number }> {
+    if (typeof rows !== 'number' || !Number.isInteger(rows) || rows < 1 || rows > 200) return fail('Choose between 1 and 200 segments.');
+    const belt = this.engine.beltSubsystem;
+    if (!belt) return fail('Spawn the extractor first.');
+    this.engine.extractorSubsystem!.skipLanding();
+    return { ok: true, laid: belt.buildInstantly(rows) };
+  }
+
+  /** Sets how much a player can carry (the backpack weight limit). */
+  public setCapacity(characterId: string, capacity: unknown): SandboxResult {
+    const session = this.engine.getPlayer(characterId);
+    if (!session) return fail('You are not in the room.');
+    if (typeof capacity !== 'number' || !Number.isFinite(capacity) || capacity < 0 || capacity > 100000) return fail('Choose a capacity from 0 to 100000.');
+    session.carryCapacity = capacity;
+    session.backpackDirty = true;
+    return { ok: true };
+  }
+
+  /** Adds items to a player's backpack, whatever the weight (so the full-pack rules can be tried). */
+  public fillBackpack(characterId: string, itemId: unknown, quantity: unknown): SandboxResult {
+    const session = this.engine.getPlayer(characterId);
+    if (!session) return fail('You are not in the room.');
+    const chosen = itemId === undefined ? heaviestItemId(this.engine) : itemId;
+    if (typeof chosen !== 'string') return fail('Pick an item.');
+    const def = this.engine.dataManager.getItemData(chosen);
+    if (!def) return fail('Unknown item.');
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1 || quantity > 10000) return fail('Choose between 1 and 10000.');
+    const held = session.temporaryBackpack.find((s) => s.itemId === def.id);
+    if (held) held.quantity += quantity;
+    else session.temporaryBackpack.push({ itemId: def.id, itemName: def.name, iconUrl: def.iconUrl ?? null, quantity });
+    session.backpackDirty = true;
+    return { ok: true };
+  }
+
+  /** Puts the room into one of the named extractor test scenes. */
+  public loadExtractorScene(characterId: string, sceneId: unknown): SandboxResult {
+    const scene = findExtractorScene(sceneId);
+    if (!scene) return fail('Unknown scene.');
+    if (!this.engine.getPlayer(characterId)) return fail('You are not in the room.');
+    return scene.apply(this.engine, characterId);
+  }
+
   /** Rebuilds the map and everything on it; everyone in the room goes back to the start. */
   public reset(): void {
+    this.engine.extractorRequested = false;
     this.engine.resetWorld();
     this.clock.paused = false;
     this.clock.speed = 1;

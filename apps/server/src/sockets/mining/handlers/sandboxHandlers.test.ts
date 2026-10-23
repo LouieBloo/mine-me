@@ -15,6 +15,11 @@ import {
   handleSandboxSetGodMode,
   handleSandboxSetSim,
   handleSandboxReset,
+  handleSandboxSpawnExtractor,
+  handleSandboxDigBelt,
+  handleSandboxSetCapacity,
+  handleSandboxFillBackpack,
+  handleSandboxLoadExtractorScene,
 } from './sandboxHandlers';
 
 const socketFor = (characterId: string | undefined) => ({ data: { characterId }, connected: true, emit: vi.fn() }) as any;
@@ -43,6 +48,11 @@ describe('sandbox handlers', () => {
         handleSandboxSetGodMode(io, socket, { enabled: true }),
         handleSandboxSetSim(io, socket, { paused: true }),
         handleSandboxReset(io, socket),
+        handleSandboxSpawnExtractor(io, socket),
+        handleSandboxDigBelt(io, socket, { rows: 3 }),
+        handleSandboxSetCapacity(io, socket, { capacity: 10 }),
+        handleSandboxFillBackpack(io, socket, { quantity: 3 }),
+        handleSandboxLoadExtractorScene(io, socket, { sceneId: 'full-pack-at-belt' }),
       ]);
       for (const r of results) expect(r).toEqual({ success: false, error: 'Sandbox tools are only available in the sandbox.' });
       expect(miningSessionManager.getSession('hs-solo')!.getPlayer('hs-solo')!.godMode).toBeUndefined();
@@ -104,6 +114,45 @@ describe('sandbox handlers', () => {
         expect(call![1].sessionState.surfaceRow).toBe(SKY);
         expect(call![1].sessionState.sandbox.mobs.length).toBeGreaterThan(0);
       }
+    });
+  });
+
+  describe('the extractor tools in a sandbox', () => {
+    afterEach(() => miningSessionManager.cancelSession('hs-a', { persistHealth: false }));
+
+    it('spawns the extractor and hands the room a fresh state that includes it', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      socket.emit.mockClear();
+      expect(await handleSandboxSpawnExtractor(io, socket)).toEqual({ success: true });
+      const sent = socket.emit.mock.calls.find((c: any[]) => c[0] === 'mining_sandbox_reset');
+      expect(sent?.[1].sessionState.extractor).toBeDefined();
+      expect(sent?.[1].sessionState.belt).toBeDefined();
+      expect(sent?.[1].message).toBeTruthy();
+      expect(await handleSandboxSpawnExtractor(io, socket)).toMatchObject({ success: false });
+    });
+
+    it('digs the belt, sets the capacity and fills the pack, and refuses bad numbers', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      expect(await handleSandboxDigBelt(io, socket, { rows: 3 })).toMatchObject({ success: false });
+      await handleSandboxSpawnExtractor(io, socket);
+      expect(await handleSandboxDigBelt(io, socket, { rows: 3 })).toEqual({ success: true, data: { laid: 3 } });
+      expect(await handleSandboxDigBelt(io, socket, { rows: -2 })).toMatchObject({ success: false });
+      expect(await handleSandboxSetCapacity(io, socket, { capacity: 77 })).toEqual({ success: true });
+      expect(miningSessionManager.getSession('hs-a')!.getPlayer('hs-a')!.carryCapacity).toBe(77);
+      expect(await handleSandboxSetCapacity(io, socket, { capacity: 'a lot' })).toMatchObject({ success: false });
+      expect(await handleSandboxFillBackpack(io, socket, { quantity: 4 })).toEqual({ success: true });
+      expect(miningSessionManager.getSession('hs-a')!.getPlayer('hs-a')!.temporaryBackpack.length).toBeGreaterThan(0);
+      expect(await handleSandboxFillBackpack(io, socket, { quantity: 0 })).toMatchObject({ success: false });
+    });
+
+    it('loads a scene (and says if there is none by that name)', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      expect(await handleSandboxLoadExtractorScene(io, socket, { sceneId: 'full-pack-at-belt' })).toEqual({ success: true });
+      expect(miningSessionManager.getSession('hs-a')!.beltSubsystem!.rows).toBeGreaterThan(0);
+      expect(await handleSandboxLoadExtractorScene(io, socket, { sceneId: 'nope' })).toEqual({ success: false, error: 'Unknown scene.' });
     });
   });
 });

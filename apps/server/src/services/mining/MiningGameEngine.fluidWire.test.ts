@@ -21,7 +21,7 @@ describe('fluids on the wire', () => {
   beforeEach(() => {
     socket = { connected: true, emit: vi.fn() };
     engine = new MiningGameEngine({
-      characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0 }, socket: socket as any,
+      characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0, skyRows: 0 }, socket: socket as any,
     });
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
     // Forget the generated oil so only this test's oil exists

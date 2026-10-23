@@ -23,6 +23,10 @@ import type { MiningMobRenderer } from '../renderers/MiningMobRenderer';
 import type { FireField } from '@mine-me/shared';
 import type { FluidRenderer } from '../renderers/FluidRenderer';
 import type { GasRenderer } from '../renderers/GasRenderer';
+import type { ExtractorRenderer } from '../renderers/ExtractorRenderer';
+import type { BeltRenderer } from '../renderers/BeltRenderer';
+import type { BeltItemRenderer } from '../renderers/BeltItemRenderer';
+import type { ExtractorSounds } from '../renderers/ExtractorSounds';
 import type { FireRenderer } from '../renderers/FireRenderer';
 import type { FluidGlow } from '../renderers/FluidGlow';
 import type { BurningBodies } from '../renderers/BurningBodies';
@@ -83,6 +87,14 @@ export interface MiningSceneRefs {
   fluidRendererRef: NullableRef<FluidRenderer>;
   /** Draws the gas the server has revealed (and holds the client's copy of the gas grid). */
   gasRendererRef?: NullableRef<GasRenderer>;
+  /** The extractor on the surface and its landing intro (absent in modes without one). */
+  extractorRendererRef?: NullableRef<ExtractorRenderer>;
+  /** The conveyor belt going down from the extractor (absent in modes without one). */
+  beltRendererRef?: NullableRef<BeltRenderer>;
+  /** The items riding the belt. */
+  beltItemRendererRef?: NullableRef<BeltItemRenderer>;
+  /** The extractor's sounds: items going onto the belt, and the running loop. */
+  extractorSoundsRef?: NullableRef<ExtractorSounds>;
   /** Which visible cells are on fire, as the server last said (ticket 061 draws it). */
   fireFieldRef: NullableRef<FireField>;
   /** Flames and lights on the burning cells. */

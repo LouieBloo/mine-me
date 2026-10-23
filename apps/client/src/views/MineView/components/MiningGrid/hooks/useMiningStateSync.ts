@@ -33,6 +33,8 @@ export interface UseMiningStateSyncOptions {
   onVisionChange?: (newVision: number) => void;
   onBackpackChange?: (newBackpack: MiningBackpackItem[], load: { weight?: number; capacity?: number }) => void;
   onBackpackFull?: () => void;
+  onStashChange?: (stash: MiningBackpackItem[]) => void;
+  onBeltChange?: (update: NonNullable<MiningStateTickPayload['belt']>) => void;
 }
 
 /**
@@ -51,6 +53,8 @@ export function useMiningStateSync({
   onVisionChange,
   onBackpackChange,
   onBackpackFull,
+  onStashChange,
+  onBeltChange,
 }: UseMiningStateSyncOptions) {
   const {
     torchEmittersRef,
@@ -70,6 +74,10 @@ export function useMiningStateSync({
   onBackpackChangeRef.current = onBackpackChange;
   const onBackpackFullRef = useRef(onBackpackFull);
   onBackpackFullRef.current = onBackpackFull;
+  const onStashChangeRef = useRef(onStashChange);
+  onStashChangeRef.current = onStashChange;
+  const onBeltChangeRef = useRef(onBeltChange);
+  onBeltChangeRef.current = onBeltChange;
 
   // Static entity descriptions arrive once; each tick only carries what changes (see EntityDefinitionCache)
   const entityDefsRef = useRef<EntityDefinitionCache | null>(null);
@@ -94,6 +102,8 @@ export function useMiningStateSync({
       onVisionChange: (vision) => onVisionChangeRef.current?.(vision),
       onBackpackChange: (backpack, load) => onBackpackChangeRef.current?.(backpack, load),
       onBackpackFull: () => onBackpackFullRef.current?.(),
+      onStashChange: (stash) => onStashChangeRef.current?.(stash),
+      onBeltChange: (update) => onBeltChangeRef.current?.(update),
     };
     const cleanup = onEvent('mining_state_tick', (payload: MiningStateTickPayload) => handleStateTick(payload, ctx));
 

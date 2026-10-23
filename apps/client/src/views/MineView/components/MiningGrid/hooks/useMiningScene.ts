@@ -30,6 +30,9 @@ import { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager'
 import { FluidRenderer } from '../renderers/FluidRenderer';
 import { autotileVariants } from '../renderers/AutotileVariants';
 import { GasRenderer } from '../renderers/GasRenderer';
+import { ExtractorRenderer } from '../renderers/ExtractorRenderer';
+import { BeltRenderer } from '../renderers/BeltRenderer';
+import { BeltItemRenderer } from '../renderers/BeltItemRenderer';
 import { FireRenderer } from '../renderers/FireRenderer';
 import { FluidGlow } from '../renderers/FluidGlow';
 import { BurningBodies } from '../renderers/BurningBodies';
@@ -78,6 +81,9 @@ export function useMiningScene({
   const tilesContainerRef = useRef<Container | null>(null);
   const fluidRendererRef = useRef<FluidRenderer | null>(null);
   const gasRendererRef = useRef<GasRenderer | null>(null);
+  const extractorRendererRef = useRef<ExtractorRenderer | null>(null);
+  const beltRendererRef = useRef<BeltRenderer | null>(null);
+  const beltItemRendererRef = useRef<BeltItemRenderer | null>(null);
   const fireFieldRef = useRef<FireField | null>(null);
   const fireRendererRef = useRef<FireRenderer | null>(null);
   const fluidGlowRef = useRef<FluidGlow | null>(null);
@@ -151,6 +157,8 @@ export function useMiningScene({
     const mobsContainer = new Container();
     const otherPlayersContainer = new Container();
     const playerContainer = new Container();
+    const beltContainer = new Container();
+    const extractorContainer = new Container();
     const particlesContainer = new Container();
     const floatingTextContainer = new Container();
     const debugContainer = new Container();
@@ -186,6 +194,9 @@ export function useMiningScene({
 
     gridContainer.addChild(backgroundContainer);
     gridContainer.addChild(tilesContainer);
+    // The extractor stands on the ground in front of the tiles, behind every body
+    gridContainer.addChild(beltContainer);
+    gridContainer.addChild(extractorContainer);
     // Fluid sits on the tiles and behind every entity, so characters and items stay visible in it
     gridContainer.addChild(fluidsContainer);
     gridContainer.addChild(fallingRocksContainer);
@@ -230,12 +241,22 @@ export function useMiningScene({
     gasRenderer.render();
     gasRendererRef.current = gasRenderer;
 
+    if (initialSessionState.belt) {
+      beltRendererRef.current = new BeltRenderer(beltContainer, initialSessionState.belt);
+      beltItemRendererRef.current = new BeltItemRenderer(beltContainer, initialSessionState.belt);
+      beltItemRendererRef.current.add(initialSessionState.beltItems ?? []);
+    }
+    if (initialSessionState.extractor) {
+      extractorRendererRef.current = new ExtractorRenderer(extractorContainer, initialSessionState.extractor);
+    }
+
     const fireField = new FireField(fluidRenderer.field.width, fluidRenderer.field.height);
     fireField.apply(initialSessionState.fireCells ?? []);
     fireFieldRef.current = fireField;
 
     const particleEngine = new ParticleEngine(particlesContainer, app.renderer, 3000);
     particleEngineRef.current = particleEngine;
+    extractorRendererRef.current?.setParticles(particleEngine);
 
     const remotePlayerRenderer = new MiningRemotePlayerRenderer(otherPlayersContainer);
     remotePlayerRenderer.setParticleEngine(particleEngine, (id) => DroppedItemVisualManager.getEffectConfig(id));
@@ -630,6 +651,9 @@ export function useMiningScene({
       fluidRendererRef.current = null;
       gasRenderer.destroy();
       gasRendererRef.current = null;
+      extractorRendererRef.current = null;
+      beltRendererRef.current = null;
+      beltItemRendererRef.current = null;
       fireFieldRef.current = null;
       lightingEngine.destroy();
       lightingEngineRef.current = null;
@@ -657,6 +681,9 @@ export function useMiningScene({
     tilesContainerRef,
     fluidRendererRef,
     gasRendererRef,
+    extractorRendererRef,
+    beltRendererRef,
+    beltItemRendererRef,
     fireFieldRef,
     fireRendererRef,
     fluidGlowRef,

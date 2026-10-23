@@ -54,6 +54,10 @@ export interface TickHandlerContext {
   onWeaponAmmo?: (ammo: { current: number; max: number; isReloading: boolean }) => void;
   onVisionChange?: (vision: number) => void;
   onBackpackChange?: (backpack: NonNullable<MiningStateTickPayload['temporaryBackpack']>, load: { weight?: number; capacity?: number }) => void;
+  /** The belt grew or started or stopped waiting. */
+  onBeltChange?: (update: NonNullable<MiningStateTickPayload['belt']>) => void;
+  /** What the player has handed to the extractor (sent whenever it changes). */
+  onStashChange?: (stash: NonNullable<MiningStateTickPayload['stash']>) => void;
   /** An item on the ground did not fit in the backpack (the server throttles this). */
   onBackpackFull?: () => void;
 }
@@ -138,6 +142,7 @@ export function applySessionData(payload: MiningStateTickPayload, ctx: TickHandl
   if (payload.temporaryBackpack) {
     ctx.onBackpackChange?.(payload.temporaryBackpack, { weight: payload.backpackWeight, capacity: payload.backpackCapacity });
   }
+  if (payload.stash) ctx.onStashChange?.(payload.stash);
   if (payload.backpackFull) {
     ctx.onBackpackFull?.();
     world.characterSoundsRef?.current?.play('backpackFull');
@@ -376,6 +381,38 @@ export function applyFluidSounds(payload: MiningStateTickPayload, ctx: TickHandl
   if (payload.fireCells && payload.fireCells.length > 0) sounds.onFireChanges(payload.fireCells, performance.now());
 }
 
+/** The belt grew, or started or stopped waiting. */
+export function applyBeltUpdate(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  if (!payload.belt) return;
+  const belt = ctx.world.beltRendererRef?.current;
+  belt?.setRows(payload.belt.rows, payload.belt.blockedBy);
+  if (payload.belt.stages) belt?.setStages(payload.belt.stages);
+  if (payload.belt.broke && payload.belt.broke.length > 0) {
+    const items = ctx.world.beltItemRendererRef?.current;
+    if (items) ctx.world.extractorSoundsRef?.current?.onBeltBroke(payload.belt.broke.map((index) => items.cellPosition(index + 0.5)));
+  }
+  ctx.onBeltChange?.(payload.belt);
+}
+
+/** Items going onto and coming off the belt (and the sounds that go with them). */
+export function applyBeltItems(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  const changes = payload.beltItems;
+  if (!changes) return;
+  const renderer = ctx.world.beltItemRendererRef?.current;
+  const sounds = ctx.world.extractorSoundsRef?.current;
+  if (renderer && changes.added) {
+    renderer.add(changes.added);
+    sounds?.onItemsAdded(changes.added, (item) => renderer.cellPosition(item.pos));
+  }
+  if (renderer && changes.removed) renderer.remove(changes.removed);
+  sounds?.syncLoop((renderer?.count ?? 0) > 0);
+}
+
+/** The extractor has landed (the server says when; the drawn landing finishes by itself). */
+export function applyExtractorUpdate(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  if (payload.extractor?.landed) ctx.world.extractorRendererRef?.current?.markLanded();
+}
+
 /** Pickup sounds of players near the local player (including their own). */
 export function applyItemPickupSounds(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
   if (!payload.itemPickups || payload.itemPickups.length === 0) return;
@@ -481,6 +518,9 @@ export function handleStateTick(payload: MiningStateTickPayload, ctx: TickHandle
   applyGasUpdates(payload, ctx);
   applyFireUpdates(payload, ctx);
   applyFluidSounds(payload, ctx); // after the fluid and fire fields are up to date
+  applyExtractorUpdate(payload, ctx);
+  applyBeltUpdate(payload, ctx);
+  applyBeltItems(payload, ctx);
   applyItemPickupSounds(payload, ctx);
   applyGasSounds(payload, ctx);
   applyBurning(payload, ctx);

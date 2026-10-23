@@ -24,6 +24,11 @@ import {
   handleSandboxSetGodMode,
   handleSandboxSetSim,
   handleSandboxReset,
+  handleSandboxSpawnExtractor,
+  handleSandboxDigBelt,
+  handleSandboxSetCapacity,
+  handleSandboxFillBackpack,
+  handleSandboxLoadExtractorScene,
 } from './miningEvents';
 import { miningSessionManager } from '../services/mining/MiningSessionManager';
 import { InventoryService } from '../services/inventory.service';
@@ -582,6 +587,11 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   sandbox_set_god_mode: handleSandboxSetGodMode,
   sandbox_set_sim: handleSandboxSetSim,
   sandbox_reset: handleSandboxReset,
+  sandbox_spawn_extractor: handleSandboxSpawnExtractor,
+  sandbox_dig_belt: handleSandboxDigBelt,
+  sandbox_set_capacity: handleSandboxSetCapacity,
+  sandbox_fill_backpack: handleSandboxFillBackpack,
+  sandbox_load_extractor_scene: handleSandboxLoadExtractorScene,
   equip_item: handleEquipItem,
   unequip_item: handleUnequipItem,
   consume_item: handleConsumeItem,

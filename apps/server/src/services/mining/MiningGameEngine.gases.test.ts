@@ -19,7 +19,7 @@ describe('gases in a mining room', () => {
   /** A sealed pocket: x 10..14 open at y 20..22, solid all around. */
   beforeEach(() => {
     engine = new MiningGameEngine({
-      characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0 },
+      characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0, skyRows: 0 },
       socket: { connected: true, emit: () => {} } as any,
     });
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
@@ -140,7 +140,7 @@ describe('gases in a mining room', () => {
 describe('generated gas pockets in a mining room', () => {
   const big = () => new MiningGameEngine({
     characterId: 'gen-gas-char', cityId: 'c', seed: 7, // (a seed whose map has gas pockets at this size: they are rare, and placement is random)
-    mapConfig: { mobSpawnCount: 0, gridWidth: 80 * BLOCK_SCALE, gridHeight: 80 * BLOCK_SCALE },
+    mapConfig: { mobSpawnCount: 0, skyRows: 0, gridWidth: 80 * BLOCK_SCALE, gridHeight: 80 * BLOCK_SCALE },
     socket: { connected: true, emit: () => {} } as any,
   });
 

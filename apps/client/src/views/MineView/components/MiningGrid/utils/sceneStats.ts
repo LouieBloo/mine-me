@@ -34,6 +34,8 @@ export interface SceneSources {
   tileGraphics?: { size: number } | null;
   renderer?: { resolution?: number; width?: number; height?: number } | null;
   gridCells?: number;
+  /** The conveyor belt's size: segments drawn and items riding it. */
+  belt?: { segments: number; items: number } | null;
 }
 
 /**
@@ -54,6 +56,10 @@ export function sampleSceneGauges(profiler: MiningProfiler, sources: SceneSource
   }
   if (sources.tileSprites) profiler.setGauge('Tile sprites', sources.tileSprites.size);
   if (sources.tileGraphics) profiler.setGauge('Tile graphics', sources.tileGraphics.size);
+  if (sources.belt) {
+    profiler.setGauge('Belt segments', sources.belt.segments);
+    profiler.setGauge('Belt items', sources.belt.items);
+  }
   if (sources.gridCells !== undefined) profiler.setGauge('Grid cells', sources.gridCells);
   const r = sources.renderer;
   if (r?.width && r?.height) {

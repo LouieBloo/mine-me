@@ -1,0 +1,24 @@
+[
+  {
+    "id": "extractor_basic",
+    "key": "basic_extractor",
+    "name": "Basic Extractor",
+    "description": "The standard extractor.",
+    "textureUrl": null,
+    "width": 12,
+    "height": 9,
+    "entranceOffset": 24,
+    "landingSeconds": 3,
+    "shaftWidth": 3,
+    "buildSecondsPerSegment": 1.5,
+    "beltSpeed": 6,
+    "depositItemsPerSecond": 20,
+    "unloadItemsPerSecond": 4,
+    "beltItemSpacing": 1.5,
+    "beltSegmentHealth": 100,
+    "health": 500,
+    "landingParticleEffectId": null,
+    "isDefault": true,
+    "soundEffects": null
+  }
+]

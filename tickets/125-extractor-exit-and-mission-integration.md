@@ -1,6 +1,6 @@
 # 125 - Exit, death and mission integration
 
-**Priority:** P1 - **Status:** Open - **Depends on:** 121, 113 (missions)
+**Priority:** P1 - **Status:** Partly done (stash exit, death, timeout and co-op rules are in; the mission reward waits for 113) - **Depends on:** 121, 113 (missions)
 
 ## Where this collides with the mission epic (108-116)
 - Mission reward is still claimed on a **safe exit at the entrance** (113). The reward now banks with the backpack and the stash together.
@@ -16,3 +16,11 @@
 
 ## Tests
 Exit with items in pack and stash, death/timeout rules, mission reward combined, double-exit idempotent, co-op separation.
+
+## Progress (2026-10-22)
+Missions (108-116) are not built, so only the extractor side is done:
+- One exit: `endSession` banks the backpack and the stash in one transaction (`RunStashService.bank`) and reports `extractedItems` (both), `backpackItems` and `stashItems`. A second exit finds no room or player and banks nothing (idempotent).
+- Death, timeout, abandon, disconnect: no backpack, the stash is kept (banked on its own); belt items are lost with the player.
+- Co-op: each player has their own stash and exits separately; the shared extractor and belt stay for the others (tested).
+- Existing loot assumptions (003) were updated in the session manager tests: timeout and death no longer say "no loot saved" but "no backpack saved, stash banked".
+- **Waiting for 113:** the mission reward paid together with the stash and pack, the results screen showing stash and pack separately (the data is returned, no screen yet), and the map requirement leaving room for the pad and shaft (110).

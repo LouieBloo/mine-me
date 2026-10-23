@@ -25,7 +25,9 @@ describe('MiningGameEngine', () => {
     });
 
     expect(engine.getPlayer('char-1')!.playerBody.position.x).toBe(MINING_CONFIG.ENTRANCE_X);
-    expect(engine.getPlayer('char-1')!.playerBody.position.y).toBe(MINING_CONFIG.ENTRANCE_Y);
+    // the player starts on the ground, below the open sky
+    expect(engine.getPlayer('char-1')!.playerBody.position.y).toBe(engine.surfaceRow + MINING_CONFIG.ENTRANCE_Y);
+    expect(engine.surfaceRow).toBeGreaterThan(0);
     expect(engine.getPlayer('char-1')!.isMining).toBe(false);
   });
 
@@ -93,6 +95,7 @@ describe('MiningGameEngine', () => {
 
   it('picks up dropped items when player overlaps item position', () => {
     const engine = new MiningGameEngine({
+      mapConfig: { skyRows: 0 },
       characterId: 'char-1',
       cityId: 'city-1',
       seed: 12345,
@@ -487,6 +490,7 @@ describe('MiningGameEngine', () => {
 
   it('mines at normal rate with miningSpeed 100 and completes dirt block in 500ms', () => {
     const engine = new MiningGameEngine({
+      mapConfig: { skyRows: 0 },
       characterId: 'char-1',
       cityId: 'city-1',
       seed: 12345,
@@ -583,6 +587,7 @@ describe('MiningGameEngine', () => {
 
   it('correctly deals damage when miningDamage is 1', () => {
     const engine = new MiningGameEngine({
+      mapConfig: { skyRows: 0 },
       characterId: 'char-1',
       cityId: 'city-1',
       seed: 12345,
