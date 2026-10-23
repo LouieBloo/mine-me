@@ -8,6 +8,11 @@ import { sumEffects, type EffectEntry } from './combatStats';
  */
 
 /** Weight limit of a character with no Carry Capacity effects at all. */
+/** Stats a mining player gets from their equipment on top of the combat stats. */
+export interface CarryStats {
+  carryCapacity: number;
+}
+
 export const BASE_CARRY_CAPACITY = 100;
 
 /** Capacity from the base plus every Carry Capacity effect in the lists (never below 0). */
@@ -27,10 +32,13 @@ export interface WeighedStack {
   quantity: number;
 }
 
-type WeightDefinitions = ReadonlyMap<string, { weight?: number | null }> | Readonly<Record<string, { weight?: number | null }>>;
+type WeightOf = { weight?: number | null } | null | undefined;
+/** Where item weights come from: a map or record by item id, or a lookup function. */
+export type WeightDefinitions = ReadonlyMap<string, WeightOf> | Readonly<Record<string, WeightOf>> | ((itemId: string) => WeightOf);
 
 const weightOf = (itemDefs: WeightDefinitions, itemId: string): number => {
-  const def = itemDefs instanceof Map ? itemDefs.get(itemId) : (itemDefs as Record<string, { weight?: number | null }>)[itemId];
+  const def =
+    typeof itemDefs === 'function' ? itemDefs(itemId) : itemDefs instanceof Map ? itemDefs.get(itemId) : (itemDefs as Record<string, WeightOf>)[itemId];
   const weight = def?.weight;
   return typeof weight === 'number' && Number.isFinite(weight) && weight > 0 ? weight : 0;
 };

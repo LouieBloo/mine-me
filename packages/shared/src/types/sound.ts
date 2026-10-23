@@ -79,7 +79,7 @@ export interface MobSoundSlotResolved extends SoundEffectSlotConfig {
 
 export type MobSoundEffectsConfig = Partial<Record<MobSoundSlot, MobSoundSlotResolved>>;
 
-export type CharacterSoundSlot = 'hurt' | 'jump' | 'land' | 'death' | 'pickup';
+export type CharacterSoundSlot = 'hurt' | 'jump' | 'land' | 'death' | 'pickup' | 'backpackFull';
 
 /** What the admin stores for one character slot: a library sound by id (the url is resolved at load). */
 export interface CharacterSoundSlotRef {

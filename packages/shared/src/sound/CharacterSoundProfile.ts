@@ -35,6 +35,12 @@ export const CHARACTER_SOUND_SLOTS: readonly CharacterSoundSlotDefinition[] = [
     icon: '🎒',
   }),
   new CharacterSoundSlotDefinition({
+    slotKey: 'backpackFull',
+    label: 'Backpack Full',
+    description: 'Plays (to this player) when an item on the ground does not fit in the backpack',
+    icon: '⚖️',
+  }),
+  new CharacterSoundSlotDefinition({
     slotKey: 'death',
     label: 'Death',
     description: 'Plays when the character dies',

@@ -1,4 +1,4 @@
-import { CharacterModEngine, type GearSubType, type MiningCombatStats, type MiningGearLayer } from '@mine-me/shared';
+import { CharacterModEngine, carryCapacityOfInventory, type CarryStats, type GearSubType, type MiningCombatStats, type MiningGearLayer } from '@mine-me/shared';
 import type { Prisma } from '@prisma/client';
 import { InventoryService } from '../inventory.service';
 
@@ -7,7 +7,7 @@ export type LoadoutInventoryEntry = Prisma.InventoryItemGetPayload<{
   include: { item: { include: { itemEffects: { include: { effect: true } } } } };
 }>;
 
-export interface MiningLoadout extends MiningCombatStats {
+export interface MiningLoadout extends MiningCombatStats, CarryStats {
   miningSpeed: number;
   gearLayers: MiningGearLayer[];
   /** Item id of the equipped WEAPON-slot gear, or null if none. */
@@ -54,6 +54,7 @@ export function buildMiningLoadout(character: { maxInventorySlots?: number; inve
     weaponDamage: mods.weaponDamage,
     pickPower: mods.pickPower,
     knockback: mods.knockback,
+    carryCapacity: carryCapacityOfInventory(clientInventory.items),
     gearLayers,
     equippedWeaponId: weapon?.item.id ?? null,
   };

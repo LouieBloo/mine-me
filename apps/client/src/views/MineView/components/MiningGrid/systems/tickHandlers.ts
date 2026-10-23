@@ -53,7 +53,9 @@ export interface TickHandlerContext {
   /** Called with the server's ammo state every tick it is sent (the reload sound watches this). */
   onWeaponAmmo?: (ammo: { current: number; max: number; isReloading: boolean }) => void;
   onVisionChange?: (vision: number) => void;
-  onBackpackChange?: (backpack: NonNullable<MiningStateTickPayload['temporaryBackpack']>) => void;
+  onBackpackChange?: (backpack: NonNullable<MiningStateTickPayload['temporaryBackpack']>, load: { weight?: number; capacity?: number }) => void;
+  /** An item on the ground did not fit in the backpack (the server throttles this). */
+  onBackpackFull?: () => void;
 }
 
 const SOUND_REPEAT_MS = 80;
@@ -133,7 +135,13 @@ export function applySessionData(payload: MiningStateTickPayload, ctx: TickHandl
     ctx.onWeaponAmmo?.(world.weaponAmmoStateRef.current);
   }
   if (payload.visionRange !== undefined) ctx.onVisionChange?.(payload.visionRange);
-  if (payload.temporaryBackpack) ctx.onBackpackChange?.(payload.temporaryBackpack);
+  if (payload.temporaryBackpack) {
+    ctx.onBackpackChange?.(payload.temporaryBackpack, { weight: payload.backpackWeight, capacity: payload.backpackCapacity });
+  }
+  if (payload.backpackFull) {
+    ctx.onBackpackFull?.();
+    world.characterSoundsRef?.current?.play('backpackFull');
+  }
 
   // The tick says only where items are (and only when that changed); their descriptions were cached
   // from `spawned` (applyEntities runs first) or the join snapshot.

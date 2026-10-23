@@ -16,8 +16,8 @@ const library = new Map([
 ]);
 
 describe('character sound slots', () => {
-  it('offers hurt, jump, land and death', () => {
-    expect(CHARACTER_SOUND_SLOT_KEYS).toEqual(['hurt', 'jump', 'land', 'pickup', 'death']);
+  it('offers hurt, jump, land, pickup, backpack full and death', () => {
+    expect(CHARACTER_SOUND_SLOT_KEYS).toEqual(['hurt', 'jump', 'land', 'pickup', 'backpackFull', 'death']);
     for (const slot of CHARACTER_SOUND_SLOTS) {
       expect(slot.label).toBeTruthy();
       expect(slot.description).toBeTruthy();

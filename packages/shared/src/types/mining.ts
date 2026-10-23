@@ -66,6 +66,7 @@ export const MINING_CONFIG = {
   EXPLOSION_MIN_DAMAGE_FRACTION: 0.25, // fraction of that damage left at the very edge of the radius (linear falloff)
   EXPLOSION_KNOCKBACK_X: 8.0 * S, // push (tiles/s) away from the centre on anything the blast moves
   EXPLOSION_KNOCKBACK_Y: -6.0 * S,
+  BACKPACK_FULL_NOTICE_COOLDOWN_SECONDS: 3.0, // minimum gap between "backpack full" notices while standing on items that don't fit
   TOOL_NOTICE_COOLDOWN_SECONDS: 3.0, // minimum gap between "your pickaxe is too weak"-style messages
   // Defaults for a mob whose data leaves a stat out (a mob's own value always wins)
   MOB_DEFAULT_MOVE_SPEED: 3.2 * S, // tiles/s
@@ -678,6 +679,9 @@ export interface MiningSessionClientState {
   droppedItems: MiningDroppedItem[];
   /** Items collected during this mining session. */
   temporaryBackpack: MiningBackpackItem[];
+  /** Total weight of the backpack and the most it can hold (Carry Capacity effects). */
+  backpackWeight?: number;
+  backpackCapacity?: number;
   /** Current vision range (tiles in each cardinal direction). */
   visionRange: number;
   /** Whether the player is currently at the entrance and can extract. */
@@ -894,6 +898,11 @@ export interface MiningStateTickPayload {
   miningTarget?: MiningPosition;
   miningProgress?: number;
   temporaryBackpack?: MiningBackpackItem[];
+  /** Sent with `temporaryBackpack` whenever it (or the capacity) changed. */
+  backpackWeight?: number;
+  backpackCapacity?: number;
+  /** An item on the ground did not fit: show the "backpack full" notice and play its sound (throttled by the server). */
+  backpackFull?: boolean;
   /** Where every dropped item is (dynamic fields only), sent only when one moved, appeared or vanished. */
   droppedItems?: MiningDroppedItemDynamic[];
   fallingRocks?: MiningFallingRock[];

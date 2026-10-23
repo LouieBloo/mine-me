@@ -17,7 +17,9 @@ import {
   MiningRigidWorld,
   type MiningActiveMob,
   type MiningBlockHitEvent,
+  backpackWeight,
   type MiningCombatStats,
+  type CarryStats,
   type MiningSessionEndedEvent,
   type DamageEvent,
   type DamageResult,
@@ -71,7 +73,7 @@ import { MiningMobSubsystem, type MiningActiveMobSession } from './subsystems/Mi
 
 export type { MiningPlayerSession, MiningActiveMobSession };
 
-export interface MiningEngineOptions extends Partial<MiningCombatStats> {
+export interface MiningEngineOptions extends Partial<MiningCombatStats & CarryStats> {
   roomId?: string;
   gameMode?: MiningGameMode;
   characterId?: string;
@@ -198,6 +200,7 @@ export class MiningGameEngine {
         weaponDamage: options.weaponDamage,
         pickPower: options.pickPower,
         knockback: options.knockback,
+        carryCapacity: options.carryCapacity,
         gearLayers: options.gearLayers,
         equippedWeaponId: options.equippedWeaponId,
         maxHealth: options.maxHealth,
@@ -322,7 +325,7 @@ export class MiningGameEngine {
     gearLayers?: MiningGearLayer[];
     equippedWeaponId?: string | null;
     maxHealth?: number;
-  } & Partial<MiningCombatStats>): MiningPlayerSession {
+  } & Partial<MiningCombatStats & CarryStats>): MiningPlayerSession {
     const session = this.playerManager.addPlayer(options);
     this.revealAndTrackTiles(session.playerBody.position, session.visionRange);
     return session;
@@ -366,7 +369,7 @@ export class MiningGameEngine {
       miningSpeed: number;
       gearLayers: MiningGearLayer[];
       equippedWeaponId: string | null;
-    } & MiningCombatStats
+    } & MiningCombatStats & Partial<CarryStats>
   ): void {
     const previousWeaponId = this.players.get(characterId)?.equippedWeaponId ?? null;
     this.playerManager.setLoadout(characterId, loadout);
@@ -963,6 +966,10 @@ export class MiningGameEngine {
         weaponAmmo: weaponAmmoPayload ?? undefined,
         droppedItems: droppedItemsPayload,
         temporaryBackpack: session.backpackDirty ? session.temporaryBackpack : undefined,
+        ...(session.backpackDirty
+          ? { backpackWeight: backpackWeight(session.temporaryBackpack, (id) => this.dataManager.getItemData(id)), backpackCapacity: session.carryCapacity }
+          : {}),
+        ...(session.backpackFullPending ? { backpackFull: true } : {}),
       };
 
       if (sendPerf) payload.perf = perf;
@@ -971,6 +978,7 @@ export class MiningGameEngine {
       emitMs += performance.now() - emitStart;
       if (sendPerf) this.profiler.notePayloadBytes(JSON.stringify(payload).length);
       session.backpackDirty = false;
+      session.backpackFullPending = false;
     }
 
     this.profiler.recordStep('broadcast (socket emit)', emitMs);

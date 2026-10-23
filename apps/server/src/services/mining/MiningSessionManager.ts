@@ -7,7 +7,9 @@ import type { MiningPlayerSession } from './subsystems/MiningPlayerManager';
 import {
   type MiningSessionClientState,
   type MiningRemotePlayer,
+  backpackWeight,
   type MiningCombatStats,
+  type CarryStats,
   type MiningGearLayer,
   type MiningBackpackItem,
   isOnEntrance,
@@ -50,7 +52,7 @@ export class MiningSessionManager {
     characterName?: string,
     gearLayers?: MiningGearLayer[],
     mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>,
-    combat: Partial<MiningCombatStats> = {},
+    combat: Partial<MiningCombatStats & CarryStats> = {},
     equippedWeaponId: string | null = null,
     maxHealth?: number,
   ): MiningGameEngine {
@@ -166,6 +168,8 @@ export class MiningSessionManager {
       },
       droppedItems: engine.droppedItems,
       temporaryBackpack: session.temporaryBackpack,
+      backpackWeight: backpackWeight(session.temporaryBackpack, (id) => MiningDataManager.getInstance().getItemData(id)),
+      backpackCapacity: session.carryCapacity,
       visionRange: session.visionRange,
       canExtract: isAtEntrance,
       isMining: session.isMining,

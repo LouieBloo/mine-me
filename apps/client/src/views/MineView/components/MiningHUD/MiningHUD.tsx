@@ -86,7 +86,11 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
 
           {/* Temporary Backpack */}
           <div className="pointer-events-auto">
-            <TemporaryBackpack items={sessionState.temporaryBackpack || []} />
+            <TemporaryBackpack
+              items={sessionState.temporaryBackpack || []}
+              weight={sessionState.backpackWeight}
+              capacity={sessionState.backpackCapacity}
+            />
           </div>
 
           {/* Camera Zoom Control (appears on zoom, fades after a few seconds) */}

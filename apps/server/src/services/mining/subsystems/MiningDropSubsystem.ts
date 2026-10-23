@@ -3,6 +3,7 @@ import {
   BLOCK_SCALE,
   MINING_CONFIG,
   MiningTileType,
+  carryRoom,
   rollDropTable,
   type MiningDroppedItem,
   type MiningItemPickupEvent,
@@ -168,21 +169,20 @@ export class MiningDropSubsystem {
 
       // AABB overlap check for pickup
       if (dx <= PICKUP_REACH && dy <= PICKUP_REACH) {
-        // Collect into player temporaryBackpack
-        const existing = session.temporaryBackpack.find((b) => b.itemId === item.itemId);
-        if (existing) {
-          existing.quantity += item.quantity;
-        } else {
-          session.temporaryBackpack.push({
-            itemId: item.itemId,
-            quantity: item.quantity,
-            itemName: item.itemName,
-            iconUrl: item.iconUrl || null,
-          });
+        // Only what fits under the carry capacity goes in; the rest stays on the ground
+        const room = carryRoom(session.temporaryBackpack, item.itemId, session.carryCapacity, this.weightOf);
+        const taken = Math.min(item.quantity, room);
+        if (taken < item.quantity) this.noteBackpackFull(session);
+        if (taken > 0) {
+          this.addToBackpack(session, item, taken);
+          pickedUp = true;
         }
-        session.backpackDirty = true;
-        this.droppedItemsDirty = true;
-        pickedUp = true;
+        if (taken < item.quantity) {
+          item.quantity -= taken;
+          remainingItems.push(item);
+          this.droppedItemsDirty = true;
+          continue;
+        }
 
         // Clean up rigid body from Planck simulation
         if (item.id) {
@@ -204,6 +204,27 @@ export class MiningDropSubsystem {
 
     // One pickup sound per player per tick, however many stacks were collected
     if (pickedUp) this.pendingPickups.push({ x: playerPos.x, y: playerPos.y });
+  }
+
+  /** What one unit of an item weighs, for the carry rules (read live from the item definitions). */
+  private readonly weightOf = (itemId: string) => this.world.data.getItemData(itemId);
+
+  private addToBackpack(session: MiningPlayerSession, item: MiningDroppedItem, quantity: number): void {
+    const existing = session.temporaryBackpack.find((b) => b.itemId === item.itemId);
+    if (existing) {
+      existing.quantity += quantity;
+    } else {
+      session.temporaryBackpack.push({ itemId: item.itemId, quantity, itemName: item.itemName, iconUrl: item.iconUrl || null });
+    }
+    session.backpackDirty = true;
+    this.droppedItemsDirty = true;
+  }
+
+  /** An item did not fit: tell the player, at most once every few seconds while they stand on it. */
+  private noteBackpackFull(session: MiningPlayerSession): void {
+    if (session.backpackFullCooldown > 0) return;
+    session.backpackFullCooldown = MINING_CONFIG.BACKPACK_FULL_NOTICE_COOLDOWN_SECONDS;
+    session.backpackFullPending = true;
   }
 
   /** The pickups since the last call, then forgets them. */

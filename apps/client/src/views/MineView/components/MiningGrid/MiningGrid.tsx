@@ -65,7 +65,8 @@ interface MiningGridProps {
   showDebug?: boolean;
   onToggleDebug?: () => void;
   onVisionChange?: (newVision: number) => void;
-  onBackpackChange?: (newBackpack: MiningBackpackItem[]) => void;
+  onBackpackChange?: (newBackpack: MiningBackpackItem[], load: { weight?: number; capacity?: number }) => void;
+  onBackpackFull?: () => void;
   /** Sandbox tool and camera settings (only in a sandbox). */
   sandbox?: SandboxViewState;
 }
@@ -90,6 +91,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onToggleDebug,
   onVisionChange,
   onBackpackChange,
+  onBackpackFull,
   sandbox,
 }) => {
   const { app } = usePixiStage();
@@ -533,6 +535,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     reloadSound: reloadSoundRef.current,
     onVisionChange,
     onBackpackChange,
+    onBackpackFull,
   });
 
   // 60+ FPS Frame Ticker Loop Hook

@@ -79,6 +79,7 @@ export const handleMiningStart = async (
         weaponDamage: loadout.weaponDamage,
         pickPower: loadout.pickPower,
         knockback: loadout.knockback,
+        carryCapacity: loadout.carryCapacity,
       },
       loadout.equippedWeaponId,
       character.maxHealth,

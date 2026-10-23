@@ -1,6 +1,6 @@
 # 118 - Full backpack: pickup refusal and feedback
 
-**Priority:** P1 - **Status:** Open - **Depends on:** 117
+**Priority:** P1 - **Status:** Done (marker on refused drops deferred) - **Depends on:** 117
 
 ## Decisions (2026-10-22, from the owner)
 - **Pickups are refused when they don't fit; the item stays on the ground.** Mining still works. The player can unload and come back.
@@ -14,3 +14,12 @@
 
 ## Tests
 Fits, doesn't fit, partial stack, throttle, prediction parity, mission counter unaffected by deposits.
+
+## Done (2026-10-22)
+- Server pickup (`MiningDropSubsystem.checkItemPickupsForPlayer`) takes what fits via the shared `carryRoom`, leaves the rest as a smaller drop; weightless items always fit. Capacity is `session.carryCapacity` (from `buildMiningLoadout`, updated by `setLoadout`; base 100).
+- Throttle: a refused item sets one "backpack full" notice per `BACKPACK_FULL_NOTICE_COOLDOWN_SECONDS` (3s); the pickup check itself is arithmetic only.
+- Wire: `backpackWeight` / `backpackCapacity` ride with `temporaryBackpack` (and the join state); `backpackFull` flags the notice tick.
+- Client: weight bar in `TemporaryBackpack`, "Backpack Full" toast, new `backpackFull` character sound slot (set it in the Character Editor; plays at the slot's own volume).
+- Prediction: pickups are server-only (the client never predicts them), so there was nothing to keep in parity.
+- Missions (109) do not exist yet; the rule stays: count what enters the backpack.
+- Deferred: the small "full" marker on refused drops near the player.

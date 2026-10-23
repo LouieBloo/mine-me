@@ -109,12 +109,21 @@ export const MineView: React.FC = () => {
     });
   }, [setMiningSession]);
 
-  const handleBackpackChange = useCallback((newBackpack: MiningBackpackItem[]) => {
+  const handleBackpackChange = useCallback((newBackpack: MiningBackpackItem[], load: { weight?: number; capacity?: number }) => {
     setMiningSession((prev) => {
       if (!prev) return prev;
-      return { ...prev, temporaryBackpack: newBackpack };
+      return {
+        ...prev,
+        temporaryBackpack: newBackpack,
+        backpackWeight: load.weight ?? prev.backpackWeight,
+        backpackCapacity: load.capacity ?? prev.backpackCapacity,
+      };
     });
   }, [setMiningSession]);
+
+  const handleBackpackFull = useCallback(() => {
+    notificationService.info('Backpack Full', 'That does not fit. Empty your backpack at the entrance, then come back for it.');
+  }, []);
 
   // Track whether session has already been extracted/cleaned up so unmount doesn't double-cancel
   const isCleanedUpRef = useRef<boolean>(false);
@@ -348,6 +357,7 @@ export const MineView: React.FC = () => {
             onToggleDebug={handleToggleDebug}
             onVisionChange={handleVisionChange}
             onBackpackChange={handleBackpackChange}
+            onBackpackFull={handleBackpackFull}
             sandbox={sandbox.view}
           />
         </PixiStageProvider>

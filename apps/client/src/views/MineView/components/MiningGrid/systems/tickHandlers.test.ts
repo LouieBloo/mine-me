@@ -194,9 +194,24 @@ describe('applySessionData', () => {
     expect(onBackpackChange).not.toHaveBeenCalled();
     applySessionData(payload({ visionRange: 8, temporaryBackpack: [{ itemId: 'a', quantity: 1 } as any] }), ctx);
     expect(onVisionChange).toHaveBeenCalledWith(8);
-    expect(onBackpackChange).toHaveBeenCalledWith([{ itemId: 'a', quantity: 1 }]);
+    expect(onBackpackChange).toHaveBeenCalledWith([{ itemId: 'a', quantity: 1 }], { weight: undefined, capacity: undefined });
+    applySessionData(payload({ temporaryBackpack: [], backpackWeight: 12, backpackCapacity: 100 }), ctx);
+    expect(onBackpackChange).toHaveBeenLastCalledWith([], { weight: 12, capacity: 100 });
     applySessionData(payload({ visionRange: 0 }), ctx); // zero is a real value
     expect(onVisionChange).toHaveBeenCalledWith(0);
+  });
+
+  it('on a "backpack full" tick shows the notice and plays the character sound, once per flag', () => {
+    const onBackpackFull = vi.fn();
+    const play = vi.fn();
+    const ctx = makeCtx(makeWorld({ characterSoundsRef: ref({ play }) }), { onBackpackFull });
+    applySessionData(payload(), ctx);
+    expect(onBackpackFull).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
+    applySessionData(payload({ backpackFull: true }), ctx);
+    expect(onBackpackFull).toHaveBeenCalledTimes(1);
+    expect(play).toHaveBeenCalledWith('backpackFull');
+    expect(() => applySessionData(payload({ backpackFull: true }), makeCtx(makeWorld()))).not.toThrow();
   });
 
   const gem = { id: 'd1', itemId: 'gem', itemName: 'Gem', iconUrl: null, quantity: 1, position: { x: 1, y: 1 }, inGameSpriteUrl: '/gem.png' } as any;

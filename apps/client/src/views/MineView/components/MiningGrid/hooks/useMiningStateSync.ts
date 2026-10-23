@@ -31,7 +31,8 @@ export interface UseMiningStateSyncOptions {
   /** Shared with the reload key so a reload sounds once however it started. */
   reloadSound?: ReloadSoundTrigger;
   onVisionChange?: (newVision: number) => void;
-  onBackpackChange?: (newBackpack: MiningBackpackItem[]) => void;
+  onBackpackChange?: (newBackpack: MiningBackpackItem[], load: { weight?: number; capacity?: number }) => void;
+  onBackpackFull?: () => void;
 }
 
 /**
@@ -49,6 +50,7 @@ export function useMiningStateSync({
   reloadSound,
   onVisionChange,
   onBackpackChange,
+  onBackpackFull,
 }: UseMiningStateSyncOptions) {
   const {
     torchEmittersRef,
@@ -66,6 +68,8 @@ export function useMiningStateSync({
 
   const onBackpackChangeRef = useRef(onBackpackChange);
   onBackpackChangeRef.current = onBackpackChange;
+  const onBackpackFullRef = useRef(onBackpackFull);
+  onBackpackFullRef.current = onBackpackFull;
 
   // Static entity descriptions arrive once; each tick only carries what changes (see EntityDefinitionCache)
   const entityDefsRef = useRef<EntityDefinitionCache | null>(null);
@@ -88,7 +92,8 @@ export function useMiningStateSync({
       onWeaponAmmo: (ammo) =>
         reloadSound?.observeAmmo(ammo.isReloading, equippedWeaponRef.current, (url, volume) => soundManager.playSfx?.(url, withVolume(volume))),
       onVisionChange: (vision) => onVisionChangeRef.current?.(vision),
-      onBackpackChange: (backpack) => onBackpackChangeRef.current?.(backpack),
+      onBackpackChange: (backpack, load) => onBackpackChangeRef.current?.(backpack, load),
+      onBackpackFull: () => onBackpackFullRef.current?.(),
     };
     const cleanup = onEvent('mining_state_tick', (payload: MiningStateTickPayload) => handleStateTick(payload, ctx));
 

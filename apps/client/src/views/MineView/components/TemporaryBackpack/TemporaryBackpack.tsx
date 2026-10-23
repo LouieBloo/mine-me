@@ -5,9 +5,20 @@ import './TemporaryBackpack.css';
 
 interface TemporaryBackpackProps {
   items: MiningBackpackItem[];
+  /** Current weight and the most the backpack can hold; no bar when the capacity is unknown. */
+  weight?: number;
+  capacity?: number;
 }
 
-export const TemporaryBackpack: React.FC<TemporaryBackpackProps> = ({ items }) => {
+/** How full the backpack is, 0 to 1 (a full or over-full pack is 1). */
+export function backpackFillRatio(weight: number | undefined, capacity: number | undefined): number {
+  if (!capacity || capacity <= 0) return 1;
+  return Math.min(1, Math.max(0, (weight ?? 0) / capacity));
+}
+
+const formatWeight = (value: number): string => (Number.isInteger(value) ? String(value) : value.toFixed(1));
+
+export const TemporaryBackpack: React.FC<TemporaryBackpackProps> = ({ items, weight, capacity }) => {
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
@@ -23,6 +34,24 @@ export const TemporaryBackpack: React.FC<TemporaryBackpackProps> = ({ items }) =
           {totalCount} {totalCount === 1 ? 'item' : 'items'}
         </span>
       </div>
+
+      {capacity !== undefined && capacity > 0 && (
+        <div className="mb-2" data-testid="backpack-weight">
+          <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-0.5">
+            <span>Weight</span>
+            <span className={backpackFillRatio(weight, capacity) >= 1 ? 'text-red-400' : ''}>
+              {formatWeight(weight ?? 0)} / {formatWeight(capacity)}
+            </span>
+          </div>
+          <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+            <div
+              data-testid="backpack-weight-fill"
+              className={`h-full rounded-full transition-all ${backpackFillRatio(weight, capacity) >= 1 ? 'bg-red-500' : backpackFillRatio(weight, capacity) >= 0.8 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+              style={{ width: `${backpackFillRatio(weight, capacity) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className="text-[11px] text-slate-500 font-medium italic text-center py-2 bg-slate-950/40 rounded-lg border border-slate-800/60">

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { TemporaryBackpack } from './TemporaryBackpack';
+import { TemporaryBackpack, backpackFillRatio } from './TemporaryBackpack';
 import type { MiningBackpackItem } from '@mine-me/shared';
 import '@testing-library/jest-dom';
 
@@ -57,3 +57,29 @@ describe('TemporaryBackpack Component', () => {
   });
 });
 
+describe('TemporaryBackpack weight bar', () => {
+  it('shows weight against capacity and fills in proportion', () => {
+    render(<TemporaryBackpack items={[]} weight={25} capacity={100} />);
+    expect(screen.getByText('25 / 100')).toBeInTheDocument();
+    expect(screen.getByTestId('backpack-weight-fill')).toHaveStyle({ width: '25%' });
+  });
+
+  it('turns red and stops at 100% when full or over', () => {
+    render(<TemporaryBackpack items={[]} weight={130} capacity={100} />);
+    expect(screen.getByTestId('backpack-weight-fill')).toHaveStyle({ width: '100%' });
+    expect(screen.getByTestId('backpack-weight-fill').className).toContain('bg-red-500');
+  });
+
+  it('has no bar until the capacity is known', () => {
+    render(<TemporaryBackpack items={[]} />);
+    expect(screen.queryByTestId('backpack-weight')).not.toBeInTheDocument();
+  });
+
+  it('backpackFillRatio clamps and tolerates missing values', () => {
+    expect(backpackFillRatio(50, 100)).toBe(0.5);
+    expect(backpackFillRatio(-5, 100)).toBe(0);
+    expect(backpackFillRatio(500, 100)).toBe(1);
+    expect(backpackFillRatio(undefined, 100)).toBe(0);
+    expect(backpackFillRatio(5, undefined)).toBe(1);
+  });
+});

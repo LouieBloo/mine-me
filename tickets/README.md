@@ -1,6 +1,6 @@
 # Tickets
 
-File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open and in-progress tickets live in this folder; a ticket moves to `done/` (and its README link gets the `done/` prefix) when it is Done. All 95 so far are archived there. Set `Status:` to Open / In Progress / Done. Every ticket gets a Q&A with the owner before work starts; answers are recorded in the ticket under "Decisions".
+File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open and in-progress tickets live in this folder; a ticket moves to `done/` (and its README link gets the `done/` prefix) when it is Done. All 96 so far are archived there. Set `Status:` to Open / In Progress / Done. Every ticket gets a Q&A with the owner before work starts; answers are recorded in the ticket under "Decisions".
 
 | ID | Title | Priority |
 |----|-------|----------|
@@ -121,7 +121,7 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [115](115-pump-fluid-objective.md) | Pump-out-a-fluid objective (future) | P3 (Open) |
 | [116](116-mission-sandbox-and-scenes.md) | Missions in sandbox mode and test scenes | P2 (Open) |
 | [117](done/117-item-weight-and-backpack-capacity.md) | Item weight and backpack carry capacity | P1 (Done; limit enforced in 118) |
-| [118](118-full-backpack-pickup-rules.md) | Full backpack: pickup refusal and feedback | P1 (Open) |
+| [118](done/118-full-backpack-pickup-rules.md) | Full backpack: pickup refusal and feedback | P1 (Done; "full" marker on drops deferred) |
 | [119](119-extractor-data-model.md) | Extractor data model and loader | P1 (Open) |
 | [120](120-extractor-entity-and-landing.md) | Extractor entity, landing intro and placement | P1 (Open) |
 | [121](121-extractor-stash-and-surface-deposit.md) | Extractor stash, surface deposit and persistence | P1 (Open) |

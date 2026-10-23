@@ -8,7 +8,9 @@ import {
   knockbackImpulse,
   sanitizeMiningInput,
   type MiningBackpackItem,
+  BASE_CARRY_CAPACITY,
   type MiningCombatStats,
+  type CarryStats,
   type MiningGearLayer,
   type MiningInputState,
   type MiningPosition,
@@ -40,7 +42,13 @@ export interface MiningPlayerSession {
   pickPower: number;
   /** Melee knockback, tenths of tiles/s; 0 = default push. */
   knockback: number;
+  /** Backpack weight limit (Carry Capacity effects on the equipped gear). */
+  carryCapacity: number;
   temporaryBackpack: MiningBackpackItem[];
+  /** Seconds before another "backpack full" notice may be sent. */
+  backpackFullCooldown: number;
+  /** A "backpack full" notice is due on the next state tick. */
+  backpackFullPending: boolean;
   gearLayers: MiningGearLayer[];
   /** Bumped whenever gearLayers change, so other clients re-fetch this player's description. */
   gearVersion: number;
@@ -130,7 +138,7 @@ export class MiningPlayerManager {
     gearLayers?: MiningGearLayer[];
     equippedWeaponId?: string | null;
     maxHealth?: number;
-  } & Partial<MiningCombatStats>): MiningPlayerSession {
+  } & Partial<MiningCombatStats & CarryStats>): MiningPlayerSession {
     let session = this.players.get(options.characterId);
     if (session) {
       if (options.equippedWeaponId !== undefined) session.equippedWeaponId = options.equippedWeaponId;
@@ -140,6 +148,7 @@ export class MiningPlayerManager {
       if (options.weaponDamage !== undefined) session.weaponDamage = options.weaponDamage;
       if (options.pickPower !== undefined) session.pickPower = options.pickPower;
       if (options.knockback !== undefined) session.knockback = options.knockback;
+      if (options.carryCapacity !== undefined) session.carryCapacity = options.carryCapacity;
       if (options.gearLayers !== undefined) this.updateGear(session, options.gearLayers);
       // A (re)joining client starts with nothing, so every entity must be described to it again
       session.known = createKnownEntities();
@@ -175,10 +184,13 @@ export class MiningPlayerManager {
       weaponDamage: options.weaponDamage ?? 25,
       pickPower: options.pickPower ?? 0,
       knockback: options.knockback ?? 0,
+      carryCapacity: options.carryCapacity ?? BASE_CARRY_CAPACITY,
       swingCooldown: 0,
       swungThisTick: false,
       noticeCooldown: 0,
       temporaryBackpack: [],
+      backpackFullCooldown: 0,
+      backpackFullPending: false,
       gearLayers: options.gearLayers || [],
       gearVersion: 0,
       known: createKnownEntities(),
@@ -374,6 +386,7 @@ export class MiningPlayerManager {
   public advanceSwings(dt: number): void {
     for (const session of this.players.values()) {
       session.noticeCooldown = Math.max(0, session.noticeCooldown - dt);
+      session.backpackFullCooldown = Math.max(0, session.backpackFullCooldown - dt);
       advanceSwing(session, dt, session.inputs.miningKey, this.getMiningSpeed(session));
     }
   }
@@ -482,7 +495,7 @@ export class MiningPlayerManager {
       miningSpeed: number;
       gearLayers: MiningGearLayer[];
       equippedWeaponId: string | null;
-    } & MiningCombatStats
+    } & MiningCombatStats & Partial<CarryStats>
   ): void {
     const session = this.players.get(characterId);
     if (!session) return;
@@ -491,6 +504,10 @@ export class MiningPlayerManager {
     session.weaponDamage = loadout.weaponDamage;
     session.pickPower = loadout.pickPower;
     session.knockback = loadout.knockback;
+    if (loadout.carryCapacity !== undefined) {
+      session.carryCapacity = loadout.carryCapacity;
+      session.backpackDirty = true;
+    }
     this.updateGear(session, loadout.gearLayers);
     session.equippedWeaponId = loadout.equippedWeaponId;
   }
