@@ -1,6 +1,6 @@
 # Tickets
 
-File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open and in-progress tickets live in this folder; a ticket moves to `done/` (and its README link gets the `done/` prefix) when it is Done. All 93 so far are archived there. Set `Status:` to Open / In Progress / Done. Every ticket gets a Q&A with the owner before work starts; answers are recorded in the ticket under "Decisions".
+File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open and in-progress tickets live in this folder; a ticket moves to `done/` (and its README link gets the `done/` prefix) when it is Done. All 94 so far are archived there. Set `Status:` to Open / In Progress / Done. Every ticket gets a Q&A with the owner before work starts; answers are recorded in the ticket under "Decisions".
 
 | ID | Title | Priority |
 |----|-------|----------|
@@ -97,4 +97,72 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [091](done/091-pickaxe-auto-target.md) | Pickaxe auto-target: mine the next blocks along the line to the cursor, Ctrl for 1x1 | P1 (Done) |
 | [092](done/092-big-rocks.md) | Rocks of several sizes (variable-size pieces) | P2 (Done) |
 | [093](done/093-mob-navigation-and-feet.md) | Mob navigation fixes and mob feet on the ground (3x blocks) | P1 (Done; judge the new mole size) |
-| [094](094-autotiling-from-one-texture.md) | Autotiling: edges and rounded corners from one texture | P2 (Built, not yet played) |
+| [094](done/094-autotiling-from-one-texture.md) | Autotiling: edges and rounded corners from one texture | P2 (Done) |
+| [095](095-biome-data-model.md) | Biome data model and loader | P1 (Open) |
+| [096](096-biome-generation.md) | Biome map generation and blended borders | P1 (Open) |
+| [097](097-biome-network-and-ambient-look.md) | Biome wire format and ambient look | P2 (Open) |
+| [098](098-admin-biomes-page.md) | Admin: Biomes page | P1 (Open) |
+| [099](099-doodad-data-model.md) | Doodad data model, loader and admin page | P1 (Open) |
+| [100](100-doodad-generation.md) | Doodad generation | P1 (Open) |
+| [101](101-doodad-network.md) | Doodad wire format and fog reveal | P1 (Open) |
+| [102](102-doodad-rendering.md) | Doodad rendering (static, layered, lit) | P1 (Open) |
+| [103](103-doodad-animation-and-effects.md) | Doodad motion, light, particles and sound | P1 (Open) |
+| [104](104-doodad-body-reaction.md) | Doodad reactions to bodies (wiggle) | P2 (Open) |
+| [105](105-doodad-removal-on-mining.md) | Doodads disappear when their anchor is removed | P1 (Open) |
+| [106](106-doodad-wandering-bugs.md) | Wandering doodads (bugs) | P3 (Open) |
+| [107](107-doodad-preview-and-sandbox.md) | Doodad admin preview and sandbox placement | P2 (Open) |
+| [108](108-mission-data-model.md) | Mission data model, objective registry and loader | P1 (Open) |
+| [109](109-objective-tracking.md) | Objective tracking engine | P1 (Open) |
+| [110](110-mission-map-generation.md) | Map generation guarantees the mission is achievable | P1 (Open) |
+| [111](111-mission-offer-and-picker.md) | Mission offers and the pre-run picker | P1 (Open) |
+| [112](112-mission-network-and-hud.md) | Mission wire format, HUD tracker and completion toast | P1 (Open) |
+| [113](113-mission-completion-rewards-and-results.md) | Mission completion, rewards, failure and results screen | P1 (Open) |
+| [114](114-admin-missions-page.md) | Admin: Missions page | P1 (Open) |
+| [115](115-pump-fluid-objective.md) | Pump-out-a-fluid objective (future) | P3 (Open) |
+| [116](116-mission-sandbox-and-scenes.md) | Missions in sandbox mode and test scenes | P2 (Open) |
+| [117](117-item-weight-and-backpack-capacity.md) | Item weight and backpack carry capacity | P1 (Open) |
+| [118](118-full-backpack-pickup-rules.md) | Full backpack: pickup refusal and feedback | P1 (Open) |
+| [119](119-extractor-data-model.md) | Extractor data model and loader | P1 (Open) |
+| [120](120-extractor-entity-and-landing.md) | Extractor entity, landing intro and placement | P1 (Open) |
+| [121](121-extractor-stash-and-surface-deposit.md) | Extractor stash, surface deposit and persistence | P1 (Open) |
+| [122](122-conveyor-belt-build.md) | Conveyor belt: digging down and laying segments | P1 (Open) |
+| [123](123-conveyor-unloading-and-item-travel.md) | Conveyor unloading and item travel | P1 (Open) |
+| [124](124-belt-and-extractor-damage.md) | Belt damage: mobs and fire | P2 (Open) |
+| [125](125-extractor-exit-and-mission-integration.md) | Exit, death and mission integration | P1 (Open) |
+| [126](126-admin-extractors-page.md) | Admin: Extractors page and item weight field | P2 (Open) |
+| [127](127-extractor-sandbox-and-profiling.md) | Extractor in sandbox mode, test scenes and profiling | P2 (Open) |
+| [128](128-extractor-and-belt-art.md) | Extractor and conveyor belt art (owner task, Gemini) | P2 (Open) |
+| [129](129-surface-environment-data-model.md) | Surface environment data model and loader | P2 (Open) |
+| [130](130-sky-and-parallax-rendering.md) | Procedural sky and parallax scenery | P2 (Open) |
+| [131](131-cloud-rendering.md) | Clouds | P2 (Open) |
+| [132](132-weather-state-and-sync.md) | Weather state and sync | P2 (Open) |
+| [133](133-precipitation-and-wind-effects.md) | Rain, snow, fog and wind effects | P2 (Open) |
+| [134](134-lightning-thunder-and-weather-lighting.md) | Lightning, thunder and weather lighting | P2 (Open) |
+| [135](135-surface-props-as-doodads.md) | Surface props via doodads (trees, bushes, birds) | P2 (Open) |
+| [136](136-admin-environments-page.md) | Admin: Environments (and weather) page | P2 (Open) |
+| [137](137-surface-art-gemini.md) | Surface background art (owner task, Gemini) | P2 (Open) |
+| [138](138-surface-sandbox-and-profiling.md) | Surface in sandbox mode, test scenes and profiling | P3 (Open) |
+| [139](139-surface-sky-rows-in-real-mine.md) | Sky rows above the ground in the real mine | P1 (Open; found in audit, blocks 120, 130, 135) |
+
+## Suggested build order (open tickets 095-139)
+
+IDs stay as they are (tickets reference each other by number); this is the order to build them in. Extractor first, because it changes the exit and loot path that mission rewards (113) build on.
+
+| Step | Tickets | What |
+|------|---------|------|
+| 1 | 117, 118 | Item weight, backpack capacity, full-pack pickup rules |
+| 2 | 139, 119, 120, 121 | Sky rows above the ground (139) first, then extractor data model, landing, stash and surface deposit |
+| 3 | 122, 123 | Conveyor belt: digging down, unloading and item travel |
+| 4 | 108, 109, 110, 111, 112, 114 | Missions: data model, tracking, generation guarantees, picker, HUD, admin |
+| 5 | 113, 125 | Mission completion and rewards, then exit/death/mission integration |
+| 6 | 124, 126, 127, 116 | Belt damage, extractor admin page, sandbox scenes (extractor and missions) |
+| 7 | 095, 096, 097, 098 | Biomes: data model, generation, ambient look, admin |
+| 8 | 099, 100, 101, 102, 103, 104, 105, 106, 107 | Doodads: data, generation, wire, rendering, motion/effects, reactions, removal, bugs, preview |
+| Any time | 128 | Extractor and belt art (owner task, Gemini); start before step 2 finishes |
+| 9 | 129, 130, 131, 132, 133, 134, 136, 138 | Surface background: environment data, sky/parallax, clouds, weather state, precipitation, lightning, admin, sandbox |
+| 10 | 135 | Surface props (needs doodads, step 8) |
+| Any time | 137 | Surface art (Gemini); start with the first environment |
+| Later | 115 | Pump-out objective (needs pumps) |
+
+Biomes and doodads (steps 7-8) touch neither the exit nor the loot rules, so they can be pulled forward whenever a visible win is wanted.
+
