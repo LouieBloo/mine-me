@@ -7,7 +7,7 @@ import { useSound } from '../../contexts/SoundContext';
 import { PixiStageProvider } from '../../components/game/PixiStageContext/PixiStageContext';
 import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
-import { MiningLoadingScreen } from './components/MiningLoadingScreen/MiningLoadingScreen';
+import { LOADING_SCREEN_EXIT_MS, MiningLoadingScreen } from './components/MiningLoadingScreen/MiningLoadingScreen';
 import { notificationService } from '../../services/notificationService';
 import { type BeltBlockedReason, type MiningBackpackItem, type MiningGameMode, isOnEntrance } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
@@ -324,7 +324,11 @@ export const MineView: React.FC = () => {
 
   const handleAssetsLoaded = useCallback(() => {
     setIsAssetsLoaded(true);
-  }, []);
+    // Tell the server the mine is on screen once the loading screen has gone, so the extractor lands where it can be seen
+    window.setTimeout(() => {
+      sendGameEvent({ type: 'mining_client_ready' }).catch(() => {});
+    }, LOADING_SCREEN_EXIT_MS);
+  }, [sendGameEvent]);
 
   const isScreenLoading = loading || !isAssetsLoaded || !miningSession;
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { MINING_CONFIG, placeExtractor } from '@mine-me/shared';
 import { MiningGameEngine } from './MiningGameEngine';
 import { MiningSessionManager } from './MiningSessionManager';
+import { EXTRACTOR_CLIENT_WAIT_SECONDS } from './subsystems/MiningExtractorSubsystem';
 
 const socket = () => {
   const emitted: { event: string; payload: any }[] = [];
@@ -97,5 +98,57 @@ describe('the extractor in a run (ticket 120)', () => {
   it('has no extractor in the sandbox', () => {
     const e = new MiningGameEngine({ characterId: 'sb', cityId: 'c', seed: 1, gameMode: 'sandbox', socket: socket().socket });
     expect(e.extractorSubsystem).toBeNull();
+  });
+
+  describe('waiting for the client (the flight must be seen)', () => {
+    const joinDeferred = () => {
+      const e = new MiningGameEngine({ roomId: 'r-defer', gameMode: 'multiplayer', cityId: 'c', seed: 3, mapConfig: { mobSpawnCount: 0 } });
+      e.addPlayer({ characterId: 'late', socket: { connected: true, emit: () => {} } as any, deferLanding: true });
+      return e;
+    };
+
+    it('does not start landing when a real client joins, only when it says it is ready', () => {
+      const e = joinDeferred();
+      const ex = e.extractorSubsystem!;
+      tickFor(e, ex.definition.landingSeconds * 3);
+      expect(ex.isLanded()).toBe(false);
+      expect(ex.landingRemaining()).toBe(ex.definition.landingSeconds); // a client joining now still sees the whole flight
+      e.clientReady();
+      tickFor(e, ex.definition.landingSeconds - 0.5);
+      expect(ex.isLanded()).toBe(false);
+      tickFor(e, 1);
+      expect(ex.isLanded()).toBe(true);
+    });
+
+    it('counts the landing from the first ready only, and a repeat does not restart it', () => {
+      const e = joinDeferred();
+      const ex = e.extractorSubsystem!;
+      e.clientReady();
+      tickFor(e, 1);
+      const remaining = ex.landingRemaining();
+      e.clientReady();
+      expect(ex.landingRemaining()).toBe(remaining);
+    });
+
+    it('does not let the belt dig or players deposit before it has landed', () => {
+      const e = joinDeferred();
+      tickFor(e, 20);
+      expect(e.beltSubsystem!.rows).toBe(0);
+    });
+
+    it('lands on its own if no client ever says it is ready', () => {
+      const e = joinDeferred();
+      const ex = e.extractorSubsystem!;
+      tickFor(e, EXTRACTOR_CLIENT_WAIT_SECONDS - 1);
+      expect(ex.isLanded()).toBe(false);
+      tickFor(e, 2 + ex.definition.landingSeconds + 0.5);
+      expect(ex.isLanded()).toBe(true);
+    });
+
+    it('a direct join (no client to wait for) still lands at once', () => {
+      const { engine } = make();
+      tickFor(engine, engine.extractorSubsystem!.definition.landingSeconds + 0.3);
+      expect(engine.extractorSubsystem!.isLanded()).toBe(true);
+    });
   });
 });

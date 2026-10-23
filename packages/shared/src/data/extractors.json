@@ -1,24 +1,27 @@
 [
   {
-    "id": "extractor_basic",
+    "id": "cmvkdi8gy0001k75lfk9wljax",
     "key": "basic_extractor",
     "name": "Basic Extractor",
     "description": "The standard extractor.",
-    "textureUrl": null,
+    "textureUrl": "/assets/sprites/extractors/cmvkdi8gy0001k75lfk9wljax-body.png",
+    "beltTextureUrl": "/assets/sprites/extractors/cmvkdi8gy0001k75lfk9wljax-belt.png",
     "width": 12,
     "height": 9,
     "entranceOffset": 24,
     "landingSeconds": 3,
     "shaftWidth": 3,
-    "buildSecondsPerSegment": 1.5,
+    "buildSecondsPerSegment": 6,
     "beltSpeed": 6,
-    "depositItemsPerSecond": 20,
     "unloadItemsPerSecond": 4,
-    "beltItemSpacing": 1.5,
+    "depositItemsPerSecond": 20,
     "beltSegmentHealth": 100,
+    "beltItemSpacing": 1.5,
     "health": 500,
     "landingParticleEffectId": null,
     "isDefault": true,
-    "soundEffects": null
+    "soundEffects": null,
+    "createdAt": "2026-10-23T02:51:11.842Z",
+    "updatedAt": "2026-10-23T22:20:43.798Z"
   }
 ]

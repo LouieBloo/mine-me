@@ -62,6 +62,21 @@ export const handleMiningExit = async (
 };
 
 /**
+ * Handler: mining_client_ready
+ * The client has finished loading and is showing the mine. The extractor's landing begins now, so the flight is
+ * seen and not played behind the loading screen. Harmless if repeated or sent by a player who is not in a mine.
+ */
+export const handleMiningClientReady = async (
+  io: Server,
+  socket: Socket,
+): Promise<GameEventResult> => {
+  const characterId = socket.data.characterId;
+  if (!characterId) return { success: false, error: 'No character selected.' };
+  miningSessionManager.getSession(characterId)?.clientReady();
+  return { success: true };
+};
+
+/**
  * Handler: mining_cancel
  * Explicitly cancels/abandons the mining session when the user leaves or navigates away.
  */

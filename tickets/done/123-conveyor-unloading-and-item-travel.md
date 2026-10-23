@@ -1,6 +1,6 @@
 # 123 - Conveyor unloading and item travel
 
-**Priority:** P1 - **Status:** Done in code (judge the feel in the game) - **Depends on:** 121, 122
+**Priority:** P1 - **Status:** Done - **Depends on:** 121, 122
 
 ## Decisions (2026-10-22, from the owner)
 - **Touching the belt starts the unload, for as long as they are touching it.** The belt does not move the player.

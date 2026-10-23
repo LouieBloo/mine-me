@@ -19,7 +19,7 @@ describe('items riding the conveyor belt (ticket 123)', () => {
   /** Lands the extractor and digs `rows` segments, then leaves everything quiet. */
   const dig = (rows: number) => {
     tickFor(def().landingSeconds + 0.1);
-    tickFor(def().buildSecondsPerSegment * rows + 0.1);
+    tickFor(def().buildSecondsPerSegment * rows + 0.5);
     expect(belt().rows).toBeGreaterThanOrEqual(rows);
   };
 
@@ -53,19 +53,25 @@ describe('items riding the conveyor belt (ticket 123)', () => {
 
   it('unloads one item at a time at the unload rate while the player touches the belt', () => {
     dig(8);
-    (def() as any).beltItemSpacing = 0.01; // (spacing is tested on its own below)
-    give('dirt', 100);
-    onBelt(4);
-    const rate = def().unloadItemsPerSecond;
-    tickFor(1);
-    const loaded = 100 - packOf('dirt');
-    expect(loaded).toBeGreaterThanOrEqual(rate - 1);
-    expect(loaded).toBeLessThanOrEqual(rate + 1);
-    // and it stops when they step off
-    away();
-    const before = packOf('dirt');
-    tickFor(1);
-    expect(packOf('dirt')).toBe(before);
+    // (spacing is tested on its own below; the definition is shared by every room in the process, so it is put back)
+    const spacing = def().beltItemSpacing;
+    (def() as any).beltItemSpacing = 0.01;
+    try {
+      give('dirt', 100);
+      onBelt(4);
+      const rate = def().unloadItemsPerSecond;
+      tickFor(1);
+      const loaded = 100 - packOf('dirt');
+      expect(loaded).toBeGreaterThanOrEqual(rate - 1);
+      expect(loaded).toBeLessThanOrEqual(rate + 1);
+      // and it stops when they step off
+      away();
+      const before = packOf('dirt');
+      tickFor(1);
+      expect(packOf('dirt')).toBe(before);
+    } finally {
+      (def() as any).beltItemSpacing = spacing;
+    }
   });
 
   it('puts the heaviest item on first', () => {
@@ -148,9 +154,11 @@ describe('items riding the conveyor belt (ticket 123)', () => {
     give('ore', 1);
     give('dirt', 1, 'other');
     onBelt(5);
-    me('other').playerBody.position = { x: belt().shaftX + 1.5, y: belt().startRow + 1 };
     tickFor(0.3);
     away();
+    // (a body in the open shaft falls, so the second player steps on once the first item has moved on up)
+    onBelt(5, 'other');
+    tickFor(0.4);
     away('other');
     tickFor(5);
     expect(stashOf('ore')).toBe(1);

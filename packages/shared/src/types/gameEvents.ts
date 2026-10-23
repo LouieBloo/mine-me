@@ -101,6 +101,14 @@ export interface MiningExitPayload extends GameEventBase {
 }
 
 // ----------------------------------------------------------------------------
+// Event: mining_client_ready
+// The client has finished loading and is showing the mine (the extractor's landing begins).
+// ----------------------------------------------------------------------------
+export interface MiningClientReadyPayload extends GameEventBase {
+  type: 'mining_client_ready';
+}
+
+// ----------------------------------------------------------------------------
 // Event: mining_cancel
 // Abandon or leave the mine without extraction. Halts server simulation loop.
 // ----------------------------------------------------------------------------
@@ -296,6 +304,7 @@ export type GameEventPayload =
   | MiningMineStartPayload
   | MiningMineCompletePayload
   | MiningExitPayload
+  | MiningClientReadyPayload
   | MiningCancelPayload
   | SandboxPourFluidPayload
   | SandboxReleaseGasPayload

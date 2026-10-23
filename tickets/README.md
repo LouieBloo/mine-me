@@ -1,6 +1,6 @@
 # Tickets
 
-File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open and in-progress tickets live in this folder; a ticket moves to `done/` (and its README link gets the `done/` prefix) when it is Done. All 97 so far are archived there. Set `Status:` to Open / In Progress / Done. Every ticket gets a Q&A with the owner before work starts; answers are recorded in the ticket under "Decisions".
+File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open and in-progress tickets live in this folder; a ticket moves to `done/` (and its README link gets the `done/` prefix) when it is Done. All 106 so far are archived there. Set `Status:` to Open / In Progress / Done. Every ticket gets a Q&A with the owner before work starts; answers are recorded in the ticket under "Decisions".
 
 | ID | Title | Priority |
 |----|-------|----------|
@@ -122,16 +122,16 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [116](116-mission-sandbox-and-scenes.md) | Missions in sandbox mode and test scenes | P2 (Open) |
 | [117](done/117-item-weight-and-backpack-capacity.md) | Item weight and backpack carry capacity | P1 (Done; limit enforced in 118) |
 | [118](done/118-full-backpack-pickup-rules.md) | Full backpack: pickup refusal and feedback | P1 (Done; "full" marker on drops deferred) |
-| [119](119-extractor-data-model.md) | Extractor data model and loader | P1 (In Progress; code done, default row applied) |
-| [120](120-extractor-entity-and-landing.md) | Extractor entity, landing intro and placement | P1 (Done in code; judge the look in the game) |
-| [121](121-extractor-stash-and-surface-deposit.md) | Extractor stash, surface deposit and persistence | P1 (Done in code; judge the feel in the game) |
-| [122](122-conveyor-belt-build.md) | Conveyor belt: digging down and laying segments | P1 (Done in code; judge the look in the game) |
-| [123](123-conveyor-unloading-and-item-travel.md) | Conveyor unloading and item travel | P1 (Done in code; judge the feel in the game) |
-| [124](124-belt-and-extractor-damage.md) | Belt damage: mobs and fire | P2 (Done in code; mobs do not path to the belt yet) |
+| [119](done/119-extractor-data-model.md) | Extractor data model and loader | P1 (Done) |
+| [120](done/120-extractor-entity-and-landing.md) | Extractor entity, landing intro and placement | P1 (Done) |
+| [121](done/121-extractor-stash-and-surface-deposit.md) | Extractor stash, surface deposit and persistence | P1 (Done) |
+| [122](done/122-conveyor-belt-build.md) | Conveyor belt: digging down and laying segments | P1 (Done) |
+| [123](done/123-conveyor-unloading-and-item-travel.md) | Conveyor unloading and item travel | P1 (Done) |
+| [124](done/124-belt-and-extractor-damage.md) | Belt damage: mobs and fire | P2 (Done) |
 | [125](125-extractor-exit-and-mission-integration.md) | Exit, death and mission integration | P1 (Partly done; mission reward waits for 113) |
-| [126](126-admin-extractors-page.md) | Admin: Extractors page and item weight field | P2 (Done in code; try it by hand) |
-| [127](127-extractor-sandbox-and-profiling.md) | Extractor in sandbox mode, test scenes and profiling | P2 (Done in code; try the scenes by hand) |
-| [128](128-extractor-and-belt-art.md) | Extractor and conveyor belt art (owner task, Gemini) | P2 (Open) |
+| [126](done/126-admin-extractors-page.md) | Admin: Extractors page and item weight field | P2 (Done) |
+| [127](done/127-extractor-sandbox-and-profiling.md) | Extractor in sandbox mode, test scenes and profiling | P2 (Done) |
+| [128](done/128-extractor-and-belt-art.md) | Extractor and conveyor belt art (owner task, Gemini) | P2 (Done) |
 | [129](129-surface-environment-data-model.md) | Surface environment data model and loader | P2 (Open) |
 | [130](130-sky-and-parallax-rendering.md) | Procedural sky and parallax scenery | P2 (Open) |
 | [131](131-cloud-rendering.md) | Clouds | P2 (Open) |

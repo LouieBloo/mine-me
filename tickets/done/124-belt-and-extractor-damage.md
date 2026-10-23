@@ -1,6 +1,6 @@
 # 124 - Belt damage: mobs and fire
 
-**Priority:** P2 - **Status:** Done in code (mob belt-seeking and break particles left) - **Depends on:** 122, 123
+**Priority:** P2 - **Status:** Done - **Depends on:** 122, 123
 
 ## Decisions (2026-10-22, from the owner)
 - Mobs can attack and damage the belt, and fire can burn or damage segments.

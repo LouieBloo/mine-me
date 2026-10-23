@@ -120,4 +120,24 @@ describe('ExtractorRenderer', () => {
     expect(r.root.destroyed).toBe(false);
     void texture;
   });
+
+  it('holds the flight while the loading screen is up and starts it on request', () => {
+    const r = new ExtractorRenderer(new Container(), state(), { startPaused: true });
+    r.update(5);
+    expect(r.hasStarted).toBe(false);
+    expect(r.hasTouchedDown).toBe(false);
+    expect(r.heightAboveGround).toBeCloseTo(LANDING_START_HEIGHT);
+    r.start();
+    r.update(1.5);
+    expect(r.hasStarted).toBe(true);
+    expect(r.heightAboveGround).toBeLessThan(LANDING_START_HEIGHT);
+    r.update(2);
+    expect(r.hasTouchedDown).toBe(true);
+  });
+
+  it('an extractor that has already landed is not held back', () => {
+    const r = new ExtractorRenderer(new Container(), state({ landingRemaining: 0 }), { startPaused: true });
+    expect(r.hasStarted).toBe(true);
+    expect(r.hasTouchedDown).toBe(true);
+  });
 });

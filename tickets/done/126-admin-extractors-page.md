@@ -1,6 +1,6 @@
 # 126 - Admin: Extractors page and item weight field
 
-**Priority:** P2 - **Status:** Done in code (try it by hand) - **Depends on:** 117, 119
+**Priority:** P2 - **Status:** Done - **Depends on:** 117, 119
 
 ## Proposed design
 - New admin page like Fluids: list, create, edit extractors (texture upload through the existing asset route, sound slots via `SoundSlotPicker`, particle picker, all rates and health fields).

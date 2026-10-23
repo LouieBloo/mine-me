@@ -40,14 +40,14 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
   });
 
   it('does not start before the extractor has landed', () => {
-    tickFor(seconds() * 2);
+    tickFor(extractor().definition.landingSeconds - 0.5);
     expect(belt().rows).toBe(0);
     expect(belt().blockedBy).toBeNull();
   });
 
   it('grows one row per build time, at the extractor\'s rate', () => {
     land();
-    tickFor(seconds() * 3 + 0.05);
+    tickFor(seconds() * 3 + 0.3);
     expect(belt().rows).toBe(3);
     const slow = extractor().definition;
     expect(slow.buildSecondsPerSegment).toBeGreaterThan(0);
@@ -56,14 +56,19 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
   it('follows a different build time when the definition says so (data, not a constant)', () => {
     land();
     const base = seconds();
+    // (the definition is shared by every room in the process: put it back afterwards)
     (extractor().definition as any).buildSecondsPerSegment = base * 4;
-    tickFor(base * 4 * 2 + 0.05);
-    expect(belt().rows).toBe(2);
+    try {
+      tickFor(base * 4 * 2 + 0.3);
+      expect(belt().rows).toBe(2);
+    } finally {
+      (extractor().definition as any).buildSecondsPerSegment = base;
+    }
   });
 
   it('digs straight down from the ground, the shaft width wide, centred under the machine', () => {
     land();
-    tickFor(seconds() * 3 + 0.05);
+    tickFor(seconds() * 3 + 0.3);
     const p = extractor().placement;
     expect(belt().startRow).toBe(engine.surfaceRow);
     expect(belt().shaftWidth).toBe(extractor().definition.shaftWidth);
@@ -78,7 +83,7 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
   it('tells clients about the removed blocks, and drops no loot', () => {
     land();
     emitted.length = 0;
-    tickFor(seconds() + 0.05);
+    tickFor(seconds() + 0.3);
     const updates = emitted.filter((e) => e.event === 'mining_state_tick').flatMap((e) => e.payload.revealedTiles ?? []);
     expect(updates.filter((u: any) => u.y === engine.surfaceRow && u.type === MiningTileType.EMPTY).length).toBeGreaterThanOrEqual(belt().shaftWidth);
     expect(engine.droppedItems).toEqual([]);
@@ -92,7 +97,7 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
       engine.grid[cell.y][cell.x] = { type: MiningTileType.ROCK, revealed: false, piece: cell.offset };
       engine.rigidWorld.addTileCollider(cell.x, cell.y);
     }
-    tickFor(seconds() + 0.05);
+    tickFor(seconds() + 0.3);
     for (const cell of pieceCells({ x, y: row }, { width: 3, height: 3 }, true)) expect(engine.grid[cell.y][cell.x].type).toBe(MiningTileType.EMPTY);
   });
 
@@ -100,7 +105,7 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
     ['fluid', () => { const f = engine.dataManager.getFluids()[0]; engine.fluidSubsystem.placeFluid(belt().shaftX + 1, belt().tipRow + 1, f.typeKey, 1); }, (r: number) => r],
   ])('pauses at %s in the next row and carries on when it is gone', (reason) => {
     land();
-    tickFor(seconds() * 2 + 0.05);
+    tickFor(seconds() * 2 + 0.3);
     const before = belt().rows;
     const row = belt().tipRow;
     open(belt().shaftX + 1, row);
@@ -110,14 +115,14 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
     expect(belt().rows).toBe(before);
     expect(belt().blockedBy).toBe(reason);
     engine.fluidSubsystem.grid.setCell(belt().shaftX + 1, row, 0, 0);
-    tickFor(seconds() * 2 + 0.05);
+    tickFor(seconds() * 2 + 0.3);
     expect(belt().rows).toBeGreaterThan(before);
     expect(belt().blockedBy).toBeNull();
   });
 
   it('pauses at gas', () => {
     land();
-    tickFor(seconds() + 0.05);
+    tickFor(seconds() + 0.3);
     const row = belt().tipRow;
     open(belt().shaftX, row);
     const gas = engine.dataManager.getGases()[0];
@@ -134,7 +139,7 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
 
   it('pauses at fire', () => {
     land();
-    tickFor(seconds() + 0.05);
+    tickFor(seconds() + 0.3);
     const row = belt().tipRow;
     open(belt().shaftX, row);
     vi.spyOn(engine.fireSubsystem, 'isBurning').mockImplementation((x, y) => x === belt().shaftX && y === row);
@@ -146,7 +151,7 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
 
   it('pauses while a falling rock is in the next row', () => {
     land();
-    tickFor(seconds() + 0.05);
+    tickFor(seconds() + 0.3);
     const row = belt().tipRow;
     engine.rockSubsystem.activeRocks.push({ cellsWide: 1, cellsHigh: 1, position: { x: belt().shaftX + 0.5, y: row + 0.5 } } as any);
     const before = belt().rows;
@@ -157,7 +162,7 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
 
   it('stops for good at a block that cannot be removed', () => {
     land();
-    tickFor(seconds() + 0.05);
+    tickFor(seconds() + 0.3);
     engine.grid[belt().tipRow][belt().shaftX + 1] = { type: MiningTileType.ENTRANCE, revealed: false };
     const before = belt().rows;
     tickFor(seconds() * 3);
@@ -178,14 +183,14 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
 
   it('is an open channel: nothing solid is left in the laid rows', () => {
     land();
-    tickFor(seconds() * 4 + 0.05);
+    tickFor(seconds() * 4 + 0.3);
     for (let i = 0; i < belt().rows; i++) for (const x of cols()) expect(engine.rigidWorld.hasTileCollider?.(x, engine.surfaceRow + i) ?? false).toBe(false);
   });
 
   it('sends the length once per change, and the whole belt in the join state', () => {
     land();
     emitted.length = 0;
-    tickFor(seconds() * 2 + 0.05);
+    tickFor(seconds() * 2 + 0.3);
     const ticks = emitted.filter((e) => e.event === 'mining_state_tick' && e.payload.belt);
     expect(ticks.map((t) => t.payload.belt.rows)).toEqual([1, 2]);
     expect(belt().clientState()).toMatchObject({ rows: 2, startRow: engine.surfaceRow, shaftWidth: belt().shaftWidth, blockedBy: null });

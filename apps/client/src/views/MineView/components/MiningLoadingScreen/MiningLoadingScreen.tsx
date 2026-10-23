@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import './MiningLoadingScreen.css';
 
+/** How long the loading screen takes to leave once loading is done (its fade, then it is removed). Things that should be seen wait this long. */
+export const LOADING_SCREEN_EXIT_MS = 450;
+
 export interface MiningLoadingScreenProps {
   isLoading: boolean;
   message?: string;
@@ -23,7 +26,7 @@ export const MiningLoadingScreen: React.FC<MiningLoadingScreenProps> = ({
     } else {
       const timer = setTimeout(() => {
         setShouldRender(false);
-      }, 450);
+      }, LOADING_SCREEN_EXIT_MS);
       return () => clearTimeout(timer);
     }
   }, [isLoading]);

@@ -1,6 +1,6 @@
 # 127 - Extractor in sandbox mode, test scenes and profiling
 
-**Priority:** P2 - **Status:** Done in code (try the scenes by hand) - **Depends on:** 120, 123
+**Priority:** P2 - **Status:** Done - **Depends on:** 120, 123
 
 ## Proposed design
 - Sandbox (065): spawn the extractor and belt, set belt length, set capacity and weights, fast-forward belt build.

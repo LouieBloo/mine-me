@@ -340,11 +340,19 @@ export class MiningGameEngine {
     gearLayers?: MiningGearLayer[];
     equippedWeaponId?: string | null;
     maxHealth?: number;
+    /** A real client is loading: the extractor lands when it says it is ready, not the moment it joins. */
+    deferLanding?: boolean;
   } & Partial<MiningCombatStats & CarryStats>): MiningPlayerSession {
     const session = this.playerManager.addPlayer(options);
-    this.extractorSubsystem?.begin();
+    if (options.deferLanding) this.extractorSubsystem?.expectClient();
+    else this.extractorSubsystem?.begin();
     this.revealAndTrackTiles(session.playerBody.position, session.visionRange);
     return session;
+  }
+
+  /** A client has finished loading and is showing the mine: the extractor can land now. */
+  public clientReady(): void {
+    this.extractorSubsystem?.begin();
   }
 
   /** Writes every player's unsaved deposits to the database now (the run is ending). */
@@ -379,7 +387,8 @@ export class MiningGameEngine {
     this.extractorSubsystem = new MiningExtractorSubsystem(this.worldView);
     this.extractorSubsystem.writeStash = this.writeStash ?? null;
     this.beltSubsystem = new MiningBeltSubsystem(this.worldView);
-    this.extractorSubsystem.begin();
+    // Clients rebuild their view after this, so the landing waits until they say they are ready
+    this.extractorSubsystem.expectClient();
     return true;
   }
 

@@ -12,7 +12,7 @@ describe('damage to the conveyor belt (ticket 124)', () => {
   const def = () => engine.extractorSubsystem!.definition;
   const me = () => engine.players.get(cid)!;
   const hit = (index: number, amount: number) => engine.damageSystem.applyDamage({ kind: 'belt', id: String(index) }, { amount, type: 'melee', source: { kind: 'environment', name: 'test' } });
-  const dig = (rows: number) => { tickFor(def().landingSeconds + 0.1); tickFor(def().buildSecondsPerSegment * rows + 0.1); expect(belt().rows).toBeGreaterThanOrEqual(rows); };
+  const dig = (rows: number) => { tickFor(def().landingSeconds + 0.1); tickFor(def().buildSecondsPerSegment * rows + 0.5); expect(belt().rows).toBeGreaterThanOrEqual(rows); };
 
   beforeEach(() => {
     emitted = [];
@@ -89,11 +89,11 @@ describe('damage to the conveyor belt (ticket 124)', () => {
     const rows = belt().rows;
     hit(2, def().beltSegmentHealth * 2);
     expect(belt().segments[2]).toBeNull();
-    tickFor(def().buildSecondsPerSegment + 0.1);
+    tickFor(def().buildSecondsPerSegment + 0.3);
     expect(belt().segments[2]).not.toBeNull();
     expect(belt().segments[2]!.health).toBe(def().beltSegmentHealth);
     expect(belt().rows).toBe(rows); // it mended before it dug further
-    tickFor(def().buildSecondsPerSegment + 0.1);
+    tickFor(def().buildSecondsPerSegment + 0.3);
     expect(belt().rows).toBe(rows + 1);
   });
 

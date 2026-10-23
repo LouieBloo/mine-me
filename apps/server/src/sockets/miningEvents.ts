@@ -22,6 +22,7 @@ export {
 export {
   handleMiningExit,
   handleMiningCancel,
+  handleMiningClientReady,
   handleMiningIncreaseVision,
   cleanupMiningSession,
 } from './mining/handlers/exitMiningSession';

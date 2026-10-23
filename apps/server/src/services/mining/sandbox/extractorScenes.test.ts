@@ -26,6 +26,10 @@ describe('extractor test scenes and sandbox tools (ticket 127)', () => {
       expect(engine.extractorSubsystem).not.toBeNull();
       expect(engine.beltSubsystem).not.toBeNull();
       expect(engine.extractorSubsystem!.isLanded()).toBe(false);
+      // Clients rebuild their view first: the landing waits until one says it is ready
+      tickFor(engine.extractorSubsystem!.definition.landingSeconds + 0.2);
+      expect(engine.extractorSubsystem!.isLanded()).toBe(false);
+      engine.clientReady();
       tickFor(engine.extractorSubsystem!.definition.landingSeconds + 0.2);
       expect(engine.extractorSubsystem!.isLanded()).toBe(true);
     });

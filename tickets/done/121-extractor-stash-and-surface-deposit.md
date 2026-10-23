@@ -1,6 +1,6 @@
 # 121 - Extractor stash, surface deposit and persistence
 
-**Priority:** P1 - **Status:** Done in code (judge the feel in the game) - **Depends on:** 117, 120
+**Priority:** P1 - **Status:** Done - **Depends on:** 117, 120
 
 ## Decisions (2026-10-22, from the owner)
 - The extractor **takes the player's items and saves them for when they leave.**

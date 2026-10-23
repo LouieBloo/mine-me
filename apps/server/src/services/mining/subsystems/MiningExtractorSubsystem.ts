@@ -9,6 +9,9 @@ import {
 import type { MiningWorld } from '../MiningWorld';
 import type { MiningPlayerSession } from './MiningPlayerManager';
 
+/** How long the landing waits for a client to say it is ready before it begins anyway. */
+export const EXTRACTOR_CLIENT_WAIT_SECONDS = 30;
+
 /** The most sim seconds a deposit waits before it is written to the database. */
 export const STASH_FLUSH_SECONDS = 1;
 
@@ -29,6 +32,8 @@ export class MiningExtractorSubsystem {
   /** Sim time at which it lands; null until the first player has joined. */
   private landsAt: number | null = null;
   private landedAnnounced = false;
+  /** Sim time at which the landing begins by itself if no client has asked (see `expectClient`). */
+  private beginDeadline: number | null = null;
   private pendingUpdate: MiningExtractorUpdate | undefined;
   /** Set by the room's owner (the session manager) in modes that save to the character. */
   public writeStash: StashWriter | null = null;
@@ -38,7 +43,15 @@ export class MiningExtractorSubsystem {
     this.placement = placeExtractor(this.definition, world.surfaceRow, world.grid[0]?.length ?? 0);
   }
 
-  /** Starts the landing clock (once; the first player joining calls it). */
+  /**
+   * The landing waits for a client to say its screen is showing the mine (`begin` then), so the flight is seen and not played
+   * behind the loading screen. If no client ever says so, it begins on its own after `maxWaitSeconds`.
+   */
+  public expectClient(maxWaitSeconds: number = EXTRACTOR_CLIENT_WAIT_SECONDS): void {
+    if (this.landsAt === null && this.beginDeadline === null) this.beginDeadline = this.world.simTime + maxWaitSeconds;
+  }
+
+  /** Starts the landing clock (once; harmless to call again). */
   public begin(): void {
     if (this.landsAt === null) this.landsAt = this.world.simTime + this.definition.landingSeconds;
   }
@@ -61,6 +74,7 @@ export class MiningExtractorSubsystem {
 
   /** Once per tick: notices the moment the machine lands. */
   public update(): void {
+    if (this.landsAt === null && this.beginDeadline !== null && this.world.simTime >= this.beginDeadline) this.begin();
     if (!this.landedAnnounced && this.isLanded()) {
       this.landedAnnounced = true;
       this.pendingUpdate = { landed: true };

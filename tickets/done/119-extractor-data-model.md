@@ -1,6 +1,6 @@
 # 119 - Extractor data model and loader
 
-**Priority:** P1 - **Status:** In Progress (code done; default row applied 2026-10-22) - **Depends on:** none
+**Priority:** P1 - **Status:** Done - **Depends on:** none
 
 ## Decisions (2026-10-22, from the owner)
 - **Data-driven rates on an `Extractor` definition** (belt speed, unload rate, build rate, shaft width, health numbers), so later upgrades just swap or scale the definition. No constants in logic.

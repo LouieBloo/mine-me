@@ -356,7 +356,7 @@ model Extractor {
   landingSeconds          Float          @default(3)
   // Width of the shaft dug for the belt, in cells
   shaftWidth              Int            @default(3)
-  buildSecondsPerSegment  Float          @default(1.5)
+  buildSecondsPerSegment  Float          @default(6)
   // Cells per second
   beltSpeed               Float          @default(6)
   unloadItemsPerSecond    Float          @default(4)

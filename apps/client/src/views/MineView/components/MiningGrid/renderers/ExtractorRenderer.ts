@@ -13,6 +13,8 @@ export interface ExtractorRendererDeps {
   particles?: ParticleEngine | null;
   /** Plays a landing/running sound at a world position (cells) at the slot's own volume. */
   playSound?: (sound: { url: string; volume: number }, position: { x: number; y: number }, spatial: typeof MINING_SPATIAL_AUDIO_PRESETS.EXTRACTOR) => void;
+  /** Hold the flight until `start()` (the loading screen is still up); a machine already landed ignores this. */
+  startPaused?: boolean;
   /** Loads the art; defaults to the Pixi asset loader. */
   loadTexture?: (url: string) => Promise<Texture | null>;
 }
@@ -32,6 +34,7 @@ export class ExtractorRenderer {
   private landedShown: boolean;
   private serverLanded: boolean;
   private destroyed = false;
+  private started: boolean;
   private playSound: ExtractorRendererDeps['playSound'];
   private particles: ParticleEngine | null;
 
@@ -45,6 +48,7 @@ export class ExtractorRenderer {
     this.particles = deps.particles ?? null;
     this.elapsed = Math.max(0, state.landingSeconds - state.landingRemaining);
     this.landedShown = state.landingRemaining <= 0;
+    this.started = deps.startPaused !== true || this.landedShown;
     this.serverLanded = this.landedShown;
     this.root.position.set(state.x * TILE_SIZE, state.y * TILE_SIZE);
     this.drawPlaceholder();
@@ -62,6 +66,16 @@ export class ExtractorRenderer {
   /** Where its sounds go (set once the sound manager exists; the scene builds the renderer first). */
   public setSoundPlayer(play: ExtractorRendererDeps['playSound']): void {
     this.playSound = play;
+  }
+
+  /** Lets the flight begin (the loading screen has gone). */
+  public start(): void {
+    this.started = true;
+  }
+
+  /** Whether the flight is running (or over). */
+  public get hasStarted(): boolean {
+    return this.started;
   }
 
   /** The server says it has landed (gameplay may use it); the drawn landing still finishes by itself. */
@@ -86,7 +100,7 @@ export class ExtractorRenderer {
 
   /** Advances the landing by `deltaSeconds`. */
   public update(deltaSeconds: number): void {
-    if (this.landedShown || this.destroyed) return;
+    if (this.landedShown || this.destroyed || !this.started) return;
     this.elapsed += Math.max(0, deltaSeconds);
     if (this.elapsed >= this.state.landingSeconds) this.touchDown();
     this.applyOffset();

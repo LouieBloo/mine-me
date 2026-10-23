@@ -30,6 +30,7 @@ import { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager'
 import { FluidRenderer } from '../renderers/FluidRenderer';
 import { autotileVariants } from '../renderers/AutotileVariants';
 import { GasRenderer } from '../renderers/GasRenderer';
+import { LOADING_SCREEN_EXIT_MS } from '../../MiningLoadingScreen/MiningLoadingScreen';
 import { ExtractorRenderer } from '../renderers/ExtractorRenderer';
 import { BeltRenderer } from '../renderers/BeltRenderer';
 import { BeltItemRenderer } from '../renderers/BeltItemRenderer';
@@ -247,7 +248,7 @@ export function useMiningScene({
       beltItemRendererRef.current.add(initialSessionState.beltItems ?? []);
     }
     if (initialSessionState.extractor) {
-      extractorRendererRef.current = new ExtractorRenderer(extractorContainer, initialSessionState.extractor);
+      extractorRendererRef.current = new ExtractorRenderer(extractorContainer, initialSessionState.extractor, { startPaused: true });
     }
 
     const fireField = new FireField(fluidRenderer.field.width, fluidRenderer.field.height);
@@ -344,6 +345,7 @@ export function useMiningScene({
     burningBodiesRef.current = burningBodies;
 
     // Load assets in parallel: cave tiling background, dirt block texture + modular character sprite with gear
+    let flightTimer: number | undefined;
     const loadAllAssets = async () => {
       // Start listing every image and sound on the server right away; it is used once the item and block data is in
       const manifestPromise = fetchAssetManifest();
@@ -610,12 +612,15 @@ export function useMiningScene({
       report(1);
       if (gridContainerRef.current) {
         onAssetsLoadedRef.current?.();
+        // The extractor's flight waits until the loading screen has gone, or it would play behind it
+        flightTimer = window.setTimeout(() => extractorRendererRef.current?.start(), LOADING_SCREEN_EXIT_MS);
       }
     };
 
     loadAllAssets();
 
     return () => {
+      if (flightTimer !== undefined) window.clearTimeout(flightTimer);
       setContainersReady(false);
       if (cameraRef.current) {
         cameraRef.current.destroy();

@@ -7,6 +7,14 @@ const STRIPES_PER_CELL = 2;
 /** The placeholder is redrawn at most this often while it moves, in seconds. */
 const REDRAW_SECONDS = 1 / 20;
 
+/**
+ * Where stripe `index` is down a cell (0 at the top edge, up to just under 1) after the belt has run to `phase`. The belt
+ * carries things UP to the extractor, so as the phase grows the stripes climb: their position falls and wraps round at the top.
+ */
+export function stripePosition(index: number, phase: number): number {
+  return ((((index - phase) % STRIPES_PER_CELL) + STRIPES_PER_CELL) % STRIPES_PER_CELL) / STRIPES_PER_CELL;
+}
+
 /** How far along the repeating stripe pattern the belt is after `seconds` at `speed` cells per second (0 up to 1 stripe, wrapping). */
 export function stripePhase(seconds: number, speed: number): number {
   const cycle = (seconds * speed * STRIPES_PER_CELL) % 1;
@@ -26,6 +34,7 @@ export class BeltRenderer {
   private readonly graphics = new Graphics();
   private rows: number;
   private blockedBy: BeltBlockedReason | null;
+  /** Seconds the belt has been running (it stands still while it waits), which is how far its stripes or art have moved. */
   private elapsed = 0;
   private sinceRedraw = REDRAW_SECONDS;
   private destroyed = false;
@@ -46,10 +55,13 @@ export class BeltRenderer {
       void loadTexture(state.textureUrl).then((texture) => {
         if (!texture || this.destroyed) return;
         this.art = new TilingSprite({ texture, width: state.shaftWidth * TILE_SIZE, height: Math.max(1, this.rows) * TILE_SIZE });
+        // The picture is drawn at any resolution: scaled so one repeat is exactly the shaft wide
+        this.art.tileScale.set((state.shaftWidth * TILE_SIZE) / Math.max(1, texture.width));
         this.art.position.set(state.shaftX * TILE_SIZE, state.startRow * TILE_SIZE);
-        this.root.addChild(this.art);
-        this.graphics.visible = false;
+        // The art goes under the drawing, which from now on only adds what the art does not have: gaps and cracks
+        this.root.addChildAt(this.art, 0);
         this.syncArt();
+        this.sinceRedraw = REDRAW_SECONDS;
       });
     }
   }
@@ -86,14 +98,16 @@ export class BeltRenderer {
   /** Moves the stripes on by `deltaSeconds`. */
   public update(deltaSeconds: number): void {
     if (this.destroyed) return;
-    this.elapsed += Math.max(0, deltaSeconds);
+    // A belt that is waiting does not move
+    if (this.blockedBy === null) this.elapsed += Math.max(0, deltaSeconds);
     this.sinceRedraw += Math.max(0, deltaSeconds);
     // A belt that is waiting does not move; one with nothing laid has nothing to draw
     if (this.rows === 0) return;
     if (this.sinceRedraw >= REDRAW_SECONDS) {
       this.sinceRedraw = 0;
       this.redraw();
-      if (this.art) this.art.tilePosition.y = (this.elapsed * this.state.beltSpeed * TILE_SIZE) % this.art.texture.height;
+      // Up, like the items: a tiling sprite's picture moves down as its offset grows, so the offset runs the other way
+      if (this.art) this.art.tilePosition.y = -((this.elapsed * this.state.beltSpeed * TILE_SIZE) % (this.art.texture.height * this.art.tileScale.y));
     }
   }
 
@@ -113,23 +127,27 @@ export class BeltRenderer {
     const { shaftX, shaftWidth, startRow, beltSpeed } = this.state;
     const left = shaftX * TILE_SIZE;
     const width = shaftWidth * TILE_SIZE;
-    const phase = this.blockedBy ? 0 : stripePhase(this.elapsed, beltSpeed);
+    const phase = stripePhase(this.elapsed, beltSpeed);
+    const artMode = this.art !== null;
     for (let i = 0; i < this.rows; i++) {
       const top = (startRow + i) * TILE_SIZE;
       const stage = this.stageOf(i);
       if (stage < 0) {
-        // Broken: a gap with the torn edges showing, until the belt lays it again
+        // Broken: a gap with the torn edges showing, until the belt lays it again (over the art, which has no gaps of its own)
+        if (artMode) g.rect(left, top, width, TILE_SIZE).fill(0x120c08);
         g.rect(left, top, 2, TILE_SIZE * 0.4).fill(0xf59e0b);
         g.rect(left + width - 2, top + TILE_SIZE * 0.6, 2, TILE_SIZE * 0.4).fill(0xf59e0b);
         continue;
       }
-      g.rect(left, top, width, TILE_SIZE).fill(0x1f2937);
-      for (let s = 0; s < STRIPES_PER_CELL; s++) {
-        const y = top + ((s + phase) / STRIPES_PER_CELL) * TILE_SIZE;
-        g.rect(left + 2, y, width - 4, Math.max(1, TILE_SIZE * 0.12)).fill(0x6b7280);
+      if (!artMode) {
+        g.rect(left, top, width, TILE_SIZE).fill(0x1f2937);
+        for (let s = 0; s < STRIPES_PER_CELL; s++) {
+          const y = top + stripePosition(s, phase) * TILE_SIZE;
+          g.rect(left + 2, y, width - 4, Math.max(1, TILE_SIZE * 0.12)).fill(0x6b7280);
+        }
+        g.rect(left, top, 2, TILE_SIZE).fill(0xf59e0b);
+        g.rect(left + width - 2, top, 2, TILE_SIZE).fill(0xf59e0b);
       }
-      g.rect(left, top, 2, TILE_SIZE).fill(0xf59e0b);
-      g.rect(left + width - 2, top, 2, TILE_SIZE).fill(0xf59e0b);
       // Cracks: more of them as the segment gets worse
       for (let c = 0; c < stage; c++) {
         const cx = left + width * ((c + 1) / (stage + 1));

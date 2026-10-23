@@ -65,7 +65,7 @@ export const DEFAULT_EXTRACTOR: Readonly<ExtractorDefinition> = {
   entranceOffset: 8 * BLOCK_SCALE,
   landingSeconds: 3,
   shaftWidth: 3,
-  buildSecondsPerSegment: 1.5,
+  buildSecondsPerSegment: 6,
   beltSpeed: 6,
   depositItemsPerSecond: 20,
   unloadItemsPerSecond: 4,

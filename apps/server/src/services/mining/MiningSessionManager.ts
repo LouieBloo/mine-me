@@ -150,6 +150,7 @@ export class MiningSessionManager {
       gearLayers,
       equippedWeaponId,
       maxHealth,
+      deferLanding: true,
     });
 
     this.playerToRoom.set(characterId, targetRoomId);
