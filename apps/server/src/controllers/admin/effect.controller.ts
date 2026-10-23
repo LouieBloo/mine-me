@@ -24,6 +24,7 @@ const EFFECT_FLAGS = [
   'toolDamageModifier',
   'pickPowerModifier',
   'knockbackModifier',
+  'carryCapacityModifier',
   'explodes',
   'ignites',
 ] as const;

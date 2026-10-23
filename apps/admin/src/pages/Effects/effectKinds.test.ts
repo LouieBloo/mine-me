@@ -6,7 +6,7 @@ describe('effect kinds', () => {
     const flags = EFFECT_KINDS.map((k) => k.flag);
     expect(new Set(flags).size).toBe(flags.length);
     expect(flags).toEqual(
-      expect.arrayContaining(['damageModifier', 'toolDamageModifier', 'pickPowerModifier', 'knockbackModifier', 'miningSpeedModifier'])
+      expect.arrayContaining(['damageModifier', 'toolDamageModifier', 'pickPowerModifier', 'knockbackModifier', 'miningSpeedModifier', 'carryCapacityModifier'])
     );
     for (const k of EFFECT_KINDS) {
       expect(k.label.length).toBeGreaterThan(0);
@@ -23,6 +23,7 @@ describe('effect kinds', () => {
     expect(getEffectKind({ pickPowerModifier: true })?.short).toBe('Pick Power');
     expect(getEffectKind({ toolDamageModifier: true })?.short).toBe('Tool Damage');
     expect(getEffectKind({ knockbackModifier: true })?.short).toBe('Knockback');
+    expect(getEffectKind({ carryCapacityModifier: true })?.short).toBe('Carry Capacity');
     // Damage wins when an effect has several flags (matches the old badge priority)
     expect(getEffectKind({ damageModifier: true, miningSpeedModifier: true })?.short).toBe('Damage');
   });

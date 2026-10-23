@@ -23,7 +23,8 @@ export type EffectFlag =
   | 'damageModifier'
   | 'toolDamageModifier'
   | 'pickPowerModifier'
-  | 'knockbackModifier';
+  | 'knockbackModifier'
+  | 'carryCapacityModifier';
 
 /** One attached effect: an item's or a mob's `ObjectEffects` row (the effect flags plus a value). */
 export interface EffectEntry {

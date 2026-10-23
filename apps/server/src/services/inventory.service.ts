@@ -159,6 +159,7 @@ export class InventoryService {
       canBeDamaged: item.canBeDamaged,
       canBeClimbed: item.canBeClimbed,
       throwable: item.throwable,
+      weight: typeof item.weight === 'number' ? item.weight : 0,
       particleEffectId: item.particleEffectId,
       particleEffect: item.particleEffect,
       heldParticleEffectId: item.heldParticleEffectId ?? null,
@@ -192,6 +193,7 @@ export class InventoryService {
           toolDamageModifier: ie.effect.toolDamageModifier,
           pickPowerModifier: ie.effect.pickPowerModifier,
           knockbackModifier: ie.effect.knockbackModifier,
+          carryCapacityModifier: ie.effect.carryCapacityModifier,
           explodes: ie.effect.explodes,
           ignites: ie.effect.ignites,
         } : undefined

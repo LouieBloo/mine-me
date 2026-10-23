@@ -134,6 +134,17 @@ describe('InventoryService', () => {
   });
 
   describe('mapItem', () => {
+    it('maps weight (0 when missing) and the Carry Capacity effect flag', () => {
+      const base = { id: 'i', name: 'Bag', description: '', type: 'GEAR', subType: 'CHEST', vendorSellPrice: 0, rarity: 'LOW' };
+      expect(InventoryService.mapItem({ ...base, weight: 2.5, itemEffects: [] })?.weight).toBe(2.5);
+      expect(InventoryService.mapItem({ ...base, itemEffects: [] })?.weight).toBe(0);
+      const withBag = InventoryService.mapItem({
+        ...base,
+        itemEffects: [{ id: 'x', itemId: 'i', effectId: 'e', value: 40, effect: { id: 'e', name: 'Carry Capacity', description: '', carryCapacityModifier: true } }],
+      });
+      expect(withBag?.itemEffects?.[0].effect?.carryCapacityModifier).toBe(true);
+    });
+
     it('should map shootsProjectiles, projectileConfig, and lightConfig', () => {
       const mockWeapon = {
         id: 'cmn_revolver_6shooter',

@@ -1,6 +1,6 @@
 # 117 - Item weight and backpack carry capacity
 
-**Priority:** P1 - **Status:** Open - **Depends on:** none (first of the extractor epic 117-127)
+**Priority:** P1 - **Status:** Done - **Depends on:** none (first of the extractor epic 117-127)
 
 ## Problem
 The backpack has no limit today, so there is no reason to return to the surface. We want a carry limit so the player must empty the pack at the extractor (118+) or on its belt.
@@ -23,3 +23,7 @@ The backpack has no limit today, so there is no reason to return to the surface.
 
 ## Tests
 `backpackWeight`, `canCarry`, `deriveCarryCapacity` (base, gear, stacked effects), loader maps weight, admin validation (weight >= 0). Mutation: ignore capacity effects -> a test fails.
+
+## Progress (2026-10-22)
+- Done: `Item.weight` and `Effect.carryCapacityModifier` (Prisma, db pushed), shared `Effect`/`GameItem` fields, `packages/shared/src/gameLogic/carryCapacity.ts` (`BASE_CARRY_CAPACITY` = 100, `deriveCarryCapacity`, `carryCapacityOfInventory`, `backpackWeight`, `carryRoom`, `canCarry`), `mapItem` wire, effect controller/validation, item weight validation (>= 0), admin Weight field and Carry Capacity effect kind, `prisma/add-item-weights.ts` (dry run by default).
+- Applied: `add-item-weights.ts --apply` created the Carry Capacity effect and set weights on 12 items. Enforcement of the limit is ticket 118.

@@ -34,6 +34,7 @@ export const itemValidation = [
   body('canBeDamaged').optional().isBoolean().withMessage('canBeDamaged must be a boolean'),
   body('canBeClimbed').optional().isBoolean().withMessage('canBeClimbed must be a boolean'),
   body('throwable').optional().isBoolean().withMessage('throwable must be a boolean'),
+  body('weight').optional().isFloat({ min: 0 }).withMessage('Weight must be >= 0'),
   body('triggerMode').optional().isIn(['SINGLE', 'HOLD']).withMessage('triggerMode must be SINGLE or HOLD'),
   body('experience').optional().isInt({ min: 0 }).withMessage('Experience must be >= 0'),
   body('combatScore').optional().isInt({ min: 0 }).withMessage('Combat Score must be >= 0'),
@@ -105,6 +106,7 @@ export const effectValidation = [
   body('toolDamageModifier').optional().isBoolean().withMessage('toolDamageModifier must be a boolean'),
   body('pickPowerModifier').optional().isBoolean().withMessage('pickPowerModifier must be a boolean'),
   body('knockbackModifier').optional().isBoolean().withMessage('knockbackModifier must be a boolean'),
+  body('carryCapacityModifier').optional().isBoolean().withMessage('carryCapacityModifier must be a boolean'),
   body('explodes').optional().isBoolean().withMessage('explodes must be a boolean'),
   body('ignites').optional().isBoolean().withMessage('ignites must be a boolean')
 ];

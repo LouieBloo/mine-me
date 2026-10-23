@@ -1,0 +1,58 @@
+import type { GameItem } from '../types';
+import { sumEffects, type EffectEntry } from './combatStats';
+
+/**
+ * Backpack weight. Every item has a `weight` (per unit); the limit comes from the Carry Capacity effect on
+ * equipped gear (like every other stat), on top of a base for a character with no gear. These pure helpers are
+ * the one rule the server, client prediction and tests share.
+ */
+
+/** Weight limit of a character with no Carry Capacity effects at all. */
+export const BASE_CARRY_CAPACITY = 100;
+
+/** Capacity from the base plus every Carry Capacity effect in the lists (never below 0). */
+export function deriveCarryCapacity(...lists: (readonly EffectEntry[] | null | undefined)[]): number {
+  const bonus = sumEffects(lists.flatMap((list) => list ?? []), 'carryCapacityModifier');
+  return Math.max(0, BASE_CARRY_CAPACITY + bonus);
+}
+
+/** Capacity from the equipped gear of a character's inventory. */
+export function carryCapacityOfInventory(inventoryItems: readonly { item: GameItem; equipped?: boolean }[]): number {
+  return deriveCarryCapacity(...inventoryItems.filter((entry) => entry.equipped).map((entry) => entry.item.itemEffects));
+}
+
+/** One stack in a backpack. */
+export interface WeighedStack {
+  itemId: string;
+  quantity: number;
+}
+
+type WeightDefinitions = ReadonlyMap<string, { weight?: number | null }> | Readonly<Record<string, { weight?: number | null }>>;
+
+const weightOf = (itemDefs: WeightDefinitions, itemId: string): number => {
+  const def = itemDefs instanceof Map ? itemDefs.get(itemId) : (itemDefs as Record<string, { weight?: number | null }>)[itemId];
+  const weight = def?.weight;
+  return typeof weight === 'number' && Number.isFinite(weight) && weight > 0 ? weight : 0;
+};
+
+/** Total weight of everything in the backpack (unknown items weigh nothing). */
+export function backpackWeight(contents: readonly WeighedStack[], itemDefs: WeightDefinitions): number {
+  let total = 0;
+  for (const stack of contents) {
+    if (stack.quantity > 0) total += weightOf(itemDefs, stack.itemId) * stack.quantity;
+  }
+  return total;
+}
+
+/** How many more units of `itemId` fit (Infinity for a weightless item, 0 when full or over). */
+export function carryRoom(contents: readonly WeighedStack[], itemId: string, capacity: number, itemDefs: WeightDefinitions): number {
+  const unit = weightOf(itemDefs, itemId);
+  if (unit <= 0) return Infinity;
+  const free = capacity - backpackWeight(contents, itemDefs);
+  return free <= 0 ? 0 : Math.floor(free / unit + 1e-9);
+}
+
+/** True if `quantity` more of `itemId` fits under `capacity`. */
+export function canCarry(contents: readonly WeighedStack[], itemId: string, quantity: number, capacity: number, itemDefs: WeightDefinitions): boolean {
+  return quantity <= 0 || carryRoom(contents, itemId, capacity, itemDefs) >= quantity;
+}

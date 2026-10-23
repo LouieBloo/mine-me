@@ -31,7 +31,7 @@ export default function ItemDetail() {
 
   const [data, setData] = useState<any>(isNew ? {
     itemKey: '', name: '', description: '', type: 'GEAR', subType: 'HEAD',
-    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', triggerMode: 'SINGLE', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, throwable: false, experience: 0,
+    vendorBuyPrice: 0, vendorSellPrice: 0, userSellPrice: 0, userBuyPrice: 0, rarity: 'LOW', triggerMode: 'SINGLE', isStartingPiece: false, canBeDamaged: false, canBeClimbed: false, throwable: false, weight: 0, experience: 0,
     combatScore: 0, defenseScore: 0, itemEffects: [], particleEffectId: null, heldParticleEffectId: null, heldLightConfig: null, physicsConfig: null, lightConfig: null,
     shootsProjectiles: false, projectileConfig: null, inGameScale: 1.0,
     holdOffsetX: 0, holdOffsetY: 0, holdRotation: 0, muzzleOffsetX: 0, muzzleOffsetY: 0,
@@ -330,6 +330,22 @@ export default function ItemDetail() {
                 className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.experience ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
               />
               {errors.experience && <p className="text-red-500 text-xs font-bold mt-1">{errors.experience}</p>}
+            </div>
+
+            {/* Weight (backpack capacity is the Carry Capacity effect) */}
+            <div className="space-y-2">
+              <label htmlFor="item-weight" className="text-xs font-black text-slate-400 uppercase tracking-widest">Weight (per unit)</label>
+              <input
+                id="item-weight"
+                type="number"
+                min={0}
+                step="any"
+                value={data.weight ?? 0}
+                onChange={(e) => { setData({ ...data, weight: Number(e.target.value) }); if (errors.weight) setErrors({ ...errors, weight: '' }); }}
+                className={`w-full p-3 bg-slate-50 border rounded-lg font-bold text-slate-800 transition-all ${errors.weight ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-slate-200'}`}
+              />
+              <p className="text-[11px] text-slate-400 font-medium">What one unit takes up in the backpack. 0 weighs nothing.</p>
+              {errors.weight && <p className="text-red-500 text-xs font-bold mt-1">{errors.weight}</p>}
             </div>
 
             {/* GEAR-only Combat and Defense scores */}

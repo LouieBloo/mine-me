@@ -164,6 +164,14 @@ describe('ItemDetail Page', () => {
     expect(slider.value).toBe('1.75');
   });
 
+  it('has a Weight field that defaults to 0 and can be changed', async () => {
+    renderDetail('new');
+    const weight = (await screen.findByLabelText(/Weight \(per unit\)/i)) as HTMLInputElement;
+    expect(weight.value).toBe('0');
+    fireEvent.change(weight, { target: { value: '2.5' } });
+    expect(weight.value).toBe('2.5');
+  });
+
   it('renders Character Hold Preview & Offsets section within ItemDetail', async () => {
     renderDetail('item_pickaxe');
     expect(await screen.findByText(/Character Hold Preview & Offsets/i)).toBeInTheDocument();

@@ -199,6 +199,8 @@ export interface GameItem {
   canBeDamaged?: boolean;
   canBeClimbed?: boolean;
   throwable?: boolean;
+  /** What one unit weighs in the backpack (>= 0; 0 weighs nothing). Capacity is the Carry Capacity effect. */
+  weight?: number;
   triggerMode?: MouseActionTriggerMode;
   shootsProjectiles?: boolean;
   projectileConfig?: ItemProjectileConfig | null;
@@ -351,6 +353,8 @@ export interface Effect {
   pickPowerModifier?: boolean;
   /** Melee knockback, in tenths of tiles/s (45 = 4.5 tiles/s). */
   knockbackModifier?: boolean;
+  /** Carry capacity: the value is added to the backpack's weight limit (see `deriveCarryCapacity`). */
+  carryCapacityModifier?: boolean;
   explodes?: boolean;
   /** Sets flammable things alight; the effect's value is the ignition strength in percent (100 = normal). */
   ignites?: boolean;

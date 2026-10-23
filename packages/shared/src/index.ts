@@ -9,6 +9,7 @@ export * from './gameLogic/rockShapes';
 export * from './gameLogic/miningTargeting';
 export * from './gameLogic/combatStats';
 export * from './gameLogic/entityStats';
+export * from './gameLogic/carryCapacity';
 export * from './gameLogic/blast';
 export * from './gameLogic/interest';
 export * from './gameLogic/mobAnimations';

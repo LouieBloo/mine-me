@@ -95,6 +95,8 @@ model Item {
   canBeDamaged    Boolean         @default(false)
   canBeClimbed    Boolean         @default(false)
   throwable       Boolean         @default(false)
+  // What one unit weighs in the backpack; capacity comes from the Carry Capacity effect
+  weight          Float           @default(0)
   triggerMode     MouseActionTriggerMode @default(SINGLE)
   particleEffectId String?
   particleEffect   ParticleEffect? @relation("ItemGroundParticle", fields: [particleEffectId], references: [id], onDelete: SetNull)
@@ -217,6 +219,8 @@ model Effect {
   toolDamageModifier  Boolean         @default(false)
   pickPowerModifier   Boolean         @default(false)
   knockbackModifier   Boolean         @default(false)
+  // Adds to the backpack weight limit (value = weight units)
+  carryCapacityModifier Boolean       @default(false)
   explodes            Boolean         @default(false)
   // Sets flammable things alight (value = ignition strength in percent, 100 = the material's own chance)
   ignites             Boolean         @default(false)
