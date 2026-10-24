@@ -163,7 +163,7 @@ describe('the conveyor belt digs a shaft (ticket 122)', () => {
   it('stops for good at a block that cannot be removed', () => {
     land();
     tickFor(seconds() + 0.3);
-    engine.grid[belt().tipRow][belt().shaftX + 1] = { type: MiningTileType.ENTRANCE, revealed: false };
+    engine.grid[belt().tipRow][belt().shaftX + 1] = { type: MiningTileType.BEDROCK, revealed: false };
     const before = belt().rows;
     tickFor(seconds() * 3);
     expect(belt().rows).toBe(before);

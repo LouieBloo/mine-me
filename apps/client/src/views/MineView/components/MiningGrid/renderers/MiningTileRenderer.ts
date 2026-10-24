@@ -23,6 +23,16 @@ export const TILE_CHUNK_CELLS = 16;
 const NEIGHBOUR_REDRAW: ReadonlyArray<readonly [number, number]> = [[0, 0], [0, -1], [1, 0], [0, 1], [-1, 0]];
 const tileChunks = new WeakMap<Container, Map<string, Container>>();
 
+/** The stand-in colours of the basic terrain blocks (ticket 140), used only while a block has no texture. */
+const BASIC_TERRAIN_LOOKS: Record<number, { base: number; fleck: number }> = {
+  [MiningTileType.STONE]: { base: 0x57534e, fleck: 0x78716c },
+  [MiningTileType.CLAY]: { base: 0x9a5b3c, fleck: 0xb87350 },
+  [MiningTileType.SANDSTONE]: { base: 0xc2a26a, fleck: 0xdcc28d },
+  [MiningTileType.GRAVEL]: { base: 0x6b6b6b, fleck: 0x9a9a9a },
+  [MiningTileType.ICE]: { base: 0x9ed8ee, fleck: 0xe0f6ff },
+  [MiningTileType.BEDROCK]: { base: 0x1c1c22, fleck: 0x34343e },
+};
+
 export class MiningTileRenderer {
   /**
    * The part of a piece's `texture` that the cell at `offset` shows: the picture is cut into a grid of
@@ -95,21 +105,6 @@ export class MiningTileRenderer {
         graphics.rect(0, 0, tileSize, tileHeight);
         graphics.fill(0x334155);
         break;
-      case MiningTileType.MINERAL:
-        graphics.rect(0, 0, tileSize, tileHeight);
-        graphics.fill(0x312e81);
-        graphics.circle(20, 20, 3);
-        graphics.circle(44, 24, 4);
-        graphics.fill(0xf59e0b);
-        break;
-      case MiningTileType.CHEST:
-        graphics.rect(4, 4, tileSize - 8, tileSize - 8);
-        graphics.fill(0xd97706);
-        break;
-      case MiningTileType.ENTRANCE:
-        graphics.rect(0, 0, tileSize, tileHeight);
-        graphics.fill(0x064e3b);
-        break;
       case MiningTileType.LADDER:
         MiningTileRenderer.drawLadder(graphics, tileSize);
         break;
@@ -129,6 +124,22 @@ export class MiningTileRenderer {
         graphics.lineTo(58, 40);
         graphics.stroke({ width: 1.5, color: 0xc2410c, alpha: 0.8 });
         break;
+      case MiningTileType.STONE:
+      case MiningTileType.CLAY:
+      case MiningTileType.SANDSTONE:
+      case MiningTileType.GRAVEL:
+      case MiningTileType.ICE:
+      case MiningTileType.BEDROCK: {
+        // Basic terrain: a flat colour with a few flecks until the block has a texture in the admin
+        const look = BASIC_TERRAIN_LOOKS[type];
+        graphics.rect(0, 0, tileSize, tileHeight);
+        graphics.fill(look.base);
+        graphics.circle(16, 20, 2);
+        graphics.circle(46, 14, 1.5);
+        graphics.circle(30, 46, 2);
+        graphics.fill(look.fleck);
+        break;
+      }
       case MiningTileType.COPPERIUM:
         // Dark shale with warm copper nuggets and cyan energy flecks
         graphics.rect(0, 0, tileSize, tileHeight);

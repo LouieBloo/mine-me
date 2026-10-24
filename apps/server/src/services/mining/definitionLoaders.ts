@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { PrismaClient } from '@prisma/client';
-import { resolveCharacterSounds, resolveExtractorSounds, resolveFluidSounds, resolveGasSounds, resolveMobSounds, type CharacterSoundEffectsConfig, type ExtractorDefinition, type FluidDefinition, type GasDefinition, type ParticleEffect, type GameItem, type Mob, type MiningBlockConfig, type SoundTrack } from '@mine-me/shared';
+import { resolveCharacterSounds, resolveExtractorSounds, resolveFluidSounds, resolveGasSounds, resolveMobSounds, type BiomeDefinition, type CharacterSoundEffectsConfig, type ExtractorDefinition, type FluidDefinition, type GasDefinition, type ParticleEffect, type GameItem, type Mob, type MiningBlockConfig, type SoundTrack } from '@mine-me/shared';
 import { CHARACTER_SOUND_CONFIG_ID } from '../characterSounds.service';
 import { MiningDataManager, type GameDefinitions } from './subsystems/MiningDataManager';
 
@@ -46,7 +46,7 @@ export function attachExtractorSounds<E extends ExtractorDefinition>(extractors:
 }
 
 type LoaderPrisma = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'fluid' | 'gas' | 'particleEffect' | 'sound' | 'characterSoundConfig'> &
-  Partial<Pick<PrismaClient, 'extractor'>>;
+  Partial<Pick<PrismaClient, 'extractor' | 'biome'>>;
 
 /** The player character's playable sounds, resolved from the stored slot references. */
 export function buildCharacterSounds(refs: unknown, library: SoundLibraryEntry[]): CharacterSoundEffectsConfig {
@@ -54,15 +54,15 @@ export function buildCharacterSounds(refs: unknown, library: SoundLibraryEntry[]
 }
 
 /**
- * Loads items, mobs, mining blocks, fluids and gases from Postgres. Includes mirror what the admin tools export
+ * Loads items, mobs, mining blocks, fluids, gases and biomes from Postgres. Includes mirror what the admin tools export
  * to the seed JSON files, so consumers see the same shape either way.
  * Throws if the database cannot be read or has no items/blocks (i.e. it has not been seeded).
- * Having no fluids or gases is fine: they are optional content.
+ * Having no fluids, gases or biomes is fine: they are optional content (the generator adds a built-in default biome).
  */
 export async function loadDefinitionsFromDatabase(
   prisma: LoaderPrisma
 ): Promise<GameDefinitions> {
-  const [items, mobs, blocks, fluids, gases, particleEffects, sounds, characterSoundConfig, extractors] = await Promise.all([
+  const [items, mobs, blocks, fluids, gases, particleEffects, sounds, characterSoundConfig, extractors, biomes] = await Promise.all([
     prisma.item.findMany({
       include: { itemEffects: { include: { effect: true } }, particleEffect: true },
     }),
@@ -78,6 +78,7 @@ export async function loadDefinitionsFromDatabase(
     prisma.sound.findMany({ select: { id: true, url: true, volume: true, isActive: true } }),
     prisma.characterSoundConfig.findUnique({ where: { id: CHARACTER_SOUND_CONFIG_ID } }),
     prisma.extractor?.findMany({ orderBy: { createdAt: 'asc' } }) ?? [],
+    prisma.biome?.findMany({ orderBy: { createdAt: 'asc' } }) ?? [],
   ]);
 
   if (items.length === 0 || blocks.length === 0) {
@@ -89,7 +90,7 @@ export async function loadDefinitionsFromDatabase(
 
   // Prisma rows carry plain strings and JSON columns where the shared definitions use unions and
   // typed configs; the admin app writes them in the shared shape, so this is the one boundary cast.
-  const definitions = { items, mobs, blocks, fluids, gases, particleEffects, extractors } as unknown as GameDefinitions;
+  const definitions = { items, mobs, blocks, fluids, gases, particleEffects, extractors, biomes } as unknown as GameDefinitions;
   definitions.mobs = attachMobSounds(definitions.mobs, sounds);
   definitions.fluids = attachFluidSounds(definitions.fluids ?? [], sounds);
   definitions.gases = attachGasSounds(definitions.gases ?? [], sounds);
@@ -117,6 +118,7 @@ export function loadDefinitionsFromFiles(dataDir: string): GameDefinitions {
     blocks: read<MiningBlockConfig>('blocks.json'),
     fluids: fs.existsSync(path.join(dataDir, 'fluids.json')) ? read<FluidDefinition>('fluids.json') : [],
     gases: fs.existsSync(path.join(dataDir, 'gases.json')) ? read<GasDefinition>('gases.json') : [],
+    biomes: fs.existsSync(path.join(dataDir, 'biomes.json')) ? read<BiomeDefinition>('biomes.json') : [],
     extractors: fs.existsSync(path.join(dataDir, 'extractors.json')) ? read<ExtractorDefinition>('extractors.json') : [],
     particleEffects: fs.existsSync(path.join(dataDir, 'particle_effects.json')) ? read<ParticleEffect>('particle_effects.json') : [],
   };
@@ -129,6 +131,6 @@ export async function installDefinitionsFromDatabase(
   const definitions = await loadDefinitionsFromDatabase(prisma);
   MiningDataManager.initialize(definitions);
   console.log(
-    `[Definitions] Loaded ${definitions.items.length} items, ${definitions.mobs.length} mobs, ${definitions.blocks.length} blocks, ${definitions.fluids?.length ?? 0} fluids, ${definitions.gases?.length ?? 0} gases, ${definitions.extractors?.length ?? 0} extractors from the database`
+    `[Definitions] Loaded ${definitions.items.length} items, ${definitions.mobs.length} mobs, ${definitions.blocks.length} blocks, ${definitions.fluids?.length ?? 0} fluids, ${definitions.gases?.length ?? 0} gases, ${definitions.extractors?.length ?? 0} extractors, ${definitions.biomes?.length ?? 0} biomes from the database`
   );
 }

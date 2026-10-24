@@ -98,10 +98,10 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [092](done/092-big-rocks.md) | Rocks of several sizes (variable-size pieces) | P2 (Done) |
 | [093](done/093-mob-navigation-and-feet.md) | Mob navigation fixes and mob feet on the ground (3x blocks) | P1 (Done; judge the new mole size) |
 | [094](done/094-autotiling-from-one-texture.md) | Autotiling: edges and rounded corners from one texture | P2 (Done) |
-| [095](095-biome-data-model.md) | Biome data model and loader | P1 (Open) |
-| [096](096-biome-generation.md) | Biome map generation and blended borders | P1 (Open) |
-| [097](097-biome-network-and-ambient-look.md) | Biome wire format and ambient look | P2 (Open) |
-| [098](098-admin-biomes-page.md) | Admin: Biomes page | P1 (Open) |
+| [095](095-biome-data-model.md) | Biome data model and loader | P1 (Built; judge in the game) |
+| [096](096-biome-generation.md) | Biome map generation and blended borders | P1 (Built; judge in the game) |
+| [097](097-biome-network-and-ambient-look.md) | Biome wire format and ambient look | P2 (Built; judge in the game) |
+| [098](098-admin-biomes-page.md) | Admin: Biomes page | P1 (Built; judge in the game) |
 | [099](099-doodad-data-model.md) | Doodad data model, loader and admin page | P1 (Open) |
 | [100](100-doodad-generation.md) | Doodad generation | P1 (Open) |
 | [101](101-doodad-network.md) | Doodad wire format and fog reveal | P1 (Open) |
@@ -143,6 +143,9 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [137](137-surface-art-gemini.md) | Surface background art (owner task, Gemini) | P2 (Open) |
 | [138](138-surface-sandbox-and-profiling.md) | Surface in sandbox mode, test scenes and profiling | P3 (Open) |
 | [139](done/139-surface-sky-rows-in-real-mine.md) | Sky rows above the ground in the real mine | P1 (Done; exit sign waits for doodads; found in audit, blocks 120, 130, 135) |
+| [140](140-basic-terrain-blocks.md) | Basic terrain blocks: stone, clay, sandstone, gravel, ice, bedrock | P2 (Built; script applied to the dev DB 2026-10-23, waiting for you to try it) |
+| [141](141-retire-blocks.md) | Retire the Bridge, Chest, Mineral and Entrance blocks | P2 (Built in code; DB rows deleted from the dev DB) |
+| [142](142-first-biomes-and-sandbox-bands.md) | First biomes and the sandbox biome walk | P2 (Built; biomes created in the dev DB, waiting for you to try it) |
 
 ## Suggested build order (open tickets 095-139)
 
@@ -165,4 +168,3 @@ IDs stay as they are (tickets reference each other by number); this is the order
 | Later | 115 | Pump-out objective (needs pumps) |
 
 Biomes and doodads (steps 7-8) touch neither the exit nor the loot rules, so they can be pulled forward whenever a visible win is wanted.
-

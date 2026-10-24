@@ -9,7 +9,7 @@ import { buildSunlightPixels, calculateSunlightMap, getSunlightSignature } from 
  * It manages:
  * - Depth-graded ambient underground darkness
  * - Real-time sunlight propagation down excavated shafts
- * - Dynamic player flashlight, flickering torches, and mineral/chest glows
+ * - Dynamic player flashlight, flickering torches, and block glows
  * - Offscreen rendering to a downscaled RenderTexture lightmap overlay with 'multiply' blend mode
  */
 export class LightingEngine {
@@ -55,6 +55,8 @@ export class LightingEngine {
 
   /** Row of the ground surface: sunlight, ambient depth and the sky are measured from here (0 in a normal mine). */
   private readonly surfaceRow: number;
+
+  /** How far the underground ambient light is lifted towards daylight, 0 (the usual darkness) to 1 (fully lit). Set by the biome. */
 
   constructor(
     app: Application,
@@ -234,7 +236,7 @@ export class LightingEngine {
       this.lights.forEach((light) => {
         if (light.enabled && light.id !== 'player_flashlight') {
           light.update(dt);
-          // Static lights (chest glows, plain torches) don't change, so they don't force a re-render
+          // Static lights (plain torches) don't change, so they don't force a re-render
           if (light.isAnimated) anyAnimatedLight = true;
         }
       });
@@ -335,7 +337,7 @@ export class LightingEngine {
     const deepHeight = worldHeight - deepY + this.sideMargin;
     if (deepHeight > 0) {
       g.rect(-this.sideMargin, deepY, worldWidth + this.sideMargin * 2, deepHeight);
-      g.fill({ color: 0x060814, alpha: 1.0 });
+      g.fill({ color: depthColors[depthColors.length - 1].color, alpha: 1.0 });
     }
   }
 

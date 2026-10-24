@@ -1,6 +1,6 @@
 # 095 - Biome data model and loader
 
-**Priority:** P1 - **Status:** Open (start here; no building yet) - **Depends on:** none (first of the biome epic 095-098; the doodad epic 099+ needs it)
+**Priority:** P1 - **Status:** Built, waiting for you to try it - **Depends on:** none (first of the biome epic 095-098; the doodad epic 099+ needs it)
 
 ## Problem
 The mine has no notion of regions. Every cell is generated from one global recipe, so the whole map looks and plays the same. We want biomes: named regions that change the block palette, fluids and gases, mob spawns and the ambient look, and that doodads (099+) can be assigned to.
@@ -26,3 +26,17 @@ The mine has no notion of regions. Every cell is generated from one global recip
 
 ## Tests
 Loader maps rows to definitions; default fallback; biome-at-cell is deterministic for a seed; depth limits respected. Mutation check: ignore depth limits -> a test fails.
+
+## Built (2026-10-23)
+Built without the usual Q&A (the owner asked to run the whole biome epic through); the choices below were mine, please review them.
+- **Table:** `Biome` (key, name, description, isDefault, minDepth, maxDepth, weight, noiseScale, blockPalette, fluidWeights, gasWeights, mobSpawns, ambient). `rarity` was dropped: `weight` already makes a biome bigger and more common. Keys are lower case (`frozen_caves`). Depths and `noiseScale` are in small blocks (original x `BLOCK_SCALE`).
+- **Shared:** `packages/shared/src/types/biome.ts` (`BiomeDefinition`, `validateBiome`, the built-in default) and the pure `BiomeField` (`gameLogic/biome/biomeField.ts`): seeded value noise per biome (stable by key, never by database order) x weight x depth window; the strongest score is the primary biome, ties go to the lower key. `normalizeBiomes` guarantees exactly one default and adds the built-in one when the table has none.
+- **Loader:** `definitionLoaders` reads the table (it is optional, like fluids), `MiningDataManager.getBiomes()/getBiome(keyOrId)`, `biomes.json` is the dev seed mirror (not created until the admin saves).
+- **Palette:** `weights` multiply how much of a block is placed (1 = usual, 0 = none); `swaps` turn one block into another (optionally a share), applied last.
+- **Not done:** no entrance guarantee (as decided), no per-biome music.
+- Tests: `biomeField.test.ts`, `biome.test.ts`, loader tests. Mutation checked: ignoring depth limits fails two tests.
+
+## Owner review (2026-10-23)
+- `rarity` stays dropped. Instead each map chooses its biomes and their weights (see 096); a biome's own `weight` is only the default.
+- Border softness stays in noise-score units. A biome's mob list replaces the map's list at that spot.
+- Biomes have no light of their own (lights belong to doodads, items and mobs): `ambient.light` was removed (see 097).

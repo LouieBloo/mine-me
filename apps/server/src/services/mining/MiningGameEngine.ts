@@ -4,6 +4,8 @@ import {
   isInInterest,
   roundWire,
   MiningTileType,
+  type BiomeClientDefinition,
+  type BiomeField,
   type MiningBackpackItem,
   type MiningDroppedItem,
   type MiningFallingRock,
@@ -118,6 +120,10 @@ export class MiningGameEngine {
   // sandbox is reset), so a subsystem always reaches the current ones through its world.
   /** Row of the ground surface (0 except in the sandbox, which has open sky above it). */
   public surfaceRow = 0;
+  /** Which biome each cell is in (null in the sandbox: the whole map is the default biome). */
+  public biomeField: BiomeField | null = null;
+  /** The primary biome of every cell (one byte each), or null when the mine is one biome and nothing needs telling. */
+  public biomeGrid: Uint8Array | null = null;
   public grid!: ServerMiningGrid;
   public rigidWorld!: MiningRigidWorld;
   public mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>;
@@ -231,9 +237,12 @@ export class MiningGameEngine {
       mapConfig,
       fluids: MiningDataManager.getInstance().getFluids(),
       gases: MiningDataManager.getInstance().getGases(),
+      biomes: MiningDataManager.getInstance().getBiomes(),
     });
     this.grid = built.grid;
     this.surfaceRow = built.surfaceRow ?? 0;
+    this.biomeField = built.biomeField ?? null;
+    this.biomeGrid = this.biomeField?.hasBiomes ? this.biomeField.primaryGrid() : null;
     const gridSize = getGridDimensions(this.grid);
 
     this.rigidWorld = new MiningRigidWorld({
@@ -808,6 +817,9 @@ export class MiningGameEngine {
       get surfaceRow() {
         return engine.surfaceRow;
       },
+      get biomeField() {
+        return engine.biomeField;
+      },
       get spawnPoint() {
         return { x: MINING_CONFIG.ENTRANCE_X, y: engine.surfaceRow + MINING_CONFIG.ENTRANCE_Y };
       },
@@ -888,6 +900,13 @@ export class MiningGameEngine {
     this.mobSubsystem.killMob(mob);
   }
 
+  /** The biomes in this mine as the client needs them (look and light), sent once. Undefined when the mine is one biome. */
+  public clientBiomes(): BiomeClientDefinition[] | undefined {
+    const field = this.biomeField;
+    if (!field?.hasBiomes) return undefined;
+    return field.biomes.map((b, index) => ({ index, key: b.key, name: b.name, ambient: { ...(b.ambient ?? {}) } }));
+  }
+
   public getActiveMobs(): MiningActiveMob[] {
     return this.mobSubsystem.getActiveMobs();
   }
@@ -913,6 +932,7 @@ export class MiningGameEngine {
             y: ny,
             type: this.grid[ny][nx].type,
             damageStage: getDamageStage(this.grid[ny][nx]),
+            ...(this.biomeGrid ? { biome: this.biomeGrid[ny * this.grid[0].length + nx] } : {}),
             ...(this.grid[ny][nx].piece ? { piece: this.grid[ny][nx].piece } : {}),
             ...(fluid ? { fluid } : {}),
             ...(gas ? { gas } : {}),

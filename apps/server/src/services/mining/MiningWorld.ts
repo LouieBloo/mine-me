@@ -1,4 +1,4 @@
-import type { MiningMapConfigData, MiningPosition, MiningRigidWorld, MiningTileType, PieceOffset } from '@mine-me/shared';
+import type { BiomeField, MiningMapConfigData, MiningPosition, MiningRigidWorld, MiningTileType, PieceOffset } from '@mine-me/shared';
 import type { ServerMiningGrid } from '../miningMap.service';
 import type { MiningDamageSystem } from './MiningDamageSystem';
 import type { MiningBlockSubsystem } from './subsystems/MiningBlockSubsystem';
@@ -45,6 +45,8 @@ export interface MiningWorld {
   readonly players: ReadonlyMap<string, MiningPlayerSession>;
   /** First ground row: rows above it are open sky. Depths (mob spawning, the entrance zone) are counted from here. */
   readonly surfaceRow: number;
+  /** Which biome each cell is in (absent: the whole mine is the default biome). Rows are rows of the whole map, sky included. */
+  readonly biomeField?: BiomeField | null;
   /** Where players start and respawn: the entrance, on the ground surface. */
   readonly spawnPoint: { x: number; y: number };
   /** Simulation time in seconds (advances one fixed step per tick). */

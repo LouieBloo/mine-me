@@ -1,0 +1,9 @@
+/* Scoped styles for BiomeDebugOverlay */
+.biome-debug-overlay {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 60;
+  min-width: 180px;
+  pointer-events: none;
+}

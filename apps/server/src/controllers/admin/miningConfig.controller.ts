@@ -51,9 +51,7 @@ export const generateMapPreview = async (req: Request, res: Response) => {
 
     let emptyCount = 0;
     let solidCount = 0;
-    let mineralCount = 0;
     let rockCount = 0;
-    let chestCount = 0;
     let copperiumCount = 0;
     let silveriumCount = 0;
 
@@ -62,9 +60,6 @@ export const generateMapPreview = async (req: Request, res: Response) => {
         const type = grid[y][x].type;
         if (type === MiningTileType.EMPTY) {
           emptyCount++;
-        } else if (type === MiningTileType.MINERAL) {
-          mineralCount++;
-          solidCount++;
         } else if (type === MiningTileType.COPPERIUM) {
           copperiumCount++;
           solidCount++;
@@ -73,9 +68,6 @@ export const generateMapPreview = async (req: Request, res: Response) => {
           solidCount++;
         } else if (type === MiningTileType.ROCK) {
           rockCount++;
-          solidCount++;
-        } else if (type === MiningTileType.CHEST) {
-          chestCount++;
           solidCount++;
         } else if (isTileSolid(type)) {
           solidCount++;
@@ -94,11 +86,9 @@ export const generateMapPreview = async (req: Request, res: Response) => {
         totalTiles,
         emptyCount,
         solidCount,
-        mineralCount,
         copperiumCount,
         silveriumCount,
         rockCount,
-        chestCount,
         voidPercentage,
         solidPercentage,
       },

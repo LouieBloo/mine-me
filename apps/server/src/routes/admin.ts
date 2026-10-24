@@ -17,6 +17,7 @@ import * as FluidController from '../controllers/admin/fluid.controller';
 import * as FluidSoundController from '../controllers/admin/fluidSound.controller';
 import * as GasController from '../controllers/admin/gas.controller';
 import * as GasSoundController from '../controllers/admin/gasSound.controller';
+import * as BiomeController from '../controllers/admin/biome.controller';
 import * as ExtractorController from '../controllers/admin/extractor.controller';
 import * as ExtractorSoundController from '../controllers/admin/extractorSound.controller';
 import * as MiningConfigController from '../controllers/admin/miningConfig.controller';
@@ -113,6 +114,16 @@ adminRouter.post('/gases', GasController.createGas);
 adminRouter.put('/gases/:id', GasController.updateGas);
 adminRouter.delete('/gases/:id', GasController.deleteGas);
 adminRouter.patch('/gases/:id/sound-effects/:slot', GasSoundController.requireGasSoundSlot, GasSoundController.setGasSoundSlot);
+
+// BIOMES (tickets 095-098)
+adminRouter.get('/biomes', BiomeController.getBiomes);
+adminRouter.post('/biomes/preview', BiomeController.previewBiomes);
+adminRouter.get('/biomes/:id', BiomeController.getBiome);
+adminRouter.post('/biomes', BiomeController.createBiome);
+adminRouter.put('/biomes/:id', BiomeController.updateBiome);
+adminRouter.patch('/biomes/:id', BiomeController.updateBiome);
+adminRouter.post('/biomes/:id/wall-texture', BiomeController.biomeWallUpload, BiomeController.uploadBiomeWallTexture);
+adminRouter.delete('/biomes/:id', BiomeController.deleteBiome);
 
 // EXTRACTORS
 adminRouter.get('/extractors', ExtractorController.getExtractors);

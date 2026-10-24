@@ -24,7 +24,7 @@ export class MiningPlayerBody extends MiningPhysicsBody {
   }
 
   /**
-   * Check if player's collider overlaps any LADDER (or ENTRANCE) tile within ladder grab width.
+   * Check if player's collider overlaps any LADDER tile within ladder grab width.
    */
   public checkIsOnLadder(grid: MiningCollisionGrid): boolean {
     const { width, height } = getGridDimensions(grid);

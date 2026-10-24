@@ -41,8 +41,8 @@ describe('mob block digging uses the shared completion path', () => {
   });
 
   it('never drops items when a mob digs, even from blocks with drop tables', () => {
-    giveBlockDrops(engine, MiningTileType.CHEST); // this block WOULD drop for anyone but a mob
-    engine.grid[15][10] = { type: MiningTileType.CHEST, revealed: true };
+    giveBlockDrops(engine, MiningTileType.STONE); // this block WOULD drop for anyone but a mob
+    engine.grid[15][10] = { type: MiningTileType.STONE, revealed: true };
     const mob = spawnDigger(9.5, 15.5);
     mob.stats.toolDamage = 100000; // a chest is tougher than dirt
 
@@ -53,8 +53,8 @@ describe('mob block digging uses the shared completion path', () => {
   });
 
   it('player mining still drops items (drops are only suppressed for mobs)', () => {
-    giveBlockDrops(engine, MiningTileType.CHEST);
-    engine.grid[15][10] = { type: MiningTileType.CHEST, revealed: true };
+    giveBlockDrops(engine, MiningTileType.STONE);
+    engine.grid[15][10] = { type: MiningTileType.STONE, revealed: true };
     engine.blockSubsystem.completeMiningBlock({ x: 10, y: 15 });
     expect(engine.droppedItems.length).toBeGreaterThan(0);
   });
@@ -107,7 +107,7 @@ describe('mob block digging uses the shared completion path', () => {
     const queued = () => (engine.blockSubsystem as any).pendingBlockHits as any[];
 
     it('queues one hit of feedback per swing, sized by the mob\'s Tool Damage', () => {
-      engine.grid[15][10] = { type: MiningTileType.MINERAL, revealed: true };
+      engine.grid[15][10] = { type: MiningTileType.CLAY, revealed: true };
       const mob = engine.spawnMob({ id: 'weak', mobEffects: mobEffects({ toolDamage: 7 }) }, { x: 9.5, y: 15.5 });
       mobSwing(engine, mob, { x: 10, y: 15 });
       expect(queued()).toHaveLength(1);
@@ -117,7 +117,7 @@ describe('mob block digging uses the shared completion path', () => {
     });
 
     it('queues nothing without a swing', () => {
-      engine.grid[15][10] = { type: MiningTileType.MINERAL, revealed: true };
+      engine.grid[15][10] = { type: MiningTileType.CLAY, revealed: true };
       const mob = spawnDigger(9.5, 15.5);
       engine.handleMobMining(mob, { x: 10, y: 15 });
       expect(queued()).toHaveLength(0);

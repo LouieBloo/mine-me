@@ -48,7 +48,7 @@ describe('pourFluid', () => {
   it.each([
     ['a solid tile', [10 * S, SKY + 5 * S, 'OIL'], /cannot hold/],
     ['an unknown fluid', [35 * S, SKY, 'LAVA9'], /Unknown fluid/],
-    ['a tile off the map', [90 * S, SKY, 'OIL'], /inside the map/],
+    ['a tile off the map', [105 * S, SKY, 'OIL'], /inside the map/],
     ['a fractional tile', [35.5, SKY, 'OIL'], /inside the map/],
     ['a non-number', ['a', SKY, 'OIL'], /inside the map/],
     ['a missing fluid', [35 * S, SKY, undefined], /Unknown fluid/],
@@ -66,7 +66,7 @@ describe('pouring in the sky', () => {
     expect(fluidAt(20 * S, 0)).toBe(0); // it has left the top
     // ...and rests on the ground (the row just above the surface), spreading along it
     let onGround = 0;
-    for (let x = 0; x < 90 * S; x++) onGround += fluidAt(x, SKY - 1);
+    for (let x = 0; x < 105 * S; x++) onGround += fluidAt(x, SKY - 1);
     expect(onGround).toBeGreaterThan(0.5);
   });
 
@@ -180,7 +180,7 @@ describe('simulation control', () => {
 describe('clearHazards', () => {
   it('removes all fluid, including the pools, and puts the fire out', () => {
     expect(engine.fluidSubsystem.grid.totalVolume()).toBeGreaterThan(0);
-    tools().ignite(38 * S, SKY + 5 * S);
+    tools().ignite(53 * S, SKY + 5 * S);
     expect(engine.fireSubsystem.grid.burningCount).toBeGreaterThan(0);
     tools().clearHazards();
     expect(engine.fluidSubsystem.grid.totalVolume()).toBe(0);
@@ -190,9 +190,9 @@ describe('clearHazards', () => {
 
 describe('ignite', () => {
   it('sets fire to fluid that burns, and not twice', () => {
-    expect(tools().ignite(38 * S, SKY + 5 * S)).toEqual({ ok: true });
-    expect(engine.fireSubsystem.grid.isBurning(38 * S, SKY + 5 * S)).toBe(true);
-    expect(tools().ignite(38 * S, SKY + 5 * S).ok).toBe(false);
+    expect(tools().ignite(53 * S, SKY + 5 * S)).toEqual({ ok: true });
+    expect(engine.fireSubsystem.grid.isBurning(53 * S, SKY + 5 * S)).toBe(true);
+    expect(tools().ignite(53 * S, SKY + 5 * S).ok).toBe(false);
   });
 
   it('refuses a cell with nothing to burn', () => {
@@ -233,7 +233,7 @@ describe('reset', () => {
   });
 
   it('puts a block that was mined back', () => {
-    const wall = { x: 31 * S, y: SKY + 4 * S }; // a rock in the pool wall
+    const wall = { x: 46 * S, y: SKY + 4 * S }; // a rock in the pool wall
     expect(engine.grid[wall.y][wall.x].type).toBe(MiningTileType.ROCK);
     engine.grid[wall.y][wall.x] = { type: MiningTileType.EMPTY, revealed: true };
     tools().reset();
@@ -261,11 +261,11 @@ describe('releaseGas', () => {
   it.each([
     ['a solid tile', [10 * S, SKY + 5 * S, 'HYDROGEN'], /cannot hold/],
     ['an unknown gas', [35 * S, SKY, 'NOPE9'], /Unknown gas/],
-    ['a tile off the map', [90 * S, SKY, 'HYDROGEN'], /inside the map/],
+    ['a tile off the map', [105 * S, SKY, 'HYDROGEN'], /inside the map/],
     ['a fractional tile', [35.5, SKY, 'HYDROGEN'], /inside the map/],
     ['a non-number', ['a', SKY, 'HYDROGEN'], /inside the map/],
     ['a missing gas', [35 * S, SKY, undefined], /Unknown gas/],
-    ['a cell holding another gas', [64 * S, SKY + 4 * S, 'NITROGEN'], /cannot hold/],
+    ['a cell holding another gas', [79 * S, SKY + 4 * S, 'NITROGEN'], /cannot hold/],
   ])('refuses %s', (_name, [x, y, key], message) => {
     const res = tools().releaseGas(x, y, key);
     expect(res.ok).toBe(false);
@@ -282,7 +282,7 @@ describe('releaseGas', () => {
     tick(60);
     // Hydrogen is going up (and out): there is some above where it was let go
     let hydrogenHigh = 0;
-    for (let y = 0; y < SKY - 2 * S; y++) for (let x = 0; x < 90 * S; x++) hydrogenHigh += gasAt(x, y) * (x >= 3 * S && x <= 7 * S ? 1 : 0);
+    for (let y = 0; y < SKY - 2 * S; y++) for (let x = 0; x < 105 * S; x++) hydrogenHigh += gasAt(x, y) * (x >= 3 * S && x <= 7 * S ? 1 : 0);
     expect(hydrogenHigh + engine.gasSubsystem.grid.ventedVolume).toBeGreaterThan(0.2);
     tick(900);
     expect(engine.gasSubsystem.grid.totalVolume(engine.gasSubsystem.registry.idOf('HYDROGEN')!) - startingHydrogen()).toBeLessThan(0.5);
@@ -308,12 +308,12 @@ describe('the sandbox start', () => {
     const hydrogen = engine.gasSubsystem.registry.idOf('HYDROGEN')!;
     // The roof is two original blocks thick; open a hole one original block wide through all of it
     for (let y = SKY; y < SKY + 2 * S; y++) {
-      for (let x = 63 * S; x < 64 * S; x++) {
+      for (let x = 78 * S; x < 79 * S; x++) {
         engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
         (engine as any).buildWorld().pushTileUpdate({ x, y, type: MiningTileType.EMPTY });
       }
     }
-    expect(grid.isOpenToSky(63 * S, SKY + 5 * S)).toBe(true);
+    expect(grid.isOpenToSky(78 * S, SKY + 5 * S)).toBe(true);
     tick(1500);
     expect(grid.ventedVolume).toBeGreaterThan(10);
     expect(grid.totalVolume(hydrogen)).toBeLessThan(48 * S * S);
@@ -324,7 +324,7 @@ describe('the sandbox start', () => {
 
 describe('igniting gas', () => {
   it('sets off hydrogen as an explosion, with no dice, and the front crosses the chamber', () => {
-    expect(tools().ignite(63 * S, SKY + 4 * S)).toEqual({ ok: true });
+    expect(tools().ignite(78 * S, SKY + 4 * S)).toEqual({ ok: true });
     expect(engine.gasExplosionSubsystem.pendingCount).toBe(1);
     expect(engine.fireSubsystem.grid.burningCount).toBe(0);
     tick(60);
@@ -334,10 +334,10 @@ describe('igniting gas', () => {
   });
 
   it('cannot light nitrogen or clear air, and still lights oil as before', () => {
-    expect(tools().ignite(73 * S, SKY + 4 * S)).toEqual({ ok: false, error: 'Nothing there can burn.' });
+    expect(tools().ignite(88 * S, SKY + 4 * S)).toEqual({ ok: false, error: 'Nothing there can burn.' });
     expect(tools().ignite(5 * S, SKY - 3 * S)).toEqual({ ok: false, error: 'Nothing there can burn.' });
-    tools().pourFluid(35 * S, SKY + 3 * S, 'OIL');
-    expect(tools().ignite(35 * S, SKY + 3 * S)).toEqual({ ok: true });
+    tools().pourFluid(50 * S, SKY + 3 * S, 'OIL');
+    expect(tools().ignite(50 * S, SKY + 3 * S)).toEqual({ ok: true });
   });
 });
 

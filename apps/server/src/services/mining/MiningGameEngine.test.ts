@@ -703,8 +703,8 @@ describe('MiningGameEngine', () => {
     engine.grid[5][11] = { type: MiningTileType.EMPTY, revealed: false };
     expect(engine.placeTorch('char-1', { x: 11, y: 5 })).toBe(false);
 
-    // Entrance tile
-    engine.grid[5][10] = { type: MiningTileType.ENTRANCE, revealed: true };
+    // Bedrock
+    engine.grid[5][10] = { type: MiningTileType.BEDROCK, revealed: true };
     expect(engine.placeTorch('char-1', { x: 10, y: 5 })).toBe(false);
   });
 
@@ -768,8 +768,8 @@ describe('MiningGameEngine', () => {
     expect(emittedPayloads[1].droppedItems).toBeUndefined();
 
     // Now drop an item (simulate mining a mineral block that drops a gem)
-    giveBlockDrops(engine, MiningTileType.MINERAL, [{ itemId: 'gem' }]);
-    engine.grid[5][10] = { type: MiningTileType.MINERAL, revealed: true };
+    giveBlockDrops(engine, MiningTileType.CLAY, [{ itemId: 'gem' }]);
+    engine.grid[5][10] = { type: MiningTileType.CLAY, revealed: true };
     engine.blockSubsystem.completeMiningBlock({ x: 10, y: 5 });
 
     (engine as any).tick(0.033);
@@ -871,7 +871,7 @@ describe('MiningGameEngine', () => {
       expect(engine.grid[10]?.[18]?.type).toBe(MiningTileType.DIRT);
     });
 
-    it('preserves ENTRANCE tile and stops active player mining in blast zone', () => {
+    it('preserves BEDROCK tile and stops active player mining in blast zone', () => {
       const engine = new MiningGameEngine({
         characterId: 'char-1',
         cityId: 'city-1',
@@ -880,7 +880,7 @@ describe('MiningGameEngine', () => {
       });
 
       // Place entrance at (5, 0) and player mining at (5, 1)
-      engine.grid[0][5] = { type: MiningTileType.ENTRANCE, revealed: true };
+      engine.grid[0][5] = { type: MiningTileType.BEDROCK, revealed: true };
       engine.grid[1][5] = { type: MiningTileType.DIRT, revealed: true };
       engine.getPlayer('char-1')!.isMining = true;
       engine.getPlayer('char-1')!.miningTarget = { x: 5, y: 1 };
@@ -894,7 +894,7 @@ describe('MiningGameEngine', () => {
       (engine as any).tick(4.1);
 
       // Entrance must be preserved
-      expect(engine.grid[0][5].type).toBe(MiningTileType.ENTRANCE);
+      expect(engine.grid[0][5].type).toBe(MiningTileType.BEDROCK);
       // Dirt at (5, 1) excavated
       expect(engine.grid[1][5].type).toBe(MiningTileType.EMPTY);
       // Mining interrupted
@@ -1024,14 +1024,14 @@ describe('MiningGameEngine', () => {
 
       vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue(testBlockConfig({
         id: 'block_mineral',
-        typeKey: 'MINERAL',
+        typeKey: 'CLAY',
         dropTable: testDropTable([
             { itemId: 'copper_ore', chance: 100, minQuantity: 1, maxQuantity: 1 },
           ]),
       }));
 
       // Place a block in the blast zone
-      engine.grid[10][11] = { type: MiningTileType.MINERAL, revealed: true };
+      engine.grid[10][11] = { type: MiningTileType.CLAY, revealed: true };
 
       // Throw dynamite right at it
       engine.throwDynamite('char-1', { target: { x: 10, y: 10 }, forceRatio: 1.0, explosionRadius: 3 });
@@ -1057,13 +1057,13 @@ describe('MiningGameEngine', () => {
 
       vi.spyOn(engine.dataManager, 'getBlockConfig').mockReturnValue(testBlockConfig({
         id: 'block_chest',
-        typeKey: 'CHEST',
+        typeKey: 'STONE',
         dropTable: testDropTable([
             { itemId: 'gold_coin', chance: 100, minQuantity: 10, maxQuantity: 10 },
           ]),
       }));
 
-      engine.grid[2][5] = { type: MiningTileType.CHEST, revealed: true };
+      engine.grid[2][5] = { type: MiningTileType.STONE, revealed: true };
       // Open air under the block, so the item (one tile across) has room to fall
       engine.grid[3][5] = { type: MiningTileType.EMPTY, revealed: true };
       engine.rigidWorld.removeTileCollider(5, 3);

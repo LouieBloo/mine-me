@@ -1,4 +1,5 @@
-import { MiningTileType, type FluidDefinition, type GasDefinition } from '@mine-me/shared';
+import { BandBiomeField, BLOCK_SCALE, MiningTileType, type BiomeDefinition, type FluidDefinition, type GasDefinition } from '@mine-me/shared';
+import { blockKeyForTileType, tileTypeForBlockKey } from '../subsystems/MiningDataManager';
 import type { GeneratedFluidCell, GeneratedGasCell, ServerMiningGrid } from '../../miningMap.service';
 import type { SandboxLayout, SandboxMobSpawn, TileRect } from './SandboxLayout';
 
@@ -11,6 +12,19 @@ export interface SandboxMap {
   mobs: readonly SandboxMobSpawn[];
   /** Row of the ground surface: where the sky ends. */
   surfaceRow: number;
+  /** Which biome each cell is in: the biomes side by side in bands. Absent when there are no biomes besides the default. */
+  biomeField?: BandBiomeField;
+}
+
+/** How wide the border between two biome bands is, in cells (4 original blocks). */
+export const SANDBOX_BIOME_BLEND_CELLS = 4 * BLOCK_SCALE;
+
+/** A fixed pseudo-random number in [0, 1) for a cell, so the sandbox looks the same every time it is built. */
+function cellRoll(x: number, y: number): number {
+  let h = (Math.imul(x, 0x27d4eb2d) ^ Math.imul(y, 0x165667b1) ^ 0x5a9b10c5) | 0;
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 /**
@@ -18,13 +32,32 @@ export interface SandboxMap {
  * fire reach every client through the normal wire format. Throws if a zone lies outside the map,
  * so a typo in a layout fails loudly instead of leaving a silent hole.
  */
-export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDefinition[], gases: readonly GasDefinition[] = []): SandboxMap {
+export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDefinition[], gases: readonly GasDefinition[] = [], biomes: readonly BiomeDefinition[] = []): SandboxMap {
   const { width, skyRows } = layout;
   const height = layout.height + skyRows;
   // Open sky first, then the ground and everything below it
   const grid: ServerMiningGrid = Array.from({ length: height }, (_, y) =>
     Array.from({ length: width }, () => ({ type: y < skyRows ? MiningTileType.EMPTY : layout.base, revealed: true })),
   );
+  // Biomes (ticket 142) stand side by side along the map. The ground is swapped the way the generator swaps it, before the zones
+  // below are painted on top, so the hand-built parts (hall, pools, block patches) stay as drawn and only the earth around them changes.
+  const biomeField = biomes.length > 0 ? new BandBiomeField(biomes, width, height, skyRows, SANDBOX_BIOME_BLEND_CELLS) : undefined;
+  const baseKey = blockKeyForTileType(layout.base);
+  if (biomeField?.hasBiomes && baseKey) {
+    for (let y = skyRows; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let reached = 0;
+        const roll = cellRoll(x, y);
+        for (const { to, chance } of biomeField.swapChances(x, y, baseKey)) {
+          reached += chance;
+          if (roll >= reached) continue;
+          const type = tileTypeForBlockKey(to);
+          if (type !== undefined) grid[y][x] = { type, revealed: true };
+          break;
+        }
+      }
+    }
+  }
   const fluidCells: GeneratedFluidCell[] = [];
   const gasCells: GeneratedGasCell[] = [];
   const byKey = <T extends { typeKey: string }>(list: readonly T[]) => [...list].sort((a, b) => (a.typeKey < b.typeKey ? -1 : a.typeKey > b.typeKey ? 1 : 0));
@@ -83,5 +116,5 @@ export function buildSandboxMap(layout: SandboxLayout, fluids: readonly FluidDef
 
   for (const mob of layout.mobs) check(Math.floor(mob.x), Math.floor(mob.y), 'mob');
   const mobs = layout.mobs.map((mob) => ({ ...mob, y: mob.y + skyRows }));
-  return { grid, fluidCells, gasCells, mobs, surfaceRow: skyRows };
+  return { grid, fluidCells, gasCells, mobs, surfaceRow: skyRows, biomeField: biomeField?.hasBiomes ? biomeField : undefined };
 }

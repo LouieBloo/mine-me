@@ -41,11 +41,24 @@ describe('MiningTileRenderer', () => {
     MiningTileRenderer.drawFallbackTile(graphics, MiningTileType.LADDER, 64);
     expect(rectSpy).toHaveBeenCalled();
 
-    MiningTileRenderer.drawFallbackTile(graphics, MiningTileType.MINERAL, 64);
+    MiningTileRenderer.drawFallbackTile(graphics, MiningTileType.STONE, 64);
     expect(rectSpy).toHaveBeenCalled();
 
     MiningTileRenderer.drawFallbackTile(graphics, MiningTileType.TORCH, 64);
     expect(rectSpy).toHaveBeenCalled();
+  });
+
+  it('draws a coloured stand-in for each basic terrain block that has no texture, each its own colour', () => {
+    const colours = new Set<unknown>();
+    for (const type of [MiningTileType.STONE, MiningTileType.CLAY, MiningTileType.SANDSTONE, MiningTileType.GRAVEL, MiningTileType.ICE, MiningTileType.BEDROCK]) {
+      const graphics = new Graphics();
+      const rect = vi.spyOn(graphics, 'rect');
+      const fill = vi.spyOn(graphics, 'fill');
+      MiningTileRenderer.drawFallbackTile(graphics, type, 64);
+      expect(rect).toHaveBeenCalledWith(0, 0, 64, 64);
+      colours.add(fill.mock.calls[0][0]);
+    }
+    expect(colours.size).toBe(6);
   });
 
   it('renders a grid of tiles into container and maintains graphics map', () => {
@@ -189,7 +202,7 @@ describe('MiningTileRenderer', () => {
       ],
       [
         { type: MiningTileType.EMPTY, revealed: true, damageStage: 1 },
-        { type: MiningTileType.ENTRANCE, revealed: true, damageStage: 4 },
+        { type: MiningTileType.BEDROCK, revealed: true, damageStage: 4 },
       ],
       [
         { type: MiningTileType.DIRT, revealed: true, damageStage: 2 },

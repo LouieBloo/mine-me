@@ -14,12 +14,12 @@ const start = (mapConfig = {}) =>
   });
 
 describe('a sandbox room', () => {
-  it('uses the hand-built 90x30 (original blocks) map under open sky, with its own physics size', () => {
+  it('uses the hand-built 105x30 (original blocks) map under open sky, with its own physics size', () => {
     const e = start();
     expect(e.grid).toHaveLength(30 * S + SKY);
-    expect(e.grid[0]).toHaveLength(90 * S);
+    expect(e.grid[0]).toHaveLength(105 * S);
     expect(e.surfaceRow).toBe(SKY);
-    expect((e.rigidWorld as any).config.width).toBe(90 * S);
+    expect((e.rigidWorld as any).config.width).toBe(105 * S);
     expect((e.rigidWorld as any).config.height).toBe(30 * S + SKY);
   });
 
@@ -31,26 +31,26 @@ describe('a sandbox room', () => {
 
   it('puts the pool fluid into the simulation and shows all of it to the client', () => {
     const e = start();
-    expect(e.fluidSubsystem.contentsAt(38 * S, SKY + 5 * S)).toBeDefined();
+    expect(e.fluidSubsystem.contentsAt(53 * S, SKY + 5 * S)).toBeDefined();
     expect(e.fluidSubsystem.visibleSnapshot().length).toBeGreaterThan(0);
   });
 
   it('keeps the player inside the map and lets them walk the surface', () => {
     const e = start();
     const me = e.players.get('sbx')!;
-    me.playerBody.position = { x: 80 * S, y: SKY - 1 };
+    me.playerBody.position = { x: 95 * S, y: SKY - 1 };
     me.inputs = { ...me.inputs, right: true };
     for (let i = 0; i < 300; i++) (e as any).tick(1 / 30);
-    expect(me.playerBody.position.x).toBeGreaterThan(60 * S);
-    expect(me.playerBody.position.x).toBeLessThanOrEqual(90 * S);
+    expect(me.playerBody.position.x).toBeGreaterThan(75 * S);
+    expect(me.playerBody.position.x).toBeLessThanOrEqual(105 * S);
   });
 
   it('settles the pools without spilling out onto the surface', () => {
     const e = start();
     for (let i = 0; i < 600; i++) (e as any).tick(1 / 30);
-    for (let x = 0; x < 90 * S; x++) {
+    for (let x = 0; x < 105 * S; x++) {
       // (the oil and water pools and the wall between them, then the lava pool)
-      if ((x >= 32 * S && x < 57 * S && !(x >= 44 * S && x < 45 * S)) || (x >= S && x < 5 * S)) continue;
+      if ((x >= 47 * S && x < 72 * S && !(x >= 59 * S && x < 60 * S)) || (x >= S && x < 5 * S)) continue;
       expect(e.fluidSubsystem.contentsAt(x, SKY)).toBeUndefined();
     }
   });
@@ -70,5 +70,14 @@ describe('a sandbox room', () => {
     expect(e.grid[DEFAULT_SKY_ROWS][0].type).toBe(MiningTileType.DIRT);
     expect(e.surfaceRow).toBe(DEFAULT_SKY_ROWS);
     expect(Math.round(e.players.get("n")!.playerBody.position.y)).toBe(DEFAULT_SKY_ROWS);
+  });
+});
+
+describe('the sandbox biomes (ticket 142)', () => {
+  it('tells the client about the biomes and which one each tile is in', () => {
+    const e = start();
+    // The test engine has no definitions loaded, so it is one biome; the wire format is covered by MiningGameEngine.biomes.test.ts.
+    expect(e.clientBiomes()).toBeUndefined();
+    expect(e.biomeGrid).toBeNull();
   });
 });

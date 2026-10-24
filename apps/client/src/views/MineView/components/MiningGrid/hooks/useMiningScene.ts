@@ -37,6 +37,7 @@ import { BeltItemRenderer } from '../renderers/BeltItemRenderer';
 import { FireRenderer } from '../renderers/FireRenderer';
 import { FluidGlow } from '../renderers/FluidGlow';
 import { BurningBodies } from '../renderers/BurningBodies';
+import { BiomeAmbient } from '../systems/BiomeAmbient';
 import { ProjectileTextureCache } from '../systems/ProjectileTextureCache';
 import {
   collectAssetUrls,
@@ -123,6 +124,7 @@ export function useMiningScene({
   const mobRendererRef = useRef<MiningMobRenderer | null>(null);
   const floatingTextManagerRef = useRef<FloatingTextManager | null>(null);
   const lightingEngineRef = useRef<LightingEngine | null>(null);
+  const biomeAmbientRef = useRef<BiomeAmbient | null>(null);
   const flashlightRef = useRef<SpotLight | null>(null);
   const particleEngineRef = useRef<ParticleEngine | null>(null);
   const particlesContainerRef = useRef<Container | null>(null);
@@ -344,6 +346,48 @@ export function useMiningScene({
     burningBodies.setup(particleEngine, initialSessionState.burningEffect);
     burningBodiesRef.current = burningBodies;
 
+    // The biome the player is in sets the wall tint, the ambient light and the biome wall textures (ticket 097).
+    // Nothing is created when the mine is one biome.
+    let dirtBackdrop: TilingSprite | null = null;
+    const biomeWalls = new Map<number, TilingSprite>();
+    const biomes = initialSessionState.biomes ?? [];
+    const biomeAmbient =
+      biomes.length > 1
+        ? new BiomeAmbient(biomes, {
+            setTint: (color) => {
+              if (dirtBackdrop) dirtBackdrop.tint = color;
+              for (const wall of biomeWalls.values()) wall.tint = color;
+            },
+            setWallAlphas: (alphas) => biomeWalls.forEach((wall, index) => (wall.alpha = alphas[index] ?? 0)),
+          })
+        : null;
+    biomeAmbientRef.current = biomeAmbient;
+    const addBackdropSprite = (texture: Texture, behind: boolean): TilingSprite => {
+      const sprite = new TilingSprite({ texture, width: bgWidth, height: bgHeight - surfaceY });
+      sprite.x = 0;
+      sprite.y = surfaceY;
+      sprite.tileScale.set(0.5);
+      sprite.cullable = true;
+      if (behind) backgroundContainer.addChildAt(sprite, 1);
+      else backgroundContainer.addChild(sprite);
+      return sprite;
+    };
+    const wallPromises = biomes.flatMap((biome) => {
+      const url = biome.ambient.wallTextureUrl;
+      if (!url || !biomeAmbient) return [];
+      return [
+        Assets.load(getAssetUrl(url))
+          .then((texture) => {
+            if (!gridContainerRef.current) return;
+            const wall = addBackdropSprite(texture, false);
+            wall.alpha = 0;
+            biomeWalls.set(biome.index, wall);
+            biomeAmbient.reapply();
+          })
+          .catch((err) => console.warn(`[MiningGrid] Could not load the wall texture of biome ${biome.key}:`, err)),
+      ];
+    });
+
     // Load assets in parallel: cave tiling background, dirt block texture + modular character sprite with gear
     let flightTimer: number | undefined;
     const loadAllAssets = async () => {
@@ -362,16 +406,9 @@ export function useMiningScene({
       const bgPromise = Assets.load(dirtBgUrl)
         .then((texture) => {
           if (!gridContainerRef.current) return;
-          const dirtTilingSprite = new TilingSprite({
-            texture,
-            width: bgWidth,
-            height: bgHeight - surfaceY,
-          });
-          dirtTilingSprite.x = 0;
-          dirtTilingSprite.y = surfaceY;
-          dirtTilingSprite.tileScale.set(0.5); // Rich natural underground dirt repeat
-          dirtTilingSprite.cullable = true;
-          backgroundContainer.addChild(dirtTilingSprite);
+          // Rich natural underground dirt repeat, behind any biome wall texture
+          dirtBackdrop = addBackdropSprite(texture, true);
+          biomeAmbient?.reapply();
         })
         .catch((err) => {
           console.warn('[MiningGrid] Could not load underground dirt background texture:', err);
@@ -608,7 +645,7 @@ export function useMiningScene({
           })().catch((err) => console.warn('[MiningGrid] Asset preload failed:', err))
         : Promise.resolve();
 
-      await Promise.allSettled([bgPromise, spritePromise, preloadPromise, ...blockPromises]);
+      await Promise.allSettled([bgPromise, spritePromise, preloadPromise, ...blockPromises, ...wallPromises]);
       report(1);
       if (gridContainerRef.current) {
         onAssetsLoadedRef.current?.();
@@ -660,6 +697,7 @@ export function useMiningScene({
       beltRendererRef.current = null;
       beltItemRendererRef.current = null;
       fireFieldRef.current = null;
+      biomeAmbientRef.current = null;
       lightingEngine.destroy();
       lightingEngineRef.current = null;
       flashlightRef.current = null;
@@ -718,6 +756,7 @@ export function useMiningScene({
     mobRendererRef,
     floatingTextManagerRef,
     lightingEngineRef,
+    biomeAmbientRef,
     flashlightRef,
     particleEngineRef,
     blockParticleConfigsRef,

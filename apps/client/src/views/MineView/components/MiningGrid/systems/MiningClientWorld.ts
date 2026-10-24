@@ -29,6 +29,7 @@ import type { BeltItemRenderer } from '../renderers/BeltItemRenderer';
 import type { ExtractorSounds } from '../renderers/ExtractorSounds';
 import type { FireRenderer } from '../renderers/FireRenderer';
 import type { FluidGlow } from '../renderers/FluidGlow';
+import type { BiomeAmbient } from './BiomeAmbient';
 import type { BurningBodies } from '../renderers/BurningBodies';
 import type { FluidSounds } from '../renderers/FluidSounds';
 import type { GasSounds } from '../renderers/GasSounds';
@@ -99,6 +100,8 @@ export interface MiningSceneRefs {
   fireFieldRef: NullableRef<FireField>;
   /** Flames and lights on the burning cells. */
   fireRendererRef: NullableRef<FireRenderer>;
+  /** The ambient look that follows the biome the player is in (absent when the mine is one biome). */
+  biomeAmbientRef?: NullableRef<BiomeAmbient>;
   /** The light fluids give off all the time (lava). */
   fluidGlowRef?: NullableRef<FluidGlow>;
   /** The effect on burning players and mobs. */

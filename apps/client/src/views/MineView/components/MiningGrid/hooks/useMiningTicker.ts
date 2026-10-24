@@ -14,6 +14,7 @@ import { TILE_SIZE } from '../renderers/MiningTileRenderer';
 import { HeldItemParticles } from '../../../../../components/game/particles/HeldItemParticles';
 import { DroppedItemVisualManager } from '../renderers/DroppedItemVisualManager';
 import { miningProfiler } from '../utils/MiningProfiler';
+import { biomeDebug } from '../utils/biomeDebug';
 import { installRenderInstrumentation } from '../utils/renderInstrumentation';
 import { sampleSceneGauges } from '../utils/sceneStats';
 import { Culler, Rectangle } from 'pixi.js';
@@ -229,6 +230,14 @@ export function useMiningTicker({
           isFacingLeftRef.current = isMovingLeft;
           playerSpriteRef.current?.setFlipped(isMovingLeft);
         }
+      }
+
+      // 3b. Biome ambient look: tint, ambient light and wall textures follow the biome the player is in
+      const biomeAmbient = world.biomeAmbientRef?.current;
+      if (biomeAmbient && grid) {
+        const at = playerBody?.position ?? currentPos;
+        biomeAmbient.update(dt, at, grid, biomeDebug.enabled && mouseWorld ? { x: mouseWorld.x / TILE_SIZE, y: mouseWorld.y / TILE_SIZE } : null);
+        biomeDebug.publish(biomeDebug.enabled ? biomeAmbient.debugInfo() : null);
       }
 
       // 4. Sprites & Animation

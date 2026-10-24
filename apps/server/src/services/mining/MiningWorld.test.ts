@@ -197,18 +197,18 @@ describe('block drops are deterministic with a fixed random source', () => {
     const original = MiningDataManager.getInstance();
     MiningDataManager.initialize(
       partialDefinitions({
-        blocks: [testBlockConfig({ typeKey: 'CHEST', dropTable: testDropTable([{ itemId: 'gem', chance: 50, minQuantity: 2, maxQuantity: 4 }]) })],
+        blocks: [testBlockConfig({ typeKey: 'STONE', dropTable: testDropTable([{ itemId: 'gem', chance: 50, minQuantity: 2, maxQuantity: 4 }]) })],
       })
     );
     try {
       const drops = new MiningDropSubsystem(stubWorld({ data: MiningDataManager.getInstance() }));
       vi.spyOn(Math, 'random').mockReturnValue(0.4); // 40 < 50: drops; quantity floor(0.4 * 3) + 2 = 3
-      drops.spawnBlockDrops(2, 2, MiningTileType.CHEST);
+      drops.spawnBlockDrops(2, 2, MiningTileType.STONE);
       expect(drops.droppedItems.map((d) => [d.itemId, d.quantity])).toEqual([['gem', 3]]);
 
       drops.droppedItems.length = 0;
       (Math.random as any).mockReturnValue(0.6); // 60 >= 50: no drop
-      drops.spawnBlockDrops(2, 2, MiningTileType.CHEST);
+      drops.spawnBlockDrops(2, 2, MiningTileType.STONE);
       expect(drops.droppedItems).toHaveLength(0);
     } finally {
       MiningDataManager.initialize({ items: original.getItems(), mobs: (original as any).mobs, blocks: [...(original as any).blocksByTypeKey.values()] });

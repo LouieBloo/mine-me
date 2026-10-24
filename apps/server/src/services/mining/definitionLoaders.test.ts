@@ -6,13 +6,14 @@ import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitio
 import { validateExtractor } from '@mine-me/shared';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 
-const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; extractors?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
+const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; biomes?: any[]; extractors?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
   ({
     item: { findMany: vi.fn().mockResolvedValue(data.items ?? [{ id: 'i1', name: 'Thing' }]) },
     mob: { findMany: vi.fn().mockResolvedValue(data.mobs ?? [{ id: 'm1', name: 'Mole' }]) },
     miningBlock: { findMany: vi.fn().mockResolvedValue(data.blocks ?? [{ id: 'b1', typeKey: 'DIRT' }]) },
     fluid: { findMany: vi.fn().mockResolvedValue(data.fluids ?? []) },
     gas: { findMany: vi.fn().mockResolvedValue(data.gases ?? []) },
+    biome: { findMany: vi.fn().mockResolvedValue(data.biomes ?? []) },
     extractor: { findMany: vi.fn().mockResolvedValue(data.extractors ?? []) },
     particleEffect: { findMany: vi.fn().mockResolvedValue(data.particleEffects ?? []) },
     sound: { findMany: vi.fn().mockResolvedValue(data.sounds ?? []) },
@@ -253,7 +254,7 @@ describe('loadDefinitionsFromFiles', () => {
     write('items.json', [{ id: 'a' }]);
     write('mobs.json', []);
     write('blocks.json', [{ typeKey: 'DIRT' }]);
-    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], extractors: [], particleEffects: [], characterSounds: {} });
+    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], biomes: [], extractors: [], particleEffects: [], characterSounds: {} });
   });
 
   it('reads fluids.json when it exists', () => {
@@ -363,5 +364,38 @@ describe('extractors', () => {
     expect(attachExtractorSounds([plain], library)[0]).toBe(plain);
     const defs = await loadDefinitionsFromDatabase(fakePrisma({ extractors: [{ ...basic, soundEffects: { loop: { soundId: 's1' } } }], sounds: library }));
     expect(defs.extractors?.[0].sounds?.loop).toMatchObject({ url: '/assets/sounds/land.mp3', volume: 1 });
+  });
+});
+
+describe('biomes', () => {
+  const frozen = { id: 'b1', key: 'frozen_caves', name: 'Frozen Caves', isDefault: false, minDepth: 30, weight: 1, noiseScale: 45 };
+
+  it('loads the biome table, oldest first', async () => {
+    const prisma = fakePrisma({ biomes: [frozen] });
+    const defs = await loadDefinitionsFromDatabase(prisma);
+    expect(defs.biomes).toEqual([frozen]);
+    expect(prisma.biome.findMany).toHaveBeenCalledWith({ orderBy: { createdAt: 'asc' } });
+  });
+
+  it('allows an empty biome table and a database client without one', async () => {
+    await expect(loadDefinitionsFromDatabase(fakePrisma({ biomes: [] }))).resolves.toMatchObject({ biomes: [] });
+    const prisma = fakePrisma({});
+    delete prisma.biome;
+    await expect(loadDefinitionsFromDatabase(prisma)).resolves.toMatchObject({ biomes: [] });
+  });
+
+  it('propagates database errors from the biome table', async () => {
+    const prisma = fakePrisma({});
+    prisma.biome.findMany.mockRejectedValue(new Error('no such table'));
+    await expect(loadDefinitionsFromDatabase(prisma)).rejects.toThrow('no such table');
+  });
+
+  it('installs biomes so they can be looked up by key or id; the first of a duplicated key wins', async () => {
+    await installDefinitionsFromDatabase(fakePrisma({ biomes: [frozen, { ...frozen, id: 'b2', name: 'Copy' }, { id: 'b3', name: 'No key' }] }));
+    const data = MiningDataManager.getInstance();
+    expect(data.getBiomes()).toHaveLength(1);
+    expect(data.getBiome('frozen_caves')?.name).toBe('Frozen Caves');
+    expect(data.getBiome('b1')?.key).toBe('frozen_caves');
+    MiningDataManager.reset();
   });
 });

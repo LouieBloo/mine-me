@@ -46,6 +46,8 @@ export * from './gameLogic/gas/gasWire';
 export * from './gameLogic/gas/gasEnvironment';
 export * from './gameLogic/gas/gasLook';
 export * from './gameLogic/gas/ExplosionFront';
+export * from './gameLogic/biome/biomeField';
+export * from './gameLogic/biome/bandBiomeField';
 export * from './gameLogic/pocketShapes';
 export * from './gameLogic/fluid/FluidRegistry';
 export * from './gameLogic/fluid/FluidGrid';

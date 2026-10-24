@@ -1,6 +1,6 @@
 # 096 - Biome map generation and blended borders
 
-**Priority:** P1 - **Status:** Open - **Depends on:** 095
+**Priority:** P1 - **Status:** Built, waiting for you to try it - **Depends on:** 095
 
 ## Problem
 Generation must pick a biome per cell and use it to shape blocks, fluids, gases and mob spawn tables, with soft borders.
@@ -18,3 +18,15 @@ Generation must pick a biome per cell and use it to shape blocks, fluids, gases 
 
 ## Tests
 Determinism per seed; the default-only case equals today's output; a border cell mixes both biomes' blocks over many samples; depth windows; mutation: use hard edges -> blend test fails.
+
+## Built (2026-10-23)
+- **Field:** `BiomeField` gives every cell a weight per biome. A biome within `biomeBlendWidth` (noise-score units, default 0.15, 0 = hard edges) of the top score contributes, linearly less the further behind it is; a biome outside its depth window has score 0 and never contributes. Depth limits fade in over a few rows.
+- **Blending by weighted choice:** ore, rock and chest spots use a weighted shuffle (a spot where the biome wants more of the block comes up earlier); fluid and gas pockets scale the number of pockets and are kept with probability multiplier / strongest; mobs are drawn from the spot's mix of spawn lists (a biome with no list contributes the map's list); swaps roll against the mixed chance.
+- **Exactly as before without biomes:** with no biomes, or biomes that change no blocks, the grid and fluids are identical to the old output (a test compares them). The new random streams (weighted order, swaps) are separate, so nothing else shifts.
+- **Config:** `biomeBlendWidth` on the map config (Prisma column, validation 0 to 0.5, "Biome Borders" card on the Mine Generator page).
+- **Stored per cell:** the primary biome index (one byte per cell) from `BiomeField.primaryGrid()`, kept by the engine; sky rows added on top are the default biome.
+- **Speed:** 135x135 with three biomes generates in about 90 ms (about 11 ms without).
+- Tests: `miningMap.biomes.test.ts` (neutral = identical, determinism, ore/rock/fluid weights, swaps with chance, unknown swap target ignored, ground row stays dirt, speed), `MiningGameEngine.biomes.test.ts` (field per room, sky shift, mob spawn lists). Mutation checked: weighted order flattened and swaps disabled both fail tests; hard edges (blend 0) never mix.
+
+## Owner review (2026-10-23)
+- `MiningMapConfigData.biomeWeights` (biome key -> weight on this map; null/empty = every biome at its own weight) is resolved by the shared `resolveMapBiomes` in the generator. The default biome always stays. Edited in the "Biomes On This Map" table of the Mine Generator page's Biome card. Eventually each city gets its own list; for now it lives on the one map config.

@@ -66,9 +66,9 @@ describe('MiningMouseController and MouseAction', () => {
       expect(style.showPreview).toBe(false);
     });
 
-    it('rejects placement over any block, ore or chest', () => {
+    it('rejects placement over any block or ore', () => {
       const action = new LadderPlacementAction(vi.fn());
-      for (const type of [MiningTileType.DIRT, MiningTileType.COPPERIUM, MiningTileType.CHEST, MiningTileType.TORCH]) {
+      for (const type of [MiningTileType.DIRT, MiningTileType.COPPERIUM, MiningTileType.TORCH]) {
         mockGrid[5][5].type = type;
         expect(action.canExecute({ x: 5, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(false);
         expect(new TorchPlacementAction(vi.fn()).canExecute({ x: 5, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(false);
@@ -158,7 +158,7 @@ describe('MiningMouseController and MouseAction', () => {
       expect(style.color).toBe(0xef4444); // Red
     });
 
-    it('rejects placement on unrevealed or entrance tiles', () => {
+    it('rejects placement on unrevealed or bedrock tiles', () => {
       const onPlace = vi.fn();
       const action = new TorchPlacementAction(onPlace);
 
@@ -166,8 +166,8 @@ describe('MiningMouseController and MouseAction', () => {
       mockGrid[5][6] = { type: MiningTileType.EMPTY, revealed: false };
       expect(action.canExecute({ x: 6, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(false);
 
-      // Entrance tile
-      mockGrid[5][6] = { type: MiningTileType.ENTRANCE, revealed: true };
+      // Bedrock tile
+      mockGrid[5][6] = { type: MiningTileType.BEDROCK, revealed: true };
       expect(action.canExecute({ x: 6, y: 5 }, { x: 5.5, y: 5.5 }, mockGrid)).toBe(false);
 
       // Already a torch tile

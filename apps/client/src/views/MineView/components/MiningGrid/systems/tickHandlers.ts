@@ -237,8 +237,6 @@ export function applyEffects(payload: MiningStateTickPayload, ctx: TickHandlerCo
           if (config) {
             particleEngine.spawnBurst(config, hitPos);
             particleEngine.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
-          } else if (hit.tileType === MiningTileType.MINERAL) {
-            particleEngine.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, hitPos);
           } else {
             particleEngine.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_chip, hitPos);
           }
@@ -282,8 +280,6 @@ export function applyTileUpdates(payload: MiningStateTickPayload, ctx: TickHandl
         if (config) {
           particleEngine.spawnBurst(config, hitPos);
           particleEngine.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
-        } else if (prevTile.type === MiningTileType.MINERAL) {
-          particleEngine.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_mineral_hit, hitPos);
         } else {
           particleEngine.spawnBurst(DEFAULT_PARTICLE_EFFECTS.block_dirt_hit, hitPos);
         }
@@ -294,6 +290,7 @@ export function applyTileUpdates(payload: MiningStateTickPayload, ctx: TickHandl
     prevTile.revealed = true;
     prevTile.damageStage = canTileBeDamaged(rt.type) ? (rt.damageStage ?? prevTile.damageStage ?? 0) : 0;
     prevTile.piece = rt.piece;
+    if (rt.biome !== undefined) prevTile.biome = rt.biome;
   }
 
   const tilesContainer = world.tilesContainerRef.current;
@@ -447,21 +444,8 @@ export function syncTileLights(revealed: NonNullable<MiningStateTickPayload['rev
     const tile = grid[y]?.[x];
     if (!tile) continue;
 
-    const chestLightId = `chest_${x}_${y}`;
     const torchLightId = `torch_${x}_${y}`;
     const blockEmitterId = `block_effect_${x}_${y}`;
-
-    if (tile.revealed && tile.type === MiningTileType.CHEST) {
-      if (!lightingEngine.getLight(chestLightId)) {
-        lightingEngine.addLight(
-          new PointLight(chestLightId, { x: x + 0.5, y: y + 0.5 }, 0xfbbf24, 0.9, 2.0, {
-            pulse: { speed: 3.2, minIntensity: 0.5, maxIntensity: 1.0 },
-          })
-        );
-      }
-    } else {
-      lightingEngine.removeLight(chestLightId);
-    }
 
     // A torch is a piece of several cells; its flame belongs to the middle one, so it lights the cavern once
     if (tile.revealed && tile.type === MiningTileType.TORCH && isPieceCentreCell(tile.piece, getTileFootprint(MiningTileType.TORCH))) {

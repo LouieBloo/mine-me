@@ -5,6 +5,7 @@ import { QuickAccessBar } from '../../../../components/QuickAccessBar/QuickAcces
 import { BeltStatus } from '../BeltStatus/BeltStatus';
 import { TemporaryBackpack } from '../TemporaryBackpack/TemporaryBackpack';
 import { PerformanceOverlay } from '../PerformanceOverlay/PerformanceOverlay';
+import { BiomeDebugOverlay } from '../BiomeDebugOverlay/BiomeDebugOverlay';
 import './MiningHUD.css';
 
 interface MiningHUDProps {
@@ -250,6 +251,7 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
         </div>
       </div>
       <PerformanceOverlay />
+      <BiomeDebugOverlay />
     </div>
   );
 };

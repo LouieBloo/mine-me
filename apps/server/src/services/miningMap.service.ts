@@ -1,5 +1,9 @@
 import { BLOCK_SCALE } from '@mine-me/shared';
 import {
+  BiomeField,
+  DEFAULT_BIOME_BLEND_WIDTH,
+  resolveMapBiomes,
+  type BiomeDefinition,
   MiningTileType,
   MINING_CONFIG,
   canTileBeDamaged,
@@ -20,7 +24,7 @@ import {
   type PieceOffset,
   type RockShape,
 } from '@mine-me/shared';
-import { MiningDataManager } from './mining/subsystems/MiningDataManager';
+import { MiningDataManager, blockKeyForTileType, tileTypeForBlockKey } from './mining/subsystems/MiningDataManager';
 
 // ============================================================================
 // Mining Map Generator
@@ -92,16 +96,14 @@ export function createSeededRng(seed: number): () => number {
 export interface MapGeneratorOptions {
   seed: number;
   config?: Partial<MiningMapConfigData>;
-  /** Number of mineral tiles to place. Overrides config percentage if provided. */
-  mineralCount?: number;
   /** Number of rock tiles to place. Overrides config percentage if provided. */
   rockCount?: number;
-  /** Number of treasure chests. Overrides config count if provided. */
-  chestCount?: number;
   /** Fluids to place in the mine as sealed pockets (those with generation settings). None by default. */
   fluids?: readonly FluidDefinition[];
   /** Gases to place in the mine as sealed pockets (those with generation settings). None by default. */
   gases?: readonly GasDefinition[];
+  /** Biomes that shape the mine (tickets 095-096). None: the whole mine is the built-in default biome, the old recipe. */
+  biomes?: readonly BiomeDefinition[];
 }
 
 /** One cell of fluid the generator placed: a full cell of `typeKey` at (x, y). */
@@ -135,6 +137,12 @@ const ORE_CLUSTER_AREA_SCALE = BLOCK_SCALE * BLOCK_SCALE;
 /** Salt for the fluids' own random stream, so pocket placement never depends on how much the other steps drew. */
 const FLUID_SEED_SALT = 0x0f1d51ed;
 
+/** Salt for the random stream that swaps base blocks per biome, so swaps never change anything else. */
+const SWAP_SEED_SALT = 0x5a9b10c5;
+
+/** Salt for the weighted ordering of ore and rock spots in biomes that change block weights. */
+const BIOME_ORDER_SEED_SALT = 0x0e0a5ed1;
+
 export class MiningMapGenerator {
   private rng: () => number;
   private config: MiningMapConfigData;
@@ -145,11 +153,15 @@ export class MiningMapGenerator {
   private readonly fluidRng: () => number;
   private readonly gases: readonly GasDefinition[];
   private readonly gasRng: () => number;
+  private readonly swapRng: () => number;
+  private readonly orderRng: () => number;
+  /** Which biome each cell is in (tickets 095-096). */
+  public readonly biomeField: BiomeField;
   /** Fluid cells placed by the last `generate()`. */
   public fluidCells: GeneratedFluidCell[] = [];
   /** Gas cells placed by the last `generate()`. */
   public gasCells: GeneratedGasCell[] = [];
-  /** Every cell inside a fluid or gas pocket, so later steps (chests...) leave them alone. */
+  /** Every cell inside a fluid or gas pocket, so later steps leave them alone. */
   private pocketCellKeys = new Set<number>();
 
   constructor(options: MapGeneratorOptions) {
@@ -158,15 +170,21 @@ export class MiningMapGenerator {
     this.fluids = options.fluids ?? [];
     this.gasRng = createSeededRng(options.seed ^ GAS_SEED_SALT);
     this.gases = options.gases ?? [];
+    this.swapRng = createSeededRng(options.seed ^ SWAP_SEED_SALT);
+    this.orderRng = createSeededRng(options.seed ^ BIOME_ORDER_SEED_SALT);
     this.config = {
       ...DEFAULT_MINING_MAP_CONFIG,
       ...options.config,
     };
-    if (options.chestCount !== undefined) {
-      this.config.chestCount = options.chestCount;
-    }
     this.width = this.config.gridWidth;
     this.height = this.config.gridHeight;
+    this.biomeField = new BiomeField(
+      options.seed,
+      resolveMapBiomes(options.biomes, this.config.biomeWeights),
+      this.config.biomeBlendWidth ?? DEFAULT_BIOME_BLEND_WIDTH,
+      this.width,
+      this.height
+    );
   }
 
   public generate(): ServerMiningGrid {
@@ -178,15 +196,15 @@ export class MiningMapGenerator {
     this.placeGasPockets();
     this.placeOreVeins();
     this.placeRocks();
-    this.placeChests();
+    this.swapBaseBlocks();
     return this.grid;
   }
 
   /**
    * Places each fluid that has generation settings: sealed pockets inside plain dirt (a square, a rectangle or a
    * winding vein, always one connected region) or, in `POOL` mode, shallow puddles on cave floors. Runs before ores,
-   * rocks and chests so there is room to fit them: a pocket's walls (a one tile margin) are solid, and the later steps
-   * leave pocket cells alone (a rock cannot sit on an open cell, ores only replace dirt, chests skip `pocketCellKeys`).
+   * and rocks so there is room to fit them: a pocket's walls (a one tile margin) are solid, and the later steps
+   * leave pocket cells alone (a rock cannot sit on an open cell, ores only replace dirt).
    * Uses its own random stream.
    */
   private placeFluidPockets(): void {
@@ -194,8 +212,9 @@ export class MiningMapGenerator {
     this.pocketCellKeys = new Set();
     for (const fluid of byTypeKey(this.fluids)) {
       const add = (x: number, y: number) => this.fluidCells.push({ x, y, typeKey: fluid.typeKey, level: 1 });
-      if (fluid.generation?.mode === 'POOL') this.placePools(fluid.generation, this.fluidRng, add);
-      else this.carvePockets(fluid.generation, this.fluidRng, add);
+      const multiplierAt = (x: number, y: number) => this.biomeField.fluidMultiplier(x, y, fluid.typeKey);
+      if (fluid.generation?.mode === 'POOL') this.placePools(fluid.generation, this.fluidRng, multiplierAt, add);
+      else this.carvePockets(fluid.generation, this.fluidRng, multiplierAt, add);
     }
   }
 
@@ -204,25 +223,43 @@ export class MiningMapGenerator {
     this.gasCells = [];
     for (const gas of byTypeKey(this.gases)) {
       const concentration = gas.generation?.concentration ?? 1;
-      this.carvePockets(gas.generation, this.gasRng, (x, y) => this.gasCells.push({ x, y, typeKey: gas.typeKey, concentration }));
+      this.carvePockets(
+        gas.generation,
+        this.gasRng,
+        (x, y) => this.biomeField.gasMultiplier(x, y, gas.typeKey),
+        (x, y) => this.gasCells.push({ x, y, typeKey: gas.typeKey, concentration })
+      );
     }
   }
 
   /**
    * Carves sealed pockets of open cells for one generating definition, calling `onCell` for each cell of each pocket.
    * Each pocket is a randomly chosen shape (by the definition's weights) and is one connected region. Only plain dirt
-   * with a solid ring around it is used, so a pocket is always sealed.
+   * with a solid ring around it is used, so a pocket is always sealed. `multiplierAt` is how much more or less of this
+   * content the biome at a cell wants (1 = as usual, 0 = none): it scales how many pockets there are and where they land.
    */
-  private carvePockets(gen: FluidGeneration | null | undefined, rng: () => number, onCell: (x: number, y: number) => void): void {
+  private carvePockets(
+    gen: FluidGeneration | null | undefined,
+    rng: () => number,
+    multiplierAt: (x: number, y: number) => number,
+    onCell: (x: number, y: number) => void
+  ): void {
     if (!gen || gen.percentage <= 0) return;
     const first = Math.max(1, gen.minDepth);
     const last = Math.min(this.height - 2, gen.maxDepth ?? this.height - 2);
     if (last < first) return;
 
     let diggable = 0;
+    let strongest = 0;
     for (let y = first; y <= last; y++) {
-      for (let x = 1; x < this.width - 1; x++) if (this.grid[y][x].type === MiningTileType.DIRT) diggable++;
+      for (let x = 1; x < this.width - 1; x++) {
+        if (this.grid[y][x].type !== MiningTileType.DIRT) continue;
+        const multiplier = multiplierAt(x, y);
+        diggable += multiplier;
+        strongest = Math.max(strongest, multiplier);
+      }
     }
+    if (strongest <= 0) return;
     const averageSide = (gen.minSize + gen.maxSize) / 2;
     const target = Math.round((diggable * gen.percentage) / 100 / (averageSide * averageSide));
     let placed = 0;
@@ -233,6 +270,7 @@ export class MiningMapGenerator {
       if (y + outline.height - 1 > last) continue;
       const cells = outline.cells.map((c) => ({ x: x + c.x, y: y + c.y }));
       if (!this.canHoldPocket(cells)) continue;
+      if (!this.biomeAccepts(multiplierAt(x + Math.floor(outline.width / 2), y + Math.floor(outline.height / 2)), strongest, rng)) continue;
       for (const { x: px, y: py } of cells) {
         this.grid[py][px] = { type: MiningTileType.EMPTY, revealed: false };
         onCell(px, py);
@@ -263,7 +301,12 @@ export class MiningMapGenerator {
    * run's width and `percentage` the share of eligible floor tiles that ends up pooled. A pool is one row of full cells
    * which the fluid simulation then spreads out. Pocket cells and spots already pooled are left alone.
    */
-  private placePools(gen: FluidGeneration, rng: () => number, onCell: (x: number, y: number) => void): void {
+  private placePools(
+    gen: FluidGeneration,
+    rng: () => number,
+    multiplierAt: (x: number, y: number) => number,
+    onCell: (x: number, y: number) => void
+  ): void {
     if (gen.percentage <= 0) return;
     const first = Math.max(1, gen.minDepth);
     const last = Math.min(this.height - 2, gen.maxDepth ?? this.height - 2);
@@ -278,12 +321,21 @@ export class MiningMapGenerator {
     const floor: Array<{ x: number; y: number }> = [];
     for (let y = first; y <= last; y++) for (let x = 1; x < this.width - 1; x++) if (isFloor(x, y)) floor.push({ x, y });
     if (floor.length === 0) return;
+    let floorWeight = 0;
+    let strongest = 0;
+    for (const spot of floor) {
+      const multiplier = multiplierAt(spot.x, spot.y);
+      floorWeight += multiplier;
+      strongest = Math.max(strongest, multiplier);
+    }
+    if (strongest <= 0) return;
 
     const averageWidth = (gen.minSize + gen.maxSize) / 2;
-    const target = Math.round((floor.length * gen.percentage) / 100 / averageWidth);
+    const target = Math.round((floorWeight * gen.percentage) / 100 / averageWidth);
     let placed = 0;
     for (let attempt = 0; attempt < target * 10 && placed < target; attempt++) {
       const start = floor[Math.floor(rng() * floor.length)];
+      if (!this.biomeAccepts(multiplierAt(start.x, start.y), strongest, rng)) continue;
       const width = gen.minSize + Math.floor(rng() * (gen.maxSize - gen.minSize + 1));
       let x = start.x;
       while (x < start.x + width && isFloor(x, start.y)) x++;
@@ -294,6 +346,75 @@ export class MiningMapGenerator {
         this.pocketCellKeys.add(start.y * this.width + px);
       }
       placed++;
+    }
+  }
+
+  /**
+   * Whether a spot wanting `multiplier` of something is used, when the best spot on the map wants `strongest`: the
+   * spot is kept with probability multiplier / strongest. A spot at full strength (always the case with no biomes)
+   * is kept without drawing a random number, so a map without biomes is generated exactly as before.
+   */
+  private biomeAccepts(multiplier: number, strongest: number, rng: () => number): boolean {
+    if (multiplier <= 0) return false;
+    if (multiplier >= strongest) return true;
+    return rng() < multiplier / strongest;
+  }
+
+  /** How much of a block the biomes want across `spots`: each spot's multiplier added up (just the count when no biome changes the block). */
+  private spotWeight(spots: readonly MiningPosition[], blockKey: string | undefined): number {
+    if (!blockKey || !this.biomeField.changesBlockWeights) return spots.length;
+    let total = 0;
+    for (const spot of spots) total += this.biomeField.blockMultiplier(spot.x, spot.y, blockKey);
+    return total;
+  }
+
+  /**
+   * Puts candidate spots in the order they are used. With no biome changing the block this is the plain shuffle of
+   * old (same draws, same result). Otherwise it is a weighted shuffle: a spot where the biome wants more of the
+   * block comes up earlier more often, and a spot that wants none is dropped.
+   */
+  private shuffleSpots<T extends MiningPosition>(spots: T[], blockKey: string | undefined): T[] {
+    if (!blockKey || !this.biomeField.changesBlockWeights) {
+      for (let i = spots.length - 1; i > 0; i--) {
+        const j = Math.floor(this.rng() * (i + 1));
+        [spots[i], spots[j]] = [spots[j], spots[i]];
+      }
+      return spots;
+    }
+    const keyed: { spot: T; key: number }[] = [];
+    for (const spot of spots) {
+      const multiplier = this.biomeField.blockMultiplier(spot.x, spot.y, blockKey);
+      if (multiplier > 0) keyed.push({ spot, key: Math.pow(this.orderRng(), 1 / multiplier) });
+    }
+    keyed.sort((a, b) => b.key - a.key);
+    return keyed.map((k) => k.spot);
+  }
+
+  /**
+   * Replaces base blocks the biomes say to swap (e.g. dirt into ice), as the very last step so everything else was
+   * placed on plain dirt as usual. Multi-cell pieces are left whole. Uses its own random stream.
+   */
+  private swapBaseBlocks(): void {
+    const field = this.biomeField;
+    if (!field.biomes.some((b) => (b.blockPalette?.swaps?.length ?? 0) > 0)) return;
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const tile = this.grid[y][x];
+        if (tile.piece) continue;
+        const key = blockKeyForTileType(tile.type);
+        if (!key) continue;
+        const chances = field.swapChances(x, y, key);
+        if (chances.length === 0) continue;
+        const roll = this.swapRng();
+        let reached = 0;
+        for (const { to, chance } of chances) {
+          reached += chance;
+          if (roll >= reached) continue;
+          const type = tileTypeForBlockKey(to);
+          if (type !== undefined) this.grid[y][x] = { type, revealed: false };
+          break;
+        }
+      }
     }
   }
 
@@ -501,6 +622,7 @@ export class MiningMapGenerator {
   }): void {
     if (opts.percentage <= 0) return;
 
+    const blockKey = blockKeyForTileType(opts.tileType);
     const eligibleDirt: MiningPosition[] = [];
     for (let y = Math.max(1, opts.minDepth); y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
@@ -514,19 +636,16 @@ export class MiningMapGenerator {
 
     if (eligibleDirt.length === 0) return;
 
-    const targetCount = Math.max(1, Math.floor((eligibleDirt.length * opts.percentage) / 100));
+    const targetCount = Math.max(1, Math.floor((this.spotWeight(eligibleDirt, blockKey) * opts.percentage) / 100));
 
-    // Fisher-Yates shuffle seed positions
-    for (let i = eligibleDirt.length - 1; i > 0; i--) {
-      const j = Math.floor(this.rng() * (i + 1));
-      [eligibleDirt[i], eligibleDirt[j]] = [eligibleDirt[j], eligibleDirt[i]];
-    }
+    // Shuffle seed positions (weighted by the biomes where they change this block)
+    const seedSpots = this.shuffleSpots(eligibleDirt, blockKey);
 
     let placed = 0;
     let idx = 0;
 
-    while (placed < targetCount && idx < eligibleDirt.length) {
-      const seedPos = eligibleDirt[idx++];
+    while (placed < targetCount && idx < seedSpots.length) {
+      const seedPos = seedSpots[idx++];
       if (this.grid[seedPos.y][seedPos.x].type !== MiningTileType.DIRT) continue;
 
       this.grid[seedPos.y][seedPos.x] = { type: opts.tileType, revealed: false };
@@ -593,14 +712,18 @@ export class MiningMapGenerator {
     }
 
     let budget = Math.floor((totalSolid * this.config.rockPercentage) / 100);
+    if (this.biomeField.changesBlockWeights) {
+      let wanted = 0;
+      for (let y = 1; y < this.height; y++) {
+        for (let x = 0; x < this.width; x++) if (isTileSolid(this.grid[y][x].type)) wanted += this.biomeField.blockMultiplier(x, y, 'ROCK');
+      }
+      budget = Math.floor((wanted * this.config.rockPercentage) / 100);
+    }
     if (budget <= 0 || anchors.length === 0) return;
 
-    for (let i = anchors.length - 1; i > 0; i--) {
-      const j = Math.floor(this.rng() * (i + 1));
-      [anchors[i], anchors[j]] = [anchors[j], anchors[i]];
-    }
+    const orderedAnchors = this.shuffleSpots(anchors, 'ROCK');
 
-    for (const anchor of anchors) {
+    for (const anchor of orderedAnchors) {
       if (budget <= 0) break;
       const picked = pickRockShape(this.rng(), (shape) => shape.width * shape.height <= budget);
       if (!picked) break;
@@ -640,59 +763,6 @@ export class MiningMapGenerator {
     return true;
   }
 
-  private placeChests(): void {
-    const targetCount = Math.max(0, this.config.chestCount);
-    if (targetCount === 0) return;
-
-    const midY = Math.floor(this.height / 2);
-
-    // Priority 1: Cavern floor positions (EMPTY space where below is solid, above is empty)
-    const cavernFloors: MiningPosition[] = [];
-    const deepDirt: MiningPosition[] = [];
-
-    for (let y = midY; y < this.height; y++) {
-      for (let x = 0; x < this.width; x++) {
-        if (this.pocketCellKeys.has(y * this.width + x)) continue;
-        if (this.grid[y][x].type === MiningTileType.EMPTY) {
-          const belowSolid = y + 1 >= this.height || isTileSolid(this.grid[y + 1][x].type);
-          const aboveAir = y - 1 >= 0 && !isTileSolid(this.grid[y - 1][x].type);
-          if (belowSolid && aboveAir) {
-            cavernFloors.push({ x, y });
-          }
-        } else if (this.grid[y][x].type === MiningTileType.DIRT) {
-          deepDirt.push({ x, y });
-        }
-      }
-    }
-
-    // Shuffle cavern floors
-    for (let i = cavernFloors.length - 1; i > 0; i--) {
-      const j = Math.floor(this.rng() * (i + 1));
-      [cavernFloors[i], cavernFloors[j]] = [cavernFloors[j], cavernFloors[i]];
-    }
-    // Shuffle deep dirt
-    for (let i = deepDirt.length - 1; i > 0; i--) {
-      const j = Math.floor(this.rng() * (i + 1));
-      [deepDirt[i], deepDirt[j]] = [deepDirt[j], deepDirt[i]];
-    }
-
-    let placed = 0;
-    // Try placing on cavern floors first
-    for (let i = 0; i < cavernFloors.length && placed < targetCount; i++) {
-      const pos = cavernFloors[i];
-      this.grid[pos.y][pos.x] = { type: MiningTileType.CHEST, revealed: false };
-      placed++;
-    }
-
-    // If more chests needed, place in deep dirt
-    for (let i = 0; i < deepDirt.length && placed < targetCount; i++) {
-      const pos = deepDirt[i];
-      if (this.grid[pos.y][pos.x].type === MiningTileType.DIRT) {
-        this.grid[pos.y][pos.x] = { type: MiningTileType.CHEST, revealed: false };
-        placed++;
-      }
-    }
-  }
 }
 
 /**
@@ -703,11 +773,13 @@ export function generateMiningMap(options: MapGeneratorOptions): ServerMiningGri
   return generator.generate();
 }
 
-/** Like `generateMiningMap`, but also says which cells hold fluid or gas (see `options.fluids` and `options.gases`). */
-export function generateMiningMapWithFluids(options: MapGeneratorOptions): { grid: ServerMiningGrid; fluidCells: GeneratedFluidCell[]; gasCells: GeneratedGasCell[] } {
+/** Like `generateMiningMap`, but also says which cells hold fluid or gas (see `options.fluids` and `options.gases`) and which biome each cell is in. */
+export function generateMiningMapWithFluids(
+  options: MapGeneratorOptions
+): { grid: ServerMiningGrid; fluidCells: GeneratedFluidCell[]; gasCells: GeneratedGasCell[]; biomeField: BiomeField } {
   const generator = new MiningMapGenerator(options);
   const grid = generator.generate();
-  return { grid, fluidCells: generator.fluidCells, gasCells: generator.gasCells };
+  return { grid, fluidCells: generator.fluidCells, gasCells: generator.gasCells, biomeField: generator.biomeField };
 }
 
 // ---------------------------------------------------------------------------
@@ -829,13 +901,15 @@ export function revealTiles(grid: ServerMiningGrid, position: MiningPosition, vi
 /**
  * Convert server grid to client-safe grid (hide unrevealed tile types).
  */
-export function toClientGrid(grid: ServerMiningGrid): import('@mine-me/shared').MiningClientTile[][] {
-  return grid.map(row =>
-    row.map(tile => ({
+export function toClientGrid(grid: ServerMiningGrid, biomeGrid?: Uint8Array | null): import('@mine-me/shared').MiningClientTile[][] {
+  return grid.map((row, y) =>
+    row.map((tile, x) => ({
       type: tile.revealed ? tile.type : MiningTileType.DIRT,
       revealed: tile.revealed,
       damageStage: tile.revealed ? getDamageStage(tile) : 0,
       ...(tile.revealed && tile.piece ? { piece: tile.piece } : {}),
+      // Which biome a cell is in is only told for revealed cells, like everything else underground
+      ...(tile.revealed && biomeGrid ? { biome: biomeGrid[y * row.length + x] } : {}),
     }))
   );
 }

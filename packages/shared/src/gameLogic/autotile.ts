@@ -83,11 +83,11 @@ export function validateAutotileConfig(config: unknown): string[] {
 
 /**
  * Whether a cell is terrain that gets edges: a solid block that is not a piece. Ladders, torches, bridges, rocks
- * and chests keep their own art (ticket 094, decision 3).
+ * keep their own art (ticket 094, decision 3).
  */
 export function isAutotileTerrain(tile: Pick<MiningClientTile, 'type' | 'piece'>): boolean {
   if (tile.piece) return false;
-  if (tile.type === MiningTileType.ROCK || tile.type === MiningTileType.CHEST) return false;
+  if (tile.type === MiningTileType.ROCK) return false;
   return isTileSolid(tile.type) && !isPieceType(tile.type);
 }
 

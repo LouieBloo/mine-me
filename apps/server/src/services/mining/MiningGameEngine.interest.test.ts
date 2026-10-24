@@ -112,8 +112,8 @@ describe('clients are only told about what is near their player', () => {
     });
 
     it('sends dropped items in view, and sends the list when the view moves over items that did not move', () => {
-      giveBlockDrops(engine, MiningTileType.CHEST, [{ itemId: 'gem' }]);
-      engine.spawnBlockDrops(FAR, ROW - 2, MiningTileType.CHEST);
+      giveBlockDrops(engine, MiningTileType.STONE, [{ itemId: 'gem' }]);
+      engine.spawnBlockDrops(FAR, ROW - 2, MiningTileType.STONE);
       tick(300); // the item lands and fully settles
       expect(engine.droppedItems.length).toBe(1);
       expect(last().droppedItems === undefined || last().droppedItems.length === 0).toBe(true);

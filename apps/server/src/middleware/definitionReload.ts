@@ -3,12 +3,16 @@ import { DEFINITIONS_RELOAD_FAILED_HEADER } from '@mine-me/shared';
 import { reloadDefinitions } from '../services/mining/definitionReloader';
 
 /** Admin route prefixes whose data ends up in the in-memory game definitions. */
-export const DEFINITION_ROUTE_PREFIXES = ['/items', '/mobs', '/blocks', '/fluids', '/gases', '/sounds', '/character-sounds', '/effects', '/particle-effects'];
+export const DEFINITION_ROUTE_PREFIXES = ['/items', '/mobs', '/blocks', '/fluids', '/gases', '/biomes', '/sounds', '/character-sounds', '/effects', '/particle-effects'];
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+/** Writes that only compute an answer (they change no stored content), so they need no reload. */
+const READ_ONLY_WRITES = new Set(['/biomes/preview']);
+
 export const affectsDefinitions = (method: string, path: string): boolean =>
   WRITE_METHODS.has(method) &&
+  !READ_ONLY_WRITES.has(path) &&
   DEFINITION_ROUTE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 
 /**

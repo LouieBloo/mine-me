@@ -68,23 +68,6 @@ describe('miningMap.service', () => {
       }
     });
 
-    it('places treasure chests in the lower half of the map', () => {
-      const grid = generateMiningMap({ seed: 777 });
-      let chestCount = 0;
-      const midY = Math.floor(MINING_CONFIG.GRID_HEIGHT / 2);
-
-      for (let y = 0; y < MINING_CONFIG.GRID_HEIGHT; y++) {
-        for (let x = 0; x < MINING_CONFIG.GRID_WIDTH; x++) {
-          if (grid[y][x].type === MiningTileType.CHEST) {
-            chestCount++;
-            expect(y).toBeGreaterThanOrEqual(midY);
-          }
-        }
-      }
-
-      expect(chestCount).toBe(MINING_CONFIG.TREASURE_CHEST_COUNT);
-    });
-
     it('honors custom config overrides to disable caverns and tunnels', () => {
       const grid = generateMiningMap({
         seed: 42,

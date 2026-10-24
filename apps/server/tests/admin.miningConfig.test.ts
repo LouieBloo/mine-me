@@ -52,6 +52,28 @@ describe('Admin Mining Config API Routes', () => {
     expect(res.body.tunnelCount).toBe(DEFAULT_MINING_MAP_CONFIG.tunnelCount);
   });
 
+  it('saves how soft the borders between biomes are, defaulting when none is sent, and refuses a bad value', async () => {
+    const first = await request(app).put('/admin/mining-config').send({ cavernDensity: 50 });
+    expect(first.body.biomeBlendWidth).toBe(DEFAULT_MINING_MAP_CONFIG.biomeBlendWidth);
+    const saved = await request(app).put('/admin/mining-config').send({ biomeBlendWidth: 0.3 });
+    expect(saved.status).toBe(200);
+    expect(saved.body.biomeBlendWidth).toBe(0.3);
+    const hard = await request(app).put('/admin/mining-config').send({ biomeBlendWidth: 0 });
+    expect(hard.body.biomeBlendWidth).toBe(0);
+    expect((await request(app).put('/admin/mining-config').send({ biomeBlendWidth: 0.9 })).status).toBe(400);
+    expect((await request(app).put('/admin/mining-config').send({ biomeBlendWidth: -1 })).status).toBe(400);
+  });
+
+  it('saves which biomes the map has and their weights, keeps them when not sent, clears them with null, and refuses bad ones', async () => {
+    const saved = await request(app).put('/admin/mining-config').send({ biomeWeights: { frozen: 2 } });
+    expect(saved.status).toBe(200);
+    expect(saved.body.biomeWeights).toEqual({ frozen: 2 });
+    expect((await request(app).put('/admin/mining-config').send({ cavernDensity: 40 })).body.biomeWeights).toEqual({ frozen: 2 });
+    expect((await request(app).put('/admin/mining-config').send({ biomeWeights: null })).body.biomeWeights).toBeNull();
+    expect((await request(app).put('/admin/mining-config').send({ biomeWeights: { frozen: 0 } })).status).toBe(400);
+    expect((await request(app).put('/admin/mining-config').send({ biomeWeights: [1] })).status).toBe(400);
+  });
+
   it('PUT /admin/mining-config updates and saves new parameters including ore vein settings', async () => {
     const res = await request(app)
       .put('/admin/mining-config')

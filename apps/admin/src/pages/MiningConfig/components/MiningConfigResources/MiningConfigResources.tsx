@@ -3,7 +3,7 @@ import type { MiningConfigFieldProps } from '../MiningConfigTypes';
 import './MiningConfigResources.css';
 
 /**
- * Resources & Hazards card: rocks, chests, ore veins, clustering.
+ * Resources & Hazards card: rocks, ore veins, clustering.
  */
 export default function MiningConfigResources({ config, onFieldChange }: MiningConfigFieldProps) {
   return (
@@ -13,7 +13,7 @@ export default function MiningConfigResources({ config, onFieldChange }: MiningC
           <span>💎</span> Resources & Hazards
         </h3>
         <p className="text-xs text-slate-500">
-          Controls mineral ore clustering, stable rock formations, and treasure chest spawns.
+          Controls ore clustering and stable rock formations.
         </p>
       </div>
 
@@ -32,22 +32,6 @@ export default function MiningConfigResources({ config, onFieldChange }: MiningC
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
           />
           <p className="text-xs text-slate-400">Guaranteed supported.</p>
-        </div>
-
-        <div className="space-y-1">
-          <label htmlFor="chestCount" className="text-sm font-semibold text-slate-700">
-            Treasure Chests
-          </label>
-          <input
-            id="chestCount"
-            type="number"
-            min="0"
-            max="15"
-            value={config.chestCount}
-            onChange={e => onFieldChange('chestCount', Number(e.target.value))}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-          <p className="text-xs text-slate-400">Placed on cavern floors.</p>
         </div>
       </div>
 

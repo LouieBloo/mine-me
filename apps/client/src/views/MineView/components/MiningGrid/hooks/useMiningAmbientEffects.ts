@@ -1,4 +1,3 @@
-import { BLOCK_SCALE } from '@mine-me/shared';
 import { useEffect } from 'react';
 import {
   MiningTileType,
@@ -70,23 +69,7 @@ export function useMiningAmbientEffects({
 
       gridRef.current.forEach((row, y) => {
         row.forEach((tile, x) => {
-          const chestLightId = `chest_${x}_${y}`;
           const torchLightId = `torch_${x}_${y}`;
-
-          if (tile.revealed && tile.type === MiningTileType.CHEST) {
-            if (!lightingEngine.getLight(chestLightId)) {
-              lightingEngine.addLight(
-                new PointLight(
-                  chestLightId,
-                  { x: x + 0.5, y: y + 0.5 },
-                  0xfbbf24,
-                  0.9,
-                  2.0 * BLOCK_SCALE,
-                  { pulse: { speed: 3.2, minIntensity: 0.5, maxIntensity: 1.0 } }
-                )
-              );
-            }
-          }
 
           if (tile.revealed && tile.type === MiningTileType.TORCH && isPieceCentreCell(tile.piece, getTileFootprint(MiningTileType.TORCH))) {
             const origin = pieceOrigin(x, y, tile.piece);

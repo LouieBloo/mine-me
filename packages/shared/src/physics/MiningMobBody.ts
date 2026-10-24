@@ -44,7 +44,7 @@ export class MiningMobBody extends MiningPhysicsBody {
   }
 
   /**
-   * Check if mob's collider overlaps any climbable tile (LADDER or ENTRANCE).
+   * Check if mob's collider overlaps any climbable tile (LADDER).
    */
   public checkIsOnLadder(grid: MiningCollisionGrid): boolean {
     const { width, height } = getGridDimensions(grid);

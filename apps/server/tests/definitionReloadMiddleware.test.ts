@@ -26,6 +26,9 @@ describe('affectsDefinitions', () => {
     expect(affectsDefinitions('PUT', '/fluids/f1')).toBe(true);
     expect(affectsDefinitions('POST', '/fluids')).toBe(true);
     expect(affectsDefinitions('PATCH', '/character-sounds/hurt')).toBe(true);
+    expect(affectsDefinitions('PUT', '/biomes/b1')).toBe(true);
+    expect(affectsDefinitions('POST', '/biomes')).toBe(true);
+    expect(affectsDefinitions('POST', '/biomes/preview')).toBe(false);
     expect(affectsDefinitions('GET', '/items')).toBe(false);
     expect(affectsDefinitions('POST', '/users')).toBe(false);
     expect(affectsDefinitions('POST', '/items-other')).toBe(false);

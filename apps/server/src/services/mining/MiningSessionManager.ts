@@ -189,7 +189,8 @@ export class MiningSessionManager {
     const activeMobs = engine.getActiveMobs();
 
     return {
-      grid: toClientGrid(engine.grid),
+      grid: toClientGrid(engine.grid, engine.biomeGrid),
+      biomes: engine.clientBiomes(),
       fluids: engine.fluidSubsystem.clientDefinitions(),
       fluidCells: engine.fluidSubsystem.visibleSnapshot(),
       gases: engine.gasSubsystem.clientDefinitions(),

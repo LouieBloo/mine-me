@@ -57,12 +57,12 @@ describe('dynamite blast rules', () => {
     });
 
     it('spares the entrance, and destroys rocks, ladders and torches', () => {
-      engine.grid[CY][CX + 2] = { type: MiningTileType.ENTRANCE, revealed: true };
+      engine.grid[CY][CX + 2] = { type: MiningTileType.BEDROCK, revealed: true };
       engine.grid[CY][CX + 1] = { type: MiningTileType.ROCK, revealed: true };
       engine.grid[CY + 1][CX] = { type: MiningTileType.LADDER, revealed: true };
       engine.grid[CY - 1][CX] = { type: MiningTileType.TORCH, revealed: true };
       boom(3);
-      expect(engine.grid[CY][CX + 2].type).toBe(MiningTileType.ENTRANCE);
+      expect(engine.grid[CY][CX + 2].type).toBe(MiningTileType.BEDROCK);
       expect(engine.grid[CY][CX + 1].type).toBe(MiningTileType.EMPTY);
       expect(engine.grid[CY + 1][CX].type).toBe(MiningTileType.EMPTY);
       expect(engine.grid[CY - 1][CX].type).toBe(MiningTileType.EMPTY);

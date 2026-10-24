@@ -1,4 +1,4 @@
-import { DEFAULT_SKY_ROWS, MiningTileType, type FluidDefinition, GasDefinition, MiningGameMode, MiningMapConfigData } from '@mine-me/shared';
+import { DEFAULT_SKY_ROWS, MiningTileType, type BiomeDefinition, type BiomeField, type FluidDefinition, GasDefinition, MiningGameMode, MiningMapConfigData } from '@mine-me/shared';
 import { generateMiningMapWithFluids, type GeneratedFluidCell, type GeneratedGasCell, type ServerMiningGrid } from '../miningMap.service';
 import { BLOCK_TILE_TYPES } from './subsystems/MiningDataManager';
 import { createDefaultSandboxLayout, type SandboxMobSpawn } from './sandbox/SandboxLayout';
@@ -15,6 +15,8 @@ export interface BuiltMap {
    * surface dummy (the generated mine). Present (even if empty) replaces that.
    */
   mobs?: readonly SandboxMobSpawn[];
+  /** Which biome each cell is in. Absent: every cell is the default. The sandbox lays its biomes out in bands. Queries use rows of the whole map, sky included. */
+  biomeField?: BiomeField;
   /** Row of the ground surface (default 0). Sky above it is open air players can be in. */
   surfaceRow?: number;
 }
@@ -24,14 +26,15 @@ export interface MapSourceOptions {
   mapConfig?: Partial<MiningMapConfigData>;
   fluids: readonly FluidDefinition[];
   gases?: readonly GasDefinition[];
+  biomes?: readonly BiomeDefinition[];
 }
 
 /** Builds the starting map for a mode: the sandbox from its layout, every other mode from the generator. */
 export function buildMapForMode(mode: MiningGameMode, options: MapSourceOptions): BuiltMap {
   if (mode === 'sandbox') {
-    return buildSandboxMap(createDefaultSandboxLayout(BLOCK_TILE_TYPES), options.fluids, options.gases);
+    return buildSandboxMap(createDefaultSandboxLayout(BLOCK_TILE_TYPES), options.fluids, options.gases, options.biomes);
   }
-  const generated = generateMiningMapWithFluids({ seed: options.seed, config: options.mapConfig, fluids: options.fluids, gases: options.gases });
+  const generated = generateMiningMapWithFluids({ seed: options.seed, config: options.mapConfig, fluids: options.fluids, gases: options.gases, biomes: options.biomes });
   return addSkyRows(generated, options.mapConfig?.skyRows ?? DEFAULT_SKY_ROWS);
 }
 
@@ -52,6 +55,7 @@ export function addSkyRows(map: BuiltMap, skyRows: number): BuiltMap {
     fluidCells: map.fluidCells.map((cell) => ({ ...cell, y: cell.y + rows })),
     gasCells: map.gasCells?.map((cell) => ({ ...cell, y: cell.y + rows })),
     mobs: map.mobs?.map((mob) => ({ ...mob, y: mob.y + rows })),
+    biomeField: map.biomeField?.shiftRows(rows),
     surfaceRow: (map.surfaceRow ?? 0) + rows,
   };
 }

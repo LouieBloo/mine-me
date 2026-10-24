@@ -381,5 +381,6 @@ export * from './modularRig';
 export * from './particles';
 export * from './fluid';
 export * from './gas';
+export * from './biome';
 export * from './extractor';
 export * from './sound';

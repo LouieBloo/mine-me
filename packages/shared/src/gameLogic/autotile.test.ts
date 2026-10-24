@@ -10,7 +10,7 @@ const tile = (type: number, revealed = true, piece?: MiningClientTile['piece']):
 const D = MiningTileType.DIRT;
 const E = MiningTileType.EMPTY;
 
-/** A grid from rows of letters: D dirt, . empty, ? fog (dirt, unrevealed), L ladder piece, R rock, C chest, S stone-ish ore (mineral). */
+/** A grid from rows of letters: D dirt, . empty, ? fog (dirt, unrevealed), L ladder piece, R rock, M ore (copperium). */
 const gridOf = (rows: string[]): MiningClientTile[][] =>
   rows.map((row) => [...row].map((c) => {
     switch (c) {
@@ -20,8 +20,7 @@ const gridOf = (rows: string[]): MiningClientTile[][] =>
       case 'x': return tile(E, false); // fog over open space
       case 'L': return tile(MiningTileType.LADDER, true, [0, 0]);
       case 'R': return tile(MiningTileType.ROCK);
-      case 'C': return tile(MiningTileType.CHEST);
-      case 'M': return tile(MiningTileType.MINERAL);
+      case 'M': return tile(MiningTileType.COPPERIUM);
       default: throw new Error(c);
     }
   }));
@@ -59,10 +58,9 @@ describe('autotileMask', () => {
     expect(autotileMask(gridOf(['DMD', 'DDD', 'DDD']), 1, 1)).toBe(0);
   });
 
-  it('treats pieces, rocks and chests as open air', () => {
+  it('treats pieces and rocks as open air', () => {
     expect(autotileMask(gridOf(['DLD', 'DDD', 'DDD']), 1, 1)).toBe(AUTOTILE_TOP);
     expect(autotileMask(gridOf(['DRD', 'DDD', 'DDD']), 1, 1)).toBe(AUTOTILE_TOP);
-    expect(autotileMask(gridOf(['DCD', 'DDD', 'DDD']), 1, 1)).toBe(AUTOTILE_TOP);
   });
 
   it('gives every one of the 16 patterns its own mask', () => {
@@ -82,7 +80,7 @@ describe('autotileMask', () => {
 });
 
 describe('isAutotileTerrain', () => {
-  it('is true for solid blocks and false for air, pieces, rocks and chests', () => {
+  it('is true for solid blocks and false for air, pieces and rocks', () => {
     expect(isAutotileTerrain(tile(D))).toBe(true);
     expect(isAutotileTerrain(tile(MiningTileType.COPPERIUM))).toBe(true);
     expect(isAutotileTerrain(tile(MiningTileType.LAVAROCK))).toBe(true);
@@ -90,7 +88,6 @@ describe('isAutotileTerrain', () => {
     expect(isAutotileTerrain(tile(MiningTileType.LADDER))).toBe(false);
     expect(isAutotileTerrain(tile(MiningTileType.BRIDGE, true, [0, 0]))).toBe(false);
     expect(isAutotileTerrain(tile(MiningTileType.ROCK))).toBe(false);
-    expect(isAutotileTerrain(tile(MiningTileType.CHEST))).toBe(false);
     expect(isAutotileTerrain(tile(D, true, [0, 0]))).toBe(false);
   });
 });

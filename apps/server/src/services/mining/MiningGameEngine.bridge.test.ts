@@ -149,12 +149,12 @@ describe('buildables only go into empty tiles', () => {
   beforeEach(() => {
     engine = new MiningGameEngine({ characterId: cid, cityId: 'c', seed: 5, mapConfig: { mobSpawnCount: 0 }, socket: { connected: true, emit: vi.fn() } as any });
     engine.players.get(cid)!.playerBody.position = { x: 22.5, y: 20.5 };
-    for (const t of [MiningTileType.DIRT, MiningTileType.ROCK, MiningTileType.CHEST, MiningTileType.COPPERIUM, MiningTileType.LADDER, MiningTileType.TORCH, MiningTileType.BRIDGE]) {
+    for (const t of [MiningTileType.DIRT, MiningTileType.ROCK, MiningTileType.STONE, MiningTileType.COPPERIUM, MiningTileType.LADDER, MiningTileType.TORCH, MiningTileType.BRIDGE]) {
       engine.grid[20][25] = { type: t, revealed: true };
     }
   });
 
-  it.each([MiningTileType.DIRT, MiningTileType.ROCK, MiningTileType.CHEST, MiningTileType.COPPERIUM, MiningTileType.LADDER, MiningTileType.TORCH, MiningTileType.BRIDGE])(
+  it.each([MiningTileType.DIRT, MiningTileType.ROCK, MiningTileType.STONE, MiningTileType.COPPERIUM, MiningTileType.LADDER, MiningTileType.TORCH, MiningTileType.BRIDGE])(
     'refuses a ladder, torch and bridge over tile type %i',
     (type) => {
       engine.grid[20][25] = { type, revealed: true };

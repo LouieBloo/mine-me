@@ -15,7 +15,7 @@ function setup(blocks: any[] = [], items: any[] = [], mobs: any[] = []) {
 }
 
 const chestWith = (entries: Array<{ itemId: string; chance: number; minQuantity: number; maxQuantity: number }>) => ({
-  id: 'b-chest', typeKey: 'CHEST', health: 100, dropTable: { items: entries },
+  id: 'b-chest', typeKey: 'STONE', health: 100, dropTable: { items: entries },
 });
 const entry = (itemId: string, chance = 100, min = 1, max = 1) => ({ itemId, chance, minQuantity: min, maxQuantity: max });
 
@@ -27,7 +27,7 @@ describe('dropped items', () => {
     it('block drops store the canonical item id even when the drop table uses an itemKey', () => {
       const s = setup([chestWith([entry('sol', 100, 5, 5)])], [{ id: 'cuid-sol', itemKey: 'sol', name: 'Sol' }]);
       restore = s.restore;
-      s.drops.spawnBlockDrops(5, 5, MiningTileType.CHEST);
+      s.drops.spawnBlockDrops(5, 5, MiningTileType.STONE);
       expect(s.drops.droppedItems).toHaveLength(1);
       expect(s.drops.droppedItems[0]).toMatchObject({ itemId: 'cuid-sol', itemName: 'Sol', quantity: 5 });
     });
@@ -35,7 +35,7 @@ describe('dropped items', () => {
     it('keeps the raw id when the item cannot be resolved', () => {
       const s = setup([chestWith([entry('mystery')])]);
       restore = s.restore;
-      s.drops.spawnBlockDrops(5, 5, MiningTileType.CHEST);
+      s.drops.spawnBlockDrops(5, 5, MiningTileType.STONE);
       expect(s.drops.droppedItems[0].itemId).toBe('mystery');
     });
 
@@ -84,7 +84,7 @@ describe('dropped items', () => {
     it('blocks drop at the centre of their tile', () => {
       const s = setup([chestWith([entry('a')])]);
       restore = s.restore;
-      s.drops.spawnBlockDrops(7, 9, MiningTileType.CHEST);
+      s.drops.spawnBlockDrops(7, 9, MiningTileType.STONE);
       expect(s.drops.droppedItems[0].position).toEqual({ x: 7.5, y: 9.5 });
     });
 
@@ -99,26 +99,25 @@ describe('dropped items', () => {
   });
 
   describe('which drops a block gives', () => {
-    it('never drops from empty tiles or the entrance', () => {
+    it('never drops from empty tiles', () => {
       const s = setup([chestWith([entry('a')])]);
       restore = s.restore;
       s.drops.spawnBlockDrops(1, 1, MiningTileType.EMPTY);
-      s.drops.spawnBlockDrops(1, 1, MiningTileType.ENTRANCE);
       expect(s.drops.droppedItems).toHaveLength(0);
     });
 
     it('rolls only the block table (its Sol range is not paid out)', () => {
-      const s = setup([{ id: 'b', typeKey: 'CHEST', health: 100, dropTable: { items: [entry('a')], solMin: 50, solMax: 50 } }], [{ id: 'sol-id', itemKey: 'sol', name: 'Sol' }]);
+      const s = setup([{ id: 'b', typeKey: 'STONE', health: 100, dropTable: { items: [entry('a')], solMin: 50, solMax: 50 } }], [{ id: 'sol-id', itemKey: 'sol', name: 'Sol' }]);
       restore = s.restore;
-      s.drops.spawnBlockDrops(1, 1, MiningTileType.CHEST);
+      s.drops.spawnBlockDrops(1, 1, MiningTileType.STONE);
       expect(s.drops.droppedItems.map((i) => i.itemId)).toEqual(['a']);
     });
 
     it('drops nothing for blocks with no drop table: there is no built-in loot', () => {
-      const s2 = setup([{ id: 'm', typeKey: 'MINERAL', health: 100 }, { id: 'c', typeKey: 'CHEST', health: 100, dropTable: { items: [] } }]);
+      const s2 = setup([{ id: 'm', typeKey: 'CLAY', health: 100 }, { id: 'c', typeKey: 'STONE', health: 100, dropTable: { items: [] } }]);
       restore = s2.restore;
-      s2.drops.spawnBlockDrops(1, 1, MiningTileType.MINERAL);
-      s2.drops.spawnBlockDrops(2, 1, MiningTileType.CHEST);
+      s2.drops.spawnBlockDrops(1, 1, MiningTileType.CLAY);
+      s2.drops.spawnBlockDrops(2, 1, MiningTileType.STONE);
       expect(s2.drops.droppedItems).toHaveLength(0);
     });
 
@@ -148,7 +147,7 @@ describe('dropped items', () => {
     it('a 0% entry never drops and a 100% entry always does', () => {
       const s = setup([chestWith([entry('never', 0), entry('always', 100)])]);
       restore = s.restore;
-      for (let i = 0; i < 50; i++) s.drops.spawnBlockDrops(1, 1, MiningTileType.CHEST);
+      for (let i = 0; i < 50; i++) s.drops.spawnBlockDrops(1, 1, MiningTileType.STONE);
       expect(new Set(s.drops.droppedItems.map((d) => d.itemId))).toEqual(new Set(['always']));
     });
   });

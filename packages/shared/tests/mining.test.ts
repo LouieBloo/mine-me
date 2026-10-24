@@ -31,16 +31,13 @@ describe('Mining Tile Definitions & Helpers', () => {
   });
 
   describe('canTileBeDamaged', () => {
-    it('returns true only for damageable tiles (DIRT, MINERAL, CHEST, COPPERIUM, SILVERIUM)', () => {
+    it('returns true only for damageable tiles (DIRT, COPPERIUM, SILVERIUM)', () => {
       expect(canTileBeDamaged(MiningTileType.DIRT)).toBe(true);
-      expect(canTileBeDamaged(MiningTileType.MINERAL)).toBe(true);
-      expect(canTileBeDamaged(MiningTileType.CHEST)).toBe(true);
       expect(canTileBeDamaged(MiningTileType.COPPERIUM)).toBe(true);
       expect(canTileBeDamaged(MiningTileType.SILVERIUM)).toBe(true);
 
       // Non-damageable / indestructible tiles
       expect(canTileBeDamaged(MiningTileType.EMPTY)).toBe(false);
-      expect(canTileBeDamaged(MiningTileType.ENTRANCE)).toBe(false);
       expect(canTileBeDamaged(MiningTileType.LADDER)).toBe(false);
       expect(canTileBeDamaged(MiningTileType.TORCH)).toBe(false);
       expect(canTileBeDamaged(MiningTileType.ROCK)).toBe(false);
@@ -50,13 +47,10 @@ describe('Mining Tile Definitions & Helpers', () => {
   describe('isTileMineable', () => {
     it('returns true only for blocks that can be mined with a pickaxe', () => {
       expect(isTileMineable(MiningTileType.DIRT)).toBe(true);
-      expect(isTileMineable(MiningTileType.MINERAL)).toBe(true);
-      expect(isTileMineable(MiningTileType.CHEST)).toBe(true);
       expect(isTileMineable(MiningTileType.COPPERIUM)).toBe(true);
       expect(isTileMineable(MiningTileType.SILVERIUM)).toBe(true);
 
       expect(isTileMineable(MiningTileType.EMPTY)).toBe(false);
-      expect(isTileMineable(MiningTileType.ENTRANCE)).toBe(false);
       expect(isTileMineable(MiningTileType.LADDER)).toBe(false);
       expect(isTileMineable(MiningTileType.TORCH)).toBe(false);
       expect(isTileMineable(MiningTileType.ROCK)).toBe(false);
@@ -67,14 +61,11 @@ describe('Mining Tile Definitions & Helpers', () => {
     it('returns true for solid obstacles that block physics movement', () => {
       expect(isTileSolid(MiningTileType.DIRT)).toBe(true);
       expect(isTileSolid(MiningTileType.ROCK)).toBe(true);
-      expect(isTileSolid(MiningTileType.MINERAL)).toBe(true);
-      expect(isTileSolid(MiningTileType.CHEST)).toBe(true);
       expect(isTileSolid(MiningTileType.COPPERIUM)).toBe(true);
       expect(isTileSolid(MiningTileType.SILVERIUM)).toBe(true);
 
       // Non-solid walkable/passable tiles
       expect(isTileSolid(MiningTileType.EMPTY)).toBe(false);
-      expect(isTileSolid(MiningTileType.ENTRANCE)).toBe(false);
       expect(isTileSolid(MiningTileType.LADDER)).toBe(false);
       expect(isTileSolid(MiningTileType.TORCH)).toBe(false);
     });
@@ -92,14 +83,11 @@ describe('Mining Tile Definitions & Helpers', () => {
   describe('isTileTransparent', () => {
     it('returns true for tiles that let sunlight through', () => {
       expect(isTileTransparent(MiningTileType.EMPTY)).toBe(true);
-      expect(isTileTransparent(MiningTileType.ENTRANCE)).toBe(true);
       expect(isTileTransparent(MiningTileType.LADDER)).toBe(true);
       expect(isTileTransparent(MiningTileType.TORCH)).toBe(true);
 
       expect(isTileTransparent(MiningTileType.DIRT)).toBe(false);
       expect(isTileTransparent(MiningTileType.ROCK)).toBe(false);
-      expect(isTileTransparent(MiningTileType.MINERAL)).toBe(false);
-      expect(isTileTransparent(MiningTileType.CHEST)).toBe(false);
       expect(isTileTransparent(MiningTileType.COPPERIUM)).toBe(false);
       expect(isTileTransparent(MiningTileType.SILVERIUM)).toBe(false);
     });
@@ -108,8 +96,7 @@ describe('Mining Tile Definitions & Helpers', () => {
   describe('getTileMaxHealth', () => {
     it('returns default max health for tiles when no dynamic block configs provided', () => {
       expect(getTileMaxHealth(MiningTileType.DIRT)).toBe(100);
-      expect(getTileMaxHealth(MiningTileType.MINERAL)).toBe(300);
-      expect(getTileMaxHealth(MiningTileType.CHEST)).toBe(200);
+      expect(getTileMaxHealth(MiningTileType.STONE)).toBe(150);
       expect(getTileMaxHealth(MiningTileType.COPPERIUM)).toBe(240);
       expect(getTileMaxHealth(MiningTileType.SILVERIUM)).toBe(400);
     });
@@ -117,13 +104,13 @@ describe('Mining Tile Definitions & Helpers', () => {
     it('dynamically prioritizes health from admin/database blockConfigs map over defaults', () => {
       const dynamicConfigs = new Map<any, any>([
         [MiningTileType.DIRT, { health: 75 }],
-        [MiningTileType.MINERAL, { health: 600 }],
+        [MiningTileType.COPPERIUM, { health: 600 }],
       ]);
 
       expect(getTileMaxHealth(MiningTileType.DIRT, dynamicConfigs)).toBe(75);
-      expect(getTileMaxHealth(MiningTileType.MINERAL, dynamicConfigs)).toBe(600);
+      expect(getTileMaxHealth(MiningTileType.COPPERIUM, dynamicConfigs)).toBe(600);
       // Fallback to default for tiles not overridden in dynamicConfigs
-      expect(getTileMaxHealth(MiningTileType.CHEST, dynamicConfigs)).toBe(200);
+      expect(getTileMaxHealth(MiningTileType.SILVERIUM, dynamicConfigs)).toBe(400);
     });
   });
 

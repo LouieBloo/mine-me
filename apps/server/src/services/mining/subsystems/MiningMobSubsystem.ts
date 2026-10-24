@@ -1,4 +1,4 @@
-import { BLOCK_SCALE } from '@mine-me/shared';
+import { BLOCK_SCALE, type BiomeField } from '@mine-me/shared';
 import {
   BaseMobAI,
   MINING_CONFIG,
@@ -274,16 +274,31 @@ export class MiningMobSubsystem {
 
     const minDepth = options?.minDepth ?? mapConfig?.mobSpawnMinDepth ?? 5;
     const allowedMobIds = options?.mobIds ?? mapConfig?.allowedMobIds ?? [];
-    if (!allowedMobIds || allowedMobIds.length === 0) return;
+    const biomes = this.world.biomeField?.hasMobSpawns ? this.world.biomeField : null;
+    if ((!allowedMobIds || allowedMobIds.length === 0) && !biomes) return;
 
     for (let i = 0; i < mobCount; i++) {
-      const mobId = allowedMobIds[i % allowedMobIds.length];
-      const mobDef = this.world.data.getMobData(mobId);
+      // Without biome spawn lists the map's mobs take turns; with them the mob is drawn from the spot's biome mix
+      const spawnPos = this.findValidCavernSpawnPosition(minDepth);
+      const mobId = biomes ? this.pickMobForSpot(biomes, spawnPos, allowedMobIds) : allowedMobIds[i % allowedMobIds.length];
+      const mobDef = mobId ? this.world.data.getMobData(mobId) : undefined;
       if (!mobDef) continue;
 
-      const spawnPos = this.findValidCavernSpawnPosition(minDepth);
       this.spawnMob(mobDef, spawnPos);
     }
+  }
+
+  /** A mob drawn by weight from what the biomes at the spot allow (their own lists, or the map's list where a biome has none). */
+  private pickMobForSpot(biomes: BiomeField, spot: Vector2D, fallbackIds: readonly string[]): string | undefined {
+    const choices = biomes.mobChoices(Math.floor(spot.x), Math.floor(spot.y), fallbackIds);
+    const total = choices.reduce((sum, c) => sum + c.weight, 0);
+    if (total <= 0) return undefined;
+    let roll = Math.random() * total;
+    for (const choice of choices) {
+      roll -= choice.weight;
+      if (roll < 0) return choice.id;
+    }
+    return choices[choices.length - 1].id;
   }
 
   public updateActiveMobs(dt: number): void {

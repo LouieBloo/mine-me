@@ -52,7 +52,8 @@ describe('MiningDataManager (in-memory definitions)', () => {
     expect(dm.getBlockConfig(MiningTileType.DIRT)?.id).toBe('b1');
     expect(dm.getBlockMaxHealth(MiningTileType.DIRT)).toBe(80);
     expect(dm.getBlockMaxHealth(MiningTileType.ROCK)).toBe(100); // health 0 -> default
-    expect(dm.getBlockMaxHealth(MiningTileType.MINERAL)).toBe(100); // no config -> default
+    expect(dm.getBlockMaxHealth(MiningTileType.CLAY)).toBe(100); // no config -> default
+    expect(dm.getBlockMaxHealth(MiningTileType.BRIDGE)).toBe(20); // an item-placed tile has no block row: the tile's own health
     expect(dm.getBlockConfig(MiningTileType.EMPTY)).toBeUndefined();
   });
 

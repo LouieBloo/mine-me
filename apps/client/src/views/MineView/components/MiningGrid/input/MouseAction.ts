@@ -168,7 +168,7 @@ export abstract class BaseBuildablePlacementAction extends BaseMouseAction {
    * 1. Target coordinate is within grid bounds.
    * 2. Target tile is within reach distance from player position.
    * 3. Target tile is revealed (not hidden in fog of war).
-   * 4. Tile allows this buildable type (not entrance, not already this type).
+   * 4. Tile allows this buildable type (not already this type).
    */
   public canExecute(target: MiningPosition, playerPos: Vector2D, grid: MiningClientTile[][]): boolean {
     return resolveBuildableAnchor(this.buildableType, target, playerPos, grid, this.reach, this.blockedByPlayer) !== null;

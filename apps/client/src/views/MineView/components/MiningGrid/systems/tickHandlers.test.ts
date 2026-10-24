@@ -296,12 +296,9 @@ describe('applyEffects', () => {
       );
     });
 
-    it('uses mineral chips for minerals and the block\'s own particle config when it has one', () => {
+    it('uses the block\'s own particle config when it has one', () => {
       const world = makeWorld();
       const ctx = makeCtx(world);
-      applyEffects(payload({ blockHits: [hit({ tileType: MiningTileType.MINERAL })] }), ctx);
-      expect(world.particleEngineRef.current.spawnBurst).toHaveBeenCalledWith(DEFAULT_PARTICLE_EFFECTS.block_mineral_chip, expect.anything());
-
       const config = { custom: true };
       world.blockParticleConfigsRef.current.set(MiningTileType.ROCK, config);
       applyEffects(payload({ blockHits: [hit({ x: 5, tileType: MiningTileType.ROCK })] }), ctx);
@@ -340,6 +337,14 @@ describe('applyTileUpdates', () => {
     expect(world.lightingEngineRef.current.updateGrid).toHaveBeenCalled();
   });
 
+  it('remembers the biome a revealed tile is in, and keeps the old one when none is sent', () => {
+    const world = makeWorld();
+    applyTileUpdates(payload({ revealedTiles: [reveal({ biome: 2 })] }), makeCtx(world));
+    expect(world.gridRef.current[1][1].biome).toBe(2);
+    applyTileUpdates(payload({ revealedTiles: [reveal({ type: MiningTileType.EMPTY })] }), makeCtx(world));
+    expect(world.gridRef.current[1][1].biome).toBe(2);
+  });
+
   it('keeps the damage stage only for tiles that can be damaged', () => {
     const world = makeWorld();
     applyTileUpdates(payload({ revealedTiles: [reveal({ type: MiningTileType.DIRT, damageStage: 3 }), reveal({ x: 2, type: MiningTileType.ROCK, damageStage: 3 })] }), makeCtx(world));
@@ -367,13 +372,12 @@ describe('applyTileUpdates', () => {
     expect(ctx.effects.recentExplosions).toEqual([]);
   });
 
-  it('lights and animates torches and chests, and removes them when the tile changes', () => {
+  it('lights and animates torches, and removes them when the tile changes', () => {
     const world = makeWorld();
     const ctx = makeCtx(world);
-    applyTileUpdates(payload({ revealedTiles: [reveal({ x: 2, y: 2, type: MiningTileType.TORCH }), reveal({ x: 3, y: 3, type: MiningTileType.CHEST })] }), ctx);
+    applyTileUpdates(payload({ revealedTiles: [reveal({ x: 2, y: 2, type: MiningTileType.TORCH })] }), ctx);
     const lights = world.lightingEngineRef.current.lights;
     expect(lights.has('torch_2_2')).toBe(true);
-    expect(lights.has('chest_3_3')).toBe(true);
     expect(world.torchEmittersRef.current.has('torch_2_2')).toBe(true);
 
     const emitter = world.torchEmittersRef.current.get('torch_2_2');
@@ -402,9 +406,9 @@ describe('applyTileUpdates', () => {
 
   it('starts an ambient emitter for blocks with a particle config, and stops it when they go', () => {
     const world = makeWorld();
-    world.blockParticleConfigsRef.current.set(MiningTileType.MINERAL, { sparkle: true });
+    world.blockParticleConfigsRef.current.set(MiningTileType.COPPERIUM, { sparkle: true });
     const ctx = makeCtx(world);
-    applyTileUpdates(payload({ revealedTiles: [reveal({ x: 4, y: 4, type: MiningTileType.MINERAL })] }), ctx);
+    applyTileUpdates(payload({ revealedTiles: [reveal({ x: 4, y: 4, type: MiningTileType.COPPERIUM })] }), ctx);
     expect(world.blockEmittersRef.current.has('block_effect_4_4')).toBe(true);
     const emitter = world.blockEmittersRef.current.get('block_effect_4_4');
     applyTileUpdates(payload({ revealedTiles: [reveal({ x: 4, y: 4, type: MiningTileType.EMPTY })] }), ctx);

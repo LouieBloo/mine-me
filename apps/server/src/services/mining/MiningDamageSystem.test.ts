@@ -141,9 +141,9 @@ describe('MiningDamageSystem', () => {
     });
 
     it('mines the block through at its max health, dropping loot for non-mob sources', () => {
-      giveBlockDrops(engine, MiningTileType.CHEST);
-      engine.grid[20][23] = { type: MiningTileType.CHEST, revealed: true };
-      const max = engine['dataManager'].getBlockMaxHealth(MiningTileType.CHEST);
+      giveBlockDrops(engine, MiningTileType.STONE);
+      engine.grid[20][23] = { type: MiningTileType.STONE, revealed: true };
+      const max = engine['dataManager'].getBlockMaxHealth(MiningTileType.STONE);
       const res = engine.damageTile(23, 20, ev({ amount: max, source: { kind: 'player', id: cid }, type: 'mining' }));
       expect(res).toMatchObject({ applied: true, destroyed: true });
       expect(engine.grid[20][23].type).toBe(MiningTileType.EMPTY);
@@ -151,8 +151,8 @@ describe('MiningDamageSystem', () => {
     });
 
     it('drops nothing when a mob breaks the block', () => {
-      giveBlockDrops(engine, MiningTileType.CHEST); // the block WOULD drop for anyone but a mob
-      engine.grid[20][23] = { type: MiningTileType.CHEST, revealed: true };
+      giveBlockDrops(engine, MiningTileType.STONE); // the block WOULD drop for anyone but a mob
+      engine.grid[20][23] = { type: MiningTileType.STONE, revealed: true };
       engine.damageTile(23, 20, ev({ amount: 99999, source: { kind: 'mob', id: 'm1' }, type: 'mining' }));
       expect(engine.grid[20][23].type).toBe(MiningTileType.EMPTY);
       expect(engine.droppedItems).toHaveLength(0);
@@ -186,7 +186,7 @@ describe('MiningDamageSystem', () => {
     it.each([
       ['empty air', MiningTileType.EMPTY],
       ['indestructible rock', MiningTileType.ROCK],
-      ['the entrance', MiningTileType.ENTRANCE],
+      ['bedrock', MiningTileType.BEDROCK],
       ['a ladder', MiningTileType.LADDER],
     ])('does not damage %s', (_n, type) => {
       engine.grid[20][23] = { type, revealed: true };

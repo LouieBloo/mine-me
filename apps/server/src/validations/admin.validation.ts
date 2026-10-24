@@ -127,8 +127,6 @@ export const miningConfigValidation = [
   body('tunnelWidth').optional().isInt({ min: 1, max: 3 * BLOCK_SCALE }).withMessage(`Tunnel Width must be between 1 and ${3 * BLOCK_SCALE}`),
   body('tunnelMinDepth').optional().isInt({ min: 1, max: 20 * BLOCK_SCALE }).withMessage(`Tunnel Min Depth must be between 1 and ${20 * BLOCK_SCALE}`),
   body('rockPercentage').optional().isInt({ min: 0, max: 50 }).withMessage('Rock Percentage must be between 0 and 50'),
-  body('mineralPercentage').optional().isInt({ min: 0, max: 50 }).withMessage('Mineral Percentage must be between 0 and 50'),
-  body('chestCount').optional().isInt({ min: 0, max: 20 }).withMessage('Chest Count must be between 0 and 20'),
   body('copperiumPercentage').optional().isInt({ min: 0, max: 30 }).withMessage('Copperium Percentage must be between 0 and 30'),
   body('silveriumPercentage').optional().isInt({ min: 0, max: 20 }).withMessage('Silverium Percentage must be between 0 and 20'),
   body('silveriumMinDepth').optional().isInt({ min: 1, max: 40 * BLOCK_SCALE }).withMessage(`Silverium Min Depth must be between 1 and ${40 * BLOCK_SCALE}`),
@@ -158,6 +156,14 @@ export const miningConfigValidation = [
     return true;
   }),
   body('skyRows').optional().isInt({ min: 0, max: 40 * BLOCK_SCALE }).withMessage(`Sky Height must be between 0 and ${40 * BLOCK_SCALE}`),
+  body('biomeBlendWidth').optional().isFloat({ min: 0, max: 0.5 }).withMessage('Biome Blend Width must be between 0 and 0.5'),
+  body('biomeWeights').optional({ nullable: true }).custom((value) => {
+    if (typeof value !== 'object' || Array.isArray(value)) throw new Error('Biome Weights must be an object of biome key to weight');
+    for (const [key, weight] of Object.entries(value as Record<string, unknown>)) {
+      if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) throw new Error(`Biome Weights.${key} must be greater than 0`);
+    }
+    return true;
+  }),
   body('mobSpawnCount').optional().isInt({ min: 0, max: 20 }).withMessage('Mob Spawn Count must be between 0 and 20'),
   body('mobSpawnMinDepth').optional().isInt({ min: 1, max: 40 * BLOCK_SCALE }).withMessage(`Mob Spawn Min Depth must be between 1 and ${40 * BLOCK_SCALE}`),
   body('allowedMobIds').optional().isArray().withMessage('Allowed Mob IDs must be an array of strings'),

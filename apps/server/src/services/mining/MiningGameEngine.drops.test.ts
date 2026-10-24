@@ -24,7 +24,7 @@ describe('dropped items are only re-sent when something changes', () => {
     });
     for (const id of [...engine.activeMobs.keys()]) engine.activeMobs.delete(id);
     // Chests drop whatever their drop table says; give this test's chests two items
-    giveBlockDrops(engine, MiningTileType.CHEST, [{ itemId: 'gem' }, { itemId: 'coin', quantity: 3 }]);
+    giveBlockDrops(engine, MiningTileType.STONE, [{ itemId: 'gem' }, { itemId: 'coin', quantity: 3 }]);
     for (let x = 16; x <= 28; x++) {
       for (let y = 17; y <= 20; y++) {
         engine.grid[y][x] = { type: MiningTileType.EMPTY, revealed: true };
@@ -44,7 +44,7 @@ describe('dropped items are only re-sent when something changes', () => {
 
   it('sends the list when items spawn and while they fall, then stops once they come to rest', () => {
     const before = ticks.length;
-    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    engine.spawnBlockDrops(25, 20, MiningTileType.STONE);
     expect(engine.droppedItems.length).toBeGreaterThan(0);
     tick(90); // 3 seconds
 
@@ -56,7 +56,7 @@ describe('dropped items are only re-sent when something changes', () => {
   });
 
   it('puts items that have come to rest to sleep, so a pile of them costs nothing to keep', () => {
-    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    engine.spawnBlockDrops(25, 20, MiningTileType.STONE);
     tick(90);
     const bodies = [...engine.activeItemBodies.values()];
     expect(bodies.length).toBeGreaterThan(0);
@@ -64,7 +64,7 @@ describe('dropped items are only re-sent when something changes', () => {
   });
 
   it('wakes a sleeping item when the floor under it is mined away', () => {
-    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    engine.spawnBlockDrops(25, 20, MiningTileType.STONE);
     tick(90);
     const item = engine.droppedItems[0];
     const body = engine.activeItemBodies.get(item.id!)!;
@@ -76,7 +76,7 @@ describe('dropped items are only re-sent when something changes', () => {
   });
 
   it('ticks carry only ids and positions; each item is described once, in `spawned`', () => {
-    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    engine.spawnBlockDrops(25, 20, MiningTileType.STONE);
     tick(30);
     const described = ticks.flatMap((t) => t.spawned?.droppedItems ?? []);
     expect(described.map((d: any) => d.id).sort()).toEqual(engine.droppedItems.map((d) => d.id).sort());
@@ -88,7 +88,7 @@ describe('dropped items are only re-sent when something changes', () => {
 
   it('every send carries the full current list (so late changes are never lost)', () => {
     const before = ticks.length;
-    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    engine.spawnBlockDrops(25, 20, MiningTileType.STONE);
     tick(5);
     const withList = ticks.slice(before).filter((t) => t.droppedItems);
     expect(withList.length).toBeGreaterThan(0);
@@ -96,7 +96,7 @@ describe('dropped items are only re-sent when something changes', () => {
   });
 
   it('sends the list again when an item is picked up, including an empty list when the last one goes', () => {
-    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    engine.spawnBlockDrops(25, 20, MiningTileType.STONE);
     tick(60); // settled
     const count = engine.droppedItems.length;
     expect(count).toBeGreaterThan(0);
@@ -121,7 +121,7 @@ describe('dropped items are only re-sent when something changes', () => {
   });
 
   it('releases the physics body of a picked-up item', () => {
-    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    engine.spawnBlockDrops(25, 20, MiningTileType.STONE);
     tick(60);
     const me = engine.players.get(cid)!;
     for (const item of [...engine.droppedItems]) {
@@ -132,7 +132,7 @@ describe('dropped items are only re-sent when something changes', () => {
   });
 
   it('a settled item that is disturbed (e.g. its floor is mined away) is announced again', () => {
-    engine.spawnBlockDrops(25, 20, MiningTileType.CHEST);
+    engine.spawnBlockDrops(25, 20, MiningTileType.STONE);
     tick(60);
     const before = ticks.length;
     const item = engine.droppedItems[0];
@@ -149,7 +149,7 @@ describe('dropped items are only re-sent when something changes', () => {
 
   it('does not grow past the hard limit however many blocks are mined', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    for (let i = 0; i < 1500; i++) engine.spawnBlockDrops(25, 20, MiningTileType.CHEST); // more drops than the limit allows
+    for (let i = 0; i < 1500; i++) engine.spawnBlockDrops(25, 20, MiningTileType.STONE); // more drops than the limit allows
     expect(engine.droppedItems.length).toBe(1000);
     expect(engine.activeItemBodies.size).toBeLessThanOrEqual(1000);
   });

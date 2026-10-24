@@ -9,9 +9,7 @@ interface PreviewStats {
   totalTiles: number;
   emptyCount: number;
   solidCount: number;
-  mineralCount: number;
   rockCount: number;
-  chestCount: number;
   copperiumCount?: number;
   silveriumCount?: number;
   voidPercentage: number;
@@ -72,10 +70,6 @@ export default function MiningConfigPreview({
           color = '#78350f'; // DIRT
         } else if (type === MiningTileType.ROCK) {
           color = '#64748b'; // ROCK
-        } else if (type === MiningTileType.MINERAL) {
-          color = '#f59e0b'; // MINERAL
-        } else if (type === MiningTileType.CHEST) {
-          color = '#eab308'; // CHEST
         } else if (type === MiningTileType.COPPERIUM) {
           color = '#b45309'; // COPPERIUM (burnished copper)
         } else if (type === MiningTileType.SILVERIUM) {
@@ -170,10 +164,6 @@ export default function MiningConfigPreview({
           <span>Rocks</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-xs bg-[#eab308] inline-block"></span>
-          <span>Chests</span>
-        </div>
-        <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-xs bg-[#b45309] inline-block"></span>
           <span>Copperium</span>
         </div>
@@ -197,10 +187,6 @@ export default function MiningConfigPreview({
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
             <div className="text-xl font-black text-slate-600">{previewData.stats.rockCount}</div>
             <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Rocks</div>
-          </div>
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
-            <div className="text-xl font-black text-yellow-500">{previewData.stats.chestCount}</div>
-            <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Chests</div>
           </div>
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
             <div className="text-xl font-black text-amber-600">{previewData.stats.copperiumCount ?? 0}</div>

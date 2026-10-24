@@ -3,6 +3,7 @@ import {
   BLOCK_SCALE,
   MINING_CONFIG,
   MiningTileType,
+  PLACED_ITEM_TILES,
   carryRoom,
   rollDropTable,
   type MiningDroppedItem,
@@ -58,7 +59,15 @@ export class MiningDropSubsystem {
 
   /** Rolls a mined block's drop table and drops the result at the tile. */
   public spawnBlockDrops(tx: number, ty: number, tileType: MiningTileType): void {
-    if (tileType === MiningTileType.EMPTY || tileType === MiningTileType.ENTRANCE) return;
+    if (tileType === MiningTileType.EMPTY) return;
+
+    // A tile an item places (a bridge) has no block row: mining it gives back the item that places it
+    const placer = PLACED_ITEM_TILES.find((p) => p.tileType === tileType);
+    if (placer) {
+      const item = this.world.data.getItems().find((i) => placer.matches(i));
+      if (item) this.spawnDrops([{ itemId: item.id, quantity: 1 }], { x: tx + 0.5, y: ty + 0.5 });
+      return;
+    }
 
     // The block's drop table (from the database) is the only source of loot: no table, no drops.
     const dropTable = this.world.data.getBlockConfig(tileType)?.dropTable;

@@ -17,8 +17,8 @@ export type SandboxZone =
   | { kind: 'fill'; tile: MiningTileType; rect: TileRect }
   /** Paints single tiles. */
   | { kind: 'tiles'; tile: MiningTileType; at: ReadonlyArray<{ x: number; y: number }> }
-  /** One tile of each type, left to right, `spacing` apart. Each is `size` x `size` cells (default 1). */
-  | { kind: 'blockRow'; y: number; startX: number; spacing: number; tiles: readonly MiningTileType[]; size?: number }
+  /** One tile of each type, left to right, `spacing` apart. Each is `size` x `size` cells (default 1). `cellSize` sets both in cells after scaling, so the blocks touch. */
+  | { kind: 'blockRow'; y: number; startX: number; spacing: number; tiles: readonly MiningTileType[]; size?: number; cellSize?: number }
   /** Carves the rectangle open and fills it with the fluid whose typeKey is `fluid`; a fluid that is not loaded leaves the pool dry. */
   | { kind: 'pool'; rect: TileRect; fluid: string; fillFromY?: number }
   /** Carves the rectangle open and fills it with `concentration` (default 1) of the gas in `gasSlot` (the loaded gases in key order); a slot with no gas stays empty. Leave solid ground around it and it is a sealed pocket. */
@@ -77,7 +77,8 @@ export function scaleSandboxLayout(layout: SandboxLayout, factor: number): Sandb
         return { ...zone, at: zone.at.flatMap((p) => cell(p.x, p.y)) };
       case 'blockRow':
         // One zone per block type is not available, so the row is spaced out and each block is drawn as a factor x factor square
-        return { ...zone, y: zone.y * factor, startX: zone.startX * factor, spacing: zone.spacing * factor, size: factor };
+        // `cellSize` (cells per block side, touching) overrides the default of one original block per block
+        return { ...zone, y: zone.y * factor, startX: zone.startX * factor, spacing: zone.cellSize ?? zone.spacing * factor, size: zone.cellSize ?? factor };
       case 'pool':
         return { ...zone, rect: scaleRect(zone.rect), fillFromY: zone.fillFromY === undefined ? undefined : zone.fillFromY * factor };
       case 'chamber':
@@ -95,16 +96,18 @@ export function scaleSandboxLayout(layout: SandboxLayout, factor: number): Sandb
 }
 
 const rect = (x0: number, y0: number, x1: number, y1: number): TileRect => ({ x0, y0, x1, y1 });
-const { EMPTY, DIRT, ROCK, MINERAL, CHEST, LADDER, COPPERIUM, SILVERIUM } = MiningTileType;
+/** How far the pools and chambers are pushed right (original blocks) to make room for the block line next to the spawn. */
+const E = 15;
+const { EMPTY, DIRT, ROCK, LADDER, COPPERIUM, SILVERIUM } = MiningTileType;
 
 /**
- * The standard sandbox, 90 wide by 30 deep in old-size blocks (180 by 60 now), under {@link SANDBOX_SKY_ROWS_OLD} rows of open sky. Left to right on the surface: spawn (x 22), two target dummies, the
- * ladder shaft into the hall (x 12-14), and oil and water pools side by side (x 32-43 and 45-56) that open onto
+ * The standard sandbox, 105 wide by 30 deep in old-size blocks, under {@link SANDBOX_SKY_ROWS_OLD} rows of open sky. Left to right on the surface: spawn (x 22), two target dummies, a line of
+ * one 4x4 patch of every block along the ground (from x 23), the ladder shaft into the hall (x 12-14), and oil and water pools side by side (x 47-58 and 60-71) that open onto
  * the surface so you can jump straight in, a lava pool at the far left (x 1-4), and
- *  two sealed gas chambers under the ground (x 60-67 hydrogen, x 70-77 nitrogen). Underground: a long open hall with one of every block and a
- * rock tower, and a bed of ore and chests to dig through.
+ *  two sealed gas chambers under the ground (x 75-82 hydrogen, x 85-92 nitrogen). Underground: a long open hall and a
+ * rock tower, and a bed of ore to dig through.
  *
- * `blockTiles` is every block type in the game, so a new block shows up in the gallery by itself.
+ * `blockTiles` is every block type in the game, so a new block shows up in the ground line by itself.
  */
 export function createDefaultSandboxLayout(blockTiles: readonly MiningTileType[]): SandboxLayout {
   return scaleSandboxLayout(createOldSizeSandboxLayout(blockTiles), SANDBOX_BLOCK_SCALE);
@@ -113,43 +116,42 @@ export function createDefaultSandboxLayout(blockTiles: readonly MiningTileType[]
 /** The standard sandbox drawn in old-size blocks (see {@link createDefaultSandboxLayout}, which draws it with half-size blocks). */
 function createOldSizeSandboxLayout(blockTiles: readonly MiningTileType[]): SandboxLayout {
   return {
-    width: 90,
+    width: 90 + E,
     height: 30,
     skyRows: SANDBOX_SKY_ROWS_OLD,
     base: DIRT,
     zones: [
+      // A 4x4 patch of every block in a line along the ground, starting just right of the spawn (x 22): walk along the top
+      { kind: 'blockRow', y: 0, startX: 23, spacing: 1, cellSize: 4, tiles: blockTiles },
+
       // Ladder shaft from the surface down to the hall
       { kind: 'fill', tile: EMPTY, rect: rect(12, 0, 14, 11) },
       { kind: 'fill', tile: LADDER, rect: rect(13, 0, 13, 11) },
 
-      // The long open hall (floor on row 16), with one of every block along its floor
-      { kind: 'fill', tile: EMPTY, rect: rect(1, 12, 88, 15) },
-      { kind: 'blockRow', y: 15, startX: 20, spacing: 2, tiles: blockTiles },
+      // The long open hall (floor on row 16)
+      { kind: 'fill', tile: EMPTY, rect: rect(1, 12, 88 + E, 15) },
       // A rock tower that falls when its floor is mined out
       { kind: 'fill', tile: ROCK, rect: rect(50, 12, 50, 15) },
 
       // Ore bed to dig through
       { kind: 'tiles', tile: COPPERIUM, at: [{ x: 6, y: 18 }, { x: 7, y: 18 }, { x: 30, y: 19 }, { x: 31, y: 19 }, { x: 60, y: 20 }, { x: 75, y: 18 }] },
       { kind: 'tiles', tile: SILVERIUM, at: [{ x: 45, y: 21 }, { x: 46, y: 21 }, { x: 82, y: 20 }] },
-      { kind: 'tiles', tile: MINERAL, at: [{ x: 14, y: 19 }, { x: 65, y: 18 }, { x: 70, y: 21 }] },
-      { kind: 'tiles', tile: CHEST, at: [{ x: 25, y: 20 }, { x: 55, y: 19 }, { x: 85, y: 21 }] },
 
       // Oil and water pools side by side (floor on row 8), and a lava pool off on its own at the far left. Break the
       // shared wall to mix oil and water; pour water into the lava to cool it into lavarock.
-      { kind: 'pool', rect: rect(32, 0, 43, 7), fluid: 'OIL', fillFromY: 1 },
-      { kind: 'pool', rect: rect(45, 0, 56, 7), fluid: 'WATER', fillFromY: 1 },
+      { kind: 'pool', rect: rect(32 + E, 0, 43 + E, 7), fluid: 'OIL', fillFromY: 1 },
+      { kind: 'pool', rect: rect(45 + E, 0, 56 + E, 7), fluid: 'WATER', fillFromY: 1 },
       { kind: 'pool', rect: rect(1, 0, 4, 7), fluid: 'LAVA', fillFromY: 1 },
       // Two sealed gas chambers in the ground (hydrogen, then nitrogen: the first two gases in key order) under a
       // two-block roof of dirt. Mine down through the roof to let one out and watch it rise or sink.
-      { kind: 'chamber', rect: rect(60, 2, 67, 7), gasSlot: 0 },
-      { kind: 'chamber', rect: rect(70, 2, 77, 7), gasSlot: 1 },
+      { kind: 'chamber', rect: rect(60 + E, 2, 67 + E, 7), gasSlot: 0 },
+      { kind: 'chamber', rect: rect(70 + E, 2, 77 + E, 7), gasSlot: 1 },
 
       // Pool walls made of different blocks
-      { kind: 'fill', tile: ROCK, rect: rect(31, 4, 31, 5) },
-      { kind: 'tiles', tile: COPPERIUM, at: [{ x: 31, y: 2 }, { x: 31, y: 3 }] },
-      { kind: 'fill', tile: ROCK, rect: rect(44, 3, 44, 4) },
-      { kind: 'tiles', tile: SILVERIUM, at: [{ x: 57, y: 2 }, { x: 57, y: 3 }] },
-      { kind: 'tiles', tile: MINERAL, at: [{ x: 57, y: 4 }, { x: 57, y: 5 }] },
+      { kind: 'fill', tile: ROCK, rect: rect(31 + E, 4, 31 + E, 5) },
+      { kind: 'tiles', tile: COPPERIUM, at: [{ x: 31 + E, y: 2 }, { x: 31 + E, y: 3 }] },
+      { kind: 'fill', tile: ROCK, rect: rect(44 + E, 3, 44 + E, 4) },
+      { kind: 'tiles', tile: SILVERIUM, at: [{ x: 57 + E, y: 2 }, { x: 57 + E, y: 3 }] },
     ],
     mobs: [
       { kind: 'surfaceDummy', x: 17.5, y: 0 },

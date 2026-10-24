@@ -4,6 +4,7 @@ import {
   SOL_CURRENCY_SUBTYPE,
   findCurrencyItem,
   isThrowableItem,
+  type BiomeDefinition,
   type CharacterSoundEffectsConfig,
   type FluidDefinition,
   type ExtractorDefinition,
@@ -15,6 +16,8 @@ import {
   type ParticleEffect,
   type ItemPhysicsConfig,
   type ItemSoundEffectsConfig,
+  PLACED_ITEM_TILES,
+  getTileDefinition,
 } from '@mine-me/shared';
 
 /** Static game definitions, in the shape the admin tools / Prisma produce. */
@@ -26,6 +29,8 @@ export interface GameDefinitions {
   fluids?: FluidDefinition[];
   /** Gases (hydrogen...). Absent means none are defined. */
   gases?: GasDefinition[];
+  /** Biomes. Absent means none are defined (the generator uses a built-in default biome everywhere). */
+  biomes?: BiomeDefinition[];
   /** Extractors. Absent means none are defined (the built-in default is used). */
   extractors?: ExtractorDefinition[];
   /** The particle effect library, so fluids and fire can name an effect by id. Absent means none. */
@@ -37,13 +42,27 @@ export interface GameDefinitions {
 const TILE_TYPE_KEYS: Record<number, string> = {
   [MiningTileType.DIRT]: 'DIRT',
   [MiningTileType.ROCK]: 'ROCK',
-  [MiningTileType.MINERAL]: 'MINERAL',
-  [MiningTileType.CHEST]: 'CHEST',
   [MiningTileType.COPPERIUM]: 'COPPERIUM',
   [MiningTileType.SILVERIUM]: 'SILVERIUM',
-  [MiningTileType.BRIDGE]: 'BRIDGE',
   [MiningTileType.LAVAROCK]: 'LAVAROCK',
+  [MiningTileType.STONE]: 'STONE',
+  [MiningTileType.CLAY]: 'CLAY',
+  [MiningTileType.SANDSTONE]: 'SANDSTONE',
+  [MiningTileType.GRAVEL]: 'GRAVEL',
+  [MiningTileType.ICE]: 'ICE',
+  [MiningTileType.BEDROCK]: 'BEDROCK',
 };
+
+/** The block key of a tile type (e.g. 'DIRT'), or undefined when the tile type is not a block with a definition. */
+export function blockKeyForTileType(type: MiningTileType): string | undefined {
+  return TILE_TYPE_KEYS[type];
+}
+
+/** The tile type of a block key (e.g. 'ROCK'), or undefined when no block has that key. */
+export function tileTypeForBlockKey(key: string): MiningTileType | undefined {
+  const entry = Object.entries(TILE_TYPE_KEYS).find(([, k]) => k === key);
+  return entry ? (Number(entry[0]) as MiningTileType) : undefined;
+}
 
 /** Every tile type that is a block with a definition (dirt, rock, ores, chests...): new ones are listed automatically. */
 export const BLOCK_TILE_TYPES: readonly MiningTileType[] = Object.keys(TILE_TYPE_KEYS).map(Number) as MiningTileType[];
@@ -68,6 +87,9 @@ export class MiningDataManager {
   private readonly gases: GasDefinition[] = [];
   private readonly gasesByTypeKey = new Map<string, GasDefinition>();
   private readonly gasesById = new Map<string, GasDefinition>();
+  private readonly biomes: BiomeDefinition[] = [];
+  private readonly biomesByKey = new Map<string, BiomeDefinition>();
+  private readonly biomesById = new Map<string, BiomeDefinition>();
   private readonly extractors: ExtractorDefinition[] = [];
   private readonly extractorsByKey = new Map<string, ExtractorDefinition>();
   private readonly extractorsById = new Map<string, ExtractorDefinition>();
@@ -107,6 +129,12 @@ export class MiningDataManager {
       this.gases.push(gas);
       this.gasesByTypeKey.set(gas.typeKey, gas);
       MiningDataManager.putFirst(this.gasesById, gas.id, gas);
+    }
+    for (const biome of definitions.biomes ?? []) {
+      if (!biome?.key || this.biomesByKey.has(biome.key)) continue;
+      this.biomes.push(biome);
+      this.biomesByKey.set(biome.key, biome);
+      MiningDataManager.putFirst(this.biomesById, biome.id, biome);
     }
     for (const extractor of definitions.extractors ?? []) {
       if (!extractor?.key || this.extractorsByKey.has(extractor.key)) continue;
@@ -176,6 +204,11 @@ export class MiningDataManager {
     if (config && typeof config.health === 'number' && config.health > 0) {
       return config.health;
     }
+    // A tile an item places (a bridge) has no block row: its health is the tile's own
+    if (PLACED_ITEM_TILES.some((p) => p.tileType === tileType)) {
+      const own = getTileDefinition(tileType).health;
+      if (own) return own;
+    }
     return 100;
   }
 
@@ -217,6 +250,17 @@ export class MiningDataManager {
   /** The extractor a run lands: the one marked default, else the first, else the built-in one. Never undefined. */
   public getDefaultExtractor(): ExtractorDefinition {
     return pickDefaultExtractor(this.extractors);
+  }
+
+  /** All biome definitions, in load order (the first of any duplicated key wins). May be empty: see `BiomeField` for the default. */
+  public getBiomes(): BiomeDefinition[] {
+    return this.biomes;
+  }
+
+  /** Biome definition by key (e.g. 'frozen_caves') or by database id. */
+  public getBiome(keyOrId: string): BiomeDefinition | undefined {
+    if (typeof keyOrId !== 'string') return undefined;
+    return this.biomesByKey.get(keyOrId) ?? this.biomesById.get(keyOrId);
   }
 
   /** All gas definitions, in load order (the first of any duplicated typeKey wins). */

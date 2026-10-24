@@ -18,9 +18,9 @@ describe('blastDamageAt', () => {
 });
 
 describe('blast proof tiles', () => {
-  it('only the entrance survives explosions; rocks are destroyed like any other block', () => {
-    expect(isTileBlastProof(MiningTileType.ENTRANCE)).toBe(true);
-    for (const t of [MiningTileType.ROCK, MiningTileType.DIRT, MiningTileType.MINERAL, MiningTileType.CHEST, MiningTileType.LADDER, MiningTileType.TORCH, MiningTileType.COPPERIUM]) {
+  it('only bedrock survives explosions; rocks are destroyed like any other block', () => {
+    expect(isTileBlastProof(MiningTileType.BEDROCK)).toBe(true);
+    for (const t of [MiningTileType.ROCK, MiningTileType.DIRT, MiningTileType.STONE, MiningTileType.LADDER, MiningTileType.TORCH, MiningTileType.COPPERIUM]) {
       expect(isTileBlastProof(t)).toBe(false);
     }
   });

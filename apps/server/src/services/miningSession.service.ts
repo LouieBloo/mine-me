@@ -265,33 +265,9 @@ export async function completeMining(
     throw new Error(`Mining not complete. ${requiredTimeMs - elapsed}ms remaining.`);
   }
 
-  const tile = session.grid[target.y][target.x];
   let itemsGained: MiningBackpackItem[] = [];
   let damageTaken = 0;
   let message: string | undefined;
-
-  // Generate loot based on tile type
-  if (tile.type === MiningTileType.MINERAL) {
-    const mineralItem = await generateMineral(session.cityId);
-    if (mineralItem) {
-      session.temporaryBackpack.push(mineralItem);
-      itemsGained.push(mineralItem);
-    }
-  } else if (tile.type === MiningTileType.CHEST) {
-    const chestItems = await generateChestLoot(session.cityId);
-    for (const item of chestItems) {
-      const existing = session.temporaryBackpack.find(b => b.itemId === item.itemId);
-      if (existing) {
-        existing.quantity += item.quantity;
-      } else {
-        session.temporaryBackpack.push(item);
-      }
-      itemsGained.push(item);
-    }
-    if (chestItems.length > 0) {
-      message = 'You found a treasure chest!';
-    }
-  }
 
   // Clear the mined tile
   session.grid[target.y][target.x] = {
@@ -341,92 +317,6 @@ export async function extractFromMine(
   await deleteSession(characterId);
 
   return extractedItems;
-}
-
-// ---------------------------------------------------------------------------
-// Loot Generation
-// ---------------------------------------------------------------------------
-
-/**
- * Generate a random mineral item from the city's material list.
- * Only picks MINERAL-subtype items associated with the city.
- */
-async function generateMineral(cityId: string): Promise<MiningBackpackItem | null> {
-  const cityMaterials = await prisma.cityMaterial.findMany({
-    where: { cityId },
-    include: {
-      item: true,
-    },
-  });
-
-  // Filter to only mineral-subtype materials
-  const minerals = cityMaterials.filter(cm => cm.item.subType === 'MINERAL');
-  if (minerals.length === 0) return null;
-
-  // Weighted random by rarity (rarer = less likely)
-  const RARITY_WEIGHTS: Record<string, number> = {
-    LOW: 50,
-    MEDIUM: 25,
-    RARE: 10,
-    VERY_RARE: 3,
-  };
-
-  const totalWeight = minerals.reduce(
-    (sum, cm) => sum + (RARITY_WEIGHTS[cm.item.rarity] ?? 50),
-    0,
-  );
-
-  let roll = Math.random() * totalWeight;
-  for (const cm of minerals) {
-    const weight = RARITY_WEIGHTS[cm.item.rarity] ?? 50;
-    roll -= weight;
-    if (roll <= 0) {
-      return {
-        itemId: cm.item.id,
-        itemName: cm.item.name,
-        iconUrl: cm.item.iconUrl,
-        quantity: 1,
-      };
-    }
-  }
-
-  // Fallback to first mineral
-  const fallback = minerals[0].item;
-  return {
-    itemId: fallback.id,
-    itemName: fallback.name,
-    iconUrl: fallback.iconUrl,
-    quantity: 1,
-  };
-}
-
-/**
- * Generate loot from a treasure chest.
- * Picks 1-3 random materials from the city.
- */
-async function generateChestLoot(cityId: string): Promise<MiningBackpackItem[]> {
-  const cityMaterials = await prisma.cityMaterial.findMany({
-    where: { cityId },
-    include: { item: true },
-  });
-
-  if (cityMaterials.length === 0) return [];
-
-  const itemCount = 1 + Math.floor(Math.random() * 3); // 1-3 items
-  const items: MiningBackpackItem[] = [];
-
-  for (let i = 0; i < itemCount; i++) {
-    const cm = cityMaterials[Math.floor(Math.random() * cityMaterials.length)];
-    const quantity = 1 + Math.floor(Math.random() * 3); // 1-3 quantity
-    items.push({
-      itemId: cm.item.id,
-      itemName: cm.item.name,
-      iconUrl: cm.item.iconUrl,
-      quantity,
-    });
-  }
-
-  return items;
 }
 
 // ---------------------------------------------------------------------------

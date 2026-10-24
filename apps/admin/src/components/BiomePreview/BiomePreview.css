@@ -1,0 +1,4 @@
+/* Scoped styles for BiomePreview */
+.biome-preview canvas {
+  image-rendering: pixelated;
+}

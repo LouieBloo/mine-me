@@ -3,6 +3,7 @@ import type { AutotileConfig } from '../gameLogic/autotile';
 import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffectsConfig, MobSoundEffectsConfig, ItemLightConfig, HeldLightConfig, CharacterSoundEffectsConfig, FluidSoundEffectsConfig, ExtractorSoundEffectsConfig } from './index';
 import type { ParticleEffect, ParticleEffectConfig } from './particles';
 import type { Flammability, FluidAppearance } from './fluid';
+import type { BiomeClientDefinition } from './biome';
 import type { GasClientDefinition, GasEvent, GasExplosionCell, GasWireCell } from '../gameLogic/gas/gasWire';
 import type { SkeletonManifest } from './modularRig';
 
@@ -51,8 +52,6 @@ export const MINING_CONFIG = {
 
   /** Time in milliseconds to mine each tile type */
   DIRT_MINE_TIME_MS: 500,
-  MINERAL_MINE_TIME_MS: 1500,
-  CHEST_MINE_TIME_MS: 1000,
 
   /** Melee hit box: pivot height above player center (shoulder), in tiles */
   MELEE_SHOULDER_OFFSET_Y: 0.35 * S,
@@ -131,14 +130,8 @@ export const MINING_CONFIG = {
   PLAYER_HIT_KNOCKBACK_Y: -4.0 * S,
   PLAYER_HIT_KNOCKBACK_SECONDS: 0.2, // movement input is ignored this long after being hit
 
-  /** Number of treasure chests per map */
-  TREASURE_CHEST_COUNT: 4,
-
   /** Approximate percentage of tiles that are rocks */
   ROCK_PERCENTAGE: 6,
-
-  /** Approximate percentage of tiles that are minerals */
-  MINERAL_PERCENTAGE: 10,
 
   /** Continuous physics parameters */
   PLAYER_RADIUS: 12, // pixels: the character sprite's foot offset below the body centre
@@ -194,20 +187,24 @@ export const MiningTileType = {
   EMPTY: 0,
   DIRT: 1,
   ROCK: 2,
-  MINERAL: 3,
-  CHEST: 4,
-  ENTRANCE: 5,
   LADDER: 6,
   TORCH: 7,
   COPPERIUM: 8,
   SILVERIUM: 9,
   BRIDGE: 10,
   LAVAROCK: 11,
+  // Basic terrain (ticket 140): plain solid blocks that differ by hardness and look; biomes swap them in
+  STONE: 12,
+  CLAY: 13,
+  SANDSTONE: 14,
+  GRAVEL: 15,
+  ICE: 16,
+  BEDROCK: 17,
 } as const;
 
 export type MiningTileType = (typeof MiningTileType)[keyof typeof MiningTileType];
 
-export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'MINERAL' | 'CHEST' | 'ENTRANCE' | 'COPPERIUM' | 'SILVERIUM' | 'BRIDGE' | 'LAVAROCK';
+export type MiningBlockTypeKey = 'DIRT' | 'ROCK' | 'COPPERIUM' | 'SILVERIUM' | 'LAVAROCK' | 'STONE' | 'CLAY' | 'SANDSTONE' | 'GRAVEL' | 'ICE' | 'BEDROCK';
 
 export interface MiningBlockConfig {
   id: string;
@@ -287,38 +284,6 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     isClimbable: false,
     isTransparent: false,
   },
-  [MiningTileType.MINERAL]: {
-    type: MiningTileType.MINERAL,
-    name: 'Mineral',
-    canBeDamaged: true,
-    isMineable: true,
-    isSolid: true,
-    isClimbable: false,
-    isTransparent: false,
-    health: 300,
-    defaultMineTimeMs: MINING_CONFIG.MINERAL_MINE_TIME_MS,
-  },
-  [MiningTileType.CHEST]: {
-    type: MiningTileType.CHEST,
-    name: 'Chest',
-    canBeDamaged: true,
-    isMineable: true,
-    isSolid: true,
-    isClimbable: false,
-    isTransparent: false,
-    health: 200,
-    defaultMineTimeMs: MINING_CONFIG.CHEST_MINE_TIME_MS,
-  },
-  [MiningTileType.ENTRANCE]: {
-    type: MiningTileType.ENTRANCE,
-    name: 'Entrance',
-    canBeDamaged: false,
-    isMineable: false,
-    isSolid: false,
-    isClimbable: false,
-    isTransparent: true,
-    isBlastProof: true,
-  },
   [MiningTileType.LADDER]: {
     type: MiningTileType.LADDER,
     name: 'Ladder',
@@ -382,6 +347,73 @@ export const MINING_TILE_DEFINITIONS: Record<MiningTileType, MiningTileDefinitio
     isTransparent: false,
     health: 500,
     defaultMineTimeMs: 2500,
+  },
+  // Basic terrain (ticket 140). The database health is what the game uses; these are the fallbacks.
+  [MiningTileType.STONE]: {
+    type: MiningTileType.STONE,
+    name: 'Stone',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    health: 150,
+    defaultMineTimeMs: 1500,
+  },
+  [MiningTileType.CLAY]: {
+    type: MiningTileType.CLAY,
+    name: 'Clay',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    health: 25,
+    defaultMineTimeMs: 250,
+  },
+  [MiningTileType.SANDSTONE]: {
+    type: MiningTileType.SANDSTONE,
+    name: 'Sandstone',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    health: 60,
+    defaultMineTimeMs: 600,
+  },
+  [MiningTileType.GRAVEL]: {
+    type: MiningTileType.GRAVEL,
+    name: 'Gravel',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    health: 20,
+    defaultMineTimeMs: 200,
+  },
+  [MiningTileType.ICE]: {
+    type: MiningTileType.ICE,
+    name: 'Ice',
+    canBeDamaged: true,
+    isMineable: true,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    health: 80,
+    defaultMineTimeMs: 800,
+  },
+  // The unbreakable floor: cannot be damaged or mined, and survives (and stops) explosions
+  [MiningTileType.BEDROCK]: {
+    type: MiningTileType.BEDROCK,
+    name: 'Bedrock',
+    canBeDamaged: false,
+    isMineable: false,
+    isSolid: true,
+    isClimbable: false,
+    isTransparent: false,
+    isBlastProof: true,
   },
 };
 
@@ -549,6 +581,8 @@ export interface MiningClientTile {
   damageStage?: number;
   /** Set on a cell of a multi-cell piece (ladder, torch, bridge, rock): [column, row] inside the piece, from its top-left cell, plus its size when pieces of the type vary. */
   piece?: PieceOffset;
+  /** Index of the cell's biome in the state's `biomes` list. Only sent for revealed cells, and only when the mine has biomes. */
+  biome?: number;
 }
 
 
@@ -740,6 +774,8 @@ export interface MiningSessionClientState {
   fluids?: { id: number; typeKey: string; name: string; color: string; opacity: number; viscosity: number; density: number; appearance?: FluidAppearance; flame?: { effect: ParticleEffectConfig | null; light: ItemLightConfig | null }; sounds?: FluidSoundEffectsConfig }[];
   /** Fluid in the cells already revealed, as [x, y, fluidId, level]; later changes arrive in each tick's `fluidCells`. */
   fluidCells?: [x: number, y: number, fluidId: number, level: number, falling?: number][];
+  /** The mine's biomes (look and ambient light), sent once. Missing means the whole mine is one biome. Cells and revealed tiles carry an index into this list. */
+  biomes?: BiomeClientDefinition[];
   /** How to draw each gas in the mine, sent once. Missing means the mine has no gases. */
   gases?: GasClientDefinition[];
   /** Gas in the cells already revealed, as [x, y, gasId, concentration]; later changes arrive in each tick's `gasCells`. */
@@ -1016,7 +1052,7 @@ export interface MiningStateTickPayload {
   explosions?: MiningExplosionEvent[];
   /** Block damage hit events (e.g. tool swing hits dealing damage) triggered during this tick. */
   blockHits?: MiningBlockHitEvent[];
-  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; piece?: PieceOffset; fluid?: [fluidId: number, level: number, falling?: number]; gas?: [gasId: number, concentration: number]; fire?: 1 }[];
+  revealedTiles?: { x: number; y: number; type: MiningTileType; damageStage?: number; piece?: PieceOffset; biome?: number; fluid?: [fluidId: number, level: number, falling?: number]; gas?: [gasId: number, concentration: number]; fire?: 1 }[];
   /**
    * Fluid cells that changed this tick, as [x, y, fluidId, level]. Only cells the fog of war has revealed
    * are ever sent (a newly revealed tile carries its fluid in `revealedTiles`).
@@ -1179,8 +1215,6 @@ export interface MiningMapConfigData {
   tunnelWidth: number;
   tunnelMinDepth: number;
   rockPercentage: number;
-  mineralPercentage: number;
-  chestCount: number;
   copperiumPercentage: number;
   silveriumPercentage: number;
   silveriumMinDepth: number;
@@ -1214,6 +1248,10 @@ export interface MiningMapConfigData {
   autotileStyle?: AutotileConfig | null;
   /** Open-air rows above the ground in the generated mine (small blocks; see `DEFAULT_SKY_ROWS`). 0 = the ground is the top row. */
   skyRows?: number;
+  /** How soft the borders between biomes are: 0 is a hard edge, bigger is a wider blend (see `DEFAULT_BIOME_BLEND_WIDTH`). */
+  biomeBlendWidth?: number;
+  /** Which biomes this map has and how strong each is on it (biome key -> weight). Null/empty: every biome at its own weight. */
+  biomeWeights?: Record<string, number> | null;
   /** Hostile NPC / Mob Spawning */
   mobSpawnCount?: number;
   mobSpawnMinDepth?: number;
@@ -1237,8 +1275,6 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   tunnelWidth: S,
   tunnelMinDepth: 2 * S,
   rockPercentage: MINING_CONFIG.ROCK_PERCENTAGE,
-  mineralPercentage: MINING_CONFIG.MINERAL_PERCENTAGE,
-  chestCount: MINING_CONFIG.TREASURE_CHEST_COUNT,
   copperiumPercentage: 4,
   silveriumPercentage: 2,
   silveriumMinDepth: 12 * S,
@@ -1267,6 +1303,8 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   burningEffectId: null,
   autotileStyle: null,
   skyRows: DEFAULT_SKY_ROWS,
+  biomeBlendWidth: 0.15,
+  biomeWeights: null,
   mobSpawnCount: 3,
   mobSpawnMinDepth: 5 * S,
   // No built-in mobs: the active map config (database) says which mobs live in the mine

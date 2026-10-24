@@ -335,6 +335,37 @@ model Gas {
   updatedAt        DateTime @updatedAt
 }
 
+/// A region of the mine (tickets 095-098): changes the block palette, fluids, gases, mob spawns and ambient look.
+/// Depths are in small blocks (original value x BLOCK_SCALE). Exactly one row is the default; the generator adds a
+/// built-in one when there is none. The weight maps and ambient are Json in the shared BiomeDefinition shapes.
+model Biome {
+  id           String   @id @default(cuid())
+  // Open key, e.g. frozen_caves
+  key          String   @unique
+  name         String
+  description  String?
+  isDefault    Boolean  @default(false)
+  minDepth     Int      @default(0)
+  // null = down to the bottom of the map
+  maxDepth     Int?
+  // How strongly it wins against overlapping biomes
+  weight       Float    @default(1)
+  // Region size in small blocks
+  noiseScale   Float    @default(45)
+  // BiomeBlockPalette: block key -> multiplier, plus base-block swaps
+  blockPalette Json?
+  // Fluid key -> multiplier on pocket count
+  fluidWeights Json?
+  // Gas key -> multiplier on pocket count
+  gasWeights   Json?
+  // Mob id -> spawn weight
+  mobSpawns    Json?
+  // BiomeAmbient: tint, light, wallTextureUrl
+  ambient      Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 /// The extractor that lands on the surface at the start of a run (tickets 119-127). Lengths and speeds are in small
 /// blocks (original value x BLOCK_SCALE). Rates are data so an upgrade is a different row, never a code change.
 model Extractor {
@@ -440,6 +471,10 @@ model MiningMapConfig {
   autotileStyle       Json?
   // Open-air rows above the ground in the generated mine (small blocks; 24 = 8 original blocks)
   skyRows             Int      @default(24)
+  // How soft the borders between biomes are (noise-score units: 0 = hard edges, 0.15 = default; ticket 096)
+  biomeBlendWidth     Float    @default(0.15)
+  // Which biomes this map has and their weight on it (biome key -> weight); null = every biome at its own weight
+  biomeWeights        Json?
   // Hostile NPC / Mob Spawning Settings
   mobSpawnCount       Int      @default(3)
   mobSpawnMinDepth    Int      @default(15)

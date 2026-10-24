@@ -26,6 +26,8 @@ import Fluids from './pages/Fluids/Fluids';
 import FluidDetail from './pages/Fluids/FluidDetail/FluidDetail';
 import Gases from './pages/Gases/Gases';
 import GasDetail from './pages/Gases/GasDetail/GasDetail';
+import Biomes from './pages/Biomes/Biomes';
+import BiomeDetail from './pages/Biomes/BiomeDetail/BiomeDetail';
 import Extractors from './pages/Extractors/Extractors';
 import ExtractorDetail from './pages/Extractors/ExtractorDetail/ExtractorDetail';
 import ItemWeights from './pages/ItemWeights/ItemWeights';
@@ -104,6 +106,14 @@ const router = createBrowserRouter([
       {
         path: "gases/:id",
         element: <GasDetail />
+      },
+      {
+        path: "biomes",
+        element: <Biomes />
+      },
+      {
+        path: "biomes/:id",
+        element: <BiomeDetail />
       },
       {
         path: "extractors",
