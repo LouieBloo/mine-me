@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SANDBOX_SIM_SPEEDS, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
+import { SANDBOX_SIM_SPEEDS, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
 import { LoadingSpinner } from '../../../../components/LoadingSpinner/LoadingSpinner';
 import { MINE_TOOL, type SandboxToolSelection } from '../../sandbox/sandboxTool';
 import './SandboxPanel.css';
@@ -25,6 +25,19 @@ export interface SandboxExtractorTools {
   onLoadScene: (sceneId: string) => void;
 }
 
+/** What the sandbox can do with doodads (ticket 107). */
+export interface SandboxDoodadTools {
+  /** The kinds that can be placed by hand. */
+  options: SandboxDoodadOption[];
+  /** Named test scenes. */
+  scenes: SandboxMobOption[];
+  /** The generator's doodad pass runs on the map. */
+  generated: boolean;
+  onSetGeneration: (enabled: boolean) => void;
+  onClear: () => void;
+  onLoadScene: (sceneId: string) => void;
+}
+
 export interface SandboxPanelProps {
   fluids: SandboxFluidOption[];
   /** The gases that can be released (absent or empty hides the gas tool). */
@@ -42,6 +55,8 @@ export interface SandboxPanelProps {
   onClearHazards: () => void;
   /** The extractor tools (absent hides the section). */
   extractor?: SandboxExtractorTools;
+  /** The doodad tools (absent or no kinds hides the section and the two mouse tools). */
+  doodads?: SandboxDoodadTools;
   onReset: () => void;
   onLeave: () => void;
   /** A command is in flight: the shared spinner shows and the buttons wait. */
@@ -71,6 +86,7 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   onSpeedChange,
   onClearHazards,
   extractor,
+  doodads,
   onReset,
   onLeave,
   busy = false,
@@ -80,10 +96,14 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   const [gasKey, setGasKey] = useState(gases[0]?.typeKey ?? '');
   const [mobId, setMobId] = useState(mobs[0]?.id ?? '');
   const [sceneId, setSceneId] = useState('');
+  const [doodadId, setDoodadId] = useState(doodads?.options[0]?.id ?? '');
+  const [doodadSceneId, setDoodadSceneId] = useState('');
   const [capacity, setCapacityText] = useState('100');
 
   const selectedFluid = fluids.some((f) => f.typeKey === fluidKey) ? fluidKey : fluids[0]?.typeKey ?? '';
   const selectedGas = gases.some((g) => g.typeKey === gasKey) ? gasKey : gases[0]?.typeKey ?? '';
+  const doodadOptions = doodads?.options ?? [];
+  const selectedDoodad = doodadOptions.some((d) => d.id === doodadId) ? doodadId : doodadOptions[0]?.id ?? '';
   const selectedMob = mobs.some((m) => m.id === mobId) ? mobId : mobs[0]?.id ?? '';
 
   return (
@@ -143,6 +163,26 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
               >
                 Light fire
               </button>
+              {doodadOptions.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className={`${BUTTON} ${tool.kind === 'placeDoodad' ? ACTIVE : IDLE}`}
+                    onClick={() => onToolChange({ kind: 'placeDoodad', doodadId: selectedDoodad })}
+                    disabled={freeCamera}
+                  >
+                    Place doodad
+                  </button>
+                  <button
+                    type="button"
+                    className={`${BUTTON} ${tool.kind === 'removeDoodad' ? ACTIVE : IDLE}`}
+                    onClick={() => onToolChange({ kind: 'removeDoodad' })}
+                    disabled={freeCamera}
+                  >
+                    Remove doodad
+                  </button>
+                </>
+              )}
             </div>
             {fluids.length > 0 && (
               <select
@@ -196,6 +236,55 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
               </select>
             )}
           </section>
+
+          {doodads && doodadOptions.length > 0 && (
+            <section aria-label="Doodads" className="flex flex-col gap-1.5">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Doodads</h3>
+              <select
+                aria-label="Doodad to place"
+                className={SELECT}
+                value={selectedDoodad}
+                onChange={(e) => {
+                  setDoodadId(e.target.value);
+                  if (tool.kind === 'placeDoodad') onToolChange({ kind: 'placeDoodad', doodadId: e.target.value });
+                }}
+              >
+                {doodadOptions.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} ({d.anchor.toLowerCase()})
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-slate-400">Click where the doodad touches: its feet, its hanging point, or the wall beside it.</p>
+              <button
+                type="button"
+                className={`${BUTTON} ${doodads.generated ? ACTIVE : IDLE}`}
+                aria-pressed={doodads.generated}
+                onClick={() => doodads.onSetGeneration(!doodads.generated)}
+                disabled={busy}
+              >
+                {doodads.generated ? 'Generated doodads on' : 'Generate doodads'}
+              </button>
+              <button type="button" className={`${BUTTON} ${IDLE}`} onClick={doodads.onClear} disabled={busy}>
+                Remove all doodads
+              </button>
+              {doodads.scenes.length > 0 && (
+                <div className="flex gap-1.5">
+                  <select aria-label="Doodad scene" className={SELECT} value={doodadSceneId} onChange={(e) => setDoodadSceneId(e.target.value)}>
+                    <option value="">Test scene...</option>
+                    {doodads.scenes.map((scene) => (
+                      <option key={scene.id} value={scene.id}>
+                        {scene.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => doodads.onLoadScene(doodadSceneId)} disabled={busy || doodadSceneId === ''}>
+                    Load
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
 
           <section aria-label="Camera" className="flex flex-col gap-1.5">
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Camera</h3>

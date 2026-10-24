@@ -120,6 +120,11 @@ export class MiningMobRenderer {
     return this.mobs.size;
   }
 
+  /** Every mob in the scene (for the doodads, which wiggle and scatter as they pass). */
+  public getMobs(): IterableIterator<MobInstance> {
+    return this.mobs.values();
+  }
+
   public getMob(id: string): MobInstance | undefined {
     return this.mobs.get(id);
   }

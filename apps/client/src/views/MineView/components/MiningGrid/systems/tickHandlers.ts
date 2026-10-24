@@ -350,6 +350,18 @@ export function applyGasUpdates(payload: MiningStateTickPayload, ctx: TickHandle
   if (payload.gasExplosions && payload.gasExplosions.length > 0) renderer.playExplosions(payload.gasExplosions);
 }
 
+/**
+ * Doodads (scenery) the server revealed or took away (ticket 101, 105). Additions come first, then removals; the field also
+ * applies the server's own removal rules to every tile change in the tick, so a doodad is gone the moment its block is, even
+ * if the removal delta were to be late. Hidden doodads are never sent, so there is nothing to filter here.
+ */
+export function applyDoodadUpdates(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  const field = ctx.world.doodadFieldRef?.current;
+  if (!field) return;
+  field.apply(payload.doodadsAdded ?? [], payload.doodadsRemoved ?? []);
+  for (const tile of payload.revealedTiles ?? []) field.onTileChanged(tile.x, tile.y, tile.type);
+}
+
 /** Fires that started or stopped: in newly revealed tiles, then this tick's changes. Updates the client's copy of the fire grid. */
 export function applyFireUpdates(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
   const field = ctx.world.fireFieldRef?.current;
@@ -500,6 +512,7 @@ export function handleStateTick(payload: MiningStateTickPayload, ctx: TickHandle
   applyTileUpdates(payload, ctx);
   applyFluidUpdates(payload, ctx);
   applyGasUpdates(payload, ctx);
+  applyDoodadUpdates(payload, ctx);
   applyFireUpdates(payload, ctx);
   applyFluidSounds(payload, ctx); // after the fluid and fire fields are up to date
   applyExtractorUpdate(payload, ctx);

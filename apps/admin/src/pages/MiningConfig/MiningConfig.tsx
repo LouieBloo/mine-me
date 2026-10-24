@@ -9,6 +9,7 @@ import MiningConfigCaverns from './components/MiningConfigCaverns/MiningConfigCa
 import MiningConfigResources from './components/MiningConfigResources/MiningConfigResources';
 import MiningConfigSky from './components/MiningConfigSky/MiningConfigSky';
 import MiningConfigBiomes from './components/MiningConfigBiomes/MiningConfigBiomes';
+import MiningConfigScenery from './components/MiningConfigScenery/MiningConfigScenery';
 import MiningConfigMobs from './components/MiningConfigMobs/MiningConfigMobs';
 import MiningConfigDamage from './components/MiningConfigDamage/MiningConfigDamage';
 import MiningConfigAutotile from './components/MiningConfigAutotile/MiningConfigAutotile';
@@ -165,6 +166,7 @@ export default function MiningConfig() {
         <div className="lg:col-span-7 space-y-6">
           <MiningConfigSky config={config} onFieldChange={handleFieldChange} />
           <MiningConfigBiomes config={config} onFieldChange={handleFieldChange} />
+          <MiningConfigScenery config={config} onFieldChange={handleFieldChange} />
           <MiningConfigCaverns config={config} onFieldChange={handleFieldChange} />
           <MiningConfigResources config={config} onFieldChange={handleFieldChange} />
           <MiningConfigMobs config={config} onFieldChange={handleFieldChange} />

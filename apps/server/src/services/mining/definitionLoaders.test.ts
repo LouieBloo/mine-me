@@ -2,11 +2,11 @@ import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds, attachFluidSounds, attachGasSounds, attachExtractorSounds } from './definitionLoaders';
+import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds, attachFluidSounds, attachGasSounds, attachExtractorSounds, attachDoodadSounds, toDoodadDefinition } from './definitionLoaders';
 import { validateExtractor } from '@mine-me/shared';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 
-const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; biomes?: any[]; extractors?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
+const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; biomes?: any[]; doodads?: any[]; extractors?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
   ({
     item: { findMany: vi.fn().mockResolvedValue(data.items ?? [{ id: 'i1', name: 'Thing' }]) },
     mob: { findMany: vi.fn().mockResolvedValue(data.mobs ?? [{ id: 'm1', name: 'Mole' }]) },
@@ -14,6 +14,7 @@ const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?
     fluid: { findMany: vi.fn().mockResolvedValue(data.fluids ?? []) },
     gas: { findMany: vi.fn().mockResolvedValue(data.gases ?? []) },
     biome: { findMany: vi.fn().mockResolvedValue(data.biomes ?? []) },
+    doodad: { findMany: vi.fn().mockResolvedValue(data.doodads ?? []) },
     extractor: { findMany: vi.fn().mockResolvedValue(data.extractors ?? []) },
     particleEffect: { findMany: vi.fn().mockResolvedValue(data.particleEffects ?? []) },
     sound: { findMany: vi.fn().mockResolvedValue(data.sounds ?? []) },
@@ -254,7 +255,7 @@ describe('loadDefinitionsFromFiles', () => {
     write('items.json', [{ id: 'a' }]);
     write('mobs.json', []);
     write('blocks.json', [{ typeKey: 'DIRT' }]);
-    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], biomes: [], extractors: [], particleEffects: [], characterSounds: {} });
+    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], biomes: [], doodads: [], extractors: [], particleEffects: [], characterSounds: {} });
   });
 
   it('reads fluids.json when it exists', () => {
@@ -396,6 +397,68 @@ describe('biomes', () => {
     expect(data.getBiomes()).toHaveLength(1);
     expect(data.getBiome('frozen_caves')?.name).toBe('Frozen Caves');
     expect(data.getBiome('b1')?.key).toBe('frozen_caves');
+    MiningDataManager.reset();
+  });
+});
+
+describe('doodads (ticket 099)', () => {
+  const row = {
+    id: 'd1', key: 'glow_mushroom', name: 'Glow Mushroom', anchor: 'FLOOR' as const, width: 3, height: 3, zOffset: 0,
+    biomes: [{ id: 'l1', doodadId: 'd1', biomeId: 'b1', weight: 2, density: 1.5, biome: { key: 'frozen_caves' } }],
+  };
+  const library = [{ id: 's1', url: '/assets/sounds/drip.mp3', volume: 1, isActive: true }];
+
+  it('loads the doodads with their biome links flattened, oldest first, asking for each link\'s biome key', async () => {
+    const prisma = fakePrisma({ doodads: [row] });
+    const defs = await loadDefinitionsFromDatabase(prisma);
+    expect(prisma.doodad.findMany).toHaveBeenCalledWith({ orderBy: { createdAt: 'asc' }, include: { biomes: { include: { biome: { select: { key: true } } } } } });
+    expect(defs.doodads).toHaveLength(1);
+    expect(defs.doodads![0].biomes).toEqual([{ biomeId: 'b1', biomeKey: 'frozen_caves', weight: 2, density: 1.5 }]);
+    expect(defs.doodads![0]).toMatchObject({ key: 'glow_mushroom', anchor: 'FLOOR', width: 3 });
+  });
+
+  it('allows an empty table and a database client without one', async () => {
+    await expect(loadDefinitionsFromDatabase(fakePrisma({ doodads: [] }))).resolves.toMatchObject({ doodads: [] });
+    const prisma = fakePrisma({});
+    delete prisma.doodad;
+    await expect(loadDefinitionsFromDatabase(prisma)).resolves.toMatchObject({ doodads: [] });
+  });
+
+  it('propagates database errors from the doodad table', async () => {
+    const prisma = fakePrisma({});
+    prisma.doodad.findMany.mockRejectedValue(new Error('no such table'));
+    await expect(loadDefinitionsFromDatabase(prisma)).rejects.toThrow('no such table');
+  });
+
+  it('resolves the sound slots to urls with their own volume', async () => {
+    const defs = await loadDefinitionsFromDatabase(fakePrisma({ doodads: [{ ...row, soundEffects: { ambient: { soundId: 's1', volume: 0.3, loop: true } } }], sounds: library }));
+    expect(defs.doodads![0].sounds?.ambient).toMatchObject({ url: '/assets/sounds/drip.mp3', volume: 0.3 });
+  });
+
+  it('attachDoodadSounds keeps the sounds of a doodad with no references, and silences a slot whose sound is gone', () => {
+    const plain = { ...toDoodadDefinition(row), sounds: { react: { url: '/assets/x.mp3' } } };
+    expect(attachDoodadSounds([plain], library)[0].sounds).toEqual({ react: { url: '/assets/x.mp3' } });
+    const gone = attachDoodadSounds([{ ...toDoodadDefinition(row), soundEffects: { ambient: { soundId: 'nope' } } }], library);
+    expect(gone[0].sounds?.ambient).toBeUndefined();
+  });
+
+  it('reads the dev mirror when there is one', () => {
+    const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'doodads-'));
+    fs.writeFileSync(path.join(tmp2, 'items.json'), '[]');
+    fs.writeFileSync(path.join(tmp2, 'mobs.json'), '[]');
+    fs.writeFileSync(path.join(tmp2, 'blocks.json'), '[]');
+    fs.writeFileSync(path.join(tmp2, 'doodads.json'), JSON.stringify([toDoodadDefinition(row)]));
+    expect(loadDefinitionsFromFiles(tmp2).doodads?.[0]).toMatchObject({ key: 'glow_mushroom', biomes: [{ biomeKey: 'frozen_caves' }] });
+    fs.rmSync(tmp2, { recursive: true });
+  });
+
+  it('installs doodads so they can be looked up by key or id; the first of a duplicated key wins', async () => {
+    await installDefinitionsFromDatabase(fakePrisma({ doodads: [row, { ...row, id: 'd2', name: 'Copy' }, { id: 'd3', name: 'No key', biomes: [] }] }));
+    const data = MiningDataManager.getInstance();
+    expect(data.getDoodads()).toHaveLength(1);
+    expect(data.getDoodad('glow_mushroom')?.name).toBe('Glow Mushroom');
+    expect(data.getDoodad('d1')?.key).toBe('glow_mushroom');
+    expect(data.getDoodad('nope')).toBeUndefined();
     MiningDataManager.reset();
   });
 });

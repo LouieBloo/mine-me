@@ -39,6 +39,7 @@ import { useMiningTicker } from './hooks/useMiningTicker';
 import { TILE_SIZE } from './renderers/MiningTileRenderer';
 import { DynamiteVisualManager } from './renderers/DynamiteVisualManager';
 import { FluidSounds } from './renderers/FluidSounds';
+import { DoodadSounds } from './systems/DoodadSounds';
 import { GasSounds } from './renderers/GasSounds';
 import { DroppedItemVisualManager } from './renderers/DroppedItemVisualManager';
 import { ProjectileVisualManager } from './renderers/ProjectileVisualManager';
@@ -288,6 +289,9 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     beltRendererRef,
     beltItemRendererRef,
     fireFieldRef,
+    doodadFieldRef,
+    doodadRendererRef,
+    doodadEffectsRef,
     fireRendererRef,
     fluidGlowRef,
     burningBodiesRef,
@@ -362,6 +366,19 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
       fluidSoundsRef.current = null;
     };
   }, [containersReady, fluidRendererRef, fireFieldRef, soundManager]);
+
+  // What the doodads sound like (needs the doodad renderer, so it is made once the scene exists)
+  const doodadSoundsRef = useRef<DoodadSounds | null>(null);
+  useEffect(() => {
+    const doodads = doodadRendererRef.current;
+    if (!containersReady || !doodads) return;
+    const sounds = new DoodadSounds(soundManager, doodads);
+    doodadSoundsRef.current = sounds;
+    return () => {
+      sounds.destroy();
+      doodadSoundsRef.current = null;
+    };
+  }, [containersReady, doodadRendererRef, soundManager]);
 
   // The extractor's landing sound (the renderer is built with the scene, before the sound manager is at hand)
   useEffect(() => {
@@ -537,11 +554,15 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     beltItemRendererRef,
     extractorSoundsRef,
     fireFieldRef,
+    doodadFieldRef,
+    doodadRendererRef,
+    doodadEffectsRef,
     fireRendererRef,
     fluidGlowRef,
     biomeAmbientRef,
     burningBodiesRef,
     fluidSoundsRef,
+    doodadSoundsRef,
     gasSoundsRef,
     fallingRocksContainerRef,
     droppedItemsContainerRef,

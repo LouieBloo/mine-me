@@ -30,6 +30,11 @@ import {
   handleSandboxSetCapacity,
   handleSandboxFillBackpack,
   handleSandboxLoadExtractorScene,
+  handleSandboxPlaceDoodad,
+  handleSandboxRemoveDoodad,
+  handleSandboxClearDoodads,
+  handleSandboxSetDoodadGeneration,
+  handleSandboxLoadDoodadScene,
 } from './miningEvents';
 import { miningSessionManager } from '../services/mining/MiningSessionManager';
 import { InventoryService } from '../services/inventory.service';
@@ -594,6 +599,11 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   sandbox_set_capacity: handleSandboxSetCapacity,
   sandbox_fill_backpack: handleSandboxFillBackpack,
   sandbox_load_extractor_scene: handleSandboxLoadExtractorScene,
+  sandbox_place_doodad: handleSandboxPlaceDoodad,
+  sandbox_remove_doodad: handleSandboxRemoveDoodad,
+  sandbox_clear_doodads: handleSandboxClearDoodads,
+  sandbox_set_doodad_generation: handleSandboxSetDoodadGeneration,
+  sandbox_load_doodad_scene: handleSandboxLoadDoodadScene,
   equip_item: handleEquipItem,
   unequip_item: handleUnequipItem,
   consume_item: handleConsumeItem,

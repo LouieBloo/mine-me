@@ -139,6 +139,26 @@ export interface GasSoundSlotResolved extends SoundEffectSlotConfig {
 
 export type GasSoundEffectsConfig = Partial<Record<GasSoundSlot, GasSoundSlotResolved>>;
 
+export type DoodadSoundSlot = 'ambient' | 'react' | 'break';
+
+/** What the admin stores for one doodad slot: a library sound by id (the url is resolved at load). */
+export interface DoodadSoundSlotRef {
+  soundId?: string | null;
+  loop?: boolean;
+  /** Volume of this sound on this doodad, 0 to 1 (1 when absent). */
+  volume?: number;
+}
+
+export type DoodadSoundSlotRefs = Partial<Record<DoodadSoundSlot, DoodadSoundSlotRef>>;
+
+/** A doodad slot after its library sound has been resolved to something the client can play. */
+export interface DoodadSoundSlotResolved extends SoundEffectSlotConfig {
+  soundId?: string | null;
+  volume?: number;
+}
+
+export type DoodadSoundEffectsConfig = Partial<Record<DoodadSoundSlot, DoodadSoundSlotResolved>>;
+
 export type ExtractorSoundSlot = 'landing' | 'loop' | 'unload' | 'beltBreak';
 
 /** What the admin stores for one extractor slot: a library sound by id (the url is resolved at load). */
@@ -207,6 +227,14 @@ export const MINING_SPATIAL_AUDIO_PRESETS = {
     minDistance: 2 * BLOCK_SCALE,
     falloffModel: 'linear' as AudioFalloffModel,
     panRange: 10 * BLOCK_SCALE,
+    enablePanning: true,
+  },
+  /** Scenery: a drip, a hum, a chirp. Quiet and close, so a field of them does not fill the cave. */
+  DOODAD: {
+    maxDistance: 12 * BLOCK_SCALE,
+    minDistance: 2 * BLOCK_SCALE,
+    falloffModel: 'linear' as AudioFalloffModel,
+    panRange: 8 * BLOCK_SCALE,
     enablePanning: true,
   },
   FLUID_SPLASH: {

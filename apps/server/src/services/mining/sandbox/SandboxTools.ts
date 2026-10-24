@@ -1,7 +1,9 @@
-import { isTileSolid, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
+import { doodadRect, isTileSolid, type DoodadPlacement, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
 import type { MiningGameEngine } from '../MiningGameEngine';
 import { WorldSimClock } from './WorldSimClock';
+import { findDoodadScene } from './doodadScenes';
 import { findExtractorScene, heaviestItemId } from './extractorScenes';
+import { doodadPlacementProblem } from './sandboxDoodads';
 
 export type SandboxResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -27,11 +29,18 @@ export class SandboxTools {
     return this.engine.dataManager.getMobs().map((mob) => ({ id: mob.id, name: mob.name }));
   }
 
+  /** The doodad kinds that can be placed by hand, for the tool panel (undefined when none are defined). */
+  public doodadOptions(): SandboxDoodadOption[] | undefined {
+    const defs = this.engine.doodadSubsystem.definitions;
+    return defs.length > 0 ? defs.map((d) => ({ id: d.id, name: d.name, anchor: d.anchor })) : undefined;
+  }
+
   public status(characterId: string): SandboxStatus {
     return {
       godMode: this.engine.getPlayer(characterId)?.godMode === true,
       paused: this.clock.paused,
       speed: this.clock.speed,
+      doodadsGenerated: this.engine.sandboxDoodadsRequested,
     };
   }
 
@@ -168,6 +177,76 @@ export class SandboxTools {
   /** Puts the room into one of the named extractor test scenes. */
   public loadExtractorScene(characterId: string, sceneId: unknown): SandboxResult {
     const scene = findExtractorScene(sceneId);
+    if (!scene) return fail('Unknown scene.');
+    if (!this.engine.getPlayer(characterId)) return fail('You are not in the room.');
+    return scene.apply(this.engine, characterId);
+  }
+
+  /**
+   * Puts a doodad where the player clicked. The clicked tile is where the doodad's anchored edge touches: the middle of the
+   * bottom row for a floor doodad, of the top row for a ceiling one, of the side against the wall for a wall doodad (it
+   * picks the side that has a wall), and the centre of a free-floating one. It must fit the way the generator fits one: open
+   * footprint, solid anchor edge.
+   */
+  public placeDoodad(doodadId: unknown, x: unknown, y: unknown): SandboxResult {
+    if (typeof x !== 'number' || typeof y !== 'number' || !this.inGrid(x, y)) return fail('Pick a tile inside the map.');
+    const sub = this.engine.doodadSubsystem;
+    const typeIndex = typeof doodadId === 'string' ? sub.definitions.findIndex((d) => d.id === doodadId) : -1;
+    if (typeIndex < 0) return fail('Unknown doodad.');
+    const def = sub.definitions[typeIndex];
+    const { width, height } = doodadRect(def, { x: 0, y: 0, variant: 0 });
+    const left = x - Math.floor((width - 1) / 2);
+    const centreY = y - Math.floor((height - 1) / 2);
+    let placement: DoodadPlacement;
+    switch (def.anchor) {
+      case 'FLOOR':
+        placement = { typeIndex, x: left, y: y - (height - 1), variant: 0, flip: false };
+        break;
+      case 'CEILING':
+        placement = { typeIndex, x: left, y, variant: 0, flip: false };
+        break;
+      case 'WALL': {
+        const solid = (cx: number, cy: number) => this.inGrid(cx, cy) && isTileSolid(this.engine.grid[cy][cx].type);
+        if (solid(x - 1, y)) placement = { typeIndex, x, y: centreY, variant: 0, flip: false };
+        else if (solid(x + 1, y)) placement = { typeIndex, x: x - width + 1, y: centreY, variant: 0, flip: true };
+        else return fail('That doodad needs a wall beside the tile you click.');
+        break;
+      }
+      default:
+        placement = { typeIndex, x: left, y: centreY, variant: 0, flip: false };
+    }
+    const problem = doodadPlacementProblem(this.engine.grid, def, placement);
+    if (problem) return fail(problem);
+    if (!sub.add(placement)) return fail('There is already a doodad there.');
+    return { ok: true };
+  }
+
+  /** Takes away the doodad standing on the clicked tile. */
+  public removeDoodad(x: unknown, y: unknown): SandboxResult {
+    if (typeof x !== 'number' || typeof y !== 'number' || !this.inGrid(x, y)) return fail('Pick a tile inside the map.');
+    const sub = this.engine.doodadSubsystem;
+    const found = sub.placementCovering(x, y);
+    if (!found) return fail('There is no doodad there.');
+    sub.removeAt(found.x, found.y);
+    return { ok: true };
+  }
+
+  /** Takes away every doodad in the room. */
+  public clearDoodads(): void {
+    const sub = this.engine.doodadSubsystem;
+    for (const p of sub.placements()) sub.removeAt(p.x, p.y);
+  }
+
+  /** Turns the generator's doodad pass on the sandbox map on or off. The caller rebuilds the map (a reset) so it takes effect. */
+  public setDoodadGeneration(enabled: unknown): SandboxResult {
+    if (typeof enabled !== 'boolean') return fail('Invalid setting.');
+    this.engine.sandboxDoodadsRequested = enabled;
+    return { ok: true };
+  }
+
+  /** Puts the room into one of the named doodad test scenes. */
+  public loadDoodadScene(characterId: string, sceneId: unknown): SandboxResult<{ placed: number }> {
+    const scene = findDoodadScene(sceneId);
     if (!scene) return fail('Unknown scene.');
     if (!this.engine.getPlayer(characterId)) return fail('You are not in the room.');
     return scene.apply(this.engine, characterId);

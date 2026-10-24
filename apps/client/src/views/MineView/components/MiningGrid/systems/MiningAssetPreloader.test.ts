@@ -29,6 +29,21 @@ describe('collectAssetUrls', () => {
     expect(collectAssetUrls(undefined, [])).toEqual({ images: [], sounds: [] });
   });
 
+  it('finds the pictures, part pictures, size pictures and sounds of the doodads sent with the map', () => {
+    const doodads = [
+      {
+        index: 0, key: 'mushroom', anchor: 'FLOOR', textureUrl: '/assets/doodads/mushroom.png',
+        sizeVariants: [{ width: 3, height: 3, weight: 1, textureUrl: '/assets/doodads/mushroom_big.png' }],
+        parts: [{ name: 'cap', file: '/assets/doodads/cap.png' }],
+        sounds: { ambient: { url: '/assets/sounds/drip.mp3', volume: 0.4 } },
+      },
+    ];
+    expect(collectAssetUrls(doodads)).toEqual({
+      images: ['/assets/doodads/cap.png', '/assets/doodads/mushroom.png', '/assets/doodads/mushroom_big.png'],
+      sounds: ['/assets/sounds/drip.mp3'],
+    });
+  });
+
   it('survives circular data', () => {
     const a: Record<string, unknown> = { icon: '/assets/a.png' };
     a.self = a;

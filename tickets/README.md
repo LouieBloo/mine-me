@@ -102,15 +102,15 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [096](096-biome-generation.md) | Biome map generation and blended borders | P1 (Built; judge in the game) |
 | [097](097-biome-network-and-ambient-look.md) | Biome wire format and ambient look | P2 (Built; judge in the game) |
 | [098](098-admin-biomes-page.md) | Admin: Biomes page | P1 (Built; judge in the game) |
-| [099](099-doodad-data-model.md) | Doodad data model, loader and admin page | P1 (Open) |
-| [100](100-doodad-generation.md) | Doodad generation | P1 (Open) |
-| [101](101-doodad-network.md) | Doodad wire format and fog reveal | P1 (Open) |
-| [102](102-doodad-rendering.md) | Doodad rendering (static, layered, lit) | P1 (Open) |
-| [103](103-doodad-animation-and-effects.md) | Doodad motion, light, particles and sound | P1 (Open) |
-| [104](104-doodad-body-reaction.md) | Doodad reactions to bodies (wiggle) | P2 (Open) |
-| [105](105-doodad-removal-on-mining.md) | Doodads disappear when their anchor is removed | P1 (Open) |
-| [106](106-doodad-wandering-bugs.md) | Wandering doodads (bugs) | P3 (Open) |
-| [107](107-doodad-preview-and-sandbox.md) | Doodad admin preview and sandbox placement | P2 (Open) |
+| [099](099-doodad-data-model.md) | Doodad data model, loader and admin page | P1 (Built; waiting for you to try it) |
+| [100](100-doodad-generation.md) | Doodad generation | P1 (Built, waiting for you to try it) |
+| [101](101-doodad-network.md) | Doodad wire format and fog reveal | P1 (Built; waiting for you to try it) |
+| [102](102-doodad-rendering.md) | Doodad rendering (static, layered, lit) | P1 (Built; placeholders drawn until there is art, waiting for you to try it) |
+| [103](103-doodad-animation-and-effects.md) | Doodad motion, light, particles and sound | P1 (Built; waiting for you to try it) |
+| [104](104-doodad-body-reaction.md) | Doodad reactions to bodies (wiggle) | P2 (Built; waiting for you to try it) |
+| [105](105-doodad-removal-on-mining.md) | Doodads disappear when their anchor is removed | P1 (Built; waiting for you to try it) |
+| [106](106-doodad-wandering-bugs.md) | Wandering doodads (bugs) | P3 (Built; waiting for you to try it) |
+| [107](107-doodad-preview-and-sandbox.md) | Doodad admin preview and sandbox placement | P2 (Built; waiting for you to try it; first doodads script not applied yet, art is an art job) |
 | [108](108-mission-data-model.md) | Mission data model, objective registry and loader | P1 (Open) |
 | [109](109-objective-tracking.md) | Objective tracking engine | P1 (Open) |
 | [110](110-mission-map-generation.md) | Map generation guarantees the mission is achievable | P1 (Open) |

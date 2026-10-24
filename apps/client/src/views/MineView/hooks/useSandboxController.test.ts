@@ -64,6 +64,26 @@ describe('useSandboxController', () => {
     expect(send).toHaveBeenCalledWith({ type: 'sandbox_reset' });
   });
 
+  it('sends the doodad commands, and keeps the setting the server answers with', async () => {
+    const send = vi.fn().mockResolvedValue({ success: true, data: { status: { godMode: false, paused: false, speed: 1, doodadsGenerated: true } } });
+    const { result } = render(send, sandboxSession());
+    await act(() => result.current.setDoodadGeneration(true));
+    expect(send).toHaveBeenCalledWith({ type: 'sandbox_set_doodad_generation', enabled: true });
+    expect(result.current.status.doodadsGenerated).toBe(true);
+    send.mockResolvedValue({ success: true });
+    await act(() => result.current.loadDoodadScene('floor-row'));
+    expect(send).toHaveBeenCalledWith({ type: 'sandbox_load_doodad_scene', sceneId: 'floor-row' });
+    await act(() => result.current.clearDoodads());
+    expect(send).toHaveBeenCalledWith({ type: 'sandbox_clear_doodads' });
+  });
+
+  it('shows why a doodad scene could not load', async () => {
+    const send = vi.fn().mockResolvedValue({ success: false, error: 'There are no doodads defined to show.' });
+    const { result } = render(send, sandboxSession());
+    await act(() => result.current.loadDoodadScene('floor-row'));
+    expect(notificationService.error).toHaveBeenCalledWith('Doodad scene', 'There are no doodads defined to show.');
+  });
+
   it('does not send a speed the sandbox does not offer', async () => {
     const send = vi.fn().mockResolvedValue({ success: true });
     const { result } = render(send, sandboxSession());

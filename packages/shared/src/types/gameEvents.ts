@@ -274,6 +274,36 @@ export interface SandboxLoadSceneEventPayload extends GameEventBase {
   sceneId: string;
 }
 
+/** Places a doodad at the clicked tile: the tile is where the doodad's anchored edge touches (see SandboxTools.placeDoodad). */
+export interface SandboxPlaceDoodadPayload extends GameEventBase {
+  type: 'sandbox_place_doodad';
+  doodadId: string;
+  x: number;
+  y: number;
+}
+
+/** Removes the doodad standing on the clicked tile. */
+export interface SandboxRemoveDoodadPayload extends GameEventBase {
+  type: 'sandbox_remove_doodad';
+  x: number;
+  y: number;
+}
+
+export interface SandboxClearDoodadsPayload extends GameEventBase {
+  type: 'sandbox_clear_doodads';
+}
+
+/** Turns the generator's doodad pass on or off for the sandbox map (the map is rebuilt). */
+export interface SandboxSetDoodadGenerationPayload extends GameEventBase {
+  type: 'sandbox_set_doodad_generation';
+  enabled: boolean;
+}
+
+export interface SandboxLoadDoodadScenePayload extends GameEventBase {
+  type: 'sandbox_load_doodad_scene';
+  sceneId: string;
+}
+
 export interface SandboxIgnitePayload extends GameEventBase {
   type: 'sandbox_ignite';
   x: number;
@@ -314,6 +344,11 @@ export type GameEventPayload =
   | SandboxSetSimPayload
   | SandboxClearHazardsPayload
   | SandboxIgnitePayload
+  | SandboxPlaceDoodadPayload
+  | SandboxRemoveDoodadPayload
+  | SandboxClearDoodadsPayload
+  | SandboxSetDoodadGenerationPayload
+  | SandboxLoadDoodadScenePayload
   | SandboxSpawnExtractorPayload
   | SandboxDigBeltPayload
   | SandboxSetCapacityPayload

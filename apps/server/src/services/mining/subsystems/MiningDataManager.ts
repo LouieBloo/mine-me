@@ -5,6 +5,7 @@ import {
   findCurrencyItem,
   isThrowableItem,
   type BiomeDefinition,
+  type DoodadDefinition,
   type CharacterSoundEffectsConfig,
   type FluidDefinition,
   type ExtractorDefinition,
@@ -31,6 +32,8 @@ export interface GameDefinitions {
   gases?: GasDefinition[];
   /** Biomes. Absent means none are defined (the generator uses a built-in default biome everywhere). */
   biomes?: BiomeDefinition[];
+  /** Doodads (mushrooms, drips...). Absent means none are defined: the mine has no decoration. */
+  doodads?: DoodadDefinition[];
   /** Extractors. Absent means none are defined (the built-in default is used). */
   extractors?: ExtractorDefinition[];
   /** The particle effect library, so fluids and fire can name an effect by id. Absent means none. */
@@ -90,6 +93,9 @@ export class MiningDataManager {
   private readonly biomes: BiomeDefinition[] = [];
   private readonly biomesByKey = new Map<string, BiomeDefinition>();
   private readonly biomesById = new Map<string, BiomeDefinition>();
+  private readonly doodads: DoodadDefinition[] = [];
+  private readonly doodadsByKey = new Map<string, DoodadDefinition>();
+  private readonly doodadsById = new Map<string, DoodadDefinition>();
   private readonly extractors: ExtractorDefinition[] = [];
   private readonly extractorsByKey = new Map<string, ExtractorDefinition>();
   private readonly extractorsById = new Map<string, ExtractorDefinition>();
@@ -135,6 +141,12 @@ export class MiningDataManager {
       this.biomes.push(biome);
       this.biomesByKey.set(biome.key, biome);
       MiningDataManager.putFirst(this.biomesById, biome.id, biome);
+    }
+    for (const doodad of definitions.doodads ?? []) {
+      if (!doodad?.key || this.doodadsByKey.has(doodad.key)) continue;
+      this.doodads.push(doodad);
+      this.doodadsByKey.set(doodad.key, doodad);
+      MiningDataManager.putFirst(this.doodadsById, doodad.id, doodad);
     }
     for (const extractor of definitions.extractors ?? []) {
       if (!extractor?.key || this.extractorsByKey.has(extractor.key)) continue;
@@ -255,6 +267,16 @@ export class MiningDataManager {
   /** All biome definitions, in load order (the first of any duplicated key wins). May be empty: see `BiomeField` for the default. */
   public getBiomes(): BiomeDefinition[] {
     return this.biomes;
+  }
+
+  /** All doodad definitions, in load order (the first of any duplicated key wins). May be empty. */
+  public getDoodads(): DoodadDefinition[] {
+    return this.doodads;
+  }
+
+  /** Doodad definition by key (e.g. 'glow_mushroom') or by database id. */
+  public getDoodad(keyOrId: string): DoodadDefinition | undefined {
+    return this.doodadsByKey.get(keyOrId) ?? this.doodadsById.get(keyOrId);
   }
 
   /** Biome definition by key (e.g. 'frozen_caves') or by database id. */

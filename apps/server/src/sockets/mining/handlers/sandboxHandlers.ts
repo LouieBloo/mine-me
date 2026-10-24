@@ -142,3 +142,45 @@ export const handleSandboxLoadExtractorScene = async (_io: Server, socket: Socke
   if (res.ok) miningSessionManager.sendSandboxState(ctx.engine, { title: 'Scene loaded', message: 'The extractor scene is ready.' });
   return toResult(res);
 };
+
+export const handleSandboxPlaceDoodad = async (
+  _io: Server,
+  socket: Socket,
+  payload: { doodadId?: unknown; x?: unknown; y?: unknown },
+): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.placeDoodad(payload?.doodadId, payload?.x, payload?.y));
+};
+
+export const handleSandboxRemoveDoodad = async (_io: Server, socket: Socket, payload: { x?: unknown; y?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.removeDoodad(payload?.x, payload?.y));
+};
+
+export const handleSandboxClearDoodads = async (_io: Server, socket: Socket): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  ctx.tools.clearDoodads();
+  return { success: true };
+};
+
+/** Turns the doodad pass on or off and rebuilds the map so it shows (everyone in the room gets the fresh state). */
+export const handleSandboxSetDoodadGeneration = async (_io: Server, socket: Socket, payload: { enabled?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  const res = ctx.tools.setDoodadGeneration(payload?.enabled);
+  if (!res.ok) return toResult(res);
+  if (!miningSessionManager.resetSandbox(ctx.characterId)) return { success: false, error: 'Could not rebuild the sandbox.' };
+  return toResult(res, statusData(ctx));
+};
+
+/** Loads a named doodad scene; the view is rebuilt so the player is where the scene put them. */
+export const handleSandboxLoadDoodadScene = async (_io: Server, socket: Socket, payload: { sceneId?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  const res = ctx.tools.loadDoodadScene(ctx.characterId, payload?.sceneId);
+  if (res.ok) miningSessionManager.sendSandboxState(ctx.engine, { title: 'Scene loaded', message: `${res.placed} doodads placed.` });
+  return toResult(res, res.ok ? { placed: res.placed } : undefined);
+};

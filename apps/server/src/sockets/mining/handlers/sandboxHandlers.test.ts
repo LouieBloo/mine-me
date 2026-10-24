@@ -20,6 +20,11 @@ import {
   handleSandboxSetCapacity,
   handleSandboxFillBackpack,
   handleSandboxLoadExtractorScene,
+  handleSandboxPlaceDoodad,
+  handleSandboxRemoveDoodad,
+  handleSandboxClearDoodads,
+  handleSandboxSetDoodadGeneration,
+  handleSandboxLoadDoodadScene,
 } from './sandboxHandlers';
 
 const socketFor = (characterId: string | undefined) => ({ data: { characterId }, connected: true, emit: vi.fn() }) as any;
@@ -53,6 +58,11 @@ describe('sandbox handlers', () => {
         handleSandboxSetCapacity(io, socket, { capacity: 10 }),
         handleSandboxFillBackpack(io, socket, { quantity: 3 }),
         handleSandboxLoadExtractorScene(io, socket, { sceneId: 'full-pack-at-belt' }),
+        handleSandboxPlaceDoodad(io, socket, { doodadId: 'x', x: 1, y: 1 }),
+        handleSandboxRemoveDoodad(io, socket, { x: 1, y: 1 }),
+        handleSandboxClearDoodads(io, socket),
+        handleSandboxSetDoodadGeneration(io, socket, { enabled: true }),
+        handleSandboxLoadDoodadScene(io, socket, { sceneId: 'floor-row' }),
       ]);
       for (const r of results) expect(r).toEqual({ success: false, error: 'Sandbox tools are only available in the sandbox.' });
       expect(miningSessionManager.getSession('hs-solo')!.getPlayer('hs-solo')!.godMode).toBeUndefined();
@@ -91,11 +101,11 @@ describe('sandbox handlers', () => {
       const socket = socketFor('hs-a');
       expect(await handleSandboxSetGodMode(io, socket, { enabled: true })).toEqual({
         success: true,
-        data: { status: { godMode: true, paused: false, speed: 1 } },
+        data: { status: { godMode: true, paused: false, speed: 1, doodadsGenerated: false } },
       });
       expect(await handleSandboxSetSim(io, socket, { paused: true, speed: 2 })).toEqual({
         success: true,
-        data: { status: { godMode: true, paused: true, speed: 2 } },
+        data: { status: { godMode: true, paused: true, speed: 2, doodadsGenerated: false } },
       });
       expect(await handleSandboxSetSim(io, socket, { speed: 7 })).toEqual({ success: false, error: 'Unsupported speed.' });
     });
@@ -153,6 +163,33 @@ describe('sandbox handlers', () => {
       expect(await handleSandboxLoadExtractorScene(io, socket, { sceneId: 'full-pack-at-belt' })).toEqual({ success: true });
       expect(miningSessionManager.getSession('hs-a')!.beltSubsystem!.rows).toBeGreaterThan(0);
       expect(await handleSandboxLoadExtractorScene(io, socket, { sceneId: 'nope' })).toEqual({ success: false, error: 'Unknown scene.' });
+    });
+  });
+  describe('the doodad tools in a sandbox', () => {
+    afterEach(() => miningSessionManager.cancelSession('hs-a', { persistHealth: false }));
+
+    it('refuses bad input with a reason, and has nothing to clear in a room without doodads', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      expect(await handleSandboxPlaceDoodad(io, socket, { doodadId: 'nope', x: 5, y: SKY + 2 })).toEqual({ success: false, error: 'Unknown doodad.' });
+      expect(await handleSandboxPlaceDoodad(io, socket, {})).toMatchObject({ success: false });
+      expect(await handleSandboxRemoveDoodad(io, socket, { x: 5, y: SKY + 2 })).toEqual({ success: false, error: 'There is no doodad there.' });
+      expect(await handleSandboxRemoveDoodad(io, socket, { x: 'a' })).toMatchObject({ success: false });
+      expect(await handleSandboxClearDoodads(io, socket)).toEqual({ success: true });
+      expect(await handleSandboxSetDoodadGeneration(io, socket, { enabled: 'yes' })).toEqual({ success: false, error: 'Invalid setting.' });
+      expect(await handleSandboxLoadDoodadScene(io, socket, { sceneId: 'nope' })).toEqual({ success: false, error: 'Unknown scene.' });
+      expect(await handleSandboxLoadDoodadScene(io, socket, { sceneId: 'floor-row' })).toEqual({ success: false, error: 'There are no doodads defined to show.' });
+    });
+
+    it('turns the generator pass on, rebuilds the room for everyone, and reports the new setting', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      socket.emit.mockClear();
+      const res = await handleSandboxSetDoodadGeneration(io, socket, { enabled: true });
+      expect(res).toMatchObject({ success: true, data: { status: { doodadsGenerated: true } } });
+      expect(socket.emit.mock.calls.some((c: any[]) => c[0] === 'mining_sandbox_reset')).toBe(true);
+      const again = await handleSandboxSetDoodadGeneration(io, socket, { enabled: false });
+      expect(again).toMatchObject({ success: true, data: { status: { doodadsGenerated: false } } });
     });
   });
 });

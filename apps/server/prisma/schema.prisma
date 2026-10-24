@@ -340,6 +340,8 @@ model Gas {
 /// built-in one when there is none. The weight maps and ambient are Json in the shared BiomeDefinition shapes.
 model Biome {
   id           String   @id @default(cuid())
+  // Doodads that may appear here, with their weight and density
+  doodads      DoodadBiome[]
   // Open key, e.g. frozen_caves
   key          String   @unique
   name         String
@@ -475,6 +477,10 @@ model MiningMapConfig {
   biomeBlendWidth     Float    @default(0.15)
   // Which biomes this map has and their weight on it (biome key -> weight); null = every biome at its own weight
   biomeWeights        Json?
+  // The most doodads (scenery) the generated mine holds; 0 = none (ticket 100)
+  doodadMaxCount      Int      @default(400)
+  // The most doodad lights alive at once on screen (ticket 103)
+  doodadMaxLights     Int      @default(12)
   // Hostile NPC / Mob Spawning Settings
   mobSpawnCount       Int      @default(3)
   mobSpawnMinDepth    Int      @default(15)
@@ -496,6 +502,8 @@ model DataMigration {
 
 model ParticleEffect {
   id           String        @id @default(cuid())
+  // Doodads that play this effect
+  doodads      Doodad[]      @relation("DoodadParticle")
   name         String        @unique
   description  String?
   type         String        @default("CONTINUOUS")
@@ -577,4 +585,59 @@ model Sound {
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+/// A doodad (tickets 099-107): purely environmental decoration anchored to a surface (mushrooms, grass, drips, bugs).
+/// Sizes and distances are in small blocks (original value x BLOCK_SCALE); only sprite offsets are pixels.
+model Doodad {
+  id               String   @id @default(cuid())
+  // Open key, e.g. glow_mushroom
+  key              String   @unique
+  name             String
+  description      String?
+  // FLOOR, CEILING, WALL or AIR (validated in shared, not a database enum)
+  anchor           String   @default("FLOOR")
+  // Footprint in small blocks
+  width            Int      @default(3)
+  height           Int      @default(3)
+  // [{ width, height, weight, textureUrl? }]: other sizes the doodad comes in
+  sizeVariants     Json?
+  textureUrl       String?
+  // Parts with pivots (SkeletonPartDef shape) for motion; null = the one texture
+  parts            Json?
+  zOffset          Int      @default(0)
+  // { preset, speed?, amplitude?, phase?, params? } (ticket 103)
+  motion           Json?
+  // { strength, radius, puff? } (ticket 104)
+  reacts           Json?
+  // ItemLightConfig + offsetX/offsetY in pixels
+  light            Json?
+  particleEffectId String?
+  particleEffect   ParticleEffect? @relation("DoodadParticle", fields: [particleEffectId], references: [id], onDelete: SetNull)
+  particleOffsetX  Float    @default(0)
+  particleOffsetY  Float    @default(0)
+  // Sound slots: library sounds by id with their own volume (DOODAD_SOUND_SLOTS)
+  soundEffects     Json?
+  // { mode, radius, speed, pauseMs } (ticket 106)
+  wander           Json?
+  // { minDepth?, maxDepth?, blocks?, nearFluids?, nearGases?, nearRadius?, darkOnly?, minSpacing? } (ticket 100)
+  spawn            Json?
+  biomes           DoodadBiome[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+/// Which biomes a doodad appears in, and how strongly.
+model DoodadBiome {
+  id        String @id @default(cuid())
+  doodadId  String
+  doodad    Doodad @relation(fields: [doodadId], references: [id], onDelete: Cascade)
+  biomeId   String
+  biome     Biome  @relation(fields: [biomeId], references: [id], onDelete: Cascade)
+  // Chance weight against the other doodads of the biome
+  weight    Float  @default(1)
+  // How many are placed (1 = the usual amount)
+  density   Float  @default(1)
+
+  @@unique([doodadId, biomeId])
 }

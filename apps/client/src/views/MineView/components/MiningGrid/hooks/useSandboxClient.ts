@@ -3,7 +3,7 @@ import type { MiningPosition, Vector2D } from '@mine-me/shared';
 import { notificationService } from '../../../../../services/notificationService';
 import type { SandboxViewState } from '../../../sandbox/sandboxTool';
 import type { IMouseAction } from '../input/MouseAction';
-import { FreeCameraAction, IgniteAction, PourFluidAction, ReleaseGasAction, SpawnMobAction } from '../input/SandboxActions';
+import { FreeCameraAction, IgniteAction, PlaceDoodadAction, PourFluidAction, ReleaseGasAction, RemoveDoodadAction, SpawnMobAction } from '../input/SandboxActions';
 import type { FreeCamera } from '../systems/FreeCamera';
 import type { MiningClientWorld } from '../systems/MiningClientWorld';
 
@@ -23,7 +23,7 @@ export async function sendSandboxCommand(
 }
 
 /**
- * The mouse tool the sandbox panel selected (pour, release gas, spawn, ignite), or the do-nothing action used
+ * The mouse tool the sandbox panel selected (pour, release gas, spawn, ignite, place or remove a doodad), or the do-nothing action used
  * while the free camera is on. Returned as an override for the normal item-driven action; null
  * means "no override" (the equipped item decides, as in a normal mine).
  */
@@ -36,6 +36,7 @@ export function useSandboxMouseAction(
   const fluidKey = tool?.kind === 'pour' ? tool.fluidKey : null;
   const gasKey = tool?.kind === 'releaseGas' ? tool.gasKey : null;
   const mobId = tool?.kind === 'spawn' ? tool.mobId : null;
+  const doodadId = tool?.kind === 'placeDoodad' ? tool.doodadId : null;
 
   return useMemo<IMouseAction | null>(() => {
     if (!sandbox) return null;
@@ -57,10 +58,16 @@ export function useSandboxMouseAction(
         return new IgniteAction((t: MiningPosition) =>
           sendSandboxCommand(sendGameEvent, { type: 'sandbox_ignite', x: t.x, y: t.y }),
         );
+      case 'placeDoodad':
+        return new PlaceDoodadAction(doodadId!, (t: MiningPosition) =>
+          sendSandboxCommand(sendGameEvent, { type: 'sandbox_place_doodad', doodadId, x: t.x, y: t.y }),
+        );
+      case 'removeDoodad':
+        return new RemoveDoodadAction((t: MiningPosition) => sendSandboxCommand(sendGameEvent, { type: 'sandbox_remove_doodad', x: t.x, y: t.y }));
       default:
         return null;
     }
-  }, [!!sandbox, freeCameraOn, tool?.kind, fluidKey, gasKey, mobId, sendGameEvent]);
+  }, [!!sandbox, freeCameraOn, tool?.kind, fluidKey, gasKey, mobId, doodadId, sendGameEvent]);
 }
 
 export interface UseSandboxFreeCameraOptions {

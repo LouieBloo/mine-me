@@ -1,6 +1,6 @@
 # 099 - Doodad data model, loader and admin page
 
-**Priority:** P1 - **Status:** Open - **Depends on:** 095 (biome table)
+**Priority:** P1 - **Status:** Built 2026-10-24 (server, shared and admin page; waiting for you to try it) - **Depends on:** 095 (biome table)
 
 ## Problem
 The mine is visually empty. Doodads are purely environmental decoration: mushrooms, grass, dripping caves, bugs, crystals, moss. They live in the background, are never interactable and are drawn behind the character. A future "mushroom item" would be a separate thing.
@@ -24,3 +24,34 @@ The mine is visually empty. Doodads are purely environmental decoration: mushroo
 
 ## Tests
 Loader, validation (footprint >= 1, anchor valid), admin route and form tests.
+
+## Decisions (assumed, to confirm) - 2026-10-24
+Recorded while building without the owner; the questions are also in `doodad-open-questions.md`.
+- A new doodad defaults to a 3x3 footprint (one original block), FLOOR anchor, draw order 0. `sizeVariants`, when present, are the only sizes picked from (list the base size too if it should stay possible); with none, the doodad is always its own footprint.
+- Parts reuse the `SkeletonPartDef` naming for pivots (`pivot_anchor`, `offset_from_anchor`, `z_index`), in pixels of the part's own picture; `name` is what the motion presets address.
+- Sound slots (`DOODAD_SOUND_SLOTS`): `ambient` (can loop), `react` (brushed by a body), `break` (anchor removed). Each stores its own volume like every other slot.
+- Spawn rules are `{ minDepth, maxDepth, blocks, nearFluids, nearGases, nearRadius, darkOnly, minSpacing }`, all optional; depths and distances in small blocks; `nearRadius` defaults to 2 original blocks.
+- Biome links live on the doodad payload (`biomes: [{ biomeId | biomeKey, weight, density }]`); sending the list replaces it in one write, leaving it out keeps the links. No separate link endpoints.
+- Pictures: `POST /api/admin/doodads/:id/texture` sets the main texture; `POST .../images/:name` saves a named extra picture (a part, or one size) and returns its url without touching the row. Files are named `<key>.png` / `<key>-<name>.png`.
+- The motion preset name is stored as an open string; it is checked against the registry in ticket 103, not here.
+- No public REST endpoint (biomes, gases and extractors have none either): the client gets the definitions with the map (ticket 101).
+- No doodad rows were created: there is no art yet. `doodads.json` is an empty mirror.
+
+## Built (2026-10-24)
+- **Schema:** `Doodad` and `DoodadBiome` (cascade delete both ways; the particle effect is `SetNull`) in `apps/server/prisma/schema.prisma`, pushed additively to the dev DB.
+- **Shared** (`packages/shared`): `types/doodad.ts` (`DoodadDefinition`, `DoodadClientDefinition` + `toClientDoodad`, anchors, `doodadSizeChoices`, `validateDoodad` and one validator per JSON column), `sound/DoodadSoundProfile.ts` (`DOODAD_SOUND_SLOTS`, `normalizeDoodadSoundRefs`, `resolveDoodadSounds`), sound types in `types/sound.ts`. Tests: `types/doodad.test.ts`, `sound/__tests__/DoodadSoundProfile.test.ts`. Mutation checked: dropping the footprint rule fails two tests.
+- **Loader:** `definitionLoaders.ts` loads doodads with their biome links (`toDoodadDefinition`, `attachDoodadSounds`); `MiningDataManager` has `getDoodads()` / `getDoodad(keyOrId)`; the dev mirror `data/doodads.json` is read by `loadDefinitionsFromFiles`.
+- **Admin REST** (`controllers/admin/doodad.controller.ts`, `doodadSound.controller.ts`, routes in `routes/admin.ts`): list, get, create, update (PUT/PATCH), delete, texture and image uploads, `PATCH /doodads/:id/sound-effects/:slot`. Every save is validated with the shared rules plus a reference check (blocks, fluids, gases, particle effects, biomes must exist) and mirrored to `doodads.json`. `/doodads` is in `DEFINITION_ROUTE_PREFIXES`, so saves reload the definitions. The Sounds page usage list shows doodad slots.
+- **Tests:** `tests/admin.doodad.test.ts`, `tests/admin.doodadSound.test.ts`, `tests/soundUsageDoodad.test.ts`, `definitionLoaders.test.ts` (doodads), `definitionReloadMiddleware.test.ts`. Mutation checked: skipping the block reference check, and not replacing the biome list, each fail a test.
+
+## Admin page built (2026-10-24, stage 5)
+- **List** (`pages/Doodads/Doodads.tsx`, nav "Doodads Editor", routes `/doodads` and `/doodads/:id`): picture, key, name, anchor, size and depth in original blocks, biomes.
+- **Editor** (`pages/Doodads/DoodadDetail/`), each panel its own folder with tests: key/name/description, anchor, footprint + draw order, `DoodadSizeVariantsEditor`, `DoodadArtPanel` (main picture upload through `POST /doodads/:id/texture`, parts with pivot/offset/layer and per-part upload through `.../images/:name`, size filled from the file), `DoodadMotionPanel` (presets from the shared registry, speed/amplitude/phase, extra numbers incl. `weight_<part>`), `DoodadBehaviourPanel` (reacts + wander, AIR can only flutter), `DoodadEffectsPanel` (the shared `ItemLightEffectConfig` + particle picker), `DoodadSpawnPanel` (depth, blocks/fluids/gases via `KeyChips`, near radius, dark only, spacing), `DoodadBiomeLinks` (weight + density per biome), `DoodadSoundEffects` (the shared `SoundSlotPicker`, `DOODAD_SOUND_SLOTS`, per-slot volume).
+- `pages/Doodads/doodadForm.ts`: form <-> `DoodadDefinition`, `previewDoodad` (half-typed values made safe for the preview), `tidySpawn`.
+- Saving validates with the shared `validateDoodad` first; the server's reasons are listed under the form. Pictures and sounds need a saved doodad (they save straight away).
+
+## Decisions (assumed, to confirm) - stage 5
+- Biome links use their own two-number table (weight + density), not the single-number `WeightTable`.
+- Sound uploads from the doodad's picker are filed under the `GENERAL` library category (there is no DOODAD category; it is only a filter label).
+- Moving a doodad to AIR turns a CRAWL/HOP wander into FLUTTER instead of showing a validation error.
+- A part's size and pivot (bottom middle) are filled in from the uploaded file when the browser can read it.

@@ -4,7 +4,9 @@ export type SandboxToolSelection =
   | { kind: 'pour'; fluidKey: string }
   | { kind: 'releaseGas'; gasKey: string }
   | { kind: 'spawn'; mobId: string }
-  | { kind: 'ignite' };
+  | { kind: 'ignite' }
+  | { kind: 'placeDoodad'; doodadId: string }
+  | { kind: 'removeDoodad' };
 
 export const MINE_TOOL: SandboxToolSelection = { kind: 'mine' };
 

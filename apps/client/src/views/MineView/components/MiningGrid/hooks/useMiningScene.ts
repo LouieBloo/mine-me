@@ -15,6 +15,7 @@ import {
   MiningTileType,
   MINING_CONFIG,
   FireField,
+  DoodadField,
   isThrowableItem,
   DEFAULT_PARTICLE_EFFECTS,
   clampSoundVolume,
@@ -31,6 +32,8 @@ import { FluidRenderer } from '../renderers/FluidRenderer';
 import { autotileVariants } from '../renderers/AutotileVariants';
 import { GasRenderer } from '../renderers/GasRenderer';
 import { LOADING_SCREEN_EXIT_MS } from '../../MiningLoadingScreen/MiningLoadingScreen';
+import { DoodadRenderer } from '../renderers/DoodadRenderer';
+import { DoodadEffects } from '../systems/DoodadEffects';
 import { ExtractorRenderer } from '../renderers/ExtractorRenderer';
 import { BeltRenderer } from '../renderers/BeltRenderer';
 import { BeltItemRenderer } from '../renderers/BeltItemRenderer';
@@ -87,6 +90,11 @@ export function useMiningScene({
   const beltRendererRef = useRef<BeltRenderer | null>(null);
   const beltItemRendererRef = useRef<BeltItemRenderer | null>(null);
   const fireFieldRef = useRef<FireField | null>(null);
+  /** The doodads the server has revealed (ticket 101); the doodad renderer draws from it. */
+  const doodadFieldRef = useRef<DoodadField | null>(null);
+  /** Draws the doodads, and gives off their light and particles (tickets 102, 103). */
+  const doodadRendererRef = useRef<DoodadRenderer | null>(null);
+  const doodadEffectsRef = useRef<DoodadEffects | null>(null);
   const fireRendererRef = useRef<FireRenderer | null>(null);
   const fluidGlowRef = useRef<FluidGlow | null>(null);
   const burningBodiesRef = useRef<BurningBodies | null>(null);
@@ -151,6 +159,7 @@ export function useMiningScene({
     const gridContainer = new Container();
     const backgroundContainer = new Container();
     const tilesContainer = new Container();
+    const doodadContainer = new Container();
     const fluidsContainer = new Container();
     const gasContainer = new Container();
     const fallingRocksContainer = new Container();
@@ -197,6 +206,8 @@ export function useMiningScene({
 
     gridContainer.addChild(backgroundContainer);
     gridContainer.addChild(tilesContainer);
+    // Scenery stands in the open cells in front of the back wall and behind everything that moves (and the extractor)
+    gridContainer.addChild(doodadContainer);
     // The extractor stands on the ground in front of the tiles, behind every body
     gridContainer.addChild(beltContainer);
     gridContainer.addChild(extractorContainer);
@@ -256,6 +267,13 @@ export function useMiningScene({
     const fireField = new FireField(fluidRenderer.field.width, fluidRenderer.field.height);
     fireField.apply(initialSessionState.fireCells ?? []);
     fireFieldRef.current = fireField;
+    const doodadField = new DoodadField(initialSessionState.doodads ?? [], initialSessionState.doodadPlacements ?? []);
+    doodadFieldRef.current = doodadField;
+    const doodadRenderer = new DoodadRenderer(doodadContainer, doodadField);
+    doodadRendererRef.current = doodadRenderer;
+    const doodadEffects = new DoodadEffects(doodadRenderer, initialSessionState.doodadMaxLights);
+    doodadEffectsRef.current = doodadEffects;
+    doodadRenderer.setPuffListener((info, effectId) => doodadEffects.puff(info, effectId));
 
     const particleEngine = new ParticleEngine(particlesContainer, app.renderer, 3000);
     particleEngineRef.current = particleEngine;
@@ -336,6 +354,7 @@ export function useMiningScene({
     // Fire: flames and lights on burning cells, and the effect on burning players and mobs (all data driven)
     const fireRenderer = new FireRenderer(fireField, fluidRenderer);
     fireRenderer.setEngines(particleEngine, lightingEngine);
+    doodadEffects.setEngines(particleEngine, lightingEngine);
     gasRenderer.setEngines(particleEngine, lightingEngine);
     fireRenderer.setBlockFlames(initialSessionState.blockFlames ?? []);
     fireRendererRef.current = fireRenderer;
@@ -628,7 +647,7 @@ export function useMiningScene({
       const preloadPromise = soundManager
         ? (async () => {
             const manifest = await manifestPromise;
-            const referenced = collectAssetUrls(dynamicItems, publicBlocks, initialSessionState.mobs, initialSessionState.characterSounds);
+            const referenced = collectAssetUrls(dynamicItems, publicBlocks, initialSessionState.mobs, initialSessionState.characterSounds, initialSessionState.doodads);
             const lists: AssetLists = {
               images: [...new Set([...manifest.images, ...referenced.images])],
               sounds: [...new Set([...manifest.sounds, ...referenced.sounds])],
@@ -697,6 +716,11 @@ export function useMiningScene({
       beltRendererRef.current = null;
       beltItemRendererRef.current = null;
       fireFieldRef.current = null;
+      doodadEffects.destroy();
+      doodadEffectsRef.current = null;
+      doodadRenderer.destroy();
+      doodadRendererRef.current = null;
+      doodadFieldRef.current = null;
       biomeAmbientRef.current = null;
       lightingEngine.destroy();
       lightingEngineRef.current = null;
@@ -728,6 +752,9 @@ export function useMiningScene({
     beltRendererRef,
     beltItemRendererRef,
     fireFieldRef,
+    doodadFieldRef,
+    doodadRendererRef,
+    doodadEffectsRef,
     fireRendererRef,
     fluidGlowRef,
     burningBodiesRef,

@@ -42,6 +42,15 @@ describe('sampleSceneGauges', () => {
     expect(none.getStats().gauges).toEqual({});
   });
 
+  it('publishes how many doodads are drawn and how many lights and emitters they keep alive', () => {
+    const profiler = new MiningProfiler(1000, true);
+    sampleSceneGauges(profiler, { doodads: { drawn: 60, lights: 12, emitters: 5 } });
+    expect(profiler.getStats().gauges).toEqual({ 'Doodads drawn': 60, 'Doodad lights': 12, 'Doodad emitters': 5 });
+    const none = new MiningProfiler(1000, true);
+    sampleSceneGauges(none, { doodads: null });
+    expect(none.getStats().gauges).toEqual({});
+  });
+
   it('does nothing while profiling is off', () => {
     const profiler = new MiningProfiler(1000, false);
     sampleSceneGauges(profiler, { stage: node(), gridCells: 5 });

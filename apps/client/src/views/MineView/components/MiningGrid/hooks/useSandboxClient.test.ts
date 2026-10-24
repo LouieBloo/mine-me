@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { FreeCamera } from '../systems/FreeCamera';
-import { FreeCameraAction, IgniteAction, PourFluidAction, ReleaseGasAction, SpawnMobAction } from '../input/SandboxActions';
+import { FreeCameraAction, IgniteAction, PlaceDoodadAction, PourFluidAction, ReleaseGasAction, RemoveDoodadAction, SpawnMobAction } from '../input/SandboxActions';
 import { sendSandboxCommand, useSandboxFreeCamera, useSandboxMouseAction } from './useSandboxClient';
 import { MINE_TOOL, type SandboxViewState } from '../../../sandbox/sandboxTool';
 import { notificationService } from '../../../../../services/notificationService';
@@ -29,6 +29,8 @@ describe('useSandboxMouseAction', () => {
     expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'releaseGas', gasKey: 'HYDROGEN' } }), send)).result.current).toBeInstanceOf(ReleaseGasAction);
     expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'spawn', mobId: 'm' } }), send)).result.current).toBeInstanceOf(SpawnMobAction);
     expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'ignite' } }), send)).result.current).toBeInstanceOf(IgniteAction);
+    expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'placeDoodad', doodadId: 'd' } }), send)).result.current).toBeInstanceOf(PlaceDoodadAction);
+    expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'removeDoodad' } }), send)).result.current).toBeInstanceOf(RemoveDoodadAction);
   });
 
   it('turns clicks into sandbox commands', async () => {
@@ -47,6 +49,14 @@ describe('useSandboxMouseAction', () => {
     const ignite = renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'ignite' } }), send)).result.current!;
     await ignite.execute({ x: 1, y: 1 }, { x: 0, y: 0 });
     expect(send).toHaveBeenCalledWith({ type: 'sandbox_ignite', x: 1, y: 1 });
+
+    const place = renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'placeDoodad', doodadId: 'mushroom' } }), send)).result.current!;
+    await place.execute({ x: 7, y: 8 }, { x: 0, y: 0 });
+    expect(send).toHaveBeenCalledWith({ type: 'sandbox_place_doodad', doodadId: 'mushroom', x: 7, y: 8 });
+
+    const remove = renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'removeDoodad' } }), send)).result.current!;
+    await remove.execute({ x: 7, y: 8 }, { x: 0, y: 0 });
+    expect(send).toHaveBeenCalledWith({ type: 'sandbox_remove_doodad', x: 7, y: 8 });
   });
 
   it('swallows clicks while the free camera is on, whatever tool is picked', () => {

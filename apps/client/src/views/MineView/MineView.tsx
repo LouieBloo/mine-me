@@ -417,6 +417,18 @@ export const MineView: React.FC = () => {
             onFillBackpack: sandbox.fillBackpack,
             onLoadScene: sandbox.loadExtractorScene,
           }}
+          doodads={
+            sandbox.info.doodads
+              ? {
+                  options: sandbox.info.doodads,
+                  scenes: sandbox.info.doodadScenes ?? [],
+                  generated: sandbox.status.doodadsGenerated === true,
+                  onSetGeneration: sandbox.setDoodadGeneration,
+                  onClear: sandbox.clearDoodads,
+                  onLoadScene: sandbox.loadDoodadScene,
+                }
+              : undefined
+          }
           onReset={sandbox.reset}
           onLeave={handleExit}
           busy={sandbox.busy}

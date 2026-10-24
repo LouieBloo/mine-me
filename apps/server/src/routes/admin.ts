@@ -18,6 +18,8 @@ import * as FluidSoundController from '../controllers/admin/fluidSound.controlle
 import * as GasController from '../controllers/admin/gas.controller';
 import * as GasSoundController from '../controllers/admin/gasSound.controller';
 import * as BiomeController from '../controllers/admin/biome.controller';
+import * as DoodadController from '../controllers/admin/doodad.controller';
+import * as DoodadSoundController from '../controllers/admin/doodadSound.controller';
 import * as ExtractorController from '../controllers/admin/extractor.controller';
 import * as ExtractorSoundController from '../controllers/admin/extractorSound.controller';
 import * as MiningConfigController from '../controllers/admin/miningConfig.controller';
@@ -124,6 +126,16 @@ adminRouter.put('/biomes/:id', BiomeController.updateBiome);
 adminRouter.patch('/biomes/:id', BiomeController.updateBiome);
 adminRouter.post('/biomes/:id/wall-texture', BiomeController.biomeWallUpload, BiomeController.uploadBiomeWallTexture);
 adminRouter.delete('/biomes/:id', BiomeController.deleteBiome);
+
+adminRouter.get('/doodads', DoodadController.getDoodads);
+adminRouter.get('/doodads/:id', DoodadController.getDoodad);
+adminRouter.post('/doodads', DoodadController.createDoodad);
+adminRouter.put('/doodads/:id', DoodadController.updateDoodad);
+adminRouter.patch('/doodads/:id', DoodadController.updateDoodad);
+adminRouter.delete('/doodads/:id', DoodadController.deleteDoodad);
+adminRouter.post('/doodads/:id/texture', DoodadController.doodadTextureUpload, DoodadController.uploadDoodadTexture);
+adminRouter.post('/doodads/:id/images/:name', DoodadController.requireImageName, DoodadController.doodadTextureUpload, DoodadController.uploadDoodadImage);
+adminRouter.patch('/doodads/:id/sound-effects/:slot', DoodadSoundController.requireDoodadSoundSlot, DoodadSoundController.setDoodadSoundSlot);
 
 // EXTRACTORS
 adminRouter.get('/extractors', ExtractorController.getExtractors);

@@ -64,6 +64,26 @@ describe('Admin Mining Config API Routes', () => {
     expect((await request(app).put('/admin/mining-config').send({ biomeBlendWidth: -1 })).status).toBe(400);
   });
 
+  it('saves the most doodads a mine holds, defaulting when none is sent, allowing 0, and refusing a bad value', async () => {
+    const first = await request(app).put('/admin/mining-config').send({ cavernDensity: 50 });
+    expect(first.body.doodadMaxCount).toBe(DEFAULT_MINING_MAP_CONFIG.doodadMaxCount);
+    expect((await request(app).put('/admin/mining-config').send({ doodadMaxCount: 120 })).body.doodadMaxCount).toBe(120);
+    expect((await request(app).put('/admin/mining-config').send({ doodadMaxCount: 0 })).body.doodadMaxCount).toBe(0);
+    expect((await request(app).put('/admin/mining-config').send({ doodadMaxCount: -1 })).status).toBe(400);
+    expect((await request(app).put('/admin/mining-config').send({ doodadMaxCount: 2.5 })).status).toBe(400);
+    expect((await request(app).put('/admin/mining-config').send({ doodadMaxCount: 99999 })).status).toBe(400);
+  });
+
+  it('saves the most doodad lights, defaulting when none is sent, allowing 0, and refusing a bad value', async () => {
+    const first = await request(app).put('/admin/mining-config').send({ cavernDensity: 50 });
+    expect(first.body.doodadMaxLights).toBe(DEFAULT_MINING_MAP_CONFIG.doodadMaxLights);
+    expect((await request(app).put('/admin/mining-config').send({ doodadMaxLights: 5 })).body.doodadMaxLights).toBe(5);
+    expect((await request(app).put('/admin/mining-config').send({ doodadMaxLights: 0 })).body.doodadMaxLights).toBe(0);
+    expect((await request(app).put('/admin/mining-config').send({ doodadMaxLights: -1 })).status).toBe(400);
+    expect((await request(app).put('/admin/mining-config').send({ doodadMaxLights: 1.5 })).status).toBe(400);
+    expect((await request(app).put('/admin/mining-config').send({ doodadMaxLights: 1000 })).status).toBe(400);
+  });
+
   it('saves which biomes the map has and their weights, keeps them when not sent, clears them with null, and refuses bad ones', async () => {
     const saved = await request(app).put('/admin/mining-config').send({ biomeWeights: { frozen: 2 } });
     expect(saved.status).toBe(200);

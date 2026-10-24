@@ -28,6 +28,7 @@ import { MiningPredictionSystem } from '../systems/MiningPredictionSystem';
 import { MiningLocalSimulationSystem } from '../systems/MiningLocalSimulationSystem';
 import { MiningReticleRenderer } from '../systems/MiningReticleRenderer';
 import { MiningDebugRenderer } from '../systems/MiningDebugRenderer';
+import { collectBodySamples, gridWanderTerrain } from '../systems/DoodadBodies';
 
 export interface UseMiningTickerOptions {
   app: Application | null;
@@ -286,6 +287,34 @@ export function useMiningTicker({
       world.fluidGlowRef?.current?.sync(nowMs, currentPos);
       world.burningBodiesRef?.current?.move('self', currentPos.x, currentPos.y);
       world.fluidSoundsRef?.current?.syncLoops(nowMs, currentPos);
+      // Scenery: sprites for the doodads near the camera, posed for this moment, and the light, particles and sound they give off
+      miningProfiler.startSection('Doodads');
+      const doodadRenderer = world.doodadRendererRef?.current;
+      if (doodadRenderer) {
+        const scale = gridContainer.scale.x || 1;
+        if (!doodadRenderer.hasTerrain) doodadRenderer.setTerrain(gridWanderTerrain(() => gridRef?.current));
+        // Bodies are only gathered when a doodad on screen reacts or wanders
+        const doodadBodies = doodadRenderer.needsBodies
+          ? collectBodySamples(
+              { x: currentPos.x, y: currentPos.y, vx: playerBody?.velocity.x, vy: playerBody?.velocity.y },
+              world.remotePlayerRendererRef?.current?.getPlayers(),
+              mobRendererRef?.current?.getMobs()
+            )
+          : undefined;
+        doodadRenderer.update(
+          nowMs / 1000,
+          {
+            x0: Math.floor(-gridContainer.x / scale / TILE_SIZE),
+            y0: Math.floor(-gridContainer.y / scale / TILE_SIZE),
+            x1: Math.ceil((-gridContainer.x + app.screen.width) / scale / TILE_SIZE),
+            y1: Math.ceil((-gridContainer.y + app.screen.height) / scale / TILE_SIZE),
+          },
+          dt,
+          doodadBodies
+        );
+        world.doodadEffectsRef?.current?.sync(nowMs, currentPos);
+        world.doodadSoundsRef?.current?.sync(nowMs, currentPos);
+      }
       miningProfiler.startSection('Fluid & Gas Draw');
       world.fluidRendererRef?.current?.update(nowMs / 1000);
       world.gasRendererRef?.current?.update(nowMs / 1000);
@@ -438,6 +467,7 @@ export function useMiningTicker({
           stage: app.stage,
           lights: lightingEngineRef.current,
           particles: particleEngineRef?.current,
+          doodads: world.doodadRendererRef?.current ? { drawn: world.doodadRendererRef.current.count, lights: world.doodadEffectsRef?.current?.lightCount ?? 0, emitters: world.doodadEffectsRef?.current?.emitterCount ?? 0 } : null,
           tileSprites: world.tileSpritesMap?.current,
           tileGraphics: world.tileGraphicsMap?.current,
           renderer: app.renderer,

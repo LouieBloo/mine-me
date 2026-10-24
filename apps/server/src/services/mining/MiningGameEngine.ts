@@ -71,6 +71,7 @@ import { SandboxTools } from './sandbox/SandboxTools';
 import { getGameModeRules, type GameModeRules } from './gameModeRules';
 import { MiningIgnitionSubsystem } from './subsystems/MiningIgnitionSubsystem';
 import { MiningFireSubsystem } from './subsystems/MiningFireSubsystem';
+import { MiningDoodadSubsystem } from './subsystems/MiningDoodadSubsystem';
 import { MiningTickProfiler } from './MiningTickProfiler';
 import { MiningBurningSubsystem } from './subsystems/MiningBurningSubsystem';
 import { MiningMobSubsystem, type MiningActiveMobSession } from './subsystems/MiningMobSubsystem';
@@ -173,11 +174,15 @@ export class MiningGameEngine {
   public extractorSubsystem: MiningExtractorSubsystem | null = null;
   /** The sandbox asked for an extractor (a mode without one has none until it is spawned; a reset takes it away). */
   public extractorRequested = false;
+  /** Sandbox: the generator's doodad pass runs on the map (a toggle in the tool panel; survives a reset). */
+  public sandboxDoodadsRequested = false;
   /** The conveyor belt going down from the extractor (null in modes without one). */
   public beltSubsystem: MiningBeltSubsystem | null = null;
   public gasExplosionSubsystem!: MiningGasExplosionSubsystem;
   public ignitionSubsystem!: MiningIgnitionSubsystem;
   public fireSubsystem!: MiningFireSubsystem;
+  /** The scenery (tickets 100-105). */
+  public doodadSubsystem!: MiningDoodadSubsystem;
   public burningSubsystem!: MiningBurningSubsystem;
   /** The single place hits are applied (see MiningDamageSystem). */
   public damageSystem!: MiningDamageSystem;
@@ -238,6 +243,8 @@ export class MiningGameEngine {
       fluids: MiningDataManager.getInstance().getFluids(),
       gases: MiningDataManager.getInstance().getGases(),
       biomes: MiningDataManager.getInstance().getBiomes(),
+      doodads: MiningDataManager.getInstance().getDoodads(),
+      sandboxDoodads: this.sandboxDoodadsRequested,
     });
     this.grid = built.grid;
     this.surfaceRow = built.surfaceRow ?? 0;
@@ -274,6 +281,7 @@ export class MiningGameEngine {
     this.extractorSubsystem = this.rules.hasExtractor || this.extractorRequested ? new MiningExtractorSubsystem(world) : null;
     if (this.extractorSubsystem) this.extractorSubsystem.writeStash = this.writeStash ?? null;
     this.beltSubsystem = this.extractorSubsystem ? new MiningBeltSubsystem(world) : null;
+    this.doodadSubsystem = new MiningDoodadSubsystem(world, MiningDataManager.getInstance().getDoodads(), built.doodads);
     for (const cell of built.fluidCells) this.fluidSubsystem.placeFluid(cell.x, cell.y, cell.typeKey, cell.level);
     for (const cell of built.gasCells ?? []) this.gasSubsystem.placeGas(cell.x, cell.y, cell.typeKey, cell.concentration);
     this.damageSystem = new MiningDamageSystem(world);
@@ -868,6 +876,9 @@ export class MiningGameEngine {
       get fire() {
         return engine.fireSubsystem;
       },
+      get doodads() {
+        return engine.doodadSubsystem;
+      },
       get ignition() {
         return engine.ignitionSubsystem;
       },
@@ -878,6 +889,7 @@ export class MiningGameEngine {
         engine.pendingRevealedTiles.push(update);
         engine.fluidSubsystem.onTileChanged(update.x, update.y);
         engine.gasSubsystem.onTileChanged(update.x, update.y);
+        engine.doodadSubsystem.onTileChanged(update.x, update.y, update.type);
       },
       revealAround: (position, visionRange) => engine.revealAndTrackTiles(position, visionRange),
       notifyPlayerHealth: (characterId, health, maxHealth) =>
@@ -925,6 +937,7 @@ export class MiningGameEngine {
         const ny = cy + dy;
         if (isInBounds(nx, ny, this.grid) && !this.grid[ny][nx].revealed) {
           this.grid[ny][nx].revealed = true;
+          this.doodadSubsystem.onTileRevealed(nx, ny);
           const fluid = this.fluidSubsystem.contentsAt(nx, ny);
           const gas = this.gasSubsystem.wireContentsAt(nx, ny);
           this.pendingRevealedTiles.push({
@@ -963,6 +976,7 @@ export class MiningGameEngine {
     const extractorUpdate = this.extractorSubsystem?.takeUpdate();
     const beltUpdate = this.beltSubsystem?.takeUpdate();
     const beltItemChanges = this.beltSubsystem?.takeItemChanges();
+    const doodadChanges = this.doodadSubsystem.takeChanges();
 
     // About once a second every player is also told what the server is spending on this room
     const sendPerf = this.tickCount % MiningGameEngine.PERF_REPORT_TICKS === 0;
@@ -1041,6 +1055,8 @@ export class MiningGameEngine {
         miningTarget: session.miningTarget ?? undefined,
         revealedTiles: this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined,
         fluidCells: fluidChanges.length > 0 ? fluidChanges : undefined,
+        doodadsAdded: doodadChanges.added.length > 0 ? doodadChanges.added : undefined,
+        doodadsRemoved: doodadChanges.removed.length > 0 ? doodadChanges.removed : undefined,
         gasCells: gasChanges.length > 0 ? gasChanges : undefined,
         gasExplosions: gasExplosions.length > 0 ? gasExplosions : undefined,
         gasEvents: gasEventsNear.length > 0 ? gasEventsNear : undefined,
@@ -1093,6 +1109,7 @@ export class MiningGameEngine {
       droppedItems: this.droppedItems.length,
       beltSegments: this.beltSubsystem?.rows ?? 0,
       beltItems: this.beltSubsystem?.items.length ?? 0,
+      doodads: this.doodadSubsystem.count,
       fallingRocks: this.rockSubsystem.activeRocks.length,
       projectiles: this.projectileSubsystem.activeProjectiles.length,
       dynamites: this.explosiveSubsystem.activeDynamites.length,

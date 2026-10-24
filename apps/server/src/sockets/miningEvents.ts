@@ -40,4 +40,9 @@ export {
   handleSandboxSetCapacity,
   handleSandboxFillBackpack,
   handleSandboxLoadExtractorScene,
+  handleSandboxPlaceDoodad,
+  handleSandboxRemoveDoodad,
+  handleSandboxClearDoodads,
+  handleSandboxSetDoodadGeneration,
+  handleSandboxLoadDoodadScene,
 } from './mining/handlers/sandboxHandlers';

@@ -111,6 +111,52 @@ export class IgniteAction extends BaseMouseAction {
   }
 }
 
+/** Sandbox: stand the chosen doodad where the cursor is (the tile is where its anchored edge touches; the server checks it fits). */
+export class PlaceDoodadAction extends BaseMouseAction {
+  public readonly doodadId: string;
+  private readonly onPlace: (target: MiningPosition) => Promise<boolean> | boolean;
+
+  constructor(doodadId: string, onPlace: (target: MiningPosition) => Promise<boolean> | boolean) {
+    super({ name: 'sandbox_place_doodad', triggerMode: MouseActionTriggerMode.SINGLE, clampsToGrid: true });
+    this.doodadId = doodadId;
+    this.onPlace = onPlace;
+  }
+
+  public canExecute(target: MiningPosition, _playerPos: Vector2D, grid: MiningClientTile[][]): boolean {
+    return inGrid(grid, target.x, target.y);
+  }
+
+  public execute(target: MiningPosition): Promise<boolean> | boolean {
+    return this.onPlace(target);
+  }
+
+  public getReticleStyle(target: MiningPosition, playerPos: Vector2D, grid: MiningClientTile[][]): ReticleStyle {
+    return toolReticle(0x84cc16, 0xbef264, this.canExecute(target, playerPos, grid));
+  }
+}
+
+/** Sandbox: take away the doodad under the cursor. */
+export class RemoveDoodadAction extends BaseMouseAction {
+  private readonly onRemove: (target: MiningPosition) => Promise<boolean> | boolean;
+
+  constructor(onRemove: (target: MiningPosition) => Promise<boolean> | boolean) {
+    super({ name: 'sandbox_remove_doodad', triggerMode: MouseActionTriggerMode.SINGLE, clampsToGrid: true });
+    this.onRemove = onRemove;
+  }
+
+  public canExecute(target: MiningPosition, _playerPos: Vector2D, grid: MiningClientTile[][]): boolean {
+    return inGrid(grid, target.x, target.y);
+  }
+
+  public execute(target: MiningPosition): Promise<boolean> | boolean {
+    return this.onRemove(target);
+  }
+
+  public getReticleStyle(target: MiningPosition, playerPos: Vector2D, grid: MiningClientTile[][]): ReticleStyle {
+    return toolReticle(0xe11d48, 0xfb7185, this.canExecute(target, playerPos, grid));
+  }
+}
+
 /** Sandbox free camera: clicking does nothing (no mining, no shooting) while the camera is detached. */
 export class FreeCameraAction extends BaseMouseAction {
   constructor() {

@@ -98,6 +98,8 @@ export function scaleSandboxLayout(layout: SandboxLayout, factor: number): Sandb
 const rect = (x0: number, y0: number, x1: number, y1: number): TileRect => ({ x0, y0, x1, y1 });
 /** How far the pools and chambers are pushed right (original blocks) to make room for the block line next to the spawn. */
 const E = 15;
+/** The long open hall under the ground, in original blocks (the doodad scenes line it with scenery). */
+export const SANDBOX_HALL_OLD: TileRect = rect(1, 12, 88 + E, 15);
 const { EMPTY, DIRT, ROCK, LADDER, COPPERIUM, SILVERIUM } = MiningTileType;
 
 /**
@@ -129,7 +131,7 @@ function createOldSizeSandboxLayout(blockTiles: readonly MiningTileType[]): Sand
       { kind: 'fill', tile: LADDER, rect: rect(13, 0, 13, 11) },
 
       // The long open hall (floor on row 16)
-      { kind: 'fill', tile: EMPTY, rect: rect(1, 12, 88 + E, 15) },
+      { kind: 'fill', tile: EMPTY, rect: SANDBOX_HALL_OLD },
       // A rock tower that falls when its floor is mined out
       { kind: 'fill', tile: ROCK, rect: rect(50, 12, 50, 15) },
 

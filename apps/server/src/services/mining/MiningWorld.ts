@@ -4,6 +4,7 @@ import type { MiningDamageSystem } from './MiningDamageSystem';
 import type { MiningBlockSubsystem } from './subsystems/MiningBlockSubsystem';
 import type { MiningDataManager } from './subsystems/MiningDataManager';
 import type { MiningDropSubsystem } from './subsystems/MiningDropSubsystem';
+import type { MiningDoodadSubsystem } from './subsystems/MiningDoodadSubsystem';
 import type { MiningFluidSubsystem } from './subsystems/MiningFluidSubsystem';
 import type { MiningBurningSubsystem } from './subsystems/MiningBurningSubsystem';
 import type { MiningBeltSubsystem } from './subsystems/MiningBeltSubsystem';
@@ -73,6 +74,8 @@ export interface MiningWorld {
   readonly fire: MiningFireSubsystem;
   /** Fire hurting bodies (and the belt). */
   readonly burning: MiningBurningSubsystem;
+  /** The scenery: doodads, their reveal and removal. */
+  readonly doodads: MiningDoodadSubsystem;
   /** The conveyor belt going down from the extractor; absent in modes without an extractor. */
   readonly belt: MiningBeltSubsystem | null;
   /** The extractor on the surface; absent in modes without one. */

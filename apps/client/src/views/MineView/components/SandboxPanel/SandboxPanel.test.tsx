@@ -225,4 +225,69 @@ describe('SandboxPanel extractor tools', () => {
     expect(screen.getByText('Spawn extractor')).toBeDisabled();
     expect(screen.getByText('Dig belt +10')).toBeDisabled();
   });
+  describe('doodads', () => {
+    const doodadTools = (over: Partial<NonNullable<SandboxPanelProps['doodads']>> = {}) => ({
+      options: [{ id: 'd1', name: 'Mushroom', anchor: 'FLOOR' }, { id: 'd2', name: 'Drip', anchor: 'CEILING' }],
+      scenes: [{ id: 'floor-row', name: 'Floor row' }],
+      generated: false,
+      onSetGeneration: vi.fn(),
+      onClear: vi.fn(),
+      onLoadScene: vi.fn(),
+      ...over,
+    });
+
+    it('hides the doodad tools when the room has no doodads', () => {
+      render(<SandboxPanel {...props()} />);
+      expect(screen.queryByText('Place doodad')).toBeNull();
+      expect(screen.queryByLabelText('Doodad to place')).toBeNull();
+      render(<SandboxPanel {...props({ doodads: doodadTools({ options: [] }) })} />);
+      expect(screen.queryByText('Place doodad')).toBeNull();
+    });
+
+    it('picks the place tool with the chosen doodad, and follows a change of doodad while it is active', () => {
+      const p = props({ doodads: doodadTools() });
+      const { rerender } = render(<SandboxPanel {...p} />);
+      fireEvent.change(screen.getByLabelText('Doodad to place'), { target: { value: 'd2' } });
+      expect(p.onToolChange).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByText('Place doodad'));
+      expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'placeDoodad', doodadId: 'd2' });
+      const active = props({ doodads: doodadTools(), tool: { kind: 'placeDoodad', doodadId: 'd2' } });
+      rerender(<SandboxPanel {...active} />);
+      fireEvent.change(screen.getByLabelText('Doodad to place'), { target: { value: 'd1' } });
+      expect(active.onToolChange).toHaveBeenCalledWith({ kind: 'placeDoodad', doodadId: 'd1' });
+    });
+
+    it('picks the remove tool, and turns off both while the camera is free', () => {
+      const p = props({ doodads: doodadTools() });
+      const { rerender } = render(<SandboxPanel {...p} />);
+      fireEvent.click(screen.getByText('Remove doodad'));
+      expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'removeDoodad' });
+      rerender(<SandboxPanel {...props({ doodads: doodadTools(), freeCamera: true })} />);
+      expect(screen.getByText('Place doodad')).toBeDisabled();
+      expect(screen.getByText('Remove doodad')).toBeDisabled();
+    });
+
+    it('toggles the generator pass, removes all, and loads a scene only once one is chosen', () => {
+      const tools = doodadTools();
+      render(<SandboxPanel {...props({ doodads: tools })} />);
+      fireEvent.click(screen.getByText('Generate doodads'));
+      expect(tools.onSetGeneration).toHaveBeenCalledWith(true);
+      fireEvent.click(screen.getByText('Remove all doodads'));
+      expect(tools.onClear).toHaveBeenCalled();
+      const load = screen.getAllByText('Load').at(-1)!;
+      expect(load).toBeDisabled();
+      fireEvent.change(screen.getByLabelText('Doodad scene'), { target: { value: 'floor-row' } });
+      expect(load).not.toBeDisabled();
+      fireEvent.click(load);
+      expect(tools.onLoadScene).toHaveBeenCalledWith('floor-row');
+    });
+
+    it('shows the generator as on, and turns it off', () => {
+      const tools = doodadTools({ generated: true });
+      render(<SandboxPanel {...props({ doodads: tools })} />);
+      expect(screen.getByText('Generated doodads on')).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(screen.getByText('Generated doodads on'));
+      expect(tools.onSetGeneration).toHaveBeenCalledWith(false);
+    });
+  });
 });

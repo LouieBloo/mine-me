@@ -69,6 +69,11 @@ export class MiningRemotePlayerRenderer {
     return this.players.size;
   }
 
+  /** Every remote player in the scene (for the doodads, which wiggle as they walk past). */
+  public getPlayers(): IterableIterator<RemotePlayerInstance> {
+    return this.players.values();
+  }
+
   public getPlayer(characterId: string): RemotePlayerInstance | undefined {
     return this.players.get(characterId);
   }

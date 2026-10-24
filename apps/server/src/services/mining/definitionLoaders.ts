@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { PrismaClient } from '@prisma/client';
-import { resolveCharacterSounds, resolveExtractorSounds, resolveFluidSounds, resolveGasSounds, resolveMobSounds, type BiomeDefinition, type CharacterSoundEffectsConfig, type ExtractorDefinition, type FluidDefinition, type GasDefinition, type ParticleEffect, type GameItem, type Mob, type MiningBlockConfig, type SoundTrack } from '@mine-me/shared';
+import { resolveCharacterSounds, resolveExtractorSounds, resolveFluidSounds, resolveDoodadSounds, resolveGasSounds, resolveMobSounds, type BiomeDefinition, type DoodadDefinition, type CharacterSoundEffectsConfig, type ExtractorDefinition, type FluidDefinition, type GasDefinition, type ParticleEffect, type GameItem, type Mob, type MiningBlockConfig, type SoundTrack } from '@mine-me/shared';
 import { CHARACTER_SOUND_CONFIG_ID } from '../characterSounds.service';
 import { MiningDataManager, type GameDefinitions } from './subsystems/MiningDataManager';
 
@@ -45,8 +45,28 @@ export function attachExtractorSounds<E extends ExtractorDefinition>(extractors:
   return extractors.map((extractor) => (extractor.soundEffects ? { ...extractor, sounds: resolveExtractorSounds(extractor.soundEffects, byId) } : extractor));
 }
 
+/**
+ * Gives each doodad its playable `sounds`, resolved from its stored `soundEffects` references. A doodad with no
+ * references keeps any `sounds` it already carries.
+ */
+export function attachDoodadSounds<D extends DoodadDefinition>(doodads: D[], library: SoundLibraryEntry[]): D[] {
+  const byId = new Map(library.map((s) => [s.id, s]));
+  return doodads.map((doodad) => (doodad.soundEffects ? { ...doodad, sounds: resolveDoodadSounds(doodad.soundEffects, byId) } : doodad));
+}
+
+/** A doodad row as Prisma returns it with its biome links (and each link's biome key). */
+export type DoodadRow = Omit<DoodadDefinition, 'biomes'> & { biomes?: Array<{ biomeId: string; weight: number; density: number; biome?: { key: string } | null }> };
+
+/** The shared shape of a doodad: its biome links flattened to `{ biomeId, biomeKey, weight, density }`. Also what the dev mirror stores. */
+export function toDoodadDefinition(row: DoodadRow): DoodadDefinition {
+  return {
+    ...row,
+    biomes: (row.biomes ?? []).map((link) => ({ biomeId: link.biomeId, ...(link.biome?.key ? { biomeKey: link.biome.key } : {}), weight: link.weight, density: link.density })),
+  };
+}
+
 type LoaderPrisma = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'fluid' | 'gas' | 'particleEffect' | 'sound' | 'characterSoundConfig'> &
-  Partial<Pick<PrismaClient, 'extractor' | 'biome'>>;
+  Partial<Pick<PrismaClient, 'extractor' | 'biome' | 'doodad'>>;
 
 /** The player character's playable sounds, resolved from the stored slot references. */
 export function buildCharacterSounds(refs: unknown, library: SoundLibraryEntry[]): CharacterSoundEffectsConfig {
@@ -62,7 +82,7 @@ export function buildCharacterSounds(refs: unknown, library: SoundLibraryEntry[]
 export async function loadDefinitionsFromDatabase(
   prisma: LoaderPrisma
 ): Promise<GameDefinitions> {
-  const [items, mobs, blocks, fluids, gases, particleEffects, sounds, characterSoundConfig, extractors, biomes] = await Promise.all([
+  const [items, mobs, blocks, fluids, gases, particleEffects, sounds, characterSoundConfig, extractors, biomes, doodadRows] = await Promise.all([
     prisma.item.findMany({
       include: { itemEffects: { include: { effect: true } }, particleEffect: true },
     }),
@@ -79,6 +99,7 @@ export async function loadDefinitionsFromDatabase(
     prisma.characterSoundConfig.findUnique({ where: { id: CHARACTER_SOUND_CONFIG_ID } }),
     prisma.extractor?.findMany({ orderBy: { createdAt: 'asc' } }) ?? [],
     prisma.biome?.findMany({ orderBy: { createdAt: 'asc' } }) ?? [],
+    prisma.doodad?.findMany({ orderBy: { createdAt: 'asc' }, include: { biomes: { include: { biome: { select: { key: true } } } } } }) ?? [],
   ]);
 
   if (items.length === 0 || blocks.length === 0) {
@@ -95,6 +116,7 @@ export async function loadDefinitionsFromDatabase(
   definitions.fluids = attachFluidSounds(definitions.fluids ?? [], sounds);
   definitions.gases = attachGasSounds(definitions.gases ?? [], sounds);
   definitions.extractors = attachExtractorSounds(definitions.extractors ?? [], sounds);
+  definitions.doodads = attachDoodadSounds((doodadRows as unknown as DoodadRow[]).map(toDoodadDefinition), sounds);
   definitions.characterSounds = buildCharacterSounds(characterSoundConfig?.soundEffects, sounds);
   return definitions;
 }
@@ -119,6 +141,7 @@ export function loadDefinitionsFromFiles(dataDir: string): GameDefinitions {
     fluids: fs.existsSync(path.join(dataDir, 'fluids.json')) ? read<FluidDefinition>('fluids.json') : [],
     gases: fs.existsSync(path.join(dataDir, 'gases.json')) ? read<GasDefinition>('gases.json') : [],
     biomes: fs.existsSync(path.join(dataDir, 'biomes.json')) ? read<BiomeDefinition>('biomes.json') : [],
+    doodads: attachDoodadSounds(fs.existsSync(path.join(dataDir, 'doodads.json')) ? read<DoodadDefinition>('doodads.json') : [], library),
     extractors: fs.existsSync(path.join(dataDir, 'extractors.json')) ? read<ExtractorDefinition>('extractors.json') : [],
     particleEffects: fs.existsSync(path.join(dataDir, 'particle_effects.json')) ? read<ParticleEffect>('particle_effects.json') : [],
   };
@@ -131,6 +154,6 @@ export async function installDefinitionsFromDatabase(
   const definitions = await loadDefinitionsFromDatabase(prisma);
   MiningDataManager.initialize(definitions);
   console.log(
-    `[Definitions] Loaded ${definitions.items.length} items, ${definitions.mobs.length} mobs, ${definitions.blocks.length} blocks, ${definitions.fluids?.length ?? 0} fluids, ${definitions.gases?.length ?? 0} gases, ${definitions.extractors?.length ?? 0} extractors, ${definitions.biomes?.length ?? 0} biomes from the database`
+    `[Definitions] Loaded ${definitions.items.length} items, ${definitions.mobs.length} mobs, ${definitions.blocks.length} blocks, ${definitions.fluids?.length ?? 0} fluids, ${definitions.gases?.length ?? 0} gases, ${definitions.extractors?.length ?? 0} extractors, ${definitions.biomes?.length ?? 0} biomes, ${definitions.doodads?.length ?? 0} doodads from the database`
   );
 }

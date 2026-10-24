@@ -20,7 +20,10 @@ import type { EmitterHandle, ParticleEngine } from '../../../../../components/ga
 import type { MiningMouseController } from '../input/MiningMouseController';
 import type { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
 import type { MiningMobRenderer } from '../renderers/MiningMobRenderer';
-import type { FireField } from '@mine-me/shared';
+import type { DoodadRenderer } from '../renderers/DoodadRenderer';
+import type { DoodadEffects } from './DoodadEffects';
+import type { DoodadSounds } from './DoodadSounds';
+import type { DoodadField, FireField } from '@mine-me/shared';
 import type { FluidRenderer } from '../renderers/FluidRenderer';
 import type { GasRenderer } from '../renderers/GasRenderer';
 import type { ExtractorRenderer } from '../renderers/ExtractorRenderer';
@@ -98,6 +101,14 @@ export interface MiningSceneRefs {
   extractorSoundsRef?: NullableRef<ExtractorSounds>;
   /** Which visible cells are on fire, as the server last said (ticket 061 draws it). */
   fireFieldRef: NullableRef<FireField>;
+  /** The doodads the server has revealed, kept up to date by the tick handlers (absent before the scene is built). */
+  doodadFieldRef?: NullableRef<DoodadField>;
+  /** Draws the doodads (ticket 102). */
+  doodadRendererRef?: NullableRef<DoodadRenderer>;
+  /** The lights and particles the doodads give off (ticket 103). */
+  doodadEffectsRef?: NullableRef<DoodadEffects>;
+  /** What the doodads sound like (ticket 103). */
+  doodadSoundsRef?: NullableRef<DoodadSounds>;
   /** Flames and lights on the burning cells. */
   fireRendererRef: NullableRef<FireRenderer>;
   /** The ambient look that follows the biome the player is in (absent when the mine is one biome). */

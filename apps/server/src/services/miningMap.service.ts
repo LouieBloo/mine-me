@@ -4,6 +4,9 @@ import {
   DEFAULT_BIOME_BLEND_WIDTH,
   resolveMapBiomes,
   type BiomeDefinition,
+  type DoodadDefinition,
+  type DoodadPlacement,
+  DEFAULT_DOODAD_MAX_COUNT,
   MiningTileType,
   MINING_CONFIG,
   canTileBeDamaged,
@@ -25,6 +28,7 @@ import {
   type RockShape,
 } from '@mine-me/shared';
 import { MiningDataManager, blockKeyForTileType, tileTypeForBlockKey } from './mining/subsystems/MiningDataManager';
+import { DOODAD_SEED_SALT, generateDoodadPlacements } from './mining/doodads/DoodadGenerator';
 
 // ============================================================================
 // Mining Map Generator
@@ -104,6 +108,8 @@ export interface MapGeneratorOptions {
   gases?: readonly GasDefinition[];
   /** Biomes that shape the mine (tickets 095-096). None: the whole mine is the built-in default biome, the old recipe. */
   biomes?: readonly BiomeDefinition[];
+  /** Doodads (scenery) to scatter through the mine (ticket 100). None: none are placed and nothing else changes. */
+  doodads?: readonly DoodadDefinition[];
 }
 
 /** One cell of fluid the generator placed: a full cell of `typeKey` at (x, y). */
@@ -155,12 +161,16 @@ export class MiningMapGenerator {
   private readonly gasRng: () => number;
   private readonly swapRng: () => number;
   private readonly orderRng: () => number;
+  private readonly doodadRng: () => number;
+  private readonly doodads: readonly DoodadDefinition[];
   /** Which biome each cell is in (tickets 095-096). */
   public readonly biomeField: BiomeField;
   /** Fluid cells placed by the last `generate()`. */
   public fluidCells: GeneratedFluidCell[] = [];
   /** Gas cells placed by the last `generate()`. */
   public gasCells: GeneratedGasCell[] = [];
+  /** Doodads placed by the last `generate()`, row by row (ticket 100). */
+  public doodadPlacements: DoodadPlacement[] = [];
   /** Every cell inside a fluid or gas pocket, so later steps leave them alone. */
   private pocketCellKeys = new Set<number>();
 
@@ -172,6 +182,8 @@ export class MiningMapGenerator {
     this.gases = options.gases ?? [];
     this.swapRng = createSeededRng(options.seed ^ SWAP_SEED_SALT);
     this.orderRng = createSeededRng(options.seed ^ BIOME_ORDER_SEED_SALT);
+    this.doodadRng = createSeededRng(options.seed ^ DOODAD_SEED_SALT);
+    this.doodads = options.doodads ?? [];
     this.config = {
       ...DEFAULT_MINING_MAP_CONFIG,
       ...options.config,
@@ -197,7 +209,23 @@ export class MiningMapGenerator {
     this.placeOreVeins();
     this.placeRocks();
     this.swapBaseBlocks();
+    this.placeDoodads();
     return this.grid;
+  }
+
+  /** Scatters the scenery over the finished mine (see `generateDoodadPlacements`). Reads the map, never changes it. */
+  private placeDoodads(): void {
+    this.doodadPlacements = generateDoodadPlacements({
+      grid: this.grid,
+      biomeField: this.biomeField,
+      doodads: this.doodads,
+      fluidCells: this.fluidCells,
+      gasCells: this.gasCells,
+      rng: this.doodadRng,
+      maxCount: this.config.doodadMaxCount ?? DEFAULT_DOODAD_MAX_COUNT,
+      entranceX: MINING_CONFIG.ENTRANCE_X,
+      blockKeyOf: blockKeyForTileType,
+    });
   }
 
   /**
@@ -776,10 +804,10 @@ export function generateMiningMap(options: MapGeneratorOptions): ServerMiningGri
 /** Like `generateMiningMap`, but also says which cells hold fluid or gas (see `options.fluids` and `options.gases`) and which biome each cell is in. */
 export function generateMiningMapWithFluids(
   options: MapGeneratorOptions
-): { grid: ServerMiningGrid; fluidCells: GeneratedFluidCell[]; gasCells: GeneratedGasCell[]; biomeField: BiomeField } {
+): { grid: ServerMiningGrid; fluidCells: GeneratedFluidCell[]; gasCells: GeneratedGasCell[]; biomeField: BiomeField; doodads: DoodadPlacement[] } {
   const generator = new MiningMapGenerator(options);
   const grid = generator.generate();
-  return { grid, fluidCells: generator.fluidCells, gasCells: generator.gasCells, biomeField: generator.biomeField };
+  return { grid, fluidCells: generator.fluidCells, gasCells: generator.gasCells, biomeField: generator.biomeField, doodads: generator.doodadPlacements };
 }
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 import type { PrismaClient } from '@prisma/client';
-import { normalizeMobSoundRefs, MOB_SOUND_SLOTS, normalizeCharacterSoundRefs, CHARACTER_SOUND_SLOTS, normalizeFluidSoundRefs, FLUID_SOUND_SLOTS, normalizeGasSoundRefs, GAS_SOUND_SLOTS, normalizeExtractorSoundRefs, EXTRACTOR_SOUND_SLOTS } from '@mine-me/shared';
+import { normalizeMobSoundRefs, MOB_SOUND_SLOTS, normalizeCharacterSoundRefs, CHARACTER_SOUND_SLOTS, normalizeFluidSoundRefs, FLUID_SOUND_SLOTS, normalizeGasSoundRefs, GAS_SOUND_SLOTS, normalizeExtractorSoundRefs, EXTRACTOR_SOUND_SLOTS, normalizeDoodadSoundRefs, DOODAD_SOUND_SLOTS } from '@mine-me/shared';
 
 import { CHARACTER_SOUND_CONFIG_ID } from './characterSounds.service';
 
-type UsageDb = Pick<PrismaClient, 'mob' | 'item' | 'miningBlock'> & Partial<Pick<PrismaClient, 'characterSoundConfig' | 'fluid' | 'gas' | 'extractor'>>;
+type UsageDb = Pick<PrismaClient, 'mob' | 'item' | 'miningBlock'> & Partial<Pick<PrismaClient, 'characterSoundConfig' | 'fluid' | 'gas' | 'extractor' | 'doodad'>>;
 
 /** What plays a sound: a short label such as `Mob: Mole Person (death)`. */
 export type SoundUsage = string;
@@ -20,7 +20,7 @@ const addTo = (index: Map<string, SoundUsage[]>, key: string | null | undefined,
  * file url, so those are keyed by url. Returns two lookups so callers can ask by either.
  */
 export async function buildSoundUsageIndex(db: UsageDb): Promise<{ byId: Map<string, SoundUsage[]>; byUrl: Map<string, SoundUsage[]> }> {
-  const [mobs, items, blocks, characterConfig, fluids, gases, extractors] = await Promise.all([
+  const [mobs, items, blocks, characterConfig, fluids, gases, extractors, doodads] = await Promise.all([
     db.mob.findMany({ select: { name: true, soundEffects: true } }),
     db.item.findMany({ select: { name: true, soundEffectUrl: true, soundEffects: true } }),
     db.miningBlock.findMany({ select: { name: true, soundEffectUrl: true } }),
@@ -28,6 +28,7 @@ export async function buildSoundUsageIndex(db: UsageDb): Promise<{ byId: Map<str
     db.fluid?.findMany({ select: { name: true, soundEffects: true } }) ?? [],
     db.gas?.findMany({ select: { name: true, soundEffects: true } }) ?? [],
     db.extractor?.findMany({ select: { name: true, soundEffects: true } }) ?? [],
+    db.doodad?.findMany({ select: { name: true, soundEffects: true } }) ?? [],
   ]);
 
   const byId = new Map<string, SoundUsage[]>();
@@ -48,6 +49,10 @@ export async function buildSoundUsageIndex(db: UsageDb): Promise<{ byId: Map<str
   for (const extractor of extractors) {
     const refs = normalizeExtractorSoundRefs(extractor.soundEffects);
     for (const def of EXTRACTOR_SOUND_SLOTS) addTo(byId, refs[def.slotKey]?.soundId, `Extractor: ${extractor.name} (${def.slotKey})`);
+  }
+  for (const doodad of doodads) {
+    const refs = normalizeDoodadSoundRefs(doodad.soundEffects);
+    for (const def of DOODAD_SOUND_SLOTS) addTo(byId, refs[def.slotKey]?.soundId, `Doodad: ${doodad.name} (${def.slotKey})`);
   }
   const characterRefs = normalizeCharacterSoundRefs(characterConfig?.soundEffects);
   for (const def of CHARACTER_SOUND_SLOTS) addTo(byId, characterRefs[def.slotKey]?.soundId, `Character (${def.slotKey})`);

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { miningProfiler } from '../utils/MiningProfiler';
-import { MiningTileType, DEFAULT_PARTICLE_EFFECTS, FireField, getTileFootprint, pieceCells, pieceCentreCell, type MiningStateTickPayload } from '@mine-me/shared';
+import { MiningTileType, DEFAULT_PARTICLE_EFFECTS, DoodadField, FireField, getTileFootprint, pieceCells, pieceCentreCell, type MiningStateTickPayload } from '@mine-me/shared';
 import {
   applyEffects,
   applyEntities,
@@ -10,6 +10,7 @@ import {
   applyExtractorUpdate,
   applyBeltUpdate,
   applyBeltItems,
+  applyDoodadUpdates,
   applyFireUpdates,
   applyFluidUpdates,
   applyGasUpdates,
@@ -614,6 +615,43 @@ describe('applyGasSounds', () => {
     const sounds = makeSounds();
     handleStateTick(payload({ gasEvents: [{ kind: 'ignite', gasId: 1, x: 1, y: 1 }] }), makeCtx(makeWorld({ gasSoundsRef: ref(sounds) })));
     expect(sounds.onEvents).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('applyDoodadUpdates', () => {
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+  const defs = [
+    { index: 0, key: 'floor', name: 'floor', anchor: 'FLOOR' as const, width: 1, height: 1, zOffset: 0 },
+    { index: 1, key: 'ceiling', name: 'ceiling', anchor: 'CEILING' as const, width: 1, height: 1, zOffset: 0 },
+  ];
+
+  it('does nothing before the doodad field exists', () => {
+    expect(() => applyDoodadUpdates(tick({ doodadsAdded: [[0, 1, 1, 0]] }), makeCtx(makeWorld()))).not.toThrow();
+  });
+
+  it('adds the doodads the server revealed, then takes away the ones it removed', () => {
+    const field = new DoodadField(defs);
+    const ctx = makeCtx(makeWorld({ doodadFieldRef: ref(field) }));
+    applyDoodadUpdates(tick({ doodadsAdded: [[0, 2, 2, 0], [1, 5, 5, 0]] }), ctx);
+    expect(field.size).toBe(2);
+    applyDoodadUpdates(tick({ doodadsRemoved: [[2, 2]] }), ctx);
+    expect(field.at(2, 2)).toBeUndefined();
+    expect(field.at(5, 5)).toBeDefined();
+  });
+
+  it('applies the removal rules to this tick\'s tile changes too, so a doodad goes with its block', () => {
+    const field = new DoodadField(defs, [[0, 2, 2, 0], [1, 5, 5, 0]]);
+    const ctx = makeCtx(makeWorld({ doodadFieldRef: ref(field) }));
+    applyDoodadUpdates(tick({ revealedTiles: [{ x: 2, y: 3, type: MiningTileType.EMPTY, damageStage: 0 }] }), ctx); // the floor under it is mined
+    expect(field.at(2, 2)).toBeUndefined();
+    applyDoodadUpdates(tick({ revealedTiles: [{ x: 5, y: 4, type: MiningTileType.DIRT, damageStage: 2 }] }), ctx); // the roof is only cracked
+    expect(field.at(5, 5)).toBeDefined();
+  });
+
+  it('runs as part of a full state tick', () => {
+    const field = new DoodadField(defs);
+    handleStateTick(payload({ doodadsAdded: [[0, 3, 3, 0]] }), makeCtx(makeWorld({ doodadFieldRef: ref(field) })));
+    expect(field.size).toBe(1);
   });
 });
 

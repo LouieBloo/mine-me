@@ -382,5 +382,6 @@ export * from './particles';
 export * from './fluid';
 export * from './gas';
 export * from './biome';
+export * from './doodad';
 export * from './extractor';
 export * from './sound';

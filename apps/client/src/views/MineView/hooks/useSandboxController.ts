@@ -73,6 +73,10 @@ export function useSandboxController(sendGameEvent: SendGameEvent, session: Mini
   const setCapacity = useCallback((capacity: number) => run({ type: 'sandbox_set_capacity', capacity }, 'Capacity'), [run]);
   const fillBackpack = useCallback((quantity: number) => run({ type: 'sandbox_fill_backpack', quantity }, 'Backpack'), [run]);
   const loadExtractorScene = useCallback((sceneId: string) => run({ type: 'sandbox_load_extractor_scene', sceneId }, 'Scene'), [run]);
+  const loadDoodadScene = useCallback((sceneId: string) => run({ type: 'sandbox_load_doodad_scene', sceneId }, 'Doodad scene'), [run]);
+  const clearDoodads = useCallback(() => run({ type: 'sandbox_clear_doodads' }, 'Doodads'), [run]);
+  /** The server rebuilds the map and answers with a fresh state for everyone, which the view handles. */
+  const setDoodadGeneration = useCallback(async (enabled: boolean) => applyStatus(await run({ type: 'sandbox_set_doodad_generation', enabled }, 'Doodads')), [run, applyStatus]);
   const clearHazards = useCallback(() => run({ type: 'sandbox_clear_hazards' }, 'Clear'), [run]);
   /** The server answers a reset with a fresh state for everyone, which the view handles. */
   const reset = useCallback(() => run({ type: 'sandbox_reset' }, 'Reset'), [run]);
@@ -100,5 +104,8 @@ export function useSandboxController(sendGameEvent: SendGameEvent, session: Mini
     setCapacity,
     fillBackpack,
     loadExtractorScene,
+    loadDoodadScene,
+    clearDoodads,
+    setDoodadGeneration,
   };
 }

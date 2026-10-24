@@ -156,6 +156,8 @@ export const miningConfigValidation = [
     return true;
   }),
   body('skyRows').optional().isInt({ min: 0, max: 40 * BLOCK_SCALE }).withMessage(`Sky Height must be between 0 and ${40 * BLOCK_SCALE}`),
+  body('doodadMaxLights').optional().isInt({ min: 0, max: 100 }).withMessage('Doodad Max Lights must be a whole number from 0 to 100'),
+  body('doodadMaxCount').optional().isInt({ min: 0, max: 5000 }).withMessage('Doodad Max Count must be a whole number from 0 to 5000'),
   body('biomeBlendWidth').optional().isFloat({ min: 0, max: 0.5 }).withMessage('Biome Blend Width must be between 0 and 0.5'),
   body('biomeWeights').optional({ nullable: true }).custom((value) => {
     if (typeof value !== 'object' || Array.isArray(value)) throw new Error('Biome Weights must be an object of biome key to weight');

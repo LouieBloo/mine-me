@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MiningTileType, MouseActionTriggerMode, type MiningClientTile } from '@mine-me/shared';
-import { FreeCameraAction, IgniteAction, PourFluidAction, ReleaseGasAction, SpawnMobAction } from './SandboxActions';
+import { FreeCameraAction, IgniteAction, PlaceDoodadAction, PourFluidAction, ReleaseGasAction, RemoveDoodadAction, SpawnMobAction } from './SandboxActions';
 
 /** 6 wide, 4 tall: sky is outside (y < 0), open row 0-1, dirt below. */
 const grid = (): MiningClientTile[][] =>
@@ -95,5 +95,29 @@ describe('FreeCameraAction', () => {
     expect(action.canExecute()).toBe(false);
     expect(action.execute()).toBe(false);
     expect(action.getReticleStyle().isValid).toBe(false);
+  });
+});
+
+describe('PlaceDoodadAction and RemoveDoodadAction', () => {
+  it('click once on any tile of the map (the server decides whether the doodad fits), and send the tile', async () => {
+    const onPlace = vi.fn().mockResolvedValue(true);
+    const place = new PlaceDoodadAction('d1', onPlace);
+    expect(place.triggerMode).toBe(MouseActionTriggerMode.SINGLE);
+    expect(place.doodadId).toBe('d1');
+    expect(place.canExecute({ x: 2, y: 2 }, player, grid())).toBe(true);
+    expect(place.canExecute({ x: 6, y: 0 }, player, grid())).toBe(false);
+    await place.execute({ x: 3, y: 1 });
+    expect(onPlace).toHaveBeenCalledWith({ x: 3, y: 1 });
+    expect(place.getReticleStyle({ x: 1, y: 0 }, player, grid()).isValid).toBe(true);
+    expect(place.getReticleStyle({ x: 9, y: 0 }, player, grid()).isValid).toBe(false);
+  });
+
+  it('removes the doodad under the cursor', async () => {
+    const onRemove = vi.fn().mockResolvedValue(true);
+    const remove = new RemoveDoodadAction(onRemove);
+    expect(remove.canExecute({ x: 0, y: 3 }, player, grid())).toBe(true);
+    expect(remove.canExecute({ x: 0, y: 4 }, player, grid())).toBe(false);
+    await remove.execute({ x: 4, y: 1 });
+    expect(onRemove).toHaveBeenCalledWith({ x: 4, y: 1 });
   });
 });

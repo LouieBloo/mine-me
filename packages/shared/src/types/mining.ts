@@ -4,6 +4,8 @@ import type { GearSubType, ItemPhysicsConfig, DropTable, MobAtlas, ItemSoundEffe
 import type { ParticleEffect, ParticleEffectConfig } from './particles';
 import type { Flammability, FluidAppearance } from './fluid';
 import type { BiomeClientDefinition } from './biome';
+import type { DoodadClientDefinition } from './doodad';
+import type { DoodadPlacementWire, DoodadRemovalWire } from '../gameLogic/doodad/doodadPlacement';
 import type { GasClientDefinition, GasEvent, GasExplosionCell, GasWireCell } from '../gameLogic/gas/gasWire';
 import type { SkeletonManifest } from './modularRig';
 
@@ -549,6 +551,14 @@ export interface SandboxMobOption {
   name: string;
 }
 
+/** A doodad the sandbox can place by hand (ticket 107). */
+export interface SandboxDoodadOption {
+  id: string;
+  name: string;
+  /** FLOOR, CEILING, WALL or AIR: the tool anchors the click the way the doodad is anchored. */
+  anchor: string;
+}
+
 /** The sandbox settings that change while it runs. */
 export interface SandboxStatus {
   /** The viewing player takes no damage. */
@@ -557,6 +567,8 @@ export interface SandboxStatus {
   paused: boolean;
   /** Fluid and fire simulation speed (one of SANDBOX_SIM_SPEEDS). */
   speed: number;
+  /** The generator's doodad pass runs on the sandbox map (it is off by default; absent means off). */
+  doodadsGenerated?: boolean;
 }
 
 /** What a sandbox client needs to build its tool panel (fluids come with the session's `fluids`). */
@@ -564,6 +576,10 @@ export interface SandboxClientInfo {
   mobs: SandboxMobOption[];
   /** The named extractor test scenes that can be loaded. */
   extractorScenes?: SandboxMobOption[];
+  /** The doodad kinds that can be placed by hand (absent when none are defined). */
+  doodads?: SandboxDoodadOption[];
+  /** The named doodad test scenes that can be loaded. */
+  doodadScenes?: SandboxMobOption[];
   status: SandboxStatus;
 }
 
@@ -776,6 +792,12 @@ export interface MiningSessionClientState {
   fluidCells?: [x: number, y: number, fluidId: number, level: number, falling?: number][];
   /** The mine's biomes (look and ambient light), sent once. Missing means the whole mine is one biome. Cells and revealed tiles carry an index into this list. */
   biomes?: BiomeClientDefinition[];
+  /** The doodads the mine can have (look, motion, light...), sent once. Missing means the mine has none. A placement's `typeIndex` is an index into this list. */
+  doodads?: DoodadClientDefinition[];
+  /** The doodads in the part of the mine already revealed; later ones arrive in each tick's `doodadsAdded`, and `doodadsRemoved` takes them away. */
+  doodadPlacements?: DoodadPlacementWire[];
+  /** The most doodad lights kept alive at once (the map's setting). Absent: the default. */
+  doodadMaxLights?: number;
   /** How to draw each gas in the mine, sent once. Missing means the mine has no gases. */
   gases?: GasClientDefinition[];
   /** Gas in the cells already revealed, as [x, y, gasId, concentration]; later changes arrive in each tick's `gasCells`. */
@@ -1058,6 +1080,10 @@ export interface MiningStateTickPayload {
    * are ever sent (a newly revealed tile carries its fluid in `revealedTiles`).
    */
   fluidCells?: [x: number, y: number, fluidId: number, level: number, falling?: number][];
+  /** Doodads that came into view this tick (their cells were revealed), as compact placements. Hidden doodads are never sent. */
+  doodadsAdded?: DoodadPlacementWire[];
+  /** Doodads that went this tick (the block they hung from or stood on was mined or blown up), by the top-left cell of their footprint. */
+  doodadsRemoved?: DoodadRemovalWire[];
   /**
    * Gas cells that changed this tick, as [x, y, gasId, concentration]. Only cells the fog of war has revealed
    * are ever sent (a newly revealed tile carries its gas in `revealedTiles`).
@@ -1250,6 +1276,10 @@ export interface MiningMapConfigData {
   skyRows?: number;
   /** How soft the borders between biomes are: 0 is a hard edge, bigger is a wider blend (see `DEFAULT_BIOME_BLEND_WIDTH`). */
   biomeBlendWidth?: number;
+  /** The most doodads the generated mine holds (0 = none). Scenery only: it keeps the scene cheap. */
+  doodadMaxCount?: number;
+  /** The most doodad lights alive at once, the ones nearest the player win (ticket 103). */
+  doodadMaxLights?: number;
   /** Which biomes this map has and how strong each is on it (biome key -> weight). Null/empty: every biome at its own weight. */
   biomeWeights?: Record<string, number> | null;
   /** Hostile NPC / Mob Spawning */
@@ -1261,6 +1291,11 @@ export interface MiningMapConfigData {
 }
 
 /** Sky above the ground in the generated mine: about one screen, 8 of the original blocks. */
+/** The most doodads a generated mine holds unless the map says otherwise. */
+export const DEFAULT_DOODAD_MAX_COUNT = 400;
+/** The most lights doodads keep alive at once unless the map says otherwise (lights are the costly part of the scene). */
+export const DEFAULT_DOODAD_MAX_LIGHTS = 12;
+
 export const DEFAULT_SKY_ROWS = 8 * BLOCK_SCALE;
 
 export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
@@ -1305,6 +1340,8 @@ export const DEFAULT_MINING_MAP_CONFIG: MiningMapConfigData = {
   skyRows: DEFAULT_SKY_ROWS,
   biomeBlendWidth: 0.15,
   biomeWeights: null,
+  doodadMaxCount: DEFAULT_DOODAD_MAX_COUNT,
+  doodadMaxLights: DEFAULT_DOODAD_MAX_LIGHTS,
   mobSpawnCount: 3,
   mobSpawnMinDepth: 5 * S,
   // No built-in mobs: the active map config (database) says which mobs live in the mine

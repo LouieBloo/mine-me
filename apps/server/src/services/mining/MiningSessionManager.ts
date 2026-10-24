@@ -15,7 +15,9 @@ import {
   isOnEntrance,
   MINING_CONFIG,
   type MiningGameMode,
+  DEFAULT_DOODAD_MAX_LIGHTS,
 } from '@mine-me/shared';
+import { DOODAD_SCENE_OPTIONS } from './sandbox/doodadScenes';
 import { EXTRACTOR_SCENE_OPTIONS } from './sandbox/extractorScenes';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 import { toClientGrid } from '../miningMap.service';
@@ -191,6 +193,9 @@ export class MiningSessionManager {
     return {
       grid: toClientGrid(engine.grid, engine.biomeGrid),
       biomes: engine.clientBiomes(),
+      doodads: engine.doodadSubsystem.clientDefinitions(),
+      doodadPlacements: engine.doodadSubsystem.visibleSnapshot(),
+      doodadMaxLights: engine.mapConfig?.doodadMaxLights ?? DEFAULT_DOODAD_MAX_LIGHTS,
       fluids: engine.fluidSubsystem.clientDefinitions(),
       fluidCells: engine.fluidSubsystem.visibleSnapshot(),
       gases: engine.gasSubsystem.clientDefinitions(),
@@ -219,7 +224,13 @@ export class MiningSessionManager {
       gameMode: engine.gameMode,
       surfaceRow: engine.surfaceRow || undefined,
       sandbox: engine.sandbox
-        ? { mobs: engine.sandbox.mobOptions(), extractorScenes: [...EXTRACTOR_SCENE_OPTIONS], status: engine.sandbox.status(characterId) }
+        ? {
+            mobs: engine.sandbox.mobOptions(),
+            extractorScenes: [...EXTRACTOR_SCENE_OPTIONS],
+            doodads: engine.sandbox.doodadOptions(),
+            doodadScenes: engine.sandbox.doodadOptions() ? [...DOODAD_SCENE_OPTIONS] : undefined,
+            status: engine.sandbox.status(characterId),
+          }
         : undefined,
       otherPlayers,
       activeDynamites: engine.activeDynamites.length > 0 ? engine.activeDynamites.map(dynamiteDefinition) : undefined,
