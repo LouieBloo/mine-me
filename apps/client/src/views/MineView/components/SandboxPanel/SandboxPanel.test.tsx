@@ -257,6 +257,15 @@ describe('SandboxPanel extractor tools', () => {
       expect(active.onToolChange).toHaveBeenCalledWith({ kind: 'placeDoodad', doodadId: 'd1' });
     });
 
+    it('picks the hit tool (ticket 143), and turns it off while the camera is free', () => {
+      const p = props({ doodads: doodadTools() });
+      const { rerender } = render(<SandboxPanel {...p} />);
+      fireEvent.click(screen.getByText('Hit doodad'));
+      expect(p.onToolChange).toHaveBeenCalledWith({ kind: 'hitDoodad' });
+      rerender(<SandboxPanel {...props({ doodads: doodadTools(), freeCamera: true })} />);
+      expect(screen.getByText('Hit doodad')).toBeDisabled();
+    });
+
     it('picks the remove tool, and turns off both while the camera is free', () => {
       const p = props({ doodads: doodadTools() });
       const { rerender } = render(<SandboxPanel {...p} />);

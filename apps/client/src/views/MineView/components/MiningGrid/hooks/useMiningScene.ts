@@ -274,6 +274,7 @@ export function useMiningScene({
     const doodadEffects = new DoodadEffects(doodadRenderer, initialSessionState.doodadMaxLights);
     doodadEffectsRef.current = doodadEffects;
     doodadRenderer.setPuffListener((info, effectId) => doodadEffects.puff(info, effectId));
+    doodadRenderer.addDeathListener((info) => doodadEffects.deathBurst(info));
 
     const particleEngine = new ParticleEngine(particlesContainer, app.renderer, 3000);
     particleEngineRef.current = particleEngine;

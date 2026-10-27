@@ -64,7 +64,8 @@
         "weight": 0.4,
         "density": 3.6
       }
-    ]
+    ],
+    "health": 10
   },
   {
     "id": "cmvmvew8n00011a8q2y3dtrru",
@@ -176,7 +177,7 @@
       "nearRadius": 12
     },
     "createdAt": "2026-10-24T20:48:01.508Z",
-    "updatedAt": "2026-10-24T21:19:24.987Z",
+    "updatedAt": "2026-10-26T22:57:49.129Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dq0001si7t9c46at4h",
@@ -202,7 +203,8 @@
         "weight": 0.1,
         "density": 2.4
       }
-    ]
+    ],
+    "health": 15
   },
   {
     "id": "cmvmvewau001y1a8qazhrrg3r",
@@ -249,7 +251,7 @@
       "minSpacing": 12
     },
     "createdAt": "2026-10-24T20:48:01.543Z",
-    "updatedAt": "2026-10-24T21:19:42.127Z",
+    "updatedAt": "2026-10-26T22:57:15.895Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dq0001si7t9c46at4h",
@@ -275,7 +277,8 @@
         "weight": 0.4,
         "density": 3
       }
-    ]
+    ],
+    "health": 1
   },
   {
     "id": "cmvmvewa3001c1a8qbtcqpmum",
@@ -394,7 +397,7 @@
       "minSpacing": 6
     },
     "createdAt": "2026-10-24T20:48:01.479Z",
-    "updatedAt": "2026-10-24T21:20:14.480Z",
+    "updatedAt": "2026-10-26T22:57:33.962Z",
     "biomes": [
       {
         "biomeId": "cmvlss0eb0006si7twio67u66",
@@ -442,7 +445,7 @@
         "weight": 1
       }
     ],
-    "textureUrl": "/assets/sprites/doodads/cmvmvew9a000f1a8qeddw4053.png",
+    "textureUrl": "/assets/sprites/doodads/cmvmvew9a000f1a8qeddw4053.png?v=1793057538987",
     "parts": null,
     "zOffset": -1,
     "motion": {
@@ -463,7 +466,7 @@
       "minDepth": 1
     },
     "createdAt": "2026-10-24T20:48:01.486Z",
-    "updatedAt": "2026-10-24T21:20:22.023Z",
+    "updatedAt": "2026-10-26T23:32:18.988Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dk0000si7t7ku5jyi4",
@@ -540,7 +543,8 @@
         "weight": 1.5,
         "density": 12
       }
-    ]
+    ],
+    "health": 5
   },
   {
     "id": "cmvmvewah001l1a8qgzgl8q6w",
@@ -612,7 +616,7 @@
         "weight": 1
       }
     ],
-    "textureUrl": "/assets/sprites/doodads/cmvmvew9g000m1a8quswx4c1w.png",
+    "textureUrl": "/assets/sprites/doodads/cmvmvew9g000m1a8quswx4c1w.png?v=1793057562916",
     "parts": null,
     "zOffset": 0,
     "motion": null,
@@ -637,7 +641,7 @@
       "minSpacing": 3
     },
     "createdAt": "2026-10-24T20:48:01.493Z",
-    "updatedAt": "2026-10-24T21:22:34.000Z",
+    "updatedAt": "2026-10-26T23:32:42.917Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dk0000si7t7ku5jyi4",
@@ -681,7 +685,8 @@
         "weight": 0.6,
         "density": 4.8
       }
-    ]
+    ],
+    "health": 15
   },
   {
     "id": "cmvmvew9n000w1a8qllh84a0t",
@@ -788,7 +793,7 @@
         "weight": 1
       }
     ],
-    "textureUrl": "/assets/sprites/doodads/cmvmvewan001p1a8qxl9mre0w.png",
+    "textureUrl": "/assets/sprites/doodads/cmvmvewan001p1a8qxl9mre0w.png?v=1793057574335",
     "parts": null,
     "zOffset": -1,
     "motion": null,
@@ -804,7 +809,7 @@
       "minSpacing": 2
     },
     "createdAt": "2026-10-24T20:48:01.535Z",
-    "updatedAt": "2026-10-24T21:22:07.279Z",
+    "updatedAt": "2026-10-26T23:32:54.336Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dq0001si7t9c46at4h",

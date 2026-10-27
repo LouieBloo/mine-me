@@ -157,6 +157,28 @@ export class RemoveDoodadAction extends BaseMouseAction {
   }
 }
 
+/** Sandbox: hit the doodad under the cursor like a weapon (hurts it, kills it, or lets a hanging one fall). */
+export class HitDoodadAction extends BaseMouseAction {
+  private readonly onHit: (target: MiningPosition) => Promise<boolean> | boolean;
+
+  constructor(onHit: (target: MiningPosition) => Promise<boolean> | boolean) {
+    super({ name: 'sandbox_hit_doodad', triggerMode: MouseActionTriggerMode.SINGLE, clampsToGrid: true });
+    this.onHit = onHit;
+  }
+
+  public canExecute(target: MiningPosition, _playerPos: Vector2D, grid: MiningClientTile[][]): boolean {
+    return inGrid(grid, target.x, target.y);
+  }
+
+  public execute(target: MiningPosition): Promise<boolean> | boolean {
+    return this.onHit(target);
+  }
+
+  public getReticleStyle(target: MiningPosition, playerPos: Vector2D, grid: MiningClientTile[][]): ReticleStyle {
+    return toolReticle(0xf97316, 0xfdba74, this.canExecute(target, playerPos, grid));
+  }
+}
+
 /** Sandbox free camera: clicking does nothing (no mining, no shooting) while the camera is detached. */
 export class FreeCameraAction extends BaseMouseAction {
   constructor() {

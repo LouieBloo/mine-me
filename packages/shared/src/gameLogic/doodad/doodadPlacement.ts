@@ -101,3 +101,12 @@ export const doodadCellKey = (x: number, y: number, width: number): number => y 
 export function orderDoodads<T extends { key: string }>(doodads: readonly T[]): T[] {
   return [...doodads].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
+
+/**
+ * A doodad falling through the air (ticket 143), as [id, typeIndex, variant, flip (0 or 1), x, y]: x and y are the top-left of
+ * its footprint in cells, with fractions. Sent every tick to players who can see it; one that disappears from the list has landed.
+ */
+export type FallingDoodadWire = [id: number, typeIndex: number, variant: number, flip: 0 | 1, x: number, y: number];
+
+/** Where a falling doodad landed and broke up, as [typeIndex, variant, flip (0 or 1), x, y]: x and y the top-left of its footprint in cells. */
+export type DoodadShatterWire = [typeIndex: number, variant: number, flip: 0 | 1, x: number, y: number];

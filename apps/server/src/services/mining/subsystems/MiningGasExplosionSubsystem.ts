@@ -140,6 +140,7 @@ export class MiningGasExplosionSubsystem {
     for (const session of Array.from(this.world.players.values())) {
       if (!session.isDead) hit({ kind: 'player', id: session.characterId }, session.playerBody.position);
     }
+    for (const target of this.world.doodads.hurtableTargets()) hit({ kind: 'doodad', id: target.id }, { x: target.x, y: target.y });
   }
 
   /** The cells that detonated since the last call, then forgets them (all of them; see `takeVisibleDetonations`). */

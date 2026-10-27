@@ -110,7 +110,7 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [104](104-doodad-body-reaction.md) | Doodad reactions to bodies (wiggle) | P2 (Built; waiting for you to try it) |
 | [105](105-doodad-removal-on-mining.md) | Doodads disappear when their anchor is removed | P1 (Built; waiting for you to try it) |
 | [106](106-doodad-wandering-bugs.md) | Wandering doodads (bugs) | P3 (Built; waiting for you to try it) |
-| [107](107-doodad-preview-and-sandbox.md) | Doodad admin preview and sandbox placement | P2 (Built; waiting for you to try it; first doodads script not applied yet, art is an art job) |
+| [107](107-doodad-preview-and-sandbox.md) | Doodad admin preview and sandbox placement | P2 (Built; waiting for you to try it; first 12 doodads applied to the dev DB and the art is uploaded) |
 | [108](108-mission-data-model.md) | Mission data model, objective registry and loader | P1 (Open) |
 | [109](109-objective-tracking.md) | Objective tracking engine | P1 (Open) |
 | [110](110-mission-map-generation.md) | Map generation guarantees the mission is achievable | P1 (Open) |
@@ -146,6 +146,7 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [140](140-basic-terrain-blocks.md) | Basic terrain blocks: stone, clay, sandstone, gravel, ice, bedrock | P2 (Built; script applied to the dev DB 2026-10-23, waiting for you to try it) |
 | [141](141-retire-blocks.md) | Retire the Bridge, Chest, Mineral and Entrance blocks | P2 (Built in code; DB rows deleted from the dev DB) |
 | [142](142-first-biomes-and-sandbox-bands.md) | First biomes and the sandbox biome walk | P2 (Built; biomes created in the dev DB, waiting for you to try it) |
+| [143](143-doodad-damage-and-falling.md) | Doodads can be hurt and killed; ceiling doodads fall like rocks | P2 (Built 2026-10-26; starting health applied to the dev DB; waiting for you to try it) |
 
 ## Suggested build order (open tickets 095-139)
 

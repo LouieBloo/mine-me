@@ -159,6 +159,12 @@ export const handleSandboxRemoveDoodad = async (_io: Server, socket: Socket, pay
   return toResult(ctx.tools.removeDoodad(payload?.x, payload?.y));
 };
 
+export const handleSandboxHitDoodad = async (_io: Server, socket: Socket, payload: { x?: unknown; y?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.hitDoodad(payload?.x, payload?.y));
+};
+
 export const handleSandboxClearDoodads = async (_io: Server, socket: Socket): Promise<GameEventResult> => {
   const ctx = sandboxFor(socket);
   if (!isContext(ctx)) return ctx;

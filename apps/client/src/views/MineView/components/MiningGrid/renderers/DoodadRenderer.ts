@@ -17,6 +17,8 @@ import {
   wanderSeed,
   type DoodadClientDefinition,
   type DoodadEntry,
+  type DoodadShatterWire,
+  type FallingDoodadWire,
   type DoodadField,
   type DoodadLayout,
   type DoodadPartLayout,
@@ -34,6 +36,12 @@ import { TILE_SIZE } from './MiningTileRenderer';
 export const DOODAD_FADE_SECONDS = 0.25;
 /** How much bigger a fading doodad gets (a small pop). */
 export const DOODAD_POP_SCALE = 0.25;
+/** How long a hurt doodad stays tinted, in seconds (ticket 143). */
+export const DOODAD_HIT_FLASH_SECONDS = 0.18;
+/** The tint of a hurt doodad. */
+export const DOODAD_HIT_TINT = 0xff7a7a;
+/** How quickly a falling doodad's picture catches up with the server's position (per second): about one server tick behind. */
+export const FALLING_CATCH_UP_PER_SECOND = 40;
 /** Cells around the camera that still get a sprite, so doodads do not pop in at the edge of the screen. */
 export const DOODAD_VIEW_MARGIN_CELLS = 3;
 /** How many pixels of a doodad's own picture make one cell, when a doodad has no picture yet (its placeholder). Offsets (light, particles) are in picture pixels. */
@@ -137,6 +145,10 @@ class DoodadView {
   public facing: 1 | -1 = 1;
   /** Seconds the fade has run, or null while the doodad is standing. */
   public fade: number | null = null;
+  /** Seconds of the hit tint left (ticket 143). */
+  public hitLeft = 0;
+  /** The server says it was killed, so its fade is a death and not a broken hold. */
+  public killed = false;
   /** Bumped on every reuse, so a texture that arrives late for the old doodad is ignored. */
   public generation = 0;
   public art: Sprite | null = null;
@@ -156,6 +168,17 @@ class DoodadView {
     for (const p of this.partSprites) p.sprite.destroy();
     this.partSprites = [];
   }
+}
+
+/** A ceiling doodad in the air: its view, where it started hanging and where it is drawn (cells). */
+interface FallingView {
+  view: DoodadView;
+  x0: number;
+  y0: number;
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
 }
 
 /** The part of a view the effects (lights, particles) need. */
@@ -190,6 +213,9 @@ export class DoodadRenderer {
   /** Pictures already loaded (null: failed, so the placeholder stays). */
   private readonly textures = new Map<string, Texture | null>();
   private removedListener: ((info: DoodadViewInfo) => void) | null = null;
+  private readonly hitListeners = new Set<(info: DoodadViewInfo) => void>();
+  private readonly deathListeners = new Set<(info: DoodadViewInfo) => void>();
+  private readonly falling = new Map<number, FallingView>();
   private puffListener: ((info: DoodadViewInfo, effectId: string) => void) | null = null;
   /** Tells how bodies move, and finds those near a doodad (tickets 104, 106). */
   private readonly bodies = new DoodadBodyTracker();
@@ -215,6 +241,81 @@ export class DoodadRenderer {
   /** Called when a doodad on screen loses its block, just as it starts to fade. */
   public setRemovedListener(listener: ((info: DoodadViewInfo) => void) | null): void {
     this.removedListener = listener;
+  }
+
+  /** Called when a doodad on screen is hurt but survives (ticket 143). Returns the function that stops listening. */
+  public addHitListener(listener: (info: DoodadViewInfo) => void): () => void {
+    this.hitListeners.add(listener);
+    return () => this.hitListeners.delete(listener);
+  }
+
+  /** Called when a doodad on screen is killed, as it starts to fade, and when a falling one lands and shatters. Returns the function that stops listening. */
+  public addDeathListener(listener: (info: DoodadViewInfo) => void): () => void {
+    this.deathListeners.add(listener);
+    return () => this.deathListeners.delete(listener);
+  }
+
+  /** Flashes the doodad that starts at a cell, as the server says it was hurt. A doodad that is not on screen is ignored. */
+  public flashHit(x: number, y: number): void {
+    const view = this.byKey.get(`${x},${y}`);
+    if (!view?.layout || view.fade !== null) return;
+    view.hitLeft = DOODAD_HIT_FLASH_SECONDS;
+    for (const listener of this.hitListeners) listener(DoodadRenderer.info(view));
+  }
+
+  /** Notes that the doodad that starts at a cell was killed, so its fade (when the removal arrives) is a death and not a lost hold. */
+  public markKilled(x: number, y: number): void {
+    const view = this.byKey.get(`${x},${y}`);
+    if (view) view.killed = true;
+  }
+
+  /**
+   * Brings the ceiling doodads in the air up to date (ticket 143): the list is everything the server says is falling near
+   * the player this tick. New ones get a view, ones that are still falling are drawn toward their new place, and ones that
+   * left the list are retired (a landing also arrives as a shatter).
+   */
+  public setFalling(wires: readonly FallingDoodadWire[]): void {
+    if (this.destroyed) return;
+    const seen = new Set<number>();
+    for (const [id, typeIndex, variant, flip, x, y] of wires) {
+      const definition = this.field.definitions[typeIndex];
+      if (!definition) continue;
+      seen.add(id);
+      const existing = this.falling.get(id);
+      if (existing) {
+        existing.targetX = x;
+        existing.targetY = y;
+        continue;
+      }
+      const size = doodadSizeChoices(definition)[variant] ?? { width: definition.width, height: definition.height };
+      const entry: DoodadEntry = { typeIndex, definition, x: Math.round(x), y: Math.round(y), width: size.width, height: size.height, variant, flip: flip === 1 };
+      const view = this.bindFalling(entry);
+      this.falling.set(id, { view, x0: entry.x, y0: entry.y, x, y, targetX: x, targetY: y });
+    }
+    for (const [id, item] of [...this.falling]) {
+      if (seen.has(id)) continue;
+      this.falling.delete(id);
+      this.retireFalling(item.view);
+    }
+  }
+
+  /** The number of ceiling doodads drawn in the air. */
+  public get fallingCount(): number {
+    return this.falling.size;
+  }
+
+  /** A falling doodad landed and broke up: its death effect and sound play where it came down. */
+  public shatter(wire: DoodadShatterWire): void {
+    if (this.destroyed) return;
+    const [typeIndex, variant, flip, x, y] = wire;
+    const definition = this.field.definitions[typeIndex];
+    if (!definition) return;
+    const size = doodadSizeChoices(definition)[variant] ?? { width: definition.width, height: definition.height };
+    const entry: DoodadEntry = { typeIndex, definition, x, y, width: size.width, height: size.height, variant, flip: flip === 1 };
+    const box = { width: size.width * this.tileSize, height: size.height * this.tileSize };
+    const layout = layoutDoodad(definition.anchor, this.footprint(entry), box, entry.flip, this.tileSize);
+    const info: DoodadViewInfo = { entry, anchorX: layout.anchorX, anchorY: layout.anchorY, artScale: this.tileSize / PLACEHOLDER_PIXELS_PER_CELL, mirror: layout.mirror, phase: 0 };
+    for (const listener of this.deathListeners) listener(info);
   }
 
   /** Called when a brushed doodad gives off its puff of spores (ticket 104). */
@@ -273,6 +374,29 @@ export class DoodadRenderer {
       }
       if (view.wander) this.wanderStep(view, dtSeconds, bodies);
       this.pose(view);
+      this.tintHit(view, dtSeconds);
+    }
+    this.moveFalling(dtSeconds);
+  }
+
+  /** Tints a hurt doodad for a moment, then back to normal. */
+  private tintHit(view: DoodadView, dtSeconds: number): void {
+    if (view.hitLeft > 0) {
+      view.hitLeft = Math.max(0, view.hitLeft - dtSeconds);
+      view.body.tint = view.hitLeft > 0 ? DOODAD_HIT_TINT : 0xffffff;
+    }
+  }
+
+  /** Draws each falling doodad a little nearer to where the server last said it was. */
+  private moveFalling(dtSeconds: number): void {
+    if (this.falling.size === 0) return;
+    const k = Math.min(1, dtSeconds * FALLING_CATCH_UP_PER_SECOND);
+    for (const item of this.falling.values()) {
+      item.x += (item.targetX - item.x) * k;
+      item.y += (item.targetY - item.y) * k;
+      const layout = item.view.layout;
+      if (!layout) continue;
+      item.view.root.position.set(layout.anchorX + (item.x - item.x0) * this.tileSize, layout.anchorY + (item.y - item.y0) * this.tileSize);
     }
   }
 
@@ -333,8 +457,15 @@ export class DoodadRenderer {
         this.release(entry, view); // scrolled away
       } else if (view.layout) {
         // Its block went while it was on screen: a short fade, and the listener (the break sound) hears of it
+        const info = DoodadRenderer.info(view);
+        if (view.killed) for (const listener of this.deathListeners) listener(info);
+        else this.removedListener?.(info);
+        // A ceiling doodad that loses its hold falls (the server sends it in the air), so it does not also fade where it hung
+        if (entry.definition.anchor === 'CEILING') {
+          this.release(entry, view);
+          continue;
+        }
         view.fade = 0;
-        this.removedListener?.(DoodadRenderer.info(view));
       } else {
         this.release(entry, view);
       }
@@ -347,6 +478,9 @@ export class DoodadRenderer {
     view.generation++;
     view.entry = entry;
     view.fade = null;
+    view.hitLeft = 0;
+    view.killed = false;
+    view.body.tint = 0xffffff;
     view.phase = doodadPhase(entry.x, entry.y);
     view.key = `${entry.x},${entry.y}`;
     view.reactive = Boolean(entry.definition.reacts || entry.definition.wander);
@@ -364,6 +498,41 @@ export class DoodadRenderer {
     this.active.set(entry, view);
     this.drawPlaceholder(view);
     void this.loadArt(view);
+  }
+
+  /** A view for a doodad that is in the air: not part of the field, never reacts, wanders or fades. */
+  private bindFalling(entry: DoodadEntry): DoodadView {
+    const view = this.pool.pop() ?? new DoodadView();
+    view.generation++;
+    view.entry = entry;
+    view.fade = null;
+    view.hitLeft = 0;
+    view.killed = false;
+    view.phase = 0;
+    view.key = '';
+    view.reactive = false;
+    view.wander = null;
+    view.clearArt();
+    view.body.alpha = 1;
+    view.body.rotation = 0;
+    view.body.tint = 0xffffff;
+    view.body.position.set(0, 0);
+    view.root.visible = true;
+    view.root.zIndex = entry.definition.zOffset + 1;
+    this.container.addChild(view.root);
+    this.drawPlaceholder(view);
+    void this.loadArt(view);
+    return view;
+  }
+
+  private retireFalling(view: DoodadView): void {
+    view.entry = null;
+    view.layout = null;
+    view.generation++;
+    view.clearArt();
+    view.root.visible = false;
+    if (view.root.parent) view.root.parent.removeChild(view.root);
+    this.pool.push(view);
   }
 
   private release(entry: DoodadEntry, view: DoodadView): void {
@@ -549,6 +718,11 @@ export class DoodadRenderer {
       view.clearArt();
       view.root.destroy({ children: true });
     }
+    for (const item of this.falling.values()) {
+      item.view.clearArt();
+      item.view.root.destroy({ children: true });
+    }
+    this.falling.clear();
     this.active.clear();
     this.pool.length = 0;
   }

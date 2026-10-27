@@ -39,6 +39,9 @@ export class MiningDamageSystem {
     // A belt segment is hit through the same door as everything else (it has health, and breaks)
     if (target.kind === 'belt') return this.world.belt?.damageSegment(Number(target.id), amount) ?? NO_DAMAGE;
 
+    // A doodad with health (a bug, a hanging stalactite) takes the same hits; it dies or falls when its health is used up
+    if (target.kind === 'doodad') return this.world.doodads.applyHit(target.id, amount);
+
     const result =
       target.kind === 'mob'
         ? this.damageMob(target.id, amount, event)

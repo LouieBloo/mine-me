@@ -13,10 +13,12 @@ import { toDoodadDefinition, type DoodadRow } from '../../services/mining/defini
 /** The columns an admin may set. `key` is only set when a doodad is created; sounds have their own route and art its upload. */
 const EDITABLE_FIELDS = [
   'name', 'description', 'anchor', 'width', 'height', 'sizeVariants', 'textureUrl', 'parts', 'zOffset', 'motion', 'reacts', 'light',
-  'particleEffectId', 'particleOffsetX', 'particleOffsetY', 'wander', 'spawn',
+  'particleEffectId', 'particleOffsetX', 'particleOffsetY', 'wander', 'spawn', 'health', 'fallDamage', 'deathParticleEffectId',
 ] as const;
 
-const NUMERIC_FIELDS = ['width', 'height', 'zOffset', 'particleOffsetX', 'particleOffsetY'] as const;
+const NUMERIC_FIELDS = ['width', 'height', 'zOffset', 'particleOffsetX', 'particleOffsetY', 'health', 'fallDamage'] as const;
+/** Numbers that may be cleared: an empty value means none (a doodad with no health cannot be hurt). */
+const NULLABLE_NUMERIC_FIELDS = ['health', 'fallDamage'] as const;
 const JSON_FIELDS = ['sizeVariants', 'parts', 'motion', 'reacts', 'light', 'wander', 'spawn'] as const;
 
 /** A doodad with the biome each link points at, so the biome's key travels with it. */
@@ -46,6 +48,7 @@ function readBody(body: Record<string, unknown>): DoodadInput {
   for (const field of NUMERIC_FIELDS) {
     const value = out[field];
     if (typeof value === 'string' && value.trim() !== '') out[field] = Number(value);
+    else if (value === '' && (NULLABLE_NUMERIC_FIELDS as readonly string[]).includes(field)) out[field] = null;
   }
   return out as DoodadInput;
 }
@@ -75,6 +78,7 @@ export async function referenceErrors(
   }
   const effectIds = [
     ['particleEffectId', doodad.particleEffectId],
+    ['deathParticleEffectId', doodad.deathParticleEffectId],
     ['reacts.puffEffectId', doodad.reacts?.puffEffectId],
   ] as const;
   for (const [field, id] of effectIds) {
@@ -148,6 +152,9 @@ export const createDoodad = async (req: Request, res: Response) => {
         particleEffectId: input.particleEffectId ?? null,
         particleOffsetX: input.particleOffsetX ?? 0,
         particleOffsetY: input.particleOffsetY ?? 0,
+        health: input.health ?? null,
+        fallDamage: input.fallDamage ?? null,
+        deathParticleEffectId: input.deathParticleEffectId ?? null,
         wander: jsonOrNull(input.wander),
         spawn: jsonOrNull(input.spawn),
         ...(refs.links && refs.links.length > 0 ? { biomes: { create: refs.links } } : {}),
@@ -186,6 +193,7 @@ export const updateDoodad = async (req: Request, res: Response) => {
     if (input.anchor !== undefined) data.anchor = input.anchor;
     if (input.textureUrl !== undefined) data.textureUrl = input.textureUrl;
     if (input.particleEffectId !== undefined) data.particleEffectId = input.particleEffectId;
+    if (input.deathParticleEffectId !== undefined) data.deathParticleEffectId = input.deathParticleEffectId;
     for (const field of NUMERIC_FIELDS) if (input[field] !== undefined) (data as Record<string, unknown>)[field] = input[field];
     for (const field of JSON_FIELDS) if (input[field] !== undefined) (data as Record<string, unknown>)[field] = jsonOrNull(input[field]);
     // The whole list is replaced, in one write, so a doodad never has half of its links
@@ -240,6 +248,9 @@ const fileFilter = (_req: unknown, file: Express.Multer.File, cb: multer.FileFil
   else cb(new Error('Only PNG or JPG images are allowed'));
 };
 
+/** A re-upload keeps the file name, so the url carries a version to make browsers and the game fetch the new picture. */
+const versionedSpriteUrl = (filename: string): string => `/assets/sprites/doodads/${filename}?v=${Date.now()}`;
+
 export const doodadTextureUpload = multer({ storage, fileFilter }).single('texture');
 
 /** Saves an uploaded picture for the doodad and points its main texture at it. Returns the saved doodad. */
@@ -254,7 +265,7 @@ export const uploadDoodadTexture = async (req: Request, res: Response) => {
       res.status(400).json({ error: 'No image file provided' });
       return;
     }
-    await prisma.doodad.update({ where: { id: doodad.id }, data: { textureUrl: `/assets/sprites/doodads/${req.file.filename}` } });
+    await prisma.doodad.update({ where: { id: doodad.id }, data: { textureUrl: versionedSpriteUrl(req.file.filename) } });
     await mirrorDoodadsToJson();
     res.json(asDoodadDefinition((await findDoodad(doodad.id)) ?? doodad));
   } catch (err: any) {
@@ -277,7 +288,7 @@ export const uploadDoodadImage = async (req: Request, res: Response) => {
       res.status(400).json({ error: 'No image file provided' });
       return;
     }
-    res.json({ url: `/assets/sprites/doodads/${req.file.filename}` });
+    res.json({ url: versionedSpriteUrl(req.file.filename) });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to upload the doodad image' });
   }

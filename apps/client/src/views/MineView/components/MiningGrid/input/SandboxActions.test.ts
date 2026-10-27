@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MiningTileType, MouseActionTriggerMode, type MiningClientTile } from '@mine-me/shared';
-import { FreeCameraAction, IgniteAction, PlaceDoodadAction, PourFluidAction, ReleaseGasAction, RemoveDoodadAction, SpawnMobAction } from './SandboxActions';
+import { FreeCameraAction, HitDoodadAction, IgniteAction, PlaceDoodadAction, PourFluidAction, ReleaseGasAction, RemoveDoodadAction, SpawnMobAction } from './SandboxActions';
 
 /** 6 wide, 4 tall: sky is outside (y < 0), open row 0-1, dirt below. */
 const grid = (): MiningClientTile[][] =>
@@ -119,5 +119,16 @@ describe('PlaceDoodadAction and RemoveDoodadAction', () => {
     expect(remove.canExecute({ x: 0, y: 4 }, player, grid())).toBe(false);
     await remove.execute({ x: 4, y: 1 });
     expect(onRemove).toHaveBeenCalledWith({ x: 4, y: 1 });
+  });
+
+  it('hits the doodad under the cursor (ticket 143)', async () => {
+    const onHit = vi.fn().mockResolvedValue(true);
+    const hitDoodad = new HitDoodadAction(onHit);
+    expect(hitDoodad.triggerMode).toBe(MouseActionTriggerMode.SINGLE);
+    expect(hitDoodad.canExecute({ x: 0, y: 3 }, player, grid())).toBe(true);
+    expect(hitDoodad.canExecute({ x: 0, y: 4 }, player, grid())).toBe(false);
+    await hitDoodad.execute({ x: 4, y: 1 });
+    expect(onHit).toHaveBeenCalledWith({ x: 4, y: 1 });
+    expect(hitDoodad.getReticleStyle({ x: 1, y: 0 }, player, grid()).isValid).toBe(true);
   });
 });

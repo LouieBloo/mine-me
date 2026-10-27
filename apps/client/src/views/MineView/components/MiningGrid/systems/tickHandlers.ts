@@ -358,8 +358,15 @@ export function applyGasUpdates(payload: MiningStateTickPayload, ctx: TickHandle
 export function applyDoodadUpdates(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
   const field = ctx.world.doodadFieldRef?.current;
   if (!field) return;
+  const renderer = ctx.world.doodadRendererRef?.current;
+  // Hurt and killed doodads (ticket 143): flash the hurt ones, and note the killed so their removal reads as a death
+  for (const [x, y] of payload.doodadsHit ?? []) renderer?.flashHit(x, y);
+  for (const [x, y] of payload.doodadsKilled ?? []) renderer?.markKilled(x, y);
   field.apply(payload.doodadsAdded ?? [], payload.doodadsRemoved ?? []);
   for (const tile of payload.revealedTiles ?? []) field.onTileChanged(tile.x, tile.y, tile.type);
+  // Ceiling doodads in the air, and the ones that landed this tick (the list is every tick, so an empty one clears them)
+  renderer?.setFalling(payload.fallingDoodads ?? []);
+  for (const wire of payload.doodadsShattered ?? []) renderer?.shatter(wire);
 }
 
 /** Fires that started or stopped: in newly revealed tiles, then this tick's changes. Updates the client's copy of the fire grid. */

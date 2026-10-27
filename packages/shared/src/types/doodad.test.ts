@@ -149,3 +149,30 @@ describe('toClientDoodad', () => {
     expect(Object.keys(out).sort()).toEqual(['anchor', 'height', 'index', 'key', 'name', 'width', 'zOffset']);
   });
 });
+
+describe('health, fall damage and death effect (ticket 143)', () => {
+  const base = { key: 'beetle', name: 'Beetle', anchor: 'FLOOR' as const, width: 3, height: 3, biomes: [] };
+
+  it('accepts a doodad with no health, and one with whole health', () => {
+    expect(validateDoodad(base)).toEqual([]);
+    expect(validateDoodad({ ...base, health: 10, fallDamage: 4.5, deathParticleEffectId: 'fx1' })).toEqual([]);
+    expect(validateDoodad({ ...base, health: null, fallDamage: null, deathParticleEffectId: null })).toEqual([]);
+  });
+
+  it('rejects health that is not a whole number of at least 1', () => {
+    expect(validateDoodad({ ...base, health: 0 })).toContain('health must be a whole number of at least 1, or empty');
+    expect(validateDoodad({ ...base, health: 2.5 })).toHaveLength(1);
+    expect(validateDoodad({ ...base, health: -3 })).toHaveLength(1);
+  });
+
+  it('rejects a fall damage of 0 or less and an empty effect id', () => {
+    expect(validateDoodad({ ...base, fallDamage: 0 })).toContain('fallDamage must be greater than 0, or empty');
+    expect(validateDoodad({ ...base, deathParticleEffectId: '' })).toContain('deathParticleEffectId must be an effect id or null');
+  });
+
+  it('sends the client only the death effect, not the health', () => {
+    const client = toClientDoodad({ ...base, id: 'd', zOffset: 0, health: 10, deathParticleEffectId: 'fx1' } as any, 0);
+    expect(client.deathParticleEffectId).toBe('fx1');
+    expect(client).not.toHaveProperty('health');
+  });
+});

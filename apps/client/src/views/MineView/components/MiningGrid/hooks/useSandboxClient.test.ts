@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { FreeCamera } from '../systems/FreeCamera';
-import { FreeCameraAction, IgniteAction, PlaceDoodadAction, PourFluidAction, ReleaseGasAction, RemoveDoodadAction, SpawnMobAction } from '../input/SandboxActions';
+import { FreeCameraAction, HitDoodadAction, IgniteAction, PlaceDoodadAction, PourFluidAction, ReleaseGasAction, RemoveDoodadAction, SpawnMobAction } from '../input/SandboxActions';
 import { sendSandboxCommand, useSandboxFreeCamera, useSandboxMouseAction } from './useSandboxClient';
 import { MINE_TOOL, type SandboxViewState } from '../../../sandbox/sandboxTool';
 import { notificationService } from '../../../../../services/notificationService';
@@ -31,6 +31,7 @@ describe('useSandboxMouseAction', () => {
     expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'ignite' } }), send)).result.current).toBeInstanceOf(IgniteAction);
     expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'placeDoodad', doodadId: 'd' } }), send)).result.current).toBeInstanceOf(PlaceDoodadAction);
     expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'removeDoodad' } }), send)).result.current).toBeInstanceOf(RemoveDoodadAction);
+    expect(renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'hitDoodad' } }), send)).result.current).toBeInstanceOf(HitDoodadAction);
   });
 
   it('turns clicks into sandbox commands', async () => {
@@ -57,6 +58,10 @@ describe('useSandboxMouseAction', () => {
     const remove = renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'removeDoodad' } }), send)).result.current!;
     await remove.execute({ x: 7, y: 8 }, { x: 0, y: 0 });
     expect(send).toHaveBeenCalledWith({ type: 'sandbox_remove_doodad', x: 7, y: 8 });
+
+    const hitDoodad = renderHook(() => useSandboxMouseAction(view({ tool: { kind: 'hitDoodad' } }), send)).result.current!;
+    await hitDoodad.execute({ x: 9, y: 4 }, { x: 0, y: 0 });
+    expect(send).toHaveBeenCalledWith({ type: 'sandbox_hit_doodad', x: 9, y: 4 });
   });
 
   it('swallows clicks while the free camera is on, whatever tool is picked', () => {

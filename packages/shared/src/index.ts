@@ -49,6 +49,7 @@ export * from './gameLogic/gas/ExplosionFront';
 export * from './gameLogic/biome/biomeField';
 export * from './gameLogic/biome/bandBiomeField';
 export * from './gameLogic/doodad/doodadPlacement';
+export * from './gameLogic/doodad/doodadDamage';
 export * from './gameLogic/doodad/DoodadField';
 export * from './gameLogic/doodad/doodadMotion';
 export * from './gameLogic/doodad/doodadLayout';

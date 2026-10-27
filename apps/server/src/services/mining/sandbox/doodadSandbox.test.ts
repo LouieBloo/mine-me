@@ -6,6 +6,7 @@ import { MiningDataManager, type GameDefinitions } from '../subsystems/MiningDat
 import { DOODAD_SCENES, DOODAD_SCENE_OPTIONS, findDoodadScene } from './doodadScenes';
 import { doodadPlacementProblem } from './sandboxDoodads';
 import { SANDBOX_BLOCK_SCALE } from './SandboxLayout';
+import { SANDBOX_DOODAD_HIT_DAMAGE } from './SandboxTools';
 
 const S = SANDBOX_BLOCK_SCALE;
 
@@ -151,6 +152,32 @@ describe('doodads in the sandbox (ticket 107)', () => {
       engine!.grid[y + 1][55] = { type: MiningTileType.EMPTY, revealed: true };
       (engine as any).buildWorld().pushTileUpdate({ x: 55, y: y + 1, type: MiningTileType.EMPTY });
       expect(standing()).toEqual([]);
+    });
+
+    it('hits a doodad with health like a weapon, kills it, lets a hanging one fall and refuses the rest (ticket 143)', () => {
+      install(DOODADS.map((d) => (d.key === 'bug_a' ? { ...d, health: 12 } : d)));
+      make();
+      const y = engine!.surfaceRow - 1;
+      const hallTop = engine!.surfaceRow + 12 * S;
+      tools().placeDoodad(idOf('bug_a'), 60, y);
+      tools().placeDoodad(idOf('ceiling_a'), 80, hallTop);
+      tools().placeDoodad(idOf('floor_a'), 55, y);
+      const bug = engine!.doodadSubsystem.placementCovering(60, y)!;
+
+      expect(tools().hitDoodad(60, y)).toEqual({ ok: true });
+      expect(engine!.doodadSubsystem.healthAt(bug.x, bug.y)).toBe(12 - SANDBOX_DOODAD_HIT_DAMAGE);
+      tools().hitDoodad(60, y);
+      tools().hitDoodad(60, y);
+      expect(standing().some((p) => keyOf(p.typeIndex) === 'bug_a')).toBe(false);
+
+      expect(tools().hitDoodad(80, hallTop)).toEqual({ ok: true });
+      expect(standing().some((p) => keyOf(p.typeIndex) === 'ceiling_a')).toBe(false);
+      expect(engine!.doodadSubsystem.falling.list).toHaveLength(1);
+
+      expect(tools().hitDoodad(55, y)).toEqual({ ok: false, error: 'That doodad has no health, so it cannot be hurt.' });
+      expect(standing().some((p) => keyOf(p.typeIndex) === 'floor_a')).toBe(true);
+      expect(tools().hitDoodad(70, y)).toEqual({ ok: false, error: 'There is no doodad there.' });
+      expect(tools().hitDoodad('a', 1).ok).toBe(false);
     });
 
     it('clears every doodad', () => {

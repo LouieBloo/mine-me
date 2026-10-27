@@ -3,7 +3,7 @@
 **Priority:** P1 - **Status:** Built 2026-10-24 (server, shared and admin page; waiting for you to try it) - **Depends on:** 095 (biome table)
 
 ## Problem
-The mine is visually empty. Doodads are purely environmental decoration: mushrooms, grass, dripping caves, bugs, crystals, moss. They live in the background, are never interactable and are drawn behind the character. A future "mushroom item" would be a separate thing.
+The mine is visually empty. Doodads are purely environmental decoration: mushrooms, grass, dripping caves, bugs, crystals, moss. They live in the background and are drawn behind the character. (2026-10-26: they are no longer untouchable: see 143, where creatures can be killed and ceiling doodads fall.) A future "mushroom item" would be a separate thing.
 
 ## Decisions (2026-10-22, from the owner)
 - **Generated and anchored to surfaces.** Anchors: floor (on top of a block), ceiling (under a block), wall (side of a block), and free-floating in open air.

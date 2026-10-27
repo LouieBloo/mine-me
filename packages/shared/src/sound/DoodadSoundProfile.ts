@@ -25,6 +25,18 @@ export const DOODAD_SOUND_SLOTS: readonly DoodadSoundSlotDefinition[] = [
     description: 'Plays when the doodad disappears because the block it hangs from or sits on is gone',
     icon: '💥',
   }),
+  new DoodadSoundSlotDefinition({
+    slotKey: 'hit',
+    label: 'Hit',
+    description: 'Plays when the doodad is hurt but survives (only for doodads with health)',
+    icon: '🩹',
+  }),
+  new DoodadSoundSlotDefinition({
+    slotKey: 'death',
+    label: 'Death',
+    description: 'Plays when the doodad is killed, or when a falling one lands and shatters',
+    icon: '☠️',
+  }),
 ];
 
 export const DOODAD_SOUND_SLOT_KEYS: readonly DoodadSoundSlot[] = DOODAD_SOUND_SLOTS.map((s) => s.slotKey);

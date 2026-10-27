@@ -40,7 +40,7 @@ describe('DoodadSoundEffects', () => {
 
   it('assigns a library sound through the doodad\'s sound endpoint and reports the saved doodad', async () => {
     const onSaved = renderIt();
-    await waitFor(() => expect(screen.getAllByRole('option', { name: 'Drip' }).length).toBe(3), { timeout: 4000 });
+    await waitFor(() => expect(screen.getAllByRole('option', { name: 'Drip' }).length).toBe(5), { timeout: 4000 });
     mockFetchWithAuth.mockClear();
     mockFetchWithAuth.mockImplementation(routes());
     fireEvent.change(screen.getByLabelText('Ambient sound'), { target: { value: 's1' } });

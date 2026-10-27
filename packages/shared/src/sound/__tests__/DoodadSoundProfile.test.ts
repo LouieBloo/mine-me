@@ -7,8 +7,8 @@ const library = new Map([
 ]);
 
 describe('doodad sound slots', () => {
-  it('has ambient, react and break, and only ambient can loop', () => {
-    expect(DOODAD_SOUND_SLOT_KEYS).toEqual(['ambient', 'react', 'break']);
+  it('has ambient, react, break, hit and death, and only ambient can loop', () => {
+    expect(DOODAD_SOUND_SLOT_KEYS).toEqual(['ambient', 'react', 'break', 'hit', 'death']);
     expect(getDoodadSoundSlot('ambient')?.loopToggleable).toBe(true);
     expect(getDoodadSoundSlot('react')?.loopToggleable).toBe(false);
     expect(isDoodadSoundSlot('break')).toBe(true);

@@ -2,6 +2,8 @@
 
 **Priority:** P1 - **Status:** Built, waiting for you to try it (the optional drop-off puff is not built) - **Depends on:** 100, 101
 
+> 2026-10-26: ceiling doodads now fall (and hurt) instead of just vanishing, and doodads can be killed; see 143.
+
 ## Decisions (2026-10-22, from the owner)
 - A doodad disappears if the block it hangs from or sits on is mined or blown up (a leaky cave block stops leaking when its block is mined). Free-floating (air) doodads are never removed this way.
 

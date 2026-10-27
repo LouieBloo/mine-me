@@ -6,7 +6,8 @@ export type SandboxToolSelection =
   | { kind: 'spawn'; mobId: string }
   | { kind: 'ignite' }
   | { kind: 'placeDoodad'; doodadId: string }
-  | { kind: 'removeDoodad' };
+  | { kind: 'removeDoodad' }
+  | { kind: 'hitDoodad' };
 
 export const MINE_TOOL: SandboxToolSelection = { kind: 'mine' };
 

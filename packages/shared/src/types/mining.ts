@@ -5,7 +5,7 @@ import type { ParticleEffect, ParticleEffectConfig } from './particles';
 import type { Flammability, FluidAppearance } from './fluid';
 import type { BiomeClientDefinition } from './biome';
 import type { DoodadClientDefinition } from './doodad';
-import type { DoodadPlacementWire, DoodadRemovalWire } from '../gameLogic/doodad/doodadPlacement';
+import type { DoodadPlacementWire, DoodadRemovalWire, FallingDoodadWire, DoodadShatterWire } from '../gameLogic/doodad/doodadPlacement';
 import type { GasClientDefinition, GasEvent, GasExplosionCell, GasWireCell } from '../gameLogic/gas/gasWire';
 import type { SkeletonManifest } from './modularRig';
 
@@ -1084,6 +1084,14 @@ export interface MiningStateTickPayload {
   doodadsAdded?: DoodadPlacementWire[];
   /** Doodads that went this tick (the block they hung from or stood on was mined or blown up), by the top-left cell of their footprint. */
   doodadsRemoved?: DoodadRemovalWire[];
+  /** Doodads hurt this tick but still standing (a hit flash and sound), by the top-left cell of their footprint (ticket 143). */
+  doodadsHit?: DoodadRemovalWire[];
+  /** Doodads killed this tick (death effect and sound at their place); the same cells also arrive in `doodadsRemoved`, which comes after. */
+  doodadsKilled?: DoodadRemovalWire[];
+  /** Ceiling doodads in the air right now, in view of the receiving player (ticket 143). */
+  fallingDoodads?: FallingDoodadWire[];
+  /** Falling doodads that landed and broke up this tick, near the receiving player: [typeIndex, variant, flip, x, y] (top-left of the footprint). */
+  doodadsShattered?: DoodadShatterWire[];
   /**
    * Gas cells that changed this tick, as [x, y, gasId, concentration]. Only cells the fog of war has revealed
    * are ever sent (a newly revealed tile carries its gas in `revealedTiles`).

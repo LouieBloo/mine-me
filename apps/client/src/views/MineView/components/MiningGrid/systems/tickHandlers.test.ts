@@ -648,6 +648,25 @@ describe('applyDoodadUpdates', () => {
     expect(field.at(5, 5)).toBeDefined();
   });
 
+  it('tells the renderer who was hurt and who was killed, before the removals, and what is falling (ticket 143)', () => {
+    const field = new DoodadField(defs, [[0, 2, 2, 0], [0, 6, 6, 0]]);
+    const renderer = { flashHit: vi.fn(), markKilled: vi.fn(), setFalling: vi.fn(), shatter: vi.fn() };
+    const ctx = makeCtx(makeWorld({ doodadFieldRef: ref(field), doodadRendererRef: ref(renderer as any) }));
+    applyDoodadUpdates(tick({ doodadsHit: [[2, 2]], doodadsKilled: [[6, 6]], doodadsRemoved: [[6, 6]], fallingDoodads: [[1, 1, 0, 0, 5, 5]], doodadsShattered: [[1, 0, 0, 9, 9]] }), ctx);
+    expect(renderer.flashHit).toHaveBeenCalledWith(2, 2);
+    expect(renderer.markKilled).toHaveBeenCalledWith(6, 6);
+    expect(renderer.markKilled.mock.invocationCallOrder[0]).toBeLessThan(renderer.setFalling.mock.invocationCallOrder[0]);
+    expect(field.at(6, 6)).toBeUndefined();
+    expect(renderer.setFalling).toHaveBeenCalledWith([[1, 1, 0, 0, 5, 5]]);
+    expect(renderer.shatter).toHaveBeenCalledWith([1, 0, 0, 9, 9]);
+  });
+
+  it('clears the falling doodads when a tick has none', () => {
+    const renderer = { flashHit: vi.fn(), markKilled: vi.fn(), setFalling: vi.fn(), shatter: vi.fn() };
+    applyDoodadUpdates(tick({}), makeCtx(makeWorld({ doodadFieldRef: ref(new DoodadField(defs)), doodadRendererRef: ref(renderer as any) })));
+    expect(renderer.setFalling).toHaveBeenCalledWith([]);
+  });
+
   it('runs as part of a full state tick', () => {
     const field = new DoodadField(defs);
     handleStateTick(payload({ doodadsAdded: [[0, 3, 3, 0]] }), makeCtx(makeWorld({ doodadFieldRef: ref(field) })));

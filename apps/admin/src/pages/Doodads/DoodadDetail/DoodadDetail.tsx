@@ -10,6 +10,7 @@ import { NEW_DOODAD, doodadToForm, formToDoodad, previewDoodad, type DoodadForm 
 import type { KeyChipOption } from './KeyChips/KeyChips';
 import DoodadSizeVariantsEditor from './DoodadSizeVariantsEditor/DoodadSizeVariantsEditor';
 import DoodadArtPanel from './DoodadArtPanel/DoodadArtPanel';
+import DoodadDamagePanel from './DoodadDamagePanel/DoodadDamagePanel';
 import DoodadMotionPanel from './DoodadMotionPanel/DoodadMotionPanel';
 import DoodadBehaviourPanel from './DoodadBehaviourPanel/DoodadBehaviourPanel';
 import DoodadEffectsPanel from './DoodadEffectsPanel/DoodadEffectsPanel';
@@ -299,6 +300,16 @@ export default function DoodadDetail() {
               particleEffects={particleEffects}
               onLightChange={(v) => set('light', v)}
               onParticleChange={(v) => set('particleEffectId', v)}
+            />
+            <DoodadDamagePanel
+              anchor={form.anchor}
+              health={form.health}
+              fallDamage={form.fallDamage}
+              deathParticleEffectId={form.deathParticleEffectId}
+              particleEffects={particleEffects}
+              onHealthChange={(v) => set('health', v)}
+              onFallDamageChange={(v) => set('fallDamage', v)}
+              onDeathEffectChange={(v) => set('deathParticleEffectId', v)}
             />
             <DoodadSpawnPanel value={form.spawn} onChange={(v) => set('spawn', v)} blocks={blocks} fluids={fluids} gases={gases} />
             <DoodadBiomeLinks value={form.biomes} biomes={biomes} onChange={(v) => set('biomes', v)} />

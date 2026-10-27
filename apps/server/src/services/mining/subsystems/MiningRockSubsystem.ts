@@ -160,6 +160,16 @@ export class MiningRockSubsystem {
     const mass = rockMass({ width: rock.cellsWide, height: rock.cellsHigh });
     const reachX = Math.max(CRUSH_RADIUS, rock.cellsWide / 2 + CRUSH_MARGIN);
     const reachY = Math.max(CRUSH_RADIUS, rock.cellsHigh / 2 + CRUSH_MARGIN);
+    // A rock also crushes doodads with health (a bug on the floor under it), once per fall
+    const damage = computeSpeedDamage(speed, rule) * Math.pow(mass, ROCK_MASS_DAMAGE_EXPONENT);
+    if (damage > 0) {
+      const box = { x0: rock.position.x - reachX, y0: Math.min(rock.previousPosition.y, rock.position.y) - reachY, x1: rock.position.x + reachX, y1: Math.max(rock.previousPosition.y, rock.position.y) + reachY };
+      for (const target of this.world.doodads.hurtableInBox(box)) {
+        if (rock.hitDoodadIds.has(target.id)) continue;
+        rock.hitDoodadIds.add(target.id);
+        this.world.damage.applyDamage({ kind: 'doodad', id: target.id }, { amount: damage, type: 'environmental', source: { kind: 'environment', id: rock.id, name: 'Falling rock' } });
+      }
+    }
     for (const session of this.world.players.values()) {
       if (rock.hitPlayerIds.has(session.characterId)) continue;
       const body = session.playerBody;

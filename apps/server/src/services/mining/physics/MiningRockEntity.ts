@@ -18,6 +18,8 @@ export class MiningRockEntity extends MiningPhysicsBody {
   public totalFallenDistance: number = 0;
   /** Players this rock has already hit, so one fall hurts each player at most once. */
   public readonly hitPlayerIds: Set<string> = new Set();
+  /** Doodads (by target id) this rock has already hit. */
+  public readonly hitDoodadIds: Set<string> = new Set();
   /** Where the rock was, and how fast it was falling, before the latest `update` (for swept hit tests). */
   public previousPosition: Vector2D;
   public previousVelocityY = 0;

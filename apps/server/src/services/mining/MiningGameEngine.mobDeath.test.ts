@@ -90,6 +90,8 @@ describe('mob death state', () => {
     const projSub = engine.projectileSubsystem;
     projSub.activeProjectiles.push({
       position: { x: mob.mobBody.position.x, y: mob.mobBody.position.y },
+      previousPosition: { x: mob.mobBody.position.x, y: mob.mobBody.position.y },
+      hitDoodadIds: new Set<string>(),
       hasHit: false,
       damage: 10,
       characterId: cid,

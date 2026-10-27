@@ -3,7 +3,7 @@ import type { MiningPosition, Vector2D } from '@mine-me/shared';
 import { notificationService } from '../../../../../services/notificationService';
 import type { SandboxViewState } from '../../../sandbox/sandboxTool';
 import type { IMouseAction } from '../input/MouseAction';
-import { FreeCameraAction, IgniteAction, PlaceDoodadAction, PourFluidAction, ReleaseGasAction, RemoveDoodadAction, SpawnMobAction } from '../input/SandboxActions';
+import { FreeCameraAction, IgniteAction, HitDoodadAction, PlaceDoodadAction, PourFluidAction, ReleaseGasAction, RemoveDoodadAction, SpawnMobAction } from '../input/SandboxActions';
 import type { FreeCamera } from '../systems/FreeCamera';
 import type { MiningClientWorld } from '../systems/MiningClientWorld';
 
@@ -64,6 +64,8 @@ export function useSandboxMouseAction(
         );
       case 'removeDoodad':
         return new RemoveDoodadAction((t: MiningPosition) => sendSandboxCommand(sendGameEvent, { type: 'sandbox_remove_doodad', x: t.x, y: t.y }));
+      case 'hitDoodad':
+        return new HitDoodadAction((t: MiningPosition) => sendSandboxCommand(sendGameEvent, { type: 'sandbox_hit_doodad', x: t.x, y: t.y }));
       default:
         return null;
     }

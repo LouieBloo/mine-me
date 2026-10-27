@@ -3,6 +3,8 @@ import { Container, Graphics, Texture, type Sprite } from 'pixi.js';
 import { DoodadField, MiningTileType, type DoodadClientDefinition, type DoodadPartDef } from '@mine-me/shared';
 import {
   DOODAD_FADE_SECONDS,
+  DOODAD_HIT_FLASH_SECONDS,
+  DOODAD_HIT_TINT,
   DOODAD_VIEW_MARGIN_CELLS,
   DoodadRenderer,
   doodadPlaceholderColor,
@@ -403,3 +405,136 @@ describe('DoodadRenderer wandering (ticket 106)', () => {
   });
 });
 
+
+describe('DoodadRenderer hurt, killed and falling doodads (ticket 143)', () => {
+  const viewAt = (renderer: DoodadRenderer, x: number, y: number) => (renderer as any).byKey.get(`${x},${y}`);
+
+  it('tints a hurt doodad for a moment, tells the hit listeners, and then goes back to normal', () => {
+    const { renderer } = make([[0, 5, 5, 0]]);
+    renderer.update(0, VIEW, 0.016);
+    const heard: number[] = [];
+    renderer.addHitListener((info) => heard.push(info.entry.x));
+    renderer.flashHit(5, 5);
+    expect(heard).toEqual([5]);
+    renderer.update(0.1, VIEW, 0.01);
+    expect(viewAt(renderer, 5, 5).body.tint).toBe(DOODAD_HIT_TINT);
+    renderer.update(0.2, VIEW, DOODAD_HIT_FLASH_SECONDS);
+    expect(viewAt(renderer, 5, 5).body.tint).toBe(0xffffff);
+  });
+
+  it('ignores a hit on a doodad that is not on screen', () => {
+    const { renderer } = make([[0, 100, 5, 0]]);
+    renderer.update(0, VIEW, 0.016);
+    const heard: number[] = [];
+    renderer.addHitListener((info) => heard.push(info.entry.x));
+    renderer.flashHit(100, 5);
+    expect(heard).toEqual([]);
+  });
+
+  it('lets a listener stop listening', () => {
+    const { renderer } = make([[0, 5, 5, 0]]);
+    renderer.update(0, VIEW, 0.016);
+    const heard: number[] = [];
+    const stop = renderer.addHitListener((info) => heard.push(info.entry.x));
+    stop();
+    renderer.flashHit(5, 5);
+    expect(heard).toEqual([]);
+  });
+
+  it('plays a death, not a broken hold, when the doodad that goes was killed', () => {
+    const { field, renderer } = make([[0, 5, 5, 0]]);
+    renderer.update(0, VIEW, 0.016);
+    const deaths: number[] = [];
+    const breaks: number[] = [];
+    renderer.addDeathListener((info) => deaths.push(info.entry.x));
+    renderer.setRemovedListener((info) => breaks.push(info.entry.x));
+    renderer.markKilled(5, 5);
+    field.apply([], [[5, 5]]);
+    renderer.update(0.1, VIEW, 0);
+    expect(deaths).toEqual([5]);
+    expect(breaks).toEqual([]);
+    expect(renderer.count).toBe(1); // it still fades away
+  });
+
+  it('plays a broken hold when a doodad goes that was not killed', () => {
+    const { field, renderer } = make([[0, 5, 5, 0]]);
+    renderer.update(0, VIEW, 0.016);
+    const deaths: number[] = [];
+    const breaks: number[] = [];
+    renderer.addDeathListener((info) => deaths.push(info.entry.x));
+    renderer.setRemovedListener((info) => breaks.push(info.entry.x));
+    field.apply([], [[5, 5]]);
+    renderer.update(0.1, VIEW, 0);
+    expect(deaths).toEqual([]);
+    expect(breaks).toEqual([5]);
+  });
+
+  it('does not fade a ceiling doodad that loses its hold, since it falls', () => {
+    const { field, renderer } = make([[1, 10, 10, 0]]);
+    renderer.update(0, VIEW, 0.016);
+    const breaks: number[] = [];
+    renderer.setRemovedListener((info) => breaks.push(info.entry.x));
+    field.onTileChanged(10, 9, MiningTileType.EMPTY); // the block above it
+    renderer.update(0.1, VIEW, 0);
+    expect(breaks).toEqual([10]);
+    expect(renderer.count).toBe(0);
+  });
+
+  describe('falling', () => {
+    it('draws a doodad in the air from where it hung and moves it toward the server\'s place', () => {
+      const { container, renderer } = make([]);
+      renderer.setFalling([[7, 1, 0, 0, 10, 10]]);
+      expect(renderer.fallingCount).toBe(1);
+      renderer.update(0, VIEW, 0.016);
+      const item = (renderer as any).falling.get(7);
+      const startY = item.view.root.y;
+      expect(startY).toBe(10 * T); // a ceiling doodad's base is the top of its footprint
+      renderer.setFalling([[7, 1, 0, 0, 10, 14]]);
+      renderer.update(0.1, VIEW, 1 / 30);
+      expect(item.view.root.y).toBeGreaterThan(startY);
+      expect(item.view.root.y).toBeLessThanOrEqual(14 * T);
+      for (let i = 0; i < 20; i++) renderer.update(0.2 + i, VIEW, 0.1);
+      expect(item.view.root.y).toBeCloseTo(14 * T, 0);
+      expect(container.children).toHaveLength(1);
+    });
+
+    it('gives the sprite back when the doodad leaves the list, and reuses it', () => {
+      const { container, renderer } = make([]);
+      renderer.setFalling([[1, 1, 0, 0, 10, 10]]);
+      renderer.setFalling([]);
+      expect(renderer.fallingCount).toBe(0);
+      expect(container.children).toHaveLength(0);
+      renderer.setFalling([[2, 1, 0, 0, 20, 10]]);
+      expect((renderer as any).pool).toHaveLength(0);
+    });
+
+    it('does not draw a falling doodad of a kind it does not know', () => {
+      const { renderer } = make([]);
+      renderer.setFalling([[1, 99, 0, 0, 10, 10]]);
+      expect(renderer.fallingCount).toBe(0);
+    });
+
+    it('is not a source of light or sound while it falls', () => {
+      const { renderer } = make([]);
+      renderer.setFalling([[1, 1, 0, 0, 10, 10]]);
+      renderer.update(0, VIEW, 0.016);
+      expect(renderer.visible()).toHaveLength(0);
+    });
+
+    it('tells the death listeners where a falling doodad shattered', () => {
+      const { renderer } = make([]);
+      const heard: Array<[number, number, number]> = [];
+      renderer.addDeathListener((info) => heard.push([info.entry.typeIndex, info.anchorX, info.anchorY]));
+      renderer.shatter([1, 0, 0, 10, 30]);
+      expect(heard).toEqual([[1, 11 * T, 30 * T]]);
+    });
+
+    it('draws nothing for a shatter of an unknown kind', () => {
+      const { renderer } = make([]);
+      const heard: number[] = [];
+      renderer.addDeathListener(() => heard.push(1));
+      renderer.shatter([99, 0, 0, 10, 30]);
+      expect(heard).toEqual([]);
+    });
+  });
+});

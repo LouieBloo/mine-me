@@ -46,6 +46,8 @@ export class MiningProjectileEntity extends MiningPhysicsBody {
   public hitMobId?: string;
   /** Mobs already damaged by this bullet; a piercing bullet never hits the same one twice. */
   public readonly hitMobIds = new Set<string>();
+  /** Doodads (by target id) already hit, so a slow bullet crossing one over several steps hurts it once. */
+  public readonly hitDoodadIds = new Set<string>();
   /** Further mobs the bullet can pass through. */
   public pierceRemaining: number;
   public angle: number = 0;

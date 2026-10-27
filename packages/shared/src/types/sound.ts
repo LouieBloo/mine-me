@@ -139,7 +139,7 @@ export interface GasSoundSlotResolved extends SoundEffectSlotConfig {
 
 export type GasSoundEffectsConfig = Partial<Record<GasSoundSlot, GasSoundSlotResolved>>;
 
-export type DoodadSoundSlot = 'ambient' | 'react' | 'break';
+export type DoodadSoundSlot = 'ambient' | 'react' | 'break' | 'hit' | 'death';
 
 /** What the admin stores for one doodad slot: a library sound by id (the url is resolved at load). */
 export interface DoodadSoundSlotRef {

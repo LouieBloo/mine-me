@@ -2,6 +2,8 @@
 
 **Priority:** P3 - **Status:** Built, waiting for you to try it (needs doodads with art or placeholders in the database) - **Depends on:** 103
 
+> 2026-10-26: the player (bullets, swings, explosions, falling rocks) can now also hurt and kill doodads that have health; see 143.
+
 ## Decisions (2026-10-22, from the owner)
 - Simple client-side wandering is included for bugs: a doodad may have a small wander/flutter motion inside a radius of its anchor. Purely cosmetic, not synced, not interactable.
 

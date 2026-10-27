@@ -504,6 +504,7 @@ model ParticleEffect {
   id           String        @id @default(cuid())
   // Doodads that play this effect
   doodads      Doodad[]      @relation("DoodadParticle")
+  deathDoodads Doodad[]      @relation("DoodadDeathParticle")
   name         String        @unique
   description  String?
   type         String        @default("CONTINUOUS")
@@ -616,6 +617,13 @@ model Doodad {
   particleEffect   ParticleEffect? @relation("DoodadParticle", fields: [particleEffectId], references: [id], onDelete: SetNull)
   particleOffsetX  Float    @default(0)
   particleOffsetY  Float    @default(0)
+  // Hit points (ticket 143): null = it cannot be hurt
+  health           Int?
+  // Mass of the doodad while it falls (ceiling doodads), which scales the damage; null = from its footprint
+  fallDamage       Float?
+  // Played where it dies (ticket 143)
+  deathParticleEffectId String?
+  deathParticleEffect   ParticleEffect? @relation("DoodadDeathParticle", fields: [deathParticleEffectId], references: [id], onDelete: SetNull)
   // Sound slots: library sounds by id with their own volume (DOODAD_SOUND_SLOTS)
   soundEffects     Json?
   // { mode, radius, speed, pauseMs } (ticket 106)

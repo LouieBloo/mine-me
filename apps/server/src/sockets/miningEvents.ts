@@ -42,6 +42,7 @@ export {
   handleSandboxLoadExtractorScene,
   handleSandboxPlaceDoodad,
   handleSandboxRemoveDoodad,
+  handleSandboxHitDoodad,
   handleSandboxClearDoodads,
   handleSandboxSetDoodadGeneration,
   handleSandboxLoadDoodadScene,

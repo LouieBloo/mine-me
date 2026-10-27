@@ -19,8 +19,12 @@ import { installRenderInstrumentation } from '../utils/renderInstrumentation';
 import { sampleSceneGauges } from '../utils/sceneStats';
 import { Culler, Rectangle } from 'pixi.js';
 
-/** Extra pixels around the screen that stay drawn, so a chunk is never culled the frame before it scrolls into view. */
-const TILE_CULL_MARGIN_PX = 400;
+/**
+ * Extra pixels around the screen that stay drawn, so a chunk is never culled the frame before it scrolls into view. The culler
+ * reads last frame's transforms, so this only has to cover one frame of camera movement; a bigger margin makes Pixi draw a ring
+ * of tiles nobody sees (on a 2560x1351 screen a 400px margin was about 1.6x the tiles actually on screen).
+ */
+const TILE_CULL_MARGIN_PX = 96;
 
 // Frame Systems
 import type { MiningClientWorld } from '../systems/MiningClientWorld';

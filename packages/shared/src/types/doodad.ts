@@ -5,7 +5,8 @@ import { isDoodadMotionPreset, DOODAD_MOTION_PRESET_NAMES } from '../gameLogic/d
 
 /**
  * Doodads (tickets 099-107): purely environmental decoration - mushrooms, grass, dripping caves, bugs, crystals, moss.
- * They live behind the characters, are never interactable, and are anchored to a surface or float in open air.
+ * They live behind the characters and are anchored to a surface or float in open air. A doodad with `health` can be
+ * hurt and killed like a mob (ticket 143), and ceiling doodads fall when they lose their hold.
  * A doodad is a row, like a fluid or a biome: nothing in logic names one.
  *
  * Units: sizes, distances and depths are in small blocks (the original value x BLOCK_SCALE); only sprite offsets
@@ -150,6 +151,12 @@ export interface DoodadDefinition {
   /** Where the effect plays, relative to the anchor point (pixels). */
   particleOffsetX?: number;
   particleOffsetY?: number;
+  /** Hit points (ticket 143). Null/absent: it cannot be hurt by hits (a ceiling doodad still falls with its block). */
+  health?: number | null;
+  /** The mass of the doodad while it falls (ceiling doodads), which scales the damage it does. Null/absent: from its footprint. */
+  fallDamage?: number | null;
+  /** ParticleEffect (by id) played where it dies. Null: none. */
+  deathParticleEffectId?: string | null;
   /** Sound slots as stored: library sounds by id (see `resolveDoodadSounds`). */
   soundEffects?: DoodadSoundSlotRefs | null;
   /** The same slots resolved to playable urls. Filled in when definitions load; never stored. */
@@ -183,6 +190,7 @@ export interface DoodadClientDefinition {
   particleEffectId?: string | null;
   particleOffsetX?: number;
   particleOffsetY?: number;
+  deathParticleEffectId?: string;
   sounds?: DoodadSoundEffectsConfig;
   wander?: DoodadWander;
 }
@@ -209,6 +217,7 @@ export function toClientDoodad(doodad: DoodadDefinition, index: number): DoodadC
     if (doodad.particleOffsetX) out.particleOffsetX = doodad.particleOffsetX;
     if (doodad.particleOffsetY) out.particleOffsetY = doodad.particleOffsetY;
   }
+  if (doodad.deathParticleEffectId) out.deathParticleEffectId = doodad.deathParticleEffectId;
   if (doodad.sounds && Object.keys(doodad.sounds).length > 0) out.sounds = doodad.sounds;
   if (doodad.wander) out.wander = doodad.wander;
   return out;
@@ -386,6 +395,11 @@ export function validateDoodad(doodad: Partial<DoodadDefinition>): string[] {
   if (doodad.zOffset !== undefined && !Number.isInteger(doodad.zOffset)) errors.push('zOffset must be a whole number');
   if (doodad.textureUrl !== undefined && doodad.textureUrl !== null && !isAssetUrl(doodad.textureUrl)) errors.push('textureUrl must be an /assets/... url');
   for (const name of ['particleOffsetX', 'particleOffsetY'] as const) if (doodad[name] !== undefined && !isNumber(doodad[name])) errors.push(`${name} must be a number`);
+  if (doodad.health !== undefined && doodad.health !== null && !isWhole(doodad.health, 1)) errors.push('health must be a whole number of at least 1, or empty');
+  if (doodad.fallDamage !== undefined && doodad.fallDamage !== null && (!isNumber(doodad.fallDamage) || doodad.fallDamage <= 0)) errors.push('fallDamage must be greater than 0, or empty');
+  if (doodad.deathParticleEffectId !== undefined && doodad.deathParticleEffectId !== null && (typeof doodad.deathParticleEffectId !== 'string' || doodad.deathParticleEffectId === '')) {
+    errors.push('deathParticleEffectId must be an effect id or null');
+  }
   errors.push(...validateDoodadSizeVariants(doodad.sizeVariants));
   errors.push(...validateDoodadParts(doodad.parts));
   errors.push(...validateDoodadMotion(doodad.motion));

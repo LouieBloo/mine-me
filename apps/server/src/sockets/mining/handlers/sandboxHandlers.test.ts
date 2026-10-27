@@ -22,6 +22,7 @@ import {
   handleSandboxLoadExtractorScene,
   handleSandboxPlaceDoodad,
   handleSandboxRemoveDoodad,
+  handleSandboxHitDoodad,
   handleSandboxClearDoodads,
   handleSandboxSetDoodadGeneration,
   handleSandboxLoadDoodadScene,
@@ -60,6 +61,7 @@ describe('sandbox handlers', () => {
         handleSandboxLoadExtractorScene(io, socket, { sceneId: 'full-pack-at-belt' }),
         handleSandboxPlaceDoodad(io, socket, { doodadId: 'x', x: 1, y: 1 }),
         handleSandboxRemoveDoodad(io, socket, { x: 1, y: 1 }),
+        handleSandboxHitDoodad(io, socket, { x: 1, y: 1 }),
         handleSandboxClearDoodads(io, socket),
         handleSandboxSetDoodadGeneration(io, socket, { enabled: true }),
         handleSandboxLoadDoodadScene(io, socket, { sceneId: 'floor-row' }),
@@ -175,6 +177,8 @@ describe('sandbox handlers', () => {
       expect(await handleSandboxPlaceDoodad(io, socket, {})).toMatchObject({ success: false });
       expect(await handleSandboxRemoveDoodad(io, socket, { x: 5, y: SKY + 2 })).toEqual({ success: false, error: 'There is no doodad there.' });
       expect(await handleSandboxRemoveDoodad(io, socket, { x: 'a' })).toMatchObject({ success: false });
+      expect(await handleSandboxHitDoodad(io, socket, { x: 5, y: SKY + 2 })).toEqual({ success: false, error: 'There is no doodad there.' });
+      expect(await handleSandboxHitDoodad(io, socket, { x: 'a' })).toMatchObject({ success: false });
       expect(await handleSandboxClearDoodads(io, socket)).toEqual({ success: true });
       expect(await handleSandboxSetDoodadGeneration(io, socket, { enabled: 'yes' })).toEqual({ success: false, error: 'Invalid setting.' });
       expect(await handleSandboxLoadDoodadScene(io, socket, { sceneId: 'nope' })).toEqual({ success: false, error: 'Unknown scene.' });

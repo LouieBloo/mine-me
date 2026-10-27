@@ -153,3 +153,47 @@ describe('DoodadSounds break', () => {
     expect(DOODAD_BREAK_INTERVAL_MS).toBeGreaterThan(0);
   });
 });
+
+describe('DoodadSounds hit and death (ticket 143)', () => {
+  const slots = { hit: { url: '/assets/sounds/squeak.mp3', volume: 0.6 }, death: { url: '/assets/sounds/splat.mp3', volume: 0.8 } };
+
+  it('plays the hit sound where a doodad on screen was hurt, at the volume of its slot', () => {
+    const t = setup(slots, [[6, 5]]);
+    t.renderer.flashHit(6, 5);
+    expect(t.sound.playPositionalSfx).toHaveBeenCalledTimes(1);
+    const [url, position, options] = t.sound.playPositionalSfx.mock.calls[0];
+    expect(url).toBe('/assets/sounds/squeak.mp3');
+    expect(position).toEqual({ x: 6.5, y: 6 });
+    expect(options.volumeScale).toBeCloseTo(0.6);
+  });
+
+  it('plays the death sound, not the break sound, for a doodad that was killed', () => {
+    const t = setup({ ...slots, break: { url: '/assets/sounds/crunch.mp3' } }, [[6, 5]]);
+    t.renderer.markKilled(6, 5);
+    t.field.apply([], [[6, 5]]);
+    t.renderer.update(1, VIEW, 0.016);
+    expect(t.sound.playPositionalSfx).toHaveBeenCalledTimes(1);
+    expect(t.sound.playPositionalSfx.mock.calls[0][0]).toBe('/assets/sounds/splat.mp3');
+  });
+
+  it('plays the death sound where a falling doodad shattered', () => {
+    const t = setup(slots, []);
+    t.renderer.shatter([0, 0, 0, 8, 12]);
+    expect(t.sound.playPositionalSfx).toHaveBeenCalledTimes(1);
+    expect(t.sound.playPositionalSfx.mock.calls[0][0]).toBe('/assets/sounds/splat.mp3');
+  });
+
+  it('plays nothing without the slots, spaces hits out, and stops listening on destroy', () => {
+    const quiet = setup(undefined, [[6, 5]]);
+    quiet.renderer.flashHit(6, 5);
+    expect(quiet.sound.playPositionalSfx).not.toHaveBeenCalled();
+
+    const t = setup(slots, [[6, 5], [9, 5]]);
+    t.renderer.flashHit(6, 5);
+    t.renderer.flashHit(9, 5);
+    expect(t.sound.playPositionalSfx).toHaveBeenCalledTimes(1);
+    t.sounds.destroy();
+    t.renderer.shatter([0, 0, 0, 8, 12]);
+    expect(t.sound.playPositionalSfx).toHaveBeenCalledTimes(1);
+  });
+});

@@ -180,6 +180,11 @@ export class MiningExplosiveSubsystem {
       const blast = hurt(session.playerBody.position);
       if (blast) this.world.damage.applyDamage({ kind: 'player', id: session.characterId }, { ...blast, type: 'explosive', source });
     }
+    // Doodads with health (bugs, hanging stalactites) are hurt by distance to the middle of their box, like mobs
+    for (const target of this.world.doodads.hurtableTargets()) {
+      const blast = hurt({ x: target.x, y: target.y });
+      if (blast) this.world.damage.applyDamage({ kind: 'doodad', id: target.id }, { amount: blast.amount, type: 'explosive', source });
+    }
 
     // A blast also hurts the belt segments it reaches, by distance, like anything else alive in it
     const belt = this.world.belt;

@@ -19,6 +19,21 @@ export function doodadEffectPoint(info: DoodadViewInfo, offsetX: number | undefi
   return { x: info.anchorX + (offsetX ?? 0) * info.artScale * info.mirror, y: info.anchorY + (offsetY ?? 0) * info.artScale };
 }
 
+/** The middle of a doodad's footprint in world pixels: its base point moved half its height (or width, on a wall) toward the body. */
+export function doodadCentre(info: DoodadViewInfo, tileSize: number): { x: number; y: number } {
+  const { anchor, width, height } = { anchor: info.entry.definition.anchor, width: info.entry.width, height: info.entry.height };
+  switch (anchor) {
+    case 'FLOOR':
+      return { x: info.anchorX, y: info.anchorY - (height * tileSize) / 2 };
+    case 'CEILING':
+      return { x: info.anchorX, y: info.anchorY + (height * tileSize) / 2 };
+    case 'WALL':
+      return { x: info.anchorX + (info.entry.flip ? -1 : 1) * (width * tileSize) / 2, y: info.anchorY };
+    default:
+      return { x: info.anchorX, y: info.anchorY };
+  }
+}
+
 const keyOf = (entry: DoodadEntry): string => `${entry.x},${entry.y}`;
 
 interface Candidate {
@@ -113,6 +128,16 @@ export class DoodadEffects {
     if (!config) return;
     const def = info.entry.definition;
     particles.spawnBurst(config, doodadEffectPoint(info, def.particleOffsetX, def.particleOffsetY));
+  }
+
+  /** The death effect of a doodad that was killed or that shattered on landing (ticket 143): once, at the middle of where it was. */
+  public deathBurst(info: DoodadViewInfo): void {
+    const particles = this.particles;
+    const effectId = info.entry.definition.deathParticleEffectId;
+    if (!particles || !effectId) return;
+    const config = this.resolveEffect(effectId);
+    if (!config) return;
+    particles.spawnBurst(config, doodadCentre(info, this.tileSize));
   }
 
   private syncLights(candidates: readonly Candidate[]): void {

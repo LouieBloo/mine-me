@@ -1,4 +1,4 @@
-import { doodadRect, isTileSolid, type DoodadPlacement, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
+import { doodadFalls, doodadRect, isTileSolid, type DoodadPlacement, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
 import type { MiningGameEngine } from '../MiningGameEngine';
 import { WorldSimClock } from './WorldSimClock';
 import { findDoodadScene } from './doodadScenes';
@@ -6,6 +6,9 @@ import { findExtractorScene, heaviestItemId } from './extractorScenes';
 import { doodadPlacementProblem } from './sandboxDoodads';
 
 export type SandboxResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
+
+/** What one hit of the sandbox's hit-doodad tool does, in hit points. */
+export const SANDBOX_DOODAD_HIT_DAMAGE = 5;
 
 const fail = (error: string): { ok: false; error: string } => ({ ok: false, error });
 
@@ -229,6 +232,28 @@ export class SandboxTools {
     if (!found) return fail('There is no doodad there.');
     sub.removeAt(found.x, found.y);
     return { ok: true };
+  }
+
+  /**
+   * Hits the doodad standing on the clicked tile for `SANDBOX_DOODAD_HIT_DAMAGE`, through the damage system like a weapon (ticket
+   * 143): one with health loses some (and dies or, if it hangs from the ceiling, falls when it runs out); a ceiling doodad with no
+   * health is let go, so a falling one can be seen without a block to mine; any other doodad cannot be hurt.
+   */
+  public hitDoodad(x: unknown, y: unknown): SandboxResult {
+    if (typeof x !== 'number' || typeof y !== 'number' || !this.inGrid(x, y)) return fail('Pick a tile inside the map.');
+    const sub = this.engine.doodadSubsystem;
+    const found = sub.placementCovering(x, y);
+    if (!found) return fail('There is no doodad there.');
+    const target = sub.hurtableCovering(x, y);
+    if (target) {
+      this.engine.applyDamage({ kind: 'doodad', id: target.id }, { amount: SANDBOX_DOODAD_HIT_DAMAGE, type: 'melee', source: { kind: 'environment', name: 'Sandbox' } });
+      return { ok: true };
+    }
+    if (doodadFalls(sub.definitions[found.typeIndex])) {
+      sub.dropAt(found.x, found.y);
+      return { ok: true };
+    }
+    return fail('That doodad has no health, so it cannot be hurt.');
   }
 
   /** Takes away every doodad in the room. */

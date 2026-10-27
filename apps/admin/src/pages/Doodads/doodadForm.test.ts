@@ -20,6 +20,15 @@ describe('doodadForm', () => {
     expect(validateDoodad(body)).toEqual([]);
   });
 
+  it('carries health, fall damage and the death effect both ways, and a new doodad cannot be hurt (ticket 143)', () => {
+    const form = doodadToForm({ ...SAVED, health: 10, fallDamage: 4, deathParticleEffectId: 'fx1' });
+    expect(form).toMatchObject({ health: 10, fallDamage: 4, deathParticleEffectId: 'fx1' });
+    expect(formToDoodad(form)).toMatchObject({ health: 10, fallDamage: 4, deathParticleEffectId: 'fx1' });
+    expect(formToDoodad(NEW_DOODAD)).toMatchObject({ health: null, fallDamage: null, deathParticleEffectId: null });
+    expect(previewDoodad(form)).toMatchObject({ health: 10 });
+    expect(validateDoodad(formToDoodad({ ...form, health: 0 })).join(' ')).toMatch(/health/);
+  });
+
   it('a brand new doodad is a valid one apart from its key and name', () => {
     const errors = validateDoodad(formToDoodad(NEW_DOODAD));
     expect(errors).toHaveLength(2);

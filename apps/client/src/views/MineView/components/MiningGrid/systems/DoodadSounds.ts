@@ -1,4 +1,4 @@
-import { MINING_SPATIAL_AUDIO_PRESETS, type DoodadEntry, type DoodadSoundSlotResolved } from '@mine-me/shared';
+import { MINING_SPATIAL_AUDIO_PRESETS, type DoodadEntry, type DoodadSoundSlot, type DoodadSoundSlotResolved } from '@mine-me/shared';
 import { withVolume } from '../../../../../services/sound/sfxVolume';
 import type { SoundManager } from '../../../../../services/sound';
 import type { DoodadRenderer, DoodadViewInfo } from '../renderers/DoodadRenderer';
@@ -15,6 +15,8 @@ export const DOODAD_ONE_SHOT_MAX_SECONDS = 9;
 export const DOODAD_SOUND_SYNC_MS = 250;
 /** Fewest milliseconds between two break sounds, so a blast does not play a hundred at once. */
 export const DOODAD_BREAK_INTERVAL_MS = 80;
+/** The same for hit and death sounds (ticket 143): a blast hurts and kills a field of bugs at once. */
+export const DOODAD_DAMAGE_SOUND_INTERVAL_MS = 80;
 
 type Sounds = Pick<SoundManager, 'playPositionalSfx' | 'playLoopingSfx' | 'updateLoopingSfxPosition' | 'stopLoopingSfx'>;
 
@@ -33,7 +35,8 @@ function waitRoll(entry: DoodadEntry, n: number): number {
  * with `withVolume` so the final level is the effects slider x the slot's volume x distance. Only doodads on screen make sound:
  *   - ambient, looping: a few positional loops on the nearest doodads that have one;
  *   - ambient, not looping: now and then (every few seconds, out of step), at most a couple at a time;
- *   - break: once, when a doodad loses its block.
+ *   - break: once, when a doodad loses its block;
+ *   - hit and death (ticket 143): when a doodad with health is hurt and survives, and when it dies or a falling one shatters.
  */
 export class DoodadSounds {
   private readonly sound: Sounds;
@@ -41,6 +44,9 @@ export class DoodadSounds {
   private readonly tileSize: number;
   private lastSync = -Infinity;
   private lastBreak = -Infinity;
+  private readonly stopListening: Array<() => void>;
+  private lastHit = -Infinity;
+  private lastDeath = -Infinity;
   private readonly loops = new Map<number, { cell: string; url: string }>();
   private readonly nextOneShot = new Map<string, { at: number; count: number }>();
 
@@ -49,13 +55,17 @@ export class DoodadSounds {
     this.renderer = renderer;
     this.tileSize = tileSize;
     renderer.setRemovedListener((info) => this.onRemoved(info, performance.now()));
+    this.stopListening = [
+      renderer.addHitListener((info) => this.onHit(info, performance.now())),
+      renderer.addDeathListener((info) => this.onDeath(info, performance.now())),
+    ];
   }
 
   public get activeLoops(): number {
     return this.loops.size;
   }
 
-  private static slot(entry: DoodadEntry, key: 'ambient' | 'react' | 'break'): DoodadSoundSlotResolved | undefined {
+  private static slot(entry: DoodadEntry, key: DoodadSoundSlot): DoodadSoundSlotResolved | undefined {
     const slot = entry.definition.sounds?.[key];
     return slot?.url ? slot : undefined;
   }
@@ -70,6 +80,24 @@ export class DoodadSounds {
     const slot = DoodadSounds.slot(info.entry, 'break');
     if (!slot?.url) return;
     this.lastBreak = nowMs;
+    this.sound.playPositionalSfx(slot.url, this.positionOf(info), withVolume(slot.volume, { spatial: MINING_SPATIAL_AUDIO_PRESETS.DOODAD }));
+  }
+
+  /** The hit sound of a doodad that was hurt and is still standing. */
+  public onHit(info: DoodadViewInfo, nowMs: number): void {
+    if (nowMs - this.lastHit < DOODAD_DAMAGE_SOUND_INTERVAL_MS) return;
+    const slot = DoodadSounds.slot(info.entry, 'hit');
+    if (!slot?.url) return;
+    this.lastHit = nowMs;
+    this.sound.playPositionalSfx(slot.url, this.positionOf(info), withVolume(slot.volume, { spatial: MINING_SPATIAL_AUDIO_PRESETS.DOODAD }));
+  }
+
+  /** The death sound of a doodad that was killed, or of a falling one that shattered on landing. */
+  public onDeath(info: DoodadViewInfo, nowMs: number): void {
+    if (nowMs - this.lastDeath < DOODAD_DAMAGE_SOUND_INTERVAL_MS) return;
+    const slot = DoodadSounds.slot(info.entry, 'death');
+    if (!slot?.url) return;
+    this.lastDeath = nowMs;
     this.sound.playPositionalSfx(slot.url, this.positionOf(info), withVolume(slot.volume, { spatial: MINING_SPATIAL_AUDIO_PRESETS.DOODAD }));
   }
 
@@ -166,5 +194,6 @@ export class DoodadSounds {
     this.loops.clear();
     this.nextOneShot.clear();
     this.renderer.setRemovedListener(null);
+    for (const stop of this.stopListening) stop();
   }
 }

@@ -159,6 +159,23 @@ describe('admin doodads', () => {
     expect(res.body.errors).toEqual(expect.arrayContaining([expect.stringContaining('weight'), expect.stringContaining('twice')]));
   });
 
+  it('saves health, fall damage and a death effect, and clears them with null or an empty value (ticket 143)', async () => {
+    const created = await request(app).post('/admin/doodads').send({ key: 'beetle', name: 'Beetle', health: '10', fallDamage: 4, deathParticleEffectId: 'fx1' });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ health: 10, fallDamage: 4, deathParticleEffectId: 'fx1' });
+    const id = rows[0].id;
+    const cleared = await request(app).patch(`/admin/doodads/${id}`).send({ health: '', fallDamage: null, deathParticleEffectId: null });
+    expect(cleared.status).toBe(200);
+    expect(rows[0]).toMatchObject({ health: null, fallDamage: null, deathParticleEffectId: null });
+  });
+
+  it('rejects bad health and an unknown death effect', async () => {
+    const res = await request(app).post('/admin/doodads').send({ key: 'beetle', name: 'Beetle', health: 0, deathParticleEffectId: 'fx_ghost' });
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toEqual(expect.arrayContaining([expect.stringContaining('health'), expect.stringContaining('unknown particle effect: fx_ghost')]));
+    expect(rows).toHaveLength(0);
+  });
+
   it('rejects a duplicate key', async () => {
     await request(app).post('/admin/doodads').send(MUSHROOM);
     expect((await request(app).post('/admin/doodads').send(MUSHROOM)).status).toBe(409);
@@ -230,16 +247,23 @@ describe('doodad texture upload', () => {
   it('saves the main picture under the shared assets folder and points the doodad at it', async () => {
     const res = await request(app).post('/admin/doodads/d1/texture').attach('texture', png, { filename: 'x.png', contentType: 'image/png' });
     expect(res.status).toBe(200);
-    expect(res.body.textureUrl).toBe('/assets/sprites/doodads/d1.png');
+    expect(res.body.textureUrl).toMatch(/^\/assets\/sprites\/doodads\/d1\.png\?v=\d+$/);
     expect(fs.existsSync(path.join(dir(), 'd1.png'))).toBe(true);
-    expect(rows[0].textureUrl).toBe('/assets/sprites/doodads/d1.png');
+    expect(rows[0].textureUrl).toBe(res.body.textureUrl);
     expect(syncJson).toHaveBeenCalled();
+  });
+
+  it('gives a re-upload a new url so the new picture shows without a refresh', async () => {
+    const first = await request(app).post('/admin/doodads/d1/texture').attach('texture', png, { filename: 'x.png', contentType: 'image/png' });
+    await new Promise((r) => setTimeout(r, 5));
+    const second = await request(app).post('/admin/doodads/d1/texture').attach('texture', png, { filename: 'x.png', contentType: 'image/png' });
+    expect(second.body.textureUrl).not.toBe(first.body.textureUrl);
   });
 
   it('saves a named picture for a part or a size and only returns its url', async () => {
     const res = await request(app).post('/admin/doodads/d1/images/cap').attach('texture', png, { filename: 'x.png', contentType: 'image/png' });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ url: '/assets/sprites/doodads/d1-cap.png' });
+    expect(res.body.url).toMatch(/^\/assets\/sprites\/doodads\/d1-cap\.png\?v=\d+$/);
     expect(fs.existsSync(path.join(dir(), 'd1-cap.png'))).toBe(true);
     expect(rows[0].textureUrl).toBeUndefined();
   });

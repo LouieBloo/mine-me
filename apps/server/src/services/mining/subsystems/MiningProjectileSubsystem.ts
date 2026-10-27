@@ -230,25 +230,30 @@ export class MiningProjectileSubsystem {
       //    piercing bullet carries on through as many as it has left, otherwise the first one stops it.
       if (!proj.expired) {
         const { previousPosition: from, position: to } = proj;
-        const along: { mob: MiningActiveMobSession; t: number }[] = [];
+        const along: Array<{ mob: MiningActiveMobSession; id?: undefined; t: number } | { mob?: undefined; id: string; t: number }> = [];
         for (const mob of mobList) {
           if (mob.health <= 0 || mob.animationState === 'death' || proj.hitMobIds.has(mob.id)) continue;
           const body = mob.mobBody;
           const t = segmentAabbEntryTime(from, to, body.position, body.halfWidth, body.halfHeight, proj.hitRadius);
           if (t !== null) along.push({ mob, t });
         }
+        // Doodads with health (bugs, hanging stalactites) are in the same line as the mobs, so the nearest thing is hit first
+        for (const target of this.world.doodads.hurtableAlong(from, to, proj.hitRadius)) {
+          if (!proj.hitDoodadIds.has(target.id)) along.push({ id: target.id, t: target.t });
+        }
         along.sort((m, n) => m.t - n.t);
-        for (const { mob, t } of along) {
-          proj.hitMobIds.add(mob.id);
-          this.world.damage.applyDamage({ kind: 'mob', id: mob.id }, hitEvent(proj));
+        for (const hit of along) {
+          if (hit.mob) proj.hitMobIds.add(hit.mob.id);
+          else proj.hitDoodadIds.add(hit.id);
+          this.world.damage.applyDamage(hit.mob ? { kind: 'mob', id: hit.mob.id } : { kind: 'doodad', id: hit.id }, hitEvent(proj));
           if (proj.pierceRemaining > 0) {
             proj.pierceRemaining--;
             continue;
           }
-          proj.position = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+          proj.position = { x: from.x + (to.x - from.x) * hit.t, y: from.y + (to.y - from.y) * hit.t };
           proj.hasHit = true;
-          proj.hitTile = undefined; // the mob was reached first
-          proj.hitMobId = mob.id;
+          proj.hitTile = undefined; // the mob (or doodad) was reached first
+          proj.hitMobId = hit.mob ? hit.mob.id : undefined;
           break;
         }
       }

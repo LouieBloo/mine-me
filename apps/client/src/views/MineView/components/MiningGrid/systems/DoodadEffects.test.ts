@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { Container } from 'pixi.js';
 import { DoodadField, type DoodadClientDefinition, type DoodadLightConfig, type ParticleEffectConfig } from '@mine-me/shared';
 import { DoodadRenderer, type DoodadTextureLoader } from '../renderers/DoodadRenderer';
-import { DOODAD_EFFECTS_SYNC_MS, DoodadEffects, MAX_DOODAD_EMITTERS, doodadEffectPoint } from './DoodadEffects';
+import { DOODAD_EFFECTS_SYNC_MS, DoodadEffects, doodadCentre, MAX_DOODAD_EMITTERS, doodadEffectPoint } from './DoodadEffects';
 
 const T = 21;
 const LIGHT: DoodadLightConfig = { enabled: true, type: 'POINT', effect: 'STATIC', color: '#88ffcc', radius: 3, intensity: 0.6 };
@@ -199,3 +199,27 @@ describe('DoodadEffects with wandering and brushed doodads (tickets 104, 106)', 
   });
 });
 
+
+describe('DoodadEffects death burst (ticket 143)', () => {
+  it('bursts the death effect at the middle of a floor doodad, and of a ceiling one', () => {
+    const t = setup(def({ deathParticleEffectId: 'splat', width: 2, height: 4 }), [[10, 5]]);
+    const info = t.renderer.visible()[0];
+    t.effects.deathBurst(info);
+    expect(t.particles.spawnBurst).toHaveBeenLastCalledWith(FX, { x: info.anchorX, y: info.anchorY - 2 * T });
+    expect(doodadCentre({ ...info, entry: { ...info.entry, definition: { ...info.entry.definition, anchor: 'CEILING' } } }, T)).toEqual({ x: info.anchorX, y: info.anchorY + 2 * T });
+    const wall = { ...info, entry: { ...info.entry, flip: true, definition: { ...info.entry.definition, anchor: 'WALL' as const } } };
+    expect(doodadCentre(wall, T)).toEqual({ x: info.anchorX - T, y: info.anchorY });
+    expect(doodadCentre({ ...info, entry: { ...info.entry, definition: { ...info.entry.definition, anchor: 'AIR' as const } } }, T)).toEqual({ x: info.anchorX, y: info.anchorY });
+  });
+
+  it('bursts nothing when the doodad has no death effect or the effect is unknown', () => {
+    const none = setup(def(), [[10, 5]]);
+    none.effects.deathBurst(none.renderer.visible()[0]);
+    expect(none.particles.spawnBurst).not.toHaveBeenCalled();
+    const t = setup(def({ deathParticleEffectId: 'gone' }), [[10, 5]]);
+    const unknown = new DoodadEffects(t.renderer, 1, () => null, T);
+    unknown.setEngines(t.particles, t.lighting);
+    unknown.deathBurst(t.renderer.visible()[0]);
+    expect(t.particles.spawnBurst).not.toHaveBeenCalled();
+  });
+});

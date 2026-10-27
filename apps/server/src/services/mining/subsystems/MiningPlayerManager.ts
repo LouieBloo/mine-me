@@ -391,6 +391,14 @@ export class MiningPlayerManager {
           knockback: knockbackImpulse(session.knockback, kbDirX > 0 ? 1 : -1),
         });
       }
+
+      // The same swing hurts doodads with health (a bug on the wall), unless a block is in the way
+      const swingSource = { kind: 'player' as const, id: session.characterId, name: session.characterName, itemId: session.equippedWeaponId ?? undefined, position: { x: px, y: py } };
+      const swingBox = { x0: weaponX - halfSize, y0: weaponY - halfSize, x1: weaponX + halfSize, y1: weaponY + halfSize };
+      for (const target of this.world.doodads.hurtableInBox(swingBox)) {
+        if (isObstructedBySolidTiles(grid, px, py, target.x, target.y)) continue;
+        this.world.damage.applyDamage({ kind: 'doodad', id: target.id }, { amount: session.weaponDamage, type: 'melee', source: swingSource });
+      }
     }
   }
 

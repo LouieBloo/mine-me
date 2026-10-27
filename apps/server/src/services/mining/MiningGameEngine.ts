@@ -591,6 +591,9 @@ export class MiningGameEngine {
     // 4. Falling rocks simulation
     this.runStep('rocks', () => this.rockSubsystem.updateFallingRocks(dt));
 
+    // 4.1 Falling stalactites and other ceiling doodads that lost their hold
+    this.runStep('doodads', () => this.doodadSubsystem.falling.update(dt));
+
     // 4.5 Fluids flow (every Nth tick; the sandbox can pause, step and change the speed)
     const worldSteps = this.sandbox
       ? this.sandbox.clock.stepsForTick(this.tickCount % MINING_CONFIG.FLUID_STEP_TICKS === 0)
@@ -977,6 +980,7 @@ export class MiningGameEngine {
     const beltUpdate = this.beltSubsystem?.takeUpdate();
     const beltItemChanges = this.beltSubsystem?.takeItemChanges();
     const doodadChanges = this.doodadSubsystem.takeChanges();
+    const doodadsShattered = this.doodadSubsystem.falling.takeShattered();
 
     // About once a second every player is also told what the server is spending on this room
     const sendPerf = this.tickCount % MiningGameEngine.PERF_REPORT_TICKS === 0;
@@ -1001,6 +1005,8 @@ export class MiningGameEngine {
         (p) => p.playerBody.position,
         (p) => known.players.has(p.characterId)
       );
+      const fallingDoodadsNear = inView(center, this.doodadSubsystem.falling.list, (f) => ({ x: f.state.x + f.state.width / 2, y: f.state.y + f.state.height / 2 }));
+      const doodadsShatteredNear = doodadsShattered.filter((d) => isInInterest(center, { x: d[3], y: d[4] }));
       const fallingRockPayloads: MiningFallingRock[] = rocksNear.map((r) => ({
         id: r.id,
         position: { x: roundWire(r.position.x), y: roundWire(r.position.y) },
@@ -1057,6 +1063,10 @@ export class MiningGameEngine {
         fluidCells: fluidChanges.length > 0 ? fluidChanges : undefined,
         doodadsAdded: doodadChanges.added.length > 0 ? doodadChanges.added : undefined,
         doodadsRemoved: doodadChanges.removed.length > 0 ? doodadChanges.removed : undefined,
+        doodadsHit: doodadChanges.hit.length > 0 ? doodadChanges.hit : undefined,
+        doodadsKilled: doodadChanges.killed.length > 0 ? doodadChanges.killed : undefined,
+        fallingDoodads: fallingDoodadsNear.length > 0 ? fallingDoodadsNear.map((f) => this.doodadSubsystem.falling.toWire(f)) : undefined,
+        doodadsShattered: doodadsShatteredNear.length > 0 ? doodadsShatteredNear : undefined,
         gasCells: gasChanges.length > 0 ? gasChanges : undefined,
         gasExplosions: gasExplosions.length > 0 ? gasExplosions : undefined,
         gasEvents: gasEventsNear.length > 0 ? gasEventsNear : undefined,

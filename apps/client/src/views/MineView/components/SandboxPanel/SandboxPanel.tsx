@@ -181,6 +181,15 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
                   >
                     Remove doodad
                   </button>
+                  <button
+                    type="button"
+                    className={`${BUTTON} ${tool.kind === 'hitDoodad' ? ACTIVE : IDLE}`}
+                    onClick={() => onToolChange({ kind: 'hitDoodad' })}
+                    disabled={freeCamera}
+                    title="Hits a doodad like a weapon: hurts it, kills it, or lets a hanging one fall"
+                  >
+                    Hit doodad
+                  </button>
                 </>
               )}
             </div>

@@ -22,6 +22,9 @@ export interface DoodadForm {
   particleEffectId: string | null;
   particleOffsetX: number;
   particleOffsetY: number;
+  health: number | null;
+  fallDamage: number | null;
+  deathParticleEffectId: string | null;
   wander: DoodadWander | null;
   spawn: DoodadSpawnRules;
   biomes: DoodadBiomeLink[];
@@ -45,6 +48,9 @@ export const NEW_DOODAD: DoodadForm = {
   particleEffectId: null,
   particleOffsetX: 0,
   particleOffsetY: 0,
+  health: null,
+  fallDamage: null,
+  deathParticleEffectId: null,
   wander: null,
   spawn: {},
   biomes: [],
@@ -94,6 +100,9 @@ export function formToDoodad(form: DoodadForm): Partial<DoodadDefinition> {
     particleEffectId: form.particleEffectId || null,
     particleOffsetX: form.particleOffsetX,
     particleOffsetY: form.particleOffsetY,
+    health: form.health,
+    fallDamage: form.fallDamage,
+    deathParticleEffectId: form.deathParticleEffectId || null,
     wander: form.wander,
     spawn: tidySpawn(form.spawn),
     biomes: form.biomes,
@@ -118,6 +127,9 @@ export function doodadToForm(doodad: DoodadDefinition): DoodadForm {
     particleEffectId: doodad.particleEffectId ?? null,
     particleOffsetX: doodad.particleOffsetX ?? 0,
     particleOffsetY: doodad.particleOffsetY ?? 0,
+    health: doodad.health ?? null,
+    fallDamage: doodad.fallDamage ?? null,
+    deathParticleEffectId: doodad.deathParticleEffectId ?? null,
     wander: doodad.wander ?? null,
     spawn: doodad.spawn ?? {},
     biomes: (doodad.biomes ?? []).map((b) => ({ biomeId: b.biomeId, biomeKey: b.biomeKey, weight: b.weight, density: b.density })),
@@ -162,6 +174,9 @@ export function previewDoodad(form: DoodadForm, id = 'draft'): DoodadDefinition 
     particleEffectId: form.particleEffectId || null,
     particleOffsetX: finite(form.particleOffsetX, 0),
     particleOffsetY: finite(form.particleOffsetY, 0),
+    health: form.health,
+    fallDamage: form.fallDamage,
+    deathParticleEffectId: form.deathParticleEffectId || null,
     wander:
       form.wander && Number.isFinite(form.wander.radius) && form.wander.radius > 0 && Number.isFinite(form.wander.speed) && form.wander.speed > 0 && Number.isFinite(form.wander.pauseMs)
         ? form.wander.mode === 'FLUTTER' || form.anchor !== 'AIR'

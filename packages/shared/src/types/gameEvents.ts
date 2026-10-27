@@ -289,6 +289,13 @@ export interface SandboxRemoveDoodadPayload extends GameEventBase {
   y: number;
 }
 
+/** Hits the doodad standing on the clicked tile like a weapon would (a ceiling doodad with no health is let go instead; ticket 143). */
+export interface SandboxHitDoodadPayload extends GameEventBase {
+  type: 'sandbox_hit_doodad';
+  x: number;
+  y: number;
+}
+
 export interface SandboxClearDoodadsPayload extends GameEventBase {
   type: 'sandbox_clear_doodads';
 }
@@ -346,6 +353,7 @@ export type GameEventPayload =
   | SandboxIgnitePayload
   | SandboxPlaceDoodadPayload
   | SandboxRemoveDoodadPayload
+  | SandboxHitDoodadPayload
   | SandboxClearDoodadsPayload
   | SandboxSetDoodadGenerationPayload
   | SandboxLoadDoodadScenePayload
