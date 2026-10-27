@@ -11,7 +11,7 @@ const TILE_PX = 28;
 export const PREVIEW_STEP_MS = Math.round((MINING_CONFIG.FLUID_STEP_TICKS / MINING_CONFIG.SERVER_TICK_RATE) * 1000);
 
 /** How often the picture is redrawn so the waves move smoothly, in ms (the simulation steps more slowly than this). */
-export const PREVIEW_FRAME_MS = 33;
+export const PREVIEW_FRAME_MS = 16;
 
 export interface FluidPreviewSettings {
   color: string;

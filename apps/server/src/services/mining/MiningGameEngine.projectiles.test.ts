@@ -20,6 +20,8 @@ describe('MiningGameEngine - Projectiles & 6-Shooter Revolver', () => {
       socket: mockSocket,
       equippedWeaponId: 'cmn_revolver_6shooter',
     });
+    // The map is unseeded, so a random doodad could sit in a bullet's path; these tests are about mobs and blocks
+    for (const p of engine.doodadSubsystem.placements()) engine.doodadSubsystem.removeAt(p.x, p.y);
   });
 
   afterEach(() => {

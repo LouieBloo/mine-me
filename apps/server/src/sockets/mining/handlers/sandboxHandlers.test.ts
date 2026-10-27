@@ -1,3 +1,4 @@
+import { MiningDataManager } from '../../../services/mining/subsystems/MiningDataManager';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../index', () => ({ prisma: { character: { update: vi.fn().mockResolvedValue({}) } } }));
@@ -171,6 +172,8 @@ describe('sandbox handlers', () => {
     afterEach(() => miningSessionManager.cancelSession('hs-a', { persistHealth: false }));
 
     it('refuses bad input with a reason, and has nothing to clear in a room without doodads', async () => {
+      // (the dev seed defines doodads; this test is about a game that has none)
+      const noDoodads = vi.spyOn(MiningDataManager.getInstance(), 'getDoodads').mockReturnValue([]);
       const socket = socketFor('hs-a');
       join('hs-a', 'sandbox', socket);
       expect(await handleSandboxPlaceDoodad(io, socket, { doodadId: 'nope', x: 5, y: SKY + 2 })).toEqual({ success: false, error: 'Unknown doodad.' });
@@ -183,6 +186,7 @@ describe('sandbox handlers', () => {
       expect(await handleSandboxSetDoodadGeneration(io, socket, { enabled: 'yes' })).toEqual({ success: false, error: 'Invalid setting.' });
       expect(await handleSandboxLoadDoodadScene(io, socket, { sceneId: 'nope' })).toEqual({ success: false, error: 'Unknown scene.' });
       expect(await handleSandboxLoadDoodadScene(io, socket, { sceneId: 'floor-row' })).toEqual({ success: false, error: 'There are no doodads defined to show.' });
+      noDoodads.mockRestore();
     });
 
     it('turns the generator pass on, rebuilds the room for everyone, and reports the new setting', async () => {
