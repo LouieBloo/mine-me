@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { PrismaClient } from '@prisma/client';
-import { resolveCharacterSounds, resolveExtractorSounds, resolveFluidSounds, resolveDoodadSounds, resolveGasSounds, resolveMissionSounds, resolveMobSounds, type BiomeDefinition, type DoodadDefinition, type CharacterSoundEffectsConfig, type ExtractorDefinition, type FluidDefinition, type GasDefinition, type MissionDefinition, type ParticleEffect, type GameItem, type Mob, type MiningBlockConfig, type SoundTrack } from '@mine-me/shared';
+import { resolveCharacterSounds, resolveExtractorSounds, resolveFluidSounds, resolveDoodadSounds, resolveGasSounds, resolveMissionSounds, resolveMobSounds, resolveSurfaceSounds, type BiomeDefinition, type SurfaceEnvironmentDefinition, type DoodadDefinition, type CharacterSoundEffectsConfig, type ExtractorDefinition, type FluidDefinition, type GasDefinition, type MissionDefinition, type ParticleEffect, type GameItem, type Mob, type MiningBlockConfig, type SoundTrack } from '@mine-me/shared';
 import { CHARACTER_SOUND_CONFIG_ID } from '../characterSounds.service';
 import { MiningDataManager, type GameDefinitions } from './subsystems/MiningDataManager';
 
@@ -63,6 +63,21 @@ export function attachMissionSounds<M extends MissionDefinition>(missions: M[], 
   return missions.map((mission) => (mission.soundEffects ? { ...mission, sounds: resolveMissionSounds(mission.soundEffects, byId) } : mission));
 }
 
+/**
+ * Gives each surface environment its playable `sounds`, resolved from its stored `soundEffects` references. An environment
+ * with no references keeps any `sounds` it already carries.
+ */
+export function attachSurfaceSounds<E extends SurfaceEnvironmentDefinition>(environments: E[], library: SoundLibraryEntry[]): E[] {
+  const byId = new Map(library.map((s) => [s.id, s]));
+  return environments.map((env) => (env.soundEffects ? { ...env, sounds: resolveSurfaceSounds(env.soundEffects, byId) } : env));
+}
+
+/** A surface environment row as Prisma returns it: the JSON columns hold the shared shapes (the admin writes them that way). */
+export function toSurfaceEnvironment(row: unknown): SurfaceEnvironmentDefinition {
+  const r = row as SurfaceEnvironmentDefinition;
+  return { ...r, layers: Array.isArray(r.layers) ? r.layers : [], props: Array.isArray(r.props) ? r.props : [] };
+}
+
 /** A mission row as Prisma returns it: the JSON columns hold the shared shapes (the admin writes them that way). */
 export function toMissionDefinition(row: unknown): MissionDefinition {
   const r = row as MissionDefinition;
@@ -81,7 +96,7 @@ export function toDoodadDefinition(row: DoodadRow): DoodadDefinition {
 }
 
 type LoaderPrisma = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'fluid' | 'gas' | 'particleEffect' | 'sound' | 'characterSoundConfig'> &
-  Partial<Pick<PrismaClient, 'extractor' | 'biome' | 'doodad' | 'mission'>>;
+  Partial<Pick<PrismaClient, 'extractor' | 'biome' | 'doodad' | 'mission' | 'surfaceEnvironment'>>;
 
 /** The player character's playable sounds, resolved from the stored slot references. */
 export function buildCharacterSounds(refs: unknown, library: SoundLibraryEntry[]): CharacterSoundEffectsConfig {
@@ -97,7 +112,7 @@ export function buildCharacterSounds(refs: unknown, library: SoundLibraryEntry[]
 export async function loadDefinitionsFromDatabase(
   prisma: LoaderPrisma
 ): Promise<GameDefinitions> {
-  const [items, mobs, blocks, fluids, gases, particleEffects, sounds, characterSoundConfig, extractors, biomes, doodadRows, missionRows] = await Promise.all([
+  const [items, mobs, blocks, fluids, gases, particleEffects, sounds, characterSoundConfig, extractors, biomes, doodadRows, missionRows, surfaceRows] = await Promise.all([
     prisma.item.findMany({
       include: { itemEffects: { include: { effect: true } }, particleEffect: true },
     }),
@@ -116,6 +131,7 @@ export async function loadDefinitionsFromDatabase(
     prisma.biome?.findMany({ orderBy: { createdAt: 'asc' } }) ?? [],
     prisma.doodad?.findMany({ orderBy: { createdAt: 'asc' }, include: { biomes: { include: { biome: { select: { key: true } } } } } }) ?? [],
     prisma.mission?.findMany({ orderBy: { createdAt: 'asc' } }) ?? [],
+    prisma.surfaceEnvironment?.findMany({ orderBy: { createdAt: 'asc' } }) ?? [],
   ]);
 
   if (items.length === 0 || blocks.length === 0) {
@@ -134,6 +150,7 @@ export async function loadDefinitionsFromDatabase(
   definitions.extractors = attachExtractorSounds(definitions.extractors ?? [], sounds);
   definitions.doodads = attachDoodadSounds((doodadRows as unknown as DoodadRow[]).map(toDoodadDefinition), sounds);
   definitions.missions = attachMissionSounds((missionRows as unknown[]).map(toMissionDefinition), sounds);
+  definitions.surfaceEnvironments = attachSurfaceSounds((surfaceRows as unknown[]).map(toSurfaceEnvironment), sounds);
   definitions.characterSounds = buildCharacterSounds(characterSoundConfig?.soundEffects, sounds);
   return definitions;
 }
@@ -160,6 +177,7 @@ export function loadDefinitionsFromFiles(dataDir: string): GameDefinitions {
     biomes: fs.existsSync(path.join(dataDir, 'biomes.json')) ? read<BiomeDefinition>('biomes.json') : [],
     doodads: attachDoodadSounds(fs.existsSync(path.join(dataDir, 'doodads.json')) ? read<DoodadDefinition>('doodads.json') : [], library),
     missions: attachMissionSounds(fs.existsSync(path.join(dataDir, 'missions.json')) ? read<MissionDefinition>('missions.json') : [], library),
+    surfaceEnvironments: attachSurfaceSounds(fs.existsSync(path.join(dataDir, 'surface_environments.json')) ? read<SurfaceEnvironmentDefinition>('surface_environments.json') : [], library),
     extractors: fs.existsSync(path.join(dataDir, 'extractors.json')) ? read<ExtractorDefinition>('extractors.json') : [],
     particleEffects: fs.existsSync(path.join(dataDir, 'particle_effects.json')) ? read<ParticleEffect>('particle_effects.json') : [],
   };
@@ -172,6 +190,6 @@ export async function installDefinitionsFromDatabase(
   const definitions = await loadDefinitionsFromDatabase(prisma);
   MiningDataManager.initialize(definitions);
   console.log(
-    `[Definitions] Loaded ${definitions.items.length} items, ${definitions.mobs.length} mobs, ${definitions.blocks.length} blocks, ${definitions.fluids?.length ?? 0} fluids, ${definitions.gases?.length ?? 0} gases, ${definitions.extractors?.length ?? 0} extractors, ${definitions.biomes?.length ?? 0} biomes, ${definitions.doodads?.length ?? 0} doodads, ${definitions.missions?.length ?? 0} missions from the database`
+    `[Definitions] Loaded ${definitions.items.length} items, ${definitions.mobs.length} mobs, ${definitions.blocks.length} blocks, ${definitions.fluids?.length ?? 0} fluids, ${definitions.gases?.length ?? 0} gases, ${definitions.extractors?.length ?? 0} extractors, ${definitions.biomes?.length ?? 0} biomes, ${definitions.doodads?.length ?? 0} doodads, ${definitions.missions?.length ?? 0} missions, ${definitions.surfaceEnvironments?.length ?? 0} surface environments from the database`
   );
 }

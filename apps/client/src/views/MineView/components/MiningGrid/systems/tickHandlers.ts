@@ -369,6 +369,12 @@ export function applyDoodadUpdates(payload: MiningStateTickPayload, ctx: TickHan
   for (const wire of payload.doodadsShattered ?? []) renderer?.shatter(wire);
 }
 
+/** The sandbox changed the surface (another environment, or a forced weather): the sky, clouds and weather follow at once (ticket 138). */
+export function applySurfaceUpdate(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
+  if (!payload.surface) return;
+  ctx.world.surfaceSystemRef?.current?.apply(payload.surface);
+}
+
 /** Fires that started or stopped: in newly revealed tiles, then this tick's changes. Updates the client's copy of the fire grid. */
 export function applyFireUpdates(payload: MiningStateTickPayload, ctx: TickHandlerContext): void {
   const field = ctx.world.fireFieldRef?.current;
@@ -520,6 +526,7 @@ export function handleStateTick(payload: MiningStateTickPayload, ctx: TickHandle
   applyFluidUpdates(payload, ctx);
   applyGasUpdates(payload, ctx);
   applyDoodadUpdates(payload, ctx);
+  applySurfaceUpdate(payload, ctx);
   applyFireUpdates(payload, ctx);
   applyFluidSounds(payload, ctx); // after the fluid and fire fields are up to date
   applyExtractorUpdate(payload, ctx);

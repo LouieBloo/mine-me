@@ -2,11 +2,11 @@ import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { attachMissionSounds, toMissionDefinition, loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds, attachFluidSounds, attachGasSounds, attachExtractorSounds, attachDoodadSounds, toDoodadDefinition } from './definitionLoaders';
+import { attachMissionSounds, toMissionDefinition, loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds, attachFluidSounds, attachGasSounds, attachExtractorSounds, attachDoodadSounds, toDoodadDefinition, attachSurfaceSounds, toSurfaceEnvironment } from './definitionLoaders';
 import { validateExtractor } from '@mine-me/shared';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 
-const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; biomes?: any[]; doodads?: any[]; missions?: any[]; extractors?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
+const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; biomes?: any[]; doodads?: any[]; missions?: any[]; surfaceEnvironments?: any[]; extractors?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
   ({
     item: { findMany: vi.fn().mockResolvedValue(data.items ?? [{ id: 'i1', name: 'Thing' }]) },
     mob: { findMany: vi.fn().mockResolvedValue(data.mobs ?? [{ id: 'm1', name: 'Mole' }]) },
@@ -16,6 +16,7 @@ const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?
     biome: { findMany: vi.fn().mockResolvedValue(data.biomes ?? []) },
     doodad: { findMany: vi.fn().mockResolvedValue(data.doodads ?? []) },
     mission: { findMany: vi.fn().mockResolvedValue(data.missions ?? []) },
+    surfaceEnvironment: { findMany: vi.fn().mockResolvedValue(data.surfaceEnvironments ?? []) },
     extractor: { findMany: vi.fn().mockResolvedValue(data.extractors ?? []) },
     particleEffect: { findMany: vi.fn().mockResolvedValue(data.particleEffects ?? []) },
     sound: { findMany: vi.fn().mockResolvedValue(data.sounds ?? []) },
@@ -256,7 +257,7 @@ describe('loadDefinitionsFromFiles', () => {
     write('items.json', [{ id: 'a' }]);
     write('mobs.json', []);
     write('blocks.json', [{ typeKey: 'DIRT' }]);
-    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], biomes: [], doodads: [], missions: [], extractors: [], particleEffects: [], characterSounds: {} });
+    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], biomes: [], doodads: [], missions: [], surfaceEnvironments: [], extractors: [], particleEffects: [], characterSounds: {} });
   });
 
   it('reads fluids.json when it exists', () => {
@@ -490,5 +491,48 @@ describe('missions (ticket 108)', () => {
   it('keeps sounds a mission already carries when it has no references', () => {
     const mission = { ...toMissionDefinition(row), soundEffects: null, sounds: { complete: { url: '/a.mp3' } } } as any;
     expect(attachMissionSounds([mission], [])[0].sounds).toEqual({ complete: { url: '/a.mp3' } });
+  });
+});
+
+describe('surface environments (ticket 129)', () => {
+  const row = {
+    id: 'e1', key: 'green_valley', name: 'Green Valley', weight: 2, isDefault: true, sky: { top: '#2f8fd8', horizon: '#9fd6ff' },
+    layers: [{ name: 'far', parallaxFactor: 0.8, yOffset: 0 }], clouds: null, weather: { clear: 1 }, props: null, soundEffects: { rain: { soundId: 's1', volume: 0.5 } },
+  };
+
+  it('loads the environments, oldest first, with their sounds resolved from the library', async () => {
+    const prisma = fakePrisma({ surfaceEnvironments: [row], sounds: [{ id: 's1', url: '/assets/sounds/rain.mp3', volume: 1, isActive: true }] });
+    const defs = await loadDefinitionsFromDatabase(prisma);
+    expect(prisma.surfaceEnvironment.findMany).toHaveBeenCalledWith({ orderBy: { createdAt: 'asc' } });
+    expect(defs.surfaceEnvironments).toHaveLength(1);
+    expect(defs.surfaceEnvironments![0]).toMatchObject({ key: 'green_valley', weather: { clear: 1 }, props: [] });
+    expect(defs.surfaceEnvironments![0].sounds?.rain).toMatchObject({ url: '/assets/sounds/rain.mp3', volume: 0.5 });
+  });
+
+  it('has none when none are defined or the table does not exist yet', async () => {
+    expect((await loadDefinitionsFromDatabase(fakePrisma({}))).surfaceEnvironments).toEqual([]);
+    const prisma = fakePrisma({});
+    delete prisma.surfaceEnvironment;
+    expect((await loadDefinitionsFromDatabase(prisma)).surfaceEnvironments).toEqual([]);
+  });
+
+  it('turns a row whose JSON columns are empty into a usable environment', () => {
+    expect(toSurfaceEnvironment({ ...row, layers: null, props: null })).toMatchObject({ layers: [], props: [] });
+  });
+
+  it('keeps sounds an environment already carries when it has no references', () => {
+    const env = { ...toSurfaceEnvironment(row), soundEffects: null, sounds: { rain: { url: '/a.mp3' } } } as any;
+    expect(attachSurfaceSounds([env], [])[0].sounds).toEqual({ rain: { url: '/a.mp3' } });
+  });
+
+  it('is served by the data manager by key or id, and the data manager lists them in load order', async () => {
+    const defs = await loadDefinitionsFromDatabase(fakePrisma({ surfaceEnvironments: [row, { ...row, id: 'e2', key: 'snowfield', name: 'Snowfield', isDefault: false }, { ...row, id: 'e3', key: 'green_valley' }] }));
+    MiningDataManager.initialize(defs);
+    const data = MiningDataManager.getInstance();
+    expect(data.getSurfaceEnvironments().map((e) => e.key)).toEqual(['green_valley', 'snowfield']);
+    expect(data.getSurfaceEnvironment('snowfield')?.name).toBe('Snowfield');
+    expect(data.getSurfaceEnvironment('e1')?.key).toBe('green_valley');
+    expect(data.getSurfaceEnvironment('nope')).toBeUndefined();
+    MiningDataManager.reset();
   });
 });

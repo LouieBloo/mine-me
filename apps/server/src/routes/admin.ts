@@ -18,6 +18,8 @@ import * as FluidSoundController from '../controllers/admin/fluidSound.controlle
 import * as GasController from '../controllers/admin/gas.controller';
 import * as GasSoundController from '../controllers/admin/gasSound.controller';
 import * as BiomeController from '../controllers/admin/biome.controller';
+import * as SurfaceEnvironmentController from '../controllers/admin/surfaceEnvironment.controller';
+import * as SurfaceEnvironmentSoundController from '../controllers/admin/surfaceEnvironmentSound.controller';
 import * as DoodadController from '../controllers/admin/doodad.controller';
 import * as DoodadSoundController from '../controllers/admin/doodadSound.controller';
 import * as MissionController from '../controllers/admin/mission.controller';
@@ -128,6 +130,16 @@ adminRouter.put('/biomes/:id', BiomeController.updateBiome);
 adminRouter.patch('/biomes/:id', BiomeController.updateBiome);
 adminRouter.post('/biomes/:id/wall-texture', BiomeController.biomeWallUpload, BiomeController.uploadBiomeWallTexture);
 adminRouter.delete('/biomes/:id', BiomeController.deleteBiome);
+
+// SURFACE ENVIRONMENTS (tickets 129-138)
+adminRouter.get('/surface-environments', SurfaceEnvironmentController.getSurfaceEnvironments);
+adminRouter.get('/surface-environments/:id', SurfaceEnvironmentController.getSurfaceEnvironment);
+adminRouter.post('/surface-environments', SurfaceEnvironmentController.createSurfaceEnvironment);
+adminRouter.put('/surface-environments/:id', SurfaceEnvironmentController.updateSurfaceEnvironment);
+adminRouter.patch('/surface-environments/:id', SurfaceEnvironmentController.updateSurfaceEnvironment);
+adminRouter.delete('/surface-environments/:id', SurfaceEnvironmentController.deleteSurfaceEnvironment);
+adminRouter.post('/surface-environments/:id/images/:name', SurfaceEnvironmentController.requireSurfaceImageName, SurfaceEnvironmentController.surfaceImageUpload, SurfaceEnvironmentController.uploadSurfaceImage);
+adminRouter.patch('/surface-environments/:id/sound-effects/:slot', SurfaceEnvironmentSoundController.requireSurfaceSoundSlot, SurfaceEnvironmentSoundController.setSurfaceSoundSlot);
 
 adminRouter.get('/doodads', DoodadController.getDoodads);
 adminRouter.get('/doodads/:id', DoodadController.getDoodad);

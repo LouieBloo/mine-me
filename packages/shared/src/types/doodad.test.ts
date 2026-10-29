@@ -185,3 +185,22 @@ describe('health, fall damage and death effect (ticket 143)', () => {
     expect(client).not.toHaveProperty('health');
   });
 });
+
+describe('hiding in weather (ticket 135)', () => {
+  const base = { key: 'bird', name: 'Bird', anchor: 'AIR' as const, width: 1, height: 1, biomes: [] };
+
+  it('accepts weather kinds, none and an empty list', () => {
+    expect(validateDoodad({ ...base, hiddenInWeather: ['storm', 'rain'] })).toEqual([]);
+    expect(validateDoodad({ ...base, hiddenInWeather: [] })).toEqual([]);
+    expect(validateDoodad({ ...base, hiddenInWeather: null })).toEqual([]);
+  });
+
+  it('rejects an unknown weather kind', () => {
+    expect(validateDoodad({ ...base, hiddenInWeather: ['hail'] }).join()).toMatch(/hiddenInWeather/);
+  });
+
+  it('sends the client the weather it hides in, only when there is some', () => {
+    expect(toClientDoodad({ ...base, id: 'd', zOffset: 0, hiddenInWeather: ['storm'] } as any, 0).hiddenInWeather).toEqual(['storm']);
+    expect(toClientDoodad({ ...base, id: 'd', zOffset: 0, hiddenInWeather: [] } as any, 0)).not.toHaveProperty('hiddenInWeather');
+  });
+});

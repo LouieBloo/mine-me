@@ -213,3 +213,31 @@ export const handleSandboxLoadMissionScene = async (_io: Server, socket: Socket,
   if (res.ok) miningSessionManager.sendSandboxState(ctx.engine, { title: 'Scene loaded', message: 'The mission has started.' });
   return toResult(res);
 };
+
+/** Swaps the surface environment (by key) for everyone in the room. */
+export const handleSandboxSetSurfaceEnvironment = async (_io: Server, socket: Socket, payload: { key?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.setSurfaceEnvironment(payload?.key), statusData(ctx));
+};
+
+/** Forces a weather state at a strength (null: back to the seeded weather). */
+export const handleSandboxSetWeather = async (_io: Server, socket: Socket, payload: { weather?: unknown; intensity?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.setWeather(payload?.weather ?? null, payload?.intensity), statusData(ctx));
+};
+
+/** Calls a lightning strike now. */
+export const handleSandboxTriggerLightning = async (_io: Server, socket: Socket): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.triggerLightning());
+};
+
+/** Loads a named surface scene (clear day, heavy rain, storm...). */
+export const handleSandboxLoadSurfaceScene = async (_io: Server, socket: Socket, payload: { sceneId?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.loadSurfaceScene(payload?.sceneId), statusData(ctx));
+};

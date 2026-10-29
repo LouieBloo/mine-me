@@ -25,6 +25,8 @@ export interface DoodadForm {
   health: number | null;
   fallDamage: number | null;
   deathParticleEffectId: string | null;
+  /** Weather kinds it hides in (birds in a storm); empty = never. */
+  hiddenInWeather: string[];
   wander: DoodadWander | null;
   spawn: DoodadSpawnRules;
   biomes: DoodadBiomeLink[];
@@ -51,6 +53,7 @@ export const NEW_DOODAD: DoodadForm = {
   health: null,
   fallDamage: null,
   deathParticleEffectId: null,
+  hiddenInWeather: [],
   wander: null,
   spawn: {},
   biomes: [],
@@ -113,6 +116,7 @@ export function formToDoodad(form: DoodadForm): Partial<DoodadDefinition> {
     health: form.health,
     fallDamage: form.fallDamage,
     deathParticleEffectId: form.deathParticleEffectId || null,
+    hiddenInWeather: form.hiddenInWeather,
     wander: form.wander,
     spawn: tidySpawn(form.spawn),
     biomes: form.biomes,
@@ -140,6 +144,7 @@ export function doodadToForm(doodad: DoodadDefinition): DoodadForm {
     health: doodad.health ?? null,
     fallDamage: doodad.fallDamage ?? null,
     deathParticleEffectId: doodad.deathParticleEffectId ?? null,
+    hiddenInWeather: doodad.hiddenInWeather ?? [],
     wander: doodad.wander ?? null,
     spawn: doodad.spawn ?? {},
     biomes: (doodad.biomes ?? []).map((b) => ({ biomeId: b.biomeId, biomeKey: b.biomeKey, weight: b.weight, density: b.density })),
@@ -187,6 +192,7 @@ export function previewDoodad(form: DoodadForm, id = 'draft'): DoodadDefinition 
     health: form.health,
     fallDamage: form.fallDamage,
     deathParticleEffectId: form.deathParticleEffectId || null,
+    hiddenInWeather: form.hiddenInWeather,
     wander:
       form.wander && Number.isFinite(form.wander.radius) && form.wander.radius > 0 && Number.isFinite(form.wander.speed) && form.wander.speed > 0 && Number.isFinite(form.wander.pauseMs)
         ? form.wander.mode === 'FLUTTER' || form.anchor !== 'AIR'

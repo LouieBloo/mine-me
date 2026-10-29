@@ -78,6 +78,7 @@ import { getGameModeRules, type GameModeRules } from './gameModeRules';
 import { MiningIgnitionSubsystem } from './subsystems/MiningIgnitionSubsystem';
 import { MiningFireSubsystem } from './subsystems/MiningFireSubsystem';
 import { MiningDoodadSubsystem } from './subsystems/MiningDoodadSubsystem';
+import { MiningSurfaceState } from './subsystems/MiningSurfaceState';
 import { MiningTickProfiler } from './MiningTickProfiler';
 import { MiningBurningSubsystem } from './subsystems/MiningBurningSubsystem';
 import { MiningMobSubsystem, type MiningActiveMobSession } from './subsystems/MiningMobSubsystem';
@@ -203,6 +204,8 @@ export class MiningGameEngine {
   public fireSubsystem!: MiningFireSubsystem;
   /** The scenery (tickets 100-105). */
   public doodadSubsystem!: MiningDoodadSubsystem;
+  /** The sky, scenery and weather above the ground (tickets 129-135). */
+  public readonly surface: MiningSurfaceState;
   public burningSubsystem!: MiningBurningSubsystem;
   /** The single place hits are applied (see MiningDamageSystem). */
   public damageSystem!: MiningDamageSystem;
@@ -231,6 +234,13 @@ export class MiningGameEngine {
     this.dataManager = MiningDataManager.getInstance();
     this.worldView = this.buildWorld();
     this.playerManager = new MiningPlayerManager(this.worldView);
+    // The sandbox always starts on the default environment (so a problem can be reproduced from the same sky); a run picks by seed
+    const environments = this.dataManager.getSurfaceEnvironments();
+    this.surface = new MiningSurfaceState({
+      seed: this.seed,
+      environments,
+      preferredKey: this.gameMode === 'sandbox' ? environments.find((e) => e.isDefault)?.key : undefined,
+    });
     this.sandbox = this.rules.hasSandboxTools ? new SandboxTools(this) : null;
     this.rebuildWorld();
 
@@ -272,6 +282,7 @@ export class MiningGameEngine {
       biomes: pickedBiomes,
       doodads: MiningDataManager.getInstance().getDoodads(),
       sandboxDoodads: this.sandboxDoodadsRequested,
+      surface: { environment: this.surface.environment, extractor: this.rules.hasExtractor || this.extractorRequested ? this.dataManager.getDefaultExtractor() : null },
       mission: this.mission && this.gameMode !== 'sandbox' ? requirementsFor(this.mission, this.dataManager) : undefined,
     });
     this.grid = built.grid;
@@ -1082,6 +1093,7 @@ export class MiningGameEngine {
     const beltUpdate = this.beltSubsystem?.takeUpdate();
     const beltItemChanges = this.beltSubsystem?.takeItemChanges();
     const doodadChanges = this.doodadSubsystem.takeChanges();
+    const surfaceUpdate = this.surface.takeUpdate();
     const doodadsShattered = this.doodadSubsystem.falling.takeShattered();
     const missionDelta = this.missionTracker?.takeDelta() ?? undefined;
 
@@ -1165,6 +1177,7 @@ export class MiningGameEngine {
         revealedTiles: this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined,
         fluidCells: fluidChanges.length > 0 ? fluidChanges : undefined,
         ...(missionDelta ? { missionProgress: missionDelta } : {}),
+        surface: surfaceUpdate,
         doodadsAdded: doodadChanges.added.length > 0 ? doodadChanges.added : undefined,
         doodadsRemoved: doodadChanges.removed.length > 0 ? doodadChanges.removed : undefined,
         doodadsHit: doodadChanges.hit.length > 0 ? doodadChanges.hit : undefined,

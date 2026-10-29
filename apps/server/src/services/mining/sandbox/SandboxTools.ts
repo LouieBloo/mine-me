@@ -1,7 +1,8 @@
-import { doodadFalls, doodadRect, isTileSolid, validateMission, type ObjectiveDefinition, type DoodadPlacement, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
+import { doodadFalls, doodadRect, isTileSolid, isWeatherId, validateMission, type ObjectiveDefinition, type DoodadPlacement, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
 import type { MiningGameEngine } from '../MiningGameEngine';
 import { WorldSimClock } from './WorldSimClock';
 import { findDoodadScene } from './doodadScenes';
+import { applySurfaceScene, findSurfaceScene } from './surfaceScenes';
 import { findExtractorScene, heaviestItemId } from './extractorScenes';
 import { doodadPlacementProblem } from './sandboxDoodads';
 import { adHocMission, findMissionScene } from './missionScenes';
@@ -46,7 +47,43 @@ export class SandboxTools {
       paused: this.clock.paused,
       speed: this.clock.speed,
       doodadsGenerated: this.engine.sandboxDoodadsRequested,
+      surfaceEnvironment: this.engine.surface.environment.key,
+      forcedWeather: this.engine.surface.forcedWeather,
     };
+  }
+
+  /** The surface environments that can be chosen, for the tool panel (undefined when none are defined). */
+  public surfaceEnvironmentOptions(): SandboxMobOption[] | undefined {
+    const all = this.engine.dataManager.getSurfaceEnvironments();
+    return all.length > 0 ? all.map((e) => ({ id: e.key, name: e.name })) : undefined;
+  }
+
+  /** Swaps the surface environment for everyone in the room. */
+  public setSurfaceEnvironment(key: unknown): SandboxResult {
+    if (typeof key !== 'string' || !this.engine.surface.setEnvironment(key)) return fail('Unknown surface environment.');
+    return { ok: true };
+  }
+
+  /** Forces a weather at a strength (null weather: the seeded one again). */
+  public setWeather(weather: unknown, intensity: unknown): SandboxResult {
+    if (weather !== null && !isWeatherId(weather)) return fail('Unknown weather.');
+    if (intensity !== undefined && (typeof intensity !== 'number' || !Number.isFinite(intensity) || intensity < 0 || intensity > 1)) return fail('Intensity must be from 0 to 1.');
+    this.engine.surface.forceWeather(weather, intensity as number | undefined);
+    return { ok: true };
+  }
+
+  /** Calls a lightning strike now (the weather does not have to be a storm). */
+  public triggerLightning(): SandboxResult {
+    this.engine.surface.triggerLightning();
+    return { ok: true };
+  }
+
+  /** Loads a named surface scene (a forced weather). */
+  public loadSurfaceScene(sceneId: unknown): SandboxResult {
+    const scene = findSurfaceScene(sceneId);
+    if (!scene) return fail('Unknown scene.');
+    applySurfaceScene(this.engine, scene);
+    return { ok: true };
   }
 
   /** Adds a full cell of a fluid to an open cell (or tops one up if it holds the same fluid). */
@@ -329,6 +366,7 @@ export class SandboxTools {
   /** Rebuilds the map and everything on it; everyone in the room goes back to the start. */
   public reset(): void {
     this.engine.extractorRequested = false;
+    this.engine.surface.clearOverride();
     this.engine.resetWorld();
     this.clock.paused = false;
     this.clock.speed = 1;

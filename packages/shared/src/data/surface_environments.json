@@ -1,0 +1,205 @@
+[
+  {
+    "id": "cmvsugi42000687b5lrfhkg1q",
+    "key": "dusty_plains",
+    "name": "Dusty Plains",
+    "description": "A warm hazy sky over dry hills, mostly clear and windy.",
+    "weight": 2,
+    "isDefault": false,
+    "sky": {
+      "top": "#3d93c9",
+      "sunX": 0.55,
+      "horizon": "#f2d9a8",
+      "sunSize": 4,
+      "sunColor": "#ffe9a0",
+      "sunHeight": 28
+    },
+    "ambientTint": "#fff0d8",
+    "layers": [
+      {
+        "name": "mesas",
+        "tint": "#c49a78",
+        "shape": "mountains",
+        "height": 34,
+        "yOffset": 0,
+        "parallaxFactor": 0.86
+      },
+      {
+        "name": "dunes",
+        "tint": "#d3b27c",
+        "shape": "hills",
+        "height": 18,
+        "yOffset": 0,
+        "parallaxFactor": 0.55
+      }
+    ],
+    "clouds": {
+      "maxCount": 6,
+      "maxHeight": 26,
+      "minHeight": 10
+    },
+    "weather": {
+      "rain": 0.5,
+      "clear": 8,
+      "windy": 3,
+      "cloudy": 2
+    },
+    "props": [
+      {
+        "density": 3,
+        "spacing": 5,
+        "doodadKey": "bush"
+      },
+      {
+        "density": 1,
+        "doodadKey": "bird",
+        "maxHeight": 24,
+        "minHeight": 10
+      }
+    ],
+    "soundEffects": null,
+    "createdAt": "2026-10-29T01:07:53.907Z",
+    "updatedAt": "2026-10-29T01:07:53.907Z"
+  },
+  {
+    "id": "cmvsugi3s000487b5f0ryck2l",
+    "key": "green_valley",
+    "name": "Green Valley",
+    "description": "Blue skies over rolling green hills, with the odd shower.",
+    "weight": 6,
+    "isDefault": true,
+    "sky": {
+      "top": "#2f8fd8",
+      "sunX": 0.72,
+      "horizon": "#a9dcff",
+      "sunSize": 3,
+      "sunColor": "#fff2b0",
+      "sunHeight": 24
+    },
+    "ambientTint": null,
+    "layers": [
+      {
+        "name": "far mountains",
+        "tint": "#8da2c2",
+        "shape": "mountains",
+        "height": 46,
+        "yOffset": 0,
+        "parallaxFactor": 0.88
+      },
+      {
+        "name": "hills",
+        "tint": "#6f9a6a",
+        "shape": "hills",
+        "height": 24,
+        "yOffset": 0,
+        "parallaxFactor": 0.62
+      },
+      {
+        "name": "treeline",
+        "tint": "#3f6b45",
+        "shape": "treeline",
+        "height": 14,
+        "yOffset": 0,
+        "parallaxFactor": 0.4
+      }
+    ],
+    "clouds": {
+      "maxCount": 10,
+      "maxHeight": 24,
+      "minHeight": 8
+    },
+    "weather": {
+      "rain": 2,
+      "clear": 6,
+      "storm": 1,
+      "windy": 1,
+      "cloudy": 3
+    },
+    "props": [
+      {
+        "density": 5,
+        "spacing": 4,
+        "doodadKey": "oak_tree"
+      },
+      {
+        "density": 7,
+        "spacing": 3,
+        "doodadKey": "bush"
+      },
+      {
+        "density": 2,
+        "doodadKey": "bird",
+        "maxHeight": 22,
+        "minHeight": 8
+      }
+    ],
+    "soundEffects": null,
+    "createdAt": "2026-10-29T01:07:53.897Z",
+    "updatedAt": "2026-10-29T01:07:53.897Z"
+  },
+  {
+    "id": "cmvsugi3y000587b54dy4n0pr",
+    "key": "snowfield",
+    "name": "Snowfield",
+    "description": "A pale cold sky over white mountains, with snow and fog.",
+    "weight": 2,
+    "isDefault": false,
+    "sky": {
+      "top": "#7fa6c9",
+      "sunX": 0.3,
+      "horizon": "#dbe8f2",
+      "sunSize": 2,
+      "sunColor": "#fff8e0",
+      "sunHeight": 14
+    },
+    "ambientTint": "#eef4ff",
+    "layers": [
+      {
+        "name": "snow peaks",
+        "tint": "#c9d8e8",
+        "shape": "mountains",
+        "height": 52,
+        "yOffset": 0,
+        "parallaxFactor": 0.88
+      },
+      {
+        "name": "pine hills",
+        "tint": "#9db4c8",
+        "shape": "hills",
+        "height": 20,
+        "yOffset": 0,
+        "parallaxFactor": 0.6
+      },
+      {
+        "name": "pines",
+        "tint": "#4d6b73",
+        "shape": "treeline",
+        "height": 16,
+        "yOffset": 0,
+        "parallaxFactor": 0.4
+      }
+    ],
+    "clouds": {
+      "maxCount": 12,
+      "maxHeight": 26,
+      "minHeight": 8
+    },
+    "weather": {
+      "fog": 2,
+      "snow": 4,
+      "clear": 3,
+      "windy": 1,
+      "cloudy": 3
+    },
+    "props": [
+      {
+        "density": 5,
+        "spacing": 3,
+        "doodadKey": "pine_tree"
+      }
+    ],
+    "soundEffects": null,
+    "createdAt": "2026-10-29T01:07:53.903Z",
+    "updatedAt": "2026-10-29T01:07:53.903Z"
+  }
+]

@@ -1,5 +1,6 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { useSound } from '../../contexts/SoundContext';
+import { surfaceSettings } from '../../services/surfaceSettings';
 import './SettingsModal.css';
 
 export const SettingsModal: React.FC = () => {
@@ -15,6 +16,12 @@ export const SettingsModal: React.FC = () => {
     setBgmVolume,
     setSfxVolume,
   } = useSound();
+
+  const [reduceFlashes, setReduceFlashes] = useState<boolean>(surfaceSettings.reduceFlashes);
+  const toggleReduceFlashes = () => {
+    surfaceSettings.setReduceFlashes(!reduceFlashes);
+    setReduceFlashes(!reduceFlashes);
+  };
 
   // Close on Escape key press
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -172,6 +179,33 @@ export const SettingsModal: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Section: Display */}
+        <div className="px-6 pb-6">
+          <div className="flex items-center space-x-2 mb-4 pb-2 border-b border-slate-800">
+            <span className="text-sm">🖥️</span>
+            <h3 className="text-xs font-black uppercase tracking-widest text-yellow-500">Display</h3>
+          </div>
+          <div className="bg-slate-800/40 p-3.5 rounded-xl border border-slate-700/50 flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <span className="text-base">⚡</span>
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-slate-200">Reduce Lightning Flashes</span>
+                <p className="text-[10px] text-slate-400">Dimmer storm flashes, with no bright bolt</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={toggleReduceFlashes}
+              aria-pressed={reduceFlashes}
+              className={`cursor-pointer px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-xs ${
+                reduceFlashes ? 'bg-emerald-600/90 hover:bg-emerald-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+              }`}
+            >
+              {reduceFlashes ? 'Flashes: Reduced' : 'Flashes: Full'}
+            </button>
           </div>
         </div>
 

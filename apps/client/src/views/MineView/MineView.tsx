@@ -442,6 +442,16 @@ export const MineView: React.FC = () => {
             onControl: sandbox.missionControl,
             onLoadScene: sandbox.loadMissionScene,
           }}
+          surface={{
+            environments: sandbox.info.surfaceEnvironments ?? [],
+            environment: sandbox.status.surfaceEnvironment,
+            scenes: sandbox.info.surfaceScenes ?? [],
+            forcedWeather: sandbox.status.forcedWeather ?? null,
+            onSetEnvironment: sandbox.setSurfaceEnvironment,
+            onSetWeather: sandbox.setWeather,
+            onLightning: sandbox.triggerLightning,
+            onLoadScene: sandbox.loadSurfaceScene,
+          }}
           onReset={sandbox.reset}
           onLeave={handleExit}
           busy={sandbox.busy}

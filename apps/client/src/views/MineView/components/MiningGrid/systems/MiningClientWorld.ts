@@ -23,6 +23,7 @@ import type { MiningMobRenderer } from '../renderers/MiningMobRenderer';
 import type { DoodadRenderer } from '../renderers/DoodadRenderer';
 import type { DoodadEffects } from './DoodadEffects';
 import type { DoodadSounds } from './DoodadSounds';
+import type { SurfaceSystem } from '../surface/SurfaceSystem';
 import type { DoodadField, FireField } from '@mine-me/shared';
 import type { FluidRenderer } from '../renderers/FluidRenderer';
 import type { GasRenderer } from '../renderers/GasRenderer';
@@ -109,6 +110,8 @@ export interface MiningSceneRefs {
   doodadEffectsRef?: NullableRef<DoodadEffects>;
   /** What the doodads sound like (ticket 103). */
   doodadSoundsRef?: NullableRef<DoodadSounds>;
+  /** The sky, scenery, clouds and weather above the ground (tickets 129-135); absent when the mine has no surface to show. */
+  surfaceSystemRef?: NullableRef<SurfaceSystem>;
   /** Flames and lights on the burning cells. */
   fireRendererRef: NullableRef<FireRenderer>;
   /** The ambient look that follows the biome the player is in (absent when the mine is one biome). */

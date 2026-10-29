@@ -5,6 +5,7 @@ import {
   findCurrencyItem,
   isThrowableItem,
   type BiomeDefinition,
+  type SurfaceEnvironmentDefinition,
   type DoodadDefinition,
   type MissionDefinition,
   type CharacterSoundEffectsConfig,
@@ -37,6 +38,8 @@ export interface GameDefinitions {
   doodads?: DoodadDefinition[];
   /** Missions (ticket 108). Absent means none are defined: runs have no mission. */
   missions?: MissionDefinition[];
+  /** Surface environments: the sky, scenery and weather above the ground (ticket 129). Absent means none are defined (a built-in plain day is used). */
+  surfaceEnvironments?: SurfaceEnvironmentDefinition[];
   /** Extractors. Absent means none are defined (the built-in default is used). */
   extractors?: ExtractorDefinition[];
   /** The particle effect library, so fluids and fire can name an effect by id. Absent means none. */
@@ -101,6 +104,8 @@ export class MiningDataManager {
   private readonly doodadsById = new Map<string, DoodadDefinition>();
   private readonly missions: MissionDefinition[] = [];
   private readonly missionsById = new Map<string, MissionDefinition>();
+  private readonly surfaceEnvironments: SurfaceEnvironmentDefinition[] = [];
+  private readonly surfaceEnvironmentsByKey = new Map<string, SurfaceEnvironmentDefinition>();
   private readonly extractors: ExtractorDefinition[] = [];
   private readonly extractorsByKey = new Map<string, ExtractorDefinition>();
   private readonly extractorsById = new Map<string, ExtractorDefinition>();
@@ -151,6 +156,11 @@ export class MiningDataManager {
       if (!mission?.id || this.missionsById.has(mission.id)) continue;
       this.missions.push(mission);
       this.missionsById.set(mission.id, mission);
+    }
+    for (const env of definitions.surfaceEnvironments ?? []) {
+      if (!env?.key || this.surfaceEnvironmentsByKey.has(env.key)) continue;
+      this.surfaceEnvironments.push(env);
+      this.surfaceEnvironmentsByKey.set(env.key, env);
     }
     for (const doodad of definitions.doodads ?? []) {
       if (!doodad?.key || this.doodadsByKey.has(doodad.key)) continue;
@@ -277,6 +287,16 @@ export class MiningDataManager {
   /** All biome definitions, in load order (the first of any duplicated key wins). May be empty: see `BiomeField` for the default. */
   public getBiomes(): BiomeDefinition[] {
     return this.biomes;
+  }
+
+  /** All surface environments, in load order. May be empty (the sky is then the built-in plain day). */
+  public getSurfaceEnvironments(): SurfaceEnvironmentDefinition[] {
+    return this.surfaceEnvironments;
+  }
+
+  /** Surface environment by key or database id. */
+  public getSurfaceEnvironment(keyOrId: string): SurfaceEnvironmentDefinition | undefined {
+    return this.surfaceEnvironmentsByKey.get(keyOrId) ?? this.surfaceEnvironments.find((e) => e.id === keyOrId);
   }
 
   /** All mission definitions, in load order. May be empty. */

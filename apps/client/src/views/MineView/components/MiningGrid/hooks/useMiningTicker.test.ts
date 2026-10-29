@@ -174,6 +174,55 @@ describe('useMiningTicker - Client-Side Prediction & Reconciliation', () => {
     expect(playerContainer.x).toBeGreaterThanOrEqual(playerBodyRef.current.position.x * TILE_SIZE - 1e-6);
   });
 
+  describe('the surface (tickets 129-138)', () => {
+    const mountWithSurface = (surface: unknown) =>
+      renderHook(() =>
+        useMiningTicker({
+          app: mockApp,
+          playerContainerRef: { current: playerContainer },
+          gridContainerRef: { current: gridContainer },
+          fallingRocksContainerRef: { current: null },
+          currentRenderPosRef, targetServerPosRef, isFacingLeftRef, playerFacingDirRef, playerSpriteRef,
+          activeFallingRocksRef, fallingRockGraphicsMap, debugGraphicsRef, showDebugRef, flashlightRef,
+          lightingEngineRef, cameraRef, playerBodyRef, gridRef, keysPressedRef, isMiningRef, miningTargetRef,
+          predictionRef: { current: new MiningPredictionState(playerBodyRef.current, keysPressedRef.current) },
+          surfaceSystemRef: { current: surface },
+        })
+      );
+
+    it('brings the surface up to date every frame with the part of the world on screen and the camera centre', () => {
+      gridContainer = { x: -100, y: -200, scale: { x: 2, y: 2 } };
+      // (a camera, so the ticker leaves the container where the test put it)
+      cameraRef.current = { setScreenSize: vi.fn(), update: vi.fn(), getZoom: vi.fn(() => 2) };
+      const surface = { update: vi.fn(), onPhase: null as null | ((name: string) => void), stats: { objects: 1, clouds: 0, particles: 0, active: true } };
+      mountWithSurface(surface);
+      tickerCallbacks[0]();
+      expect(surface.update).toHaveBeenCalledTimes(1);
+      const [view, centreY] = surface.update.mock.calls[0];
+      // 800 x 600 screen at zoom 2 is 400 x 300 world pixels, starting at world (50, 100)
+      expect(view).toEqual({ left: 50, top: 100, width: 400, height: 300 });
+      expect(centreY).toBe(250);
+      tickerCallbacks[0]();
+      expect(surface.update).toHaveBeenCalledTimes(2);
+    });
+
+    it('lets the profiler hear each phase of the surface as its own section', () => {
+      gridContainer = { x: 0, y: 0, scale: { x: 1, y: 1 } };
+      const surface = { update: vi.fn(), onPhase: null as null | ((name: string) => void) };
+      const start = vi.spyOn(miningProfiler, 'startSection');
+      mountWithSurface(surface);
+      tickerCallbacks[0]();
+      surface.onPhase?.('Clouds');
+      expect(start).toHaveBeenCalledWith('Clouds');
+      start.mockRestore();
+    });
+
+    it('runs fine in a mine with no surface', () => {
+      mount();
+      expect(() => frames(2)).not.toThrow();
+    });
+  });
+
   describe('camera', () => {
     const fakeCamera = () => ({ setScreenSize: vi.fn(), update: vi.fn(), getZoom: vi.fn(() => 1.5) });
 

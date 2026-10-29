@@ -316,6 +316,30 @@ export interface SandboxLoadDoodadScenePayload extends GameEventBase {
   sceneId: string;
 }
 
+/** Sandbox: swaps the surface environment (by key) for everyone in the room. */
+export interface SandboxSetSurfaceEnvironmentPayload extends GameEventBase {
+  type: 'sandbox_set_surface_environment';
+  key: string;
+}
+
+/** Sandbox: forces a weather state at a strength (null weather: back to the seeded weather). */
+export interface SandboxSetWeatherPayload extends GameEventBase {
+  type: 'sandbox_set_weather';
+  weather: string | null;
+  intensity?: number;
+}
+
+/** Sandbox: calls a lightning strike now. */
+export interface SandboxTriggerLightningPayload extends GameEventBase {
+  type: 'sandbox_trigger_lightning';
+}
+
+/** Sandbox: loads a named surface scene (clear day, heavy rain, storm...). */
+export interface SandboxLoadSurfaceScenePayload extends GameEventBase {
+  type: 'sandbox_load_surface_scene';
+  sceneId: string;
+}
+
 /** Asks what missions a new run of this mode would offer (rolled once per player and kept until they start). */
 export interface MiningMissionOffersPayload extends GameEventBase {
   type: 'mining_mission_offers';
@@ -387,6 +411,10 @@ export type GameEventPayload =
   | SandboxClearDoodadsPayload
   | SandboxSetDoodadGenerationPayload
   | SandboxLoadDoodadScenePayload
+  | SandboxSetSurfaceEnvironmentPayload
+  | SandboxSetWeatherPayload
+  | SandboxTriggerLightningPayload
+  | SandboxLoadSurfaceScenePayload
   | MiningMissionOffersPayload
   | SandboxStartMissionPayload
   | SandboxMissionControlPayload

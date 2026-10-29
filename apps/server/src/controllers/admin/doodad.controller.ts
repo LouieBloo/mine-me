@@ -13,7 +13,7 @@ import { toDoodadDefinition, type DoodadRow } from '../../services/mining/defini
 /** The columns an admin may set. `key` is only set when a doodad is created; sounds have their own route and art its upload. */
 const EDITABLE_FIELDS = [
   'name', 'description', 'anchor', 'width', 'height', 'sizeVariants', 'textureUrl', 'parts', 'zOffset', 'motion', 'reacts', 'light',
-  'particleEffectId', 'particleOffsetX', 'particleOffsetY', 'wander', 'spawn', 'health', 'fallDamage', 'deathParticleEffectId',
+  'particleEffectId', 'particleOffsetX', 'particleOffsetY', 'wander', 'spawn', 'health', 'fallDamage', 'deathParticleEffectId', 'hiddenInWeather',
 ] as const;
 
 const NUMERIC_FIELDS = ['width', 'height', 'zOffset', 'particleOffsetX', 'particleOffsetY', 'health', 'fallDamage'] as const;
@@ -155,6 +155,7 @@ export const createDoodad = async (req: Request, res: Response) => {
         health: input.health ?? null,
         fallDamage: input.fallDamage ?? null,
         deathParticleEffectId: input.deathParticleEffectId ?? null,
+        hiddenInWeather: input.hiddenInWeather ?? [],
         wander: jsonOrNull(input.wander),
         spawn: jsonOrNull(input.spawn),
         ...(refs.links && refs.links.length > 0 ? { biomes: { create: refs.links } } : {}),
@@ -194,6 +195,7 @@ export const updateDoodad = async (req: Request, res: Response) => {
     if (input.textureUrl !== undefined) data.textureUrl = input.textureUrl;
     if (input.particleEffectId !== undefined) data.particleEffectId = input.particleEffectId;
     if (input.deathParticleEffectId !== undefined) data.deathParticleEffectId = input.deathParticleEffectId;
+    if (input.hiddenInWeather !== undefined) data.hiddenInWeather = input.hiddenInWeather ?? [];
     for (const field of NUMERIC_FIELDS) if (input[field] !== undefined) (data as Record<string, unknown>)[field] = input[field];
     for (const field of JSON_FIELDS) if (input[field] !== undefined) (data as Record<string, unknown>)[field] = jsonOrNull(input[field]);
     // The whole list is replaced, in one write, so a doodad never has half of its links

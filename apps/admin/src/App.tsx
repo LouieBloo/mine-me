@@ -32,6 +32,8 @@ import Doodads from './pages/Doodads/Doodads';
 import DoodadDetail from './pages/Doodads/DoodadDetail/DoodadDetail';
 import Missions from './pages/Missions/Missions';
 import MissionDetail from './pages/Missions/MissionDetail/MissionDetail';
+import SurfaceEnvironments from './pages/SurfaceEnvironments/SurfaceEnvironments';
+import SurfaceEnvironmentDetail from './pages/SurfaceEnvironments/SurfaceEnvironmentDetail/SurfaceEnvironmentDetail';
 import Extractors from './pages/Extractors/Extractors';
 import ExtractorDetail from './pages/Extractors/ExtractorDetail/ExtractorDetail';
 import ItemWeights from './pages/ItemWeights/ItemWeights';
@@ -134,6 +136,14 @@ const router = createBrowserRouter([
       {
         path: "missions/:id",
         element: <MissionDetail />
+      },
+      {
+        path: "surface-environments",
+        element: <SurfaceEnvironments />
+      },
+      {
+        path: "surface-environments/:id",
+        element: <SurfaceEnvironmentDetail />
       },
       {
         path: "extractors",

@@ -3,6 +3,7 @@ export * from './FluidSoundProfile';
 export * from './GasSoundProfile';
 export * from './DoodadSoundProfile';
 export * from './MissionSoundProfile';
+export * from './SurfaceSoundProfile';
 export * from './ExtractorSoundProfile';
 export * from './ItemSoundProfile';
 export * from './MobSoundProfile';

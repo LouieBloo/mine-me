@@ -1,6 +1,8 @@
-import { DEFAULT_SKY_ROWS, MiningTileType, type BiomeDefinition, type BiomeField, type DoodadDefinition, type DoodadPlacement, type FluidDefinition, GasDefinition, MiningGameMode, MiningMapConfigData, type MissionRequirements, hasRequirements } from '@mine-me/shared';
+import { DEFAULT_SKY_ROWS, MINING_CONFIG, MiningTileType, placeExtractor, type ExtractorDefinition, type SurfaceEnvironmentDefinition, type BiomeDefinition, type BiomeField, type DoodadDefinition, type DoodadPlacement, type FluidDefinition, GasDefinition, MiningGameMode, MiningMapConfigData, type MissionRequirements, hasRequirements } from '@mine-me/shared';
 import { generateMiningMapWithFluids, type GeneratedFluidCell, type GeneratedGasCell, type ServerMiningGrid } from '../miningMap.service';
-import { BLOCK_TILE_TYPES } from './subsystems/MiningDataManager';
+import { BLOCK_TILE_TYPES, blockKeyForTileType } from './subsystems/MiningDataManager';
+import { createSeededRng } from '../miningMap.service';
+import { SURFACE_PROPS_SEED_SALT, generateSurfaceProps } from './doodads/SurfaceProps';
 import { createDefaultSandboxLayout, type SandboxMobSpawn } from './sandbox/SandboxLayout';
 import { buildSandboxMap } from './sandbox/SandboxMapBuilder';
 import { mapShortfall } from './missions/missionCensus';
@@ -39,14 +41,42 @@ export interface MapSourceOptions {
   mission?: MissionRequirements;
   /** Sandbox only: run the generator's doodad pass on the hand-built map (off by default, ticket 107). */
   sandboxDoodads?: boolean;
+  /** The surface the run has (ticket 135): its props are placed on the ground. Absent: no surface props. */
+  surface?: {
+    environment: Pick<SurfaceEnvironmentDefinition, 'props'>;
+    /** The extractor that will land on the surface: its pad stays clear of props. */
+    extractor?: Pick<ExtractorDefinition, 'width' | 'height' | 'entranceOffset' | 'shaftWidth'> | null;
+  };
 }
+
+/** The surface props of an environment as doodad placements on a finished map (rows of the whole map, sky included). */
+function surfacePropsFor(map: BuiltMap, options: MapSourceOptions): DoodadPlacement[] {
+  if (!options.surface || !options.doodads?.length) return [];
+  const surfaceRow = map.surfaceRow ?? 0;
+  const pad = options.surface.extractor ? placeExtractor(options.surface.extractor, surfaceRow, map.grid[0]?.length ?? 0) : null;
+  return generateSurfaceProps({
+    grid: map.grid,
+    surfaceRow,
+    environment: options.surface.environment,
+    doodads: options.doodads,
+    rng: createSeededRng(options.seed ^ SURFACE_PROPS_SEED_SALT),
+    entranceX: MINING_CONFIG.ENTRANCE_X,
+    avoid: pad ? [{ x0: pad.x, x1: pad.x + pad.width - 1 }] : [],
+    blockKeyOf: (type) => blockKeyForTileType(type),
+  });
+}
+
+const withSurfaceProps = (map: BuiltMap, options: MapSourceOptions): BuiltMap => {
+  const props = surfacePropsFor(map, options);
+  return props.length === 0 ? map : { ...map, doodads: [...(map.doodads ?? []), ...props] };
+};
 
 /** Builds the starting map for a mode: the sandbox from its layout, every other mode from the generator. */
 export function buildMapForMode(mode: MiningGameMode, options: MapSourceOptions): BuiltMap {
   if (mode === 'sandbox') {
     const map = buildSandboxMap(createDefaultSandboxLayout(BLOCK_TILE_TYPES), options.fluids, options.gases, options.biomes);
     if (!options.sandboxDoodads || !options.doodads?.length) return map;
-    return { ...map, doodads: generateSandboxDoodads(map, { seed: options.seed, doodads: options.doodads, biomes: options.biomes, maxCount: options.mapConfig?.doodadMaxCount }) };
+    return withSurfaceProps({ ...map, doodads: generateSandboxDoodads(map, { seed: options.seed, doodads: options.doodads, biomes: options.biomes, maxCount: options.mapConfig?.doodadMaxCount }) }, options);
   }
   const mission = options.mission && hasRequirements(options.mission) ? options.mission : undefined;
   const generate = (seed: number) =>
@@ -54,7 +84,7 @@ export function buildMapForMode(mode: MiningGameMode, options: MapSourceOptions)
   let generated = generate(options.seed);
   // The generator tops up what the mission needs; if a crowded map still falls short, the next derived seed is tried
   for (let attempt = 1; mission && attempt <= MISSION_MAP_RETRIES && mapShortfall(mission, generated).length > 0; attempt++) generated = generate(options.seed + attempt * 7919);
-  return addSkyRows(generated, options.mapConfig?.skyRows ?? DEFAULT_SKY_ROWS);
+  return withSurfaceProps(addSkyRows(generated, options.mapConfig?.skyRows ?? DEFAULT_SKY_ROWS), options);
 }
 
 /**

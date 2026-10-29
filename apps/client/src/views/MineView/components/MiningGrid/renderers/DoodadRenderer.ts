@@ -34,6 +34,8 @@ import { TILE_SIZE } from './MiningTileRenderer';
 
 /** How long a doodad takes to fade away when its block is mined, in seconds. */
 export const DOODAD_FADE_SECONDS = 0.25;
+/** Seconds a doodad takes to fade out of (or back into) the weather it hides in. */
+export const DOODAD_WEATHER_FADE_SECONDS = 1.5;
 /** How much bigger a fading doodad gets (a small pop). */
 export const DOODAD_POP_SCALE = 0.25;
 /** How long a hurt doodad stays tinted, in seconds (ticket 143). */
@@ -147,6 +149,8 @@ class DoodadView {
   public fade: number | null = null;
   /** Seconds of the hit tint left (ticket 143). */
   public hitLeft = 0;
+  /** How hidden it is by the weather, 0 (shown) to 1 (gone): birds leave the sky in a storm (ticket 135). */
+  public hide = 0;
   /** The server says it was killed, so its fade is a death and not a broken hold. */
   public killed = false;
   /** Bumped on every reuse, so a texture that arrives late for the old doodad is ignored. */
@@ -221,6 +225,11 @@ export class DoodadRenderer {
   private readonly bodies = new DoodadBodyTracker();
   private readonly reactions = new DoodadReactionSystem();
   private terrain: WanderTerrain | null = null;
+  /** The ground surface row: doodads standing above it are the surface props, which feel the wind and the weather (ticket 135). */
+  private surfaceRow = Number.NEGATIVE_INFINITY;
+  /** The weather now, and how much stronger than usual the surface doodads sway in its wind. */
+  private weatherType = 'clear';
+  private windSway = 1;
   /** How many of the doodads with a sprite react or wander. */
   private reactiveCount = 0;
   private readonly byKey = new Map<string, DoodadView>();
@@ -337,6 +346,22 @@ export class DoodadRenderer {
     return this.reactiveCount > 0 || this.reactions.activeCount > 0;
   }
 
+  /** Tells the renderer where the ground is, so it knows which doodads are surface props. */
+  public setSurfaceRow(row: number): void {
+    this.surfaceRow = row;
+  }
+
+  /** The weather now (ticket 135): its kind hides the doodads that hide in it, and `windSway` multiplies the sway of the surface doodads. */
+  public setWeather(type: string, windSway: number): void {
+    this.weatherType = type;
+    this.windSway = Number.isFinite(windSway) && windSway > 0 ? windSway : 1;
+  }
+
+  /** How strongly the wind sways a surface doodad (1 = its own sway). */
+  public get currentWindSway(): number {
+    return this.windSway;
+  }
+
   /** The doodads on screen and where they stand, for the effects. Fading ones are left out. */
   public visible(): DoodadViewInfo[] {
     const out: DoodadViewInfo[] = [];
@@ -375,8 +400,33 @@ export class DoodadRenderer {
       if (view.wander) this.wanderStep(view, dtSeconds, bodies);
       this.pose(view);
       this.tintHit(view, dtSeconds);
+      this.weatherHide(view, dtSeconds);
     }
     this.moveFalling(dtSeconds);
+  }
+
+  /** Fades a doodad that hides in the current weather out, and back in when it clears (birds in a storm). */
+  private weatherHide(view: DoodadView, dtSeconds: number): void {
+    const hides = view.entry!.definition.hiddenInWeather;
+    if (!hides && view.hide === 0) return;
+    const target = hides?.includes(this.weatherType) ? 1 : 0;
+    if (view.hide !== target) {
+      const step = dtSeconds / DOODAD_WEATHER_FADE_SECONDS;
+      view.hide = target > view.hide ? Math.min(target, view.hide + step) : Math.max(target, view.hide - step);
+      view.root.alpha = 1 - view.hide;
+      view.root.visible = view.hide < 0.999;
+    }
+  }
+
+  /** Whether a doodad stands above the ground (a tree, a bush, a bird), where the wind blows. */
+  private onSurface(entry: DoodadEntry): boolean {
+    return entry.y + entry.height <= this.surfaceRow;
+  }
+
+  /** The pose with the wind's extra sway on it, for a surface doodad. */
+  private windy(pose: DoodadPose, entry: DoodadEntry): DoodadPose {
+    if (this.windSway === 1 || !this.onSurface(entry)) return pose;
+    return { ...pose, rotation: pose.rotation * this.windSway, x: pose.x * this.windSway };
   }
 
   /** Tints a hurt doodad for a moment, then back to normal. */
@@ -479,6 +529,7 @@ export class DoodadRenderer {
     view.entry = entry;
     view.fade = null;
     view.hitLeft = 0;
+    view.hide = 0;
     view.killed = false;
     view.body.tint = 0xffffff;
     view.phase = doodadPhase(entry.x, entry.y);
@@ -493,6 +544,7 @@ export class DoodadRenderer {
     view.body.rotation = 0;
     view.body.position.set(0, 0);
     view.root.visible = true;
+    view.root.alpha = 1;
     view.root.zIndex = entry.definition.zOffset;
     this.container.addChild(view.root);
     this.active.set(entry, view);
@@ -656,7 +708,7 @@ export class DoodadRenderer {
       // The lean from a brush turns the whole body about the base, over what each part does
       view.body.rotation = this.reactions.angleOf(view.key);
       for (const p of view.partSprites) {
-        const pose = evaluateDoodadMotion(motion, this.timeSeconds, view.phase, p.layout.name);
+        const pose = this.windy(evaluateDoodadMotion(motion, this.timeSeconds, view.phase, p.layout.name), entry);
         p.sprite.rotation = pose.rotation * layout.mirror;
         p.sprite.position.set(p.layout.x - layout.anchorX + pose.x * layout.drawWidth * layout.mirror, p.layout.y - layout.anchorY + pose.y * layout.drawHeight);
         p.sprite.scale.set(p.baseScaleX * layout.mirror * pose.scaleX, p.baseScaleY * pose.scaleY);
@@ -664,7 +716,7 @@ export class DoodadRenderer {
       }
       return;
     }
-    const pose = evaluateDoodadMotion(motion, this.timeSeconds, view.phase);
+    const pose = this.windy(evaluateDoodadMotion(motion, this.timeSeconds, view.phase), entry);
     this.applyBodyPose(view, pose, layout);
     if (view.wander) this.applyWander(view, layout);
     // A placeholder drip draws its own drop

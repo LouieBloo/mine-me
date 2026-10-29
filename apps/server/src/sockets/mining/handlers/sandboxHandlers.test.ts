@@ -27,6 +27,10 @@ import {
   handleSandboxClearDoodads,
   handleSandboxSetDoodadGeneration,
   handleSandboxLoadDoodadScene,
+  handleSandboxSetSurfaceEnvironment,
+  handleSandboxSetWeather,
+  handleSandboxTriggerLightning,
+  handleSandboxLoadSurfaceScene,
   handleSandboxStartMission,
   handleSandboxMissionControl,
   handleSandboxLoadMissionScene,
@@ -58,6 +62,10 @@ describe('sandbox handlers', () => {
         handleSandboxSetGodMode(io, socket, { enabled: true }),
         handleSandboxSetSim(io, socket, { paused: true }),
         handleSandboxReset(io, socket),
+        handleSandboxSetSurfaceEnvironment(io, socket, { key: 'x' }),
+        handleSandboxSetWeather(io, socket, { weather: 'rain' }),
+        handleSandboxTriggerLightning(io, socket),
+        handleSandboxLoadSurfaceScene(io, socket, { sceneId: 'storm' }),
         handleSandboxSpawnExtractor(io, socket),
         handleSandboxDigBelt(io, socket, { rows: 3 }),
         handleSandboxSetCapacity(io, socket, { capacity: 10 }),
@@ -110,11 +118,11 @@ describe('sandbox handlers', () => {
       const socket = socketFor('hs-a');
       expect(await handleSandboxSetGodMode(io, socket, { enabled: true })).toEqual({
         success: true,
-        data: { status: { godMode: true, paused: false, speed: 1, doodadsGenerated: false } },
+        data: { status: { godMode: true, paused: false, speed: 1, doodadsGenerated: false, surfaceEnvironment: expect.any(String), forcedWeather: null } },
       });
       expect(await handleSandboxSetSim(io, socket, { paused: true, speed: 2 })).toEqual({
         success: true,
-        data: { status: { godMode: true, paused: true, speed: 2, doodadsGenerated: false } },
+        data: { status: { godMode: true, paused: true, speed: 2, doodadsGenerated: false, surfaceEnvironment: expect.any(String), forcedWeather: null } },
       });
       expect(await handleSandboxSetSim(io, socket, { speed: 7 })).toEqual({ success: false, error: 'Unsupported speed.' });
     });
@@ -203,9 +211,38 @@ describe('sandbox handlers', () => {
       expect(res).toMatchObject({ success: true, data: { status: { doodadsGenerated: true } } });
       expect(socket.emit.mock.calls.some((c: any[]) => c[0] === 'mining_sandbox_reset')).toBe(true);
       const again = await handleSandboxSetDoodadGeneration(io, socket, { enabled: false });
-      expect(again).toMatchObject({ success: true, data: { status: { doodadsGenerated: false } } });
+      expect(again).toMatchObject({ success: true, data: { status: { doodadsGenerated: false, surfaceEnvironment: expect.any(String), forcedWeather: null } } });
     });
   });
+  describe('the surface tools in a sandbox (ticket 138)', () => {
+    it('forces a weather, reports it in the status, and goes back to the seeded one', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      const engine = miningSessionManager.getSession('hs-a')!;
+      expect(await handleSandboxSetWeather(io, socket, { weather: 'storm', intensity: 0.5 })).toMatchObject({ success: true, data: { status: { forcedWeather: 'storm' } } });
+      expect(engine.surface.weatherNow().type).toBe('storm');
+      expect(await handleSandboxSetWeather(io, socket, { weather: null })).toMatchObject({ success: true, data: { status: { forcedWeather: null } } });
+    });
+
+    it('refuses a bad weather or strength with a reason', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      expect(await handleSandboxSetWeather(io, socket, { weather: 'hail' })).toEqual({ success: false, error: 'Unknown weather.' });
+      expect(await handleSandboxSetWeather(io, socket, { weather: 'rain', intensity: 4 })).toEqual({ success: false, error: 'Intensity must be from 0 to 1.' });
+      expect(await handleSandboxSetSurfaceEnvironment(io, socket, { key: 'nope' })).toEqual({ success: false, error: 'Unknown surface environment.' });
+      expect(await handleSandboxLoadSurfaceScene(io, socket, { sceneId: 'nope' })).toEqual({ success: false, error: 'Unknown scene.' });
+    });
+
+    it('calls a strike and loads a scene', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      const engine = miningSessionManager.getSession('hs-a')!;
+      expect(await handleSandboxTriggerLightning(io, socket)).toEqual({ success: true });
+      expect(await handleSandboxLoadSurfaceScene(io, socket, { sceneId: 'snow' })).toMatchObject({ success: true, data: { status: { forcedWeather: 'snow' } } });
+      expect(engine.surface.weatherNow().snow).toBeGreaterThan(0);
+    });
+  });
+
   describe('the mission tools in a sandbox (ticket 116)', () => {
     it('starts a one-off mission, tells the room, completes it, restarts it and drops it', async () => {
       const socket = socketFor('hs-a');

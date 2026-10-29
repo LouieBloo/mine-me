@@ -23,6 +23,9 @@ export class LightingEngine {
   private lightmapSprite: Sprite | null = null;
   private lightsContainer: Container;
   private ambientGraphics: Graphics;
+  /** The sky above the ground in the lightmap: white (full daylight) unless the weather dims or tints it. */
+  private skyGraphics: Graphics;
+  private skyLight = 0xffffff;
   private sunlightSprite: Sprite | null = null;
   private sunlightSource: BufferImageSource | null = null;
   private sunlightPixels: Uint8Array | undefined;
@@ -76,8 +79,10 @@ export class LightingEngine {
     // Internal offscreen container where all ambient, sun, and light sources are rendered
     this.lightsContainer = new Container();
     this.ambientGraphics = new Graphics();
+    this.skyGraphics = new Graphics();
     this.lightsGraphics = new Graphics();
 
+    this.lightsContainer.addChild(this.skyGraphics);
     this.lightsContainer.addChild(this.ambientGraphics);
     this.lightsContainer.addChild(this.lightsGraphics);
 
@@ -278,6 +283,23 @@ export class LightingEngine {
     this.onTiming(phase, performance.now() - start);
   }
 
+  /**
+   * Sets the light above the ground (ticket 134): white is full daylight, a dimmer or bluer colour is bad weather, a flash
+   * brightens it again. Underground is not touched. The lightmap is only redrawn when the colour actually changed.
+   */
+  public setSkyLight(color: number): void {
+    const next = color & 0xffffff;
+    if (next === this.skyLight) return;
+    this.skyLight = next;
+    this.skyGraphics.tint = next;
+    this.isLightmapDirty = true;
+  }
+
+  /** The light above the ground right now. */
+  public getSkyLight(): number {
+    return this.skyLight;
+  }
+
   /** How many light sources are active (for the performance overlay). */
   public getLightCount(): number {
     return this.lights.size;
@@ -294,10 +316,12 @@ export class LightingEngine {
     const worldWidth = this.gridWidth * this.tileSize;
     const worldHeight = this.gridHeight * this.tileSize;
 
-    // 1. Sky above the ground surface: 100% daylight white
+    // 1. Sky above the ground surface: 100% daylight white (its own graphics, so the weather can tint it without a redraw)
     const surfaceY = this.surfaceRow * this.tileSize;
-    g.rect(-this.sideMargin, -this.skyMargin, worldWidth + this.sideMargin * 2, this.skyMargin + surfaceY);
-    g.fill({ color: 0xffffff, alpha: 1.0 });
+    this.skyGraphics.clear();
+    this.skyGraphics.rect(-this.sideMargin, -this.skyMargin, worldWidth + this.sideMargin * 2, this.skyMargin + surfaceY);
+    this.skyGraphics.fill({ color: 0xffffff, alpha: 1.0 });
+    this.skyGraphics.tint = this.skyLight;
 
     // 2. Depth gradient steps for underground (y in [0, gridHeight])
     // Ambient multipliers by depth layer:

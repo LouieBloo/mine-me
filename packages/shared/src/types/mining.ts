@@ -9,6 +9,7 @@ import type { DoodadPlacementWire, DoodadRemovalWire, FallingDoodadWire, DoodadS
 import type { GasClientDefinition, GasEvent, GasExplosionCell, GasWireCell } from '../gameLogic/gas/gasWire';
 import type { SkeletonManifest } from './modularRig';
 import type { MissionClientState, MissionProgressDelta, MissionResultView } from './mission';
+import type { SurfaceClientState, SurfaceUpdateWire, WeatherId } from './surface';
 
 // ============================================================================
 // Mining Mini-Game Types & Constants
@@ -570,6 +571,9 @@ export interface SandboxStatus {
   speed: number;
   /** The generator's doodad pass runs on the sandbox map (it is off by default; absent means off). */
   doodadsGenerated?: boolean;
+  /** The key of the surface environment in use, and the weather forced on it (absent: the seeded one). */
+  surfaceEnvironment?: string;
+  forcedWeather?: WeatherId | null;
 }
 
 /** What a sandbox client needs to build its tool panel (fluids come with the session's `fluids`). */
@@ -585,6 +589,10 @@ export interface SandboxClientInfo {
   missions?: SandboxMobOption[];
   /** The named mission test scenes that can be loaded. */
   missionScenes?: SandboxMobOption[];
+  /** The surface environments that can be chosen (absent: none are defined, so only the built-in sky). */
+  surfaceEnvironments?: SandboxMobOption[];
+  /** The named surface test scenes (weather and sky) that can be loaded. */
+  surfaceScenes?: SandboxMobOption[];
   status: SandboxStatus;
 }
 
@@ -850,6 +858,8 @@ export interface MiningSessionClientState {
   gameMode?: MiningGameMode;
   /** Row of the ground surface (0 in the normal mine; the sandbox has open sky rows above it). */
   surfaceRow?: number;
+  /** The sky, scenery and weather above the ground (ticket 129). Sent once; the sandbox can change it later via a tick's `surface`. */
+  surface?: SurfaceClientState;
   /** Sandbox tool options and settings (sandbox rooms only). */
   sandbox?: SandboxClientInfo;
   /** Other players in the shared mining room (if multiplayer). An empty array means "none". */
@@ -1093,6 +1103,8 @@ export interface MiningStateTickPayload {
   /** Mission objectives that moved this tick (only the ones that changed). */
   missionProgress?: MissionProgressDelta;
   doodadsAdded?: DoodadPlacementWire[];
+  /** The sandbox changed the surface (a different environment or forced weather). */
+  surface?: SurfaceUpdateWire;
   /** Doodads that went this tick (the block they hung from or stood on was mined or blown up), by the top-left cell of their footprint. */
   doodadsRemoved?: DoodadRemovalWire[];
   /** Doodads hurt this tick but still standing (a hit flash and sound), by the top-left cell of their footprint (ticket 143). */

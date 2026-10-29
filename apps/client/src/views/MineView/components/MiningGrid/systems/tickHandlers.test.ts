@@ -11,6 +11,7 @@ import {
   applyBeltUpdate,
   applyBeltItems,
   applyDoodadUpdates,
+  applySurfaceUpdate,
   applyFireUpdates,
   applyFluidUpdates,
   applyGasUpdates,
@@ -615,6 +616,30 @@ describe('applyGasSounds', () => {
     const sounds = makeSounds();
     handleStateTick(payload({ gasEvents: [{ kind: 'ignite', gasId: 1, x: 1, y: 1 }] }), makeCtx(makeWorld({ gasSoundsRef: ref(sounds) })));
     expect(sounds.onEvents).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('applySurfaceUpdate (ticket 138)', () => {
+  const tick = (extra: Partial<MiningStateTickPayload>) => ({ tick: 1, ...extra }) as MiningStateTickPayload;
+
+  it('hands a change of environment or weather to the surface', () => {
+    const surface = { apply: vi.fn() };
+    const update = { override: { weather: 'storm' as const }, serverNow: 5 };
+    applySurfaceUpdate(tick({ surface: update }), makeCtx(makeWorld({ surfaceSystemRef: ref(surface) })));
+    expect(surface.apply).toHaveBeenCalledWith(update);
+  });
+
+  it('does nothing in a tick without a surface change, or before the surface exists', () => {
+    const surface = { apply: vi.fn() };
+    applySurfaceUpdate(tick({}), makeCtx(makeWorld({ surfaceSystemRef: ref(surface) })));
+    expect(surface.apply).not.toHaveBeenCalled();
+    expect(() => applySurfaceUpdate(tick({ surface: { serverNow: 1 } }), makeCtx(makeWorld()))).not.toThrow();
+  });
+
+  it('runs as part of a full state tick', () => {
+    const surface = { apply: vi.fn() };
+    handleStateTick(payload({ surface: { override: null, serverNow: 9 } }), makeCtx(makeWorld({ surfaceSystemRef: ref(surface) })));
+    expect(surface.apply).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { SandboxPanel, type SandboxPanelProps } from './SandboxPanel';
 
 const props = (over: Partial<SandboxPanelProps> = {}): SandboxPanelProps => ({
@@ -346,5 +346,86 @@ describe('SandboxPanel extractor tools', () => {
       fireEvent.click(screen.getByText('Generated doodads on'));
       expect(tools.onSetGeneration).toHaveBeenCalledWith(false);
     });
+  });
+});
+
+describe('SandboxPanel surface tools (ticket 138)', () => {
+  const surface = (over: Partial<NonNullable<SandboxPanelProps['surface']>> = {}): NonNullable<SandboxPanelProps['surface']> => ({
+    environments: [{ id: 'green_valley', name: 'Green Valley' }, { id: 'snowfield', name: 'Snowfield' }],
+    environment: 'green_valley',
+    scenes: [{ id: 'storm', name: 'Storm with lightning' }, { id: 'snow', name: 'Snow' }],
+    forcedWeather: null,
+    onSetEnvironment: vi.fn(),
+    onSetWeather: vi.fn(),
+    onLightning: vi.fn(),
+    onLoadScene: vi.fn(),
+    ...over,
+  });
+
+  it('is hidden when the room has no surface tools', () => {
+    render(<SandboxPanel {...props()} />);
+    expect(screen.queryByLabelText('Surface')).not.toBeInTheDocument();
+  });
+
+  it('swaps the environment', () => {
+    const s = surface();
+    render(<SandboxPanel {...props({ surface: s })} />);
+    expect(screen.getByLabelText('Surface environment')).toHaveValue('green_valley');
+    fireEvent.change(screen.getByLabelText('Surface environment'), { target: { value: 'snowfield' } });
+    expect(s.onSetEnvironment).toHaveBeenCalledWith('snowfield');
+  });
+
+  it('hides the environment picker when only the built-in sky exists, but keeps the weather tools', () => {
+    render(<SandboxPanel {...props({ surface: surface({ environments: [] }) })} />);
+    expect(screen.queryByLabelText('Surface environment')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Weather')).toBeInTheDocument();
+  });
+
+  it('forces the chosen weather at the chosen strength, and goes back to the seeded weather', () => {
+    const s = surface();
+    render(<SandboxPanel {...props({ surface: s })} />);
+    fireEvent.change(screen.getByLabelText('Weather'), { target: { value: 'storm' } });
+    fireEvent.change(screen.getByLabelText('Weather strength'), { target: { value: '0.5' } });
+    fireEvent.click(screen.getByText('Set'));
+    expect(s.onSetWeather).toHaveBeenCalledWith('storm', 0.5);
+    fireEvent.change(screen.getByLabelText('Weather'), { target: { value: '' } });
+    fireEvent.click(screen.getByText('Set'));
+    expect(s.onSetWeather).toHaveBeenLastCalledWith(null, 0.5);
+  });
+
+  it('lists every weather kind', () => {
+    render(<SandboxPanel {...props({ surface: surface() })} />);
+    const picker = within(screen.getByLabelText('Weather'));
+    for (const label of ['Clear', 'Cloudy', 'Windy', 'Rain', 'Storm', 'Snow', 'Fog']) expect(picker.getByRole('option', { name: label })).toBeInTheDocument();
+  });
+
+  it('calls a lightning strike', () => {
+    const s = surface();
+    render(<SandboxPanel {...props({ surface: s })} />);
+    fireEvent.click(screen.getByText('Lightning strike'));
+    expect(s.onLightning).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads the chosen scene, and not before one is chosen', () => {
+    const s = surface();
+    render(<SandboxPanel {...props({ surface: s })} />);
+    const load = screen.getAllByText('Load').at(-1)!;
+    expect(load).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Surface scene'), { target: { value: 'storm' } });
+    fireEvent.click(load);
+    expect(s.onLoadScene).toHaveBeenCalledWith('storm');
+  });
+
+  it('says whether the weather is forced', () => {
+    const { rerender } = render(<SandboxPanel {...props({ surface: surface() })} />);
+    expect(screen.getByText('Weather follows the seed.')).toBeInTheDocument();
+    rerender(<SandboxPanel {...props({ surface: surface({ forcedWeather: 'storm' }) })} />);
+    expect(screen.getByText('Weather forced to Storm.')).toBeInTheDocument();
+  });
+
+  it('holds the buttons while a command is running', () => {
+    render(<SandboxPanel {...props({ surface: surface(), busy: true })} />);
+    expect(screen.getByText('Lightning strike')).toBeDisabled();
+    expect(screen.getByText('Set')).toBeDisabled();
   });
 });

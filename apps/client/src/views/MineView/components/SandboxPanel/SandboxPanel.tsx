@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SANDBOX_SIM_SPEEDS, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
+import { SANDBOX_SIM_SPEEDS, WEATHER_IDS, WEATHER_TYPES, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
 import { LoadingSpinner } from '../../../../components/LoadingSpinner/LoadingSpinner';
 import { MINE_TOOL, type SandboxToolSelection } from '../../sandbox/sandboxTool';
 import './SandboxPanel.css';
@@ -51,6 +51,23 @@ export interface SandboxMissionTools {
   onLoadScene: (sceneId: string) => void;
 }
 
+/** What the sandbox can do with the surface above the ground (tickets 129-138). */
+export interface SandboxSurfaceTools {
+  /** The loaded environments that can be chosen (empty: only the built-in sky). */
+  environments: SandboxMobOption[];
+  /** The environment in use, by key. */
+  environment?: string;
+  /** Named test scenes (clear day, heavy rain, storm...). */
+  scenes: SandboxMobOption[];
+  /** The weather forced right now (null: the seeded one). */
+  forcedWeather: string | null;
+  onSetEnvironment: (key: string) => void;
+  /** Forces a weather at a strength 0 to 1, or null to go back to the seeded weather. */
+  onSetWeather: (weather: string | null, intensity: number) => void;
+  onLightning: () => void;
+  onLoadScene: (sceneId: string) => void;
+}
+
 export interface SandboxPanelProps {
   fluids: SandboxFluidOption[];
   /** The gases that can be released (absent or empty hides the gas tool). */
@@ -72,6 +89,8 @@ export interface SandboxPanelProps {
   doodads?: SandboxDoodadTools;
   /** The mission tools (absent hides the section). */
   missions?: SandboxMissionTools;
+  /** The surface tools: environment, weather, lightning and scenes (absent hides the section). */
+  surface?: SandboxSurfaceTools;
   onReset: () => void;
   onLeave: () => void;
   /** A command is in flight: the shared spinner shows and the buttons wait. */
@@ -103,6 +122,7 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   extractor,
   doodads,
   missions,
+  surface,
   onReset,
   onLeave,
   busy = false,
@@ -117,6 +137,9 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   const [missionId, setMissionId] = useState('');
   const [missionSceneId, setMissionSceneId] = useState('');
   const [capacity, setCapacityText] = useState('100');
+  const [surfaceSceneId, setSurfaceSceneId] = useState('');
+  const [weatherPick, setWeatherPick] = useState('');
+  const [intensity, setIntensity] = useState(1);
 
   const selectedFluid = fluids.some((f) => f.typeKey === fluidKey) ? fluidKey : fluids[0]?.typeKey ?? '';
   const selectedGas = gases.some((g) => g.typeKey === gasKey) ? gasKey : gases[0]?.typeKey ?? '';
@@ -357,6 +380,80 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
                   </button>
                 </div>
               )}
+            </section>
+          )}
+
+          {surface && (
+            <section aria-label="Surface" className="flex flex-col gap-1.5">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Surface and weather</h3>
+              {surface.environments.length > 0 && (
+                <select
+                  aria-label="Surface environment"
+                  className={SELECT}
+                  value={surface.environment ?? ''}
+                  onChange={(e) => surface.onSetEnvironment(e.target.value)}
+                  disabled={busy}
+                >
+                  {surface.environments.map((env) => (
+                    <option key={env.id} value={env.id}>
+                      {env.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="flex gap-1.5">
+                <select aria-label="Weather" className={SELECT} value={weatherPick} onChange={(e) => setWeatherPick(e.target.value)}>
+                  <option value="">Seeded weather</option>
+                  {WEATHER_IDS.map((id) => (
+                    <option key={id} value={id}>
+                      {WEATHER_TYPES[id].label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className={`${BUTTON} ${IDLE}`}
+                  onClick={() => surface.onSetWeather(weatherPick === '' ? null : weatherPick, intensity)}
+                  disabled={busy}
+                >
+                  Set
+                </button>
+              </div>
+              <label className="flex items-center gap-2 text-[10px] text-slate-400">
+                Strength
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  aria-label="Weather strength"
+                  className="flex-1 cursor-pointer"
+                  value={intensity}
+                  onChange={(e) => setIntensity(Number(e.target.value))}
+                />
+                <span className="w-8 text-right font-mono">{Math.round(intensity * 100)}%</span>
+              </label>
+              <button type="button" className={`${BUTTON} ${IDLE}`} onClick={surface.onLightning} disabled={busy}>
+                Lightning strike
+              </button>
+              {surface.scenes.length > 0 && (
+                <div className="flex gap-1.5">
+                  <select aria-label="Surface scene" className={SELECT} value={surfaceSceneId} onChange={(e) => setSurfaceSceneId(e.target.value)}>
+                    <option value="">Test scene...</option>
+                    {surface.scenes.map((scene) => (
+                      <option key={scene.id} value={scene.id}>
+                        {scene.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => surface.onLoadScene(surfaceSceneId)} disabled={busy || surfaceSceneId === ''}>
+                    Load
+                  </button>
+                </div>
+              )}
+              <p className="text-[10px] text-slate-400">
+                {surface.forcedWeather ? `Weather forced to ${WEATHER_TYPES[surface.forcedWeather as keyof typeof WEATHER_TYPES]?.label ?? surface.forcedWeather}.` : 'Weather follows the seed.'}
+              </p>
             </section>
           )}
 

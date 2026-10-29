@@ -21,6 +21,7 @@ import {
   type MissionResultView,
 } from '@mine-me/shared';
 import { DOODAD_SCENE_OPTIONS } from './sandbox/doodadScenes';
+import { SURFACE_SCENE_OPTIONS } from './sandbox/surfaceScenes';
 import { EXTRACTOR_SCENE_OPTIONS } from './sandbox/extractorScenes';
 import { MISSION_SCENE_OPTIONS } from './sandbox/missionScenes';
 import { MiningDataManager } from './subsystems/MiningDataManager';
@@ -249,6 +250,7 @@ export class MiningSessionManager {
       miningTotal: session.miningTotal || undefined,
       gameMode: engine.gameMode,
       surfaceRow: engine.surfaceRow || undefined,
+      surface: engine.surface.clientState(),
       sandbox: engine.sandbox
         ? {
             mobs: engine.sandbox.mobOptions(),
@@ -257,6 +259,8 @@ export class MiningSessionManager {
             doodadScenes: engine.sandbox.doodadOptions() ? [...DOODAD_SCENE_OPTIONS] : undefined,
             missions: engine.sandbox.missionOptions(),
             missionScenes: [...MISSION_SCENE_OPTIONS],
+            surfaceEnvironments: engine.sandbox.surfaceEnvironmentOptions(),
+            surfaceScenes: [...SURFACE_SCENE_OPTIONS],
             status: engine.sandbox.status(characterId),
           }
         : undefined,

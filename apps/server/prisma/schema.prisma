@@ -624,6 +624,8 @@ model Doodad {
   // Played where it dies (ticket 143)
   deathParticleEffectId String?
   deathParticleEffect   ParticleEffect? @relation("DoodadDeathParticle", fields: [deathParticleEffectId], references: [id], onDelete: SetNull)
+  // Weather kinds it hides in, e.g. birds in a storm (ticket 135)
+  hiddenInWeather  String[] @default([])
   // Sound slots: library sounds by id with their own volume (DOODAD_SOUND_SLOTS)
   soundEffects     Json?
   // { mode, radius, speed, pauseMs } (ticket 106)
@@ -676,4 +678,33 @@ model Mission {
   soundEffects Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+/// The surface above the ground: sky, scenery, clouds, weather and props (tickets 129-138). All cosmetic.
+model SurfaceEnvironment {
+  id           String   @id @default(cuid())
+  // Open key, e.g. green_valley
+  key          String   @unique
+  name         String
+  description  String?
+  // Chance weight when a run picks one
+  weight       Float    @default(1)
+  // The one used when nothing else can be picked (exactly one row)
+  isDefault    Boolean  @default(false)
+  // { top, horizon, sunColor?, sunX?, sunHeight?, sunSize? }
+  sky          Json
+  // CSS hex colour multiplied into the surface light (null = none)
+  ambientTint  String?
+  // [{ name, textureUrl?, parallaxFactor, yOffset, tint?, scale?, shape?, height?, alpha? }]
+  layers       Json?
+  // { textureUrls?, maxCount?, minHeight?, maxHeight? }
+  clouds       Json?
+  // weather kind -> chance weight
+  weather      Json?
+  // [{ doodadKey, density, spacing?, minHeight?, maxHeight? }]
+  props        Json?
+  // Sound slots (rain, wind, thunder): library sounds by id, each with its own volume
+  soundEffects Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

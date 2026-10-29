@@ -9,6 +9,16 @@ const SAVED: DoodadDefinition = {
   spawn: { minDepth: 9, blocks: ['STONE'] }, biomes: [{ biomeId: 'b1', biomeKey: 'frozen_caves', weight: 2, density: 1.5 }],
 };
 
+describe('hiding in weather (ticket 135)', () => {
+  it('starts with no weather, carries the list both ways, and is sent as saved', () => {
+    expect(NEW_DOODAD.hiddenInWeather).toEqual([]);
+    const form = doodadToForm({ ...SAVED, hiddenInWeather: ['rain', 'storm'] });
+    expect(form.hiddenInWeather).toEqual(['rain', 'storm']);
+    expect(formToDoodad(form)).toMatchObject({ hiddenInWeather: ['rain', 'storm'] });
+    expect(doodadToForm(SAVED).hiddenInWeather).toEqual([]);
+  });
+});
+
 describe('doodadForm', () => {
   it('turns a saved doodad into a form and back without changing it', () => {
     const body = formToDoodad(doodadToForm(SAVED));

@@ -36,6 +36,8 @@ export interface SceneSources {
   gridCells?: number;
   /** The scenery on screen: doodads drawn, and the lights and particle emitters they keep alive. */
   doodads?: { drawn: number; lights: number; emitters: number } | null;
+  /** The surface above the ground: its display objects, the clouds showing and the weather particles showing (all zero underground). */
+  surface?: { objects: number; clouds: number; particles: number; active: boolean } | null;
   /** The conveyor belt's size: segments drawn and items riding it. */
   belt?: { segments: number; items: number } | null;
 }
@@ -55,6 +57,12 @@ export function sampleSceneGauges(profiler: MiningProfiler, sources: SceneSource
   if (sources.particles) {
     profiler.setGauge('Particles', sources.particles.getActiveParticleCount());
     profiler.setGauge('Particle emitters', sources.particles.getEmitterCount());
+  }
+  if (sources.surface) {
+    profiler.setGauge('Surface objects', sources.surface.objects);
+    profiler.setGauge('Clouds shown', sources.surface.clouds);
+    profiler.setGauge('Weather particles', sources.surface.particles);
+    profiler.setGauge('Surface drawn', sources.surface.active ? 1 : 0);
   }
   if (sources.tileSprites) profiler.setGauge('Tile sprites', sources.tileSprites.size);
   if (sources.tileGraphics) profiler.setGauge('Tile graphics', sources.tileGraphics.size);

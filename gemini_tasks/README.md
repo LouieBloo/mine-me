@@ -17,7 +17,7 @@ These six are finished and archived in `done/` (like finished tickets in `ticket
 
 ## Doodads (tickets 099-107) - done
 
-Twelve pieces of cave scenery, one picture each. They show as coloured placeholders until art is uploaded (admin app, **Doodads Editor**, **Art** panel). One brief per doodad; the combined overview is [doodads-art.md](doodads-art.md). All generated and moved to `done/`.
+Twelve pieces of cave scenery, one picture each. They show as coloured placeholders until art is uploaded (admin app, **Doodads Editor**, **Art** panel). One brief per doodad; the combined overview is [doodads-art.md](done/doodads-art.md). All generated and moved to `done/`.
 
 | Doodad | Brief | Save as |
 |---|---|---|
@@ -33,6 +33,21 @@ Twelve pieces of cave scenery, one picture each. They show as coloured placehold
 | Wall Moss | [doodad_wall_moss_art_prompt.md](done/doodad_wall_moss_art_prompt.md) | `doodad_wall_moss.png` |
 | Firefly | [doodad_firefly_art_prompt.md](done/doodad_firefly_art_prompt.md) | `doodad_firefly.png` |
 | Cave Beetle | [doodad_cave_beetle_art_prompt.md](done/doodad_cave_beetle_art_prompt.md) | `doodad_cave_beetle.png` |
+
+## Surface (tickets 129-138) - done
+
+The sky, scenery, clouds and props above the ground. They draw as stand-ins in code until art is uploaded (admin app, **Surface Editor** for strips and clouds, **Doodads Editor** for trees, bushes and the bird). The overview, with what is *not* needed, is [surface-art.md](done/surface-art.md). All generated and moved to `done/`.
+
+| Piece | Brief | Save as |
+|---|---|---|
+| Far mountains strip | [surface_far_mountains_art_prompt.md](done/surface_far_mountains_art_prompt.md) | `surface_far_mountains.png` |
+| Rolling hills strip | [surface_hills_art_prompt.md](done/surface_hills_art_prompt.md) | `surface_hills.png` |
+| Treeline strip | [surface_treeline_art_prompt.md](done/surface_treeline_art_prompt.md) | `surface_treeline.png` |
+| Clouds (3 shapes) | [surface_clouds_art_prompt.md](done/surface_clouds_art_prompt.md) | `surface_cloud_a.png`, `_b`, `_c` |
+| Oak Tree | [doodad_oak_tree_art_prompt.md](done/doodad_oak_tree_art_prompt.md) | `doodad_oak_tree.png` |
+| Pine Tree | [doodad_pine_tree_art_prompt.md](done/doodad_pine_tree_art_prompt.md) | `doodad_pine_tree.png` |
+| Bush | [doodad_bush_art_prompt.md](done/doodad_bush_art_prompt.md) | `doodad_bush.png` |
+| Bird | [doodad_bird_art_prompt.md](done/doodad_bird_art_prompt.md) | `doodad_bird.png` |
 
 ## Tips for all of them
 - Make them as a set, in one session if you can, so the palettes sit well together. Dirt and Lavarock are the existing blocks to match.

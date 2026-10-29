@@ -11,6 +11,7 @@ import type { KeyChipOption } from './KeyChips/KeyChips';
 import DoodadSizeVariantsEditor from './DoodadSizeVariantsEditor/DoodadSizeVariantsEditor';
 import DoodadArtPanel from './DoodadArtPanel/DoodadArtPanel';
 import DoodadDamagePanel from './DoodadDamagePanel/DoodadDamagePanel';
+import DoodadWeatherPanel from './DoodadWeatherPanel/DoodadWeatherPanel';
 import DoodadMotionPanel from './DoodadMotionPanel/DoodadMotionPanel';
 import DoodadBehaviourPanel from './DoodadBehaviourPanel/DoodadBehaviourPanel';
 import DoodadEffectsPanel from './DoodadEffectsPanel/DoodadEffectsPanel';
@@ -312,6 +313,7 @@ export default function DoodadDetail() {
               onFallDamageChange={(v) => set('fallDamage', v)}
               onDeathEffectChange={(v) => set('deathParticleEffectId', v)}
             />
+            <DoodadWeatherPanel hiddenInWeather={form.hiddenInWeather} onChange={(v) => set('hiddenInWeather', v)} />
             <DoodadSpawnPanel value={form.spawn} onChange={(v) => set('spawn', v)} blocks={blocks} fluids={fluids} gases={gases} />
             <DoodadGroupsPanel value={form.spawn} onChange={(v) => set('spawn', v)} />
             <DoodadBiomeLinks value={form.biomes} biomes={biomes} onChange={(v) => set('biomes', v)} />

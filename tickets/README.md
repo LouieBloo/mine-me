@@ -1,6 +1,6 @@
 # Tickets
 
-File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open and in-progress tickets live in this folder; a ticket moves to `done/` (and its README link gets the `done/` prefix) when it is Done. All 118 so far are archived there. Set `Status:` to Open / In Progress / Done. Every ticket gets a Q&A with the owner before work starts; answers are recorded in the ticket under "Decisions".
+File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open and in-progress tickets live in this folder; a ticket moves to `done/` (and its README link gets the `done/` prefix) when it is Done. All 143 so far are archived there. Set `Status:` to Open / In Progress / Done. Every ticket gets a Q&A with the owner before work starts; answers are recorded in the ticket under "Decisions".
 
 | ID | Title | Priority |
 |----|-------|----------|
@@ -98,10 +98,10 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [092](done/092-big-rocks.md) | Rocks of several sizes (variable-size pieces) | P2 (Done) |
 | [093](done/093-mob-navigation-and-feet.md) | Mob navigation fixes and mob feet on the ground (3x blocks) | P1 (Done; judge the new mole size) |
 | [094](done/094-autotiling-from-one-texture.md) | Autotiling: edges and rounded corners from one texture | P2 (Done) |
-| [095](095-biome-data-model.md) | Biome data model and loader | P1 (Built; judge in the game) |
-| [096](096-biome-generation.md) | Biome map generation and blended borders | P1 (Built; judge in the game) |
-| [097](097-biome-network-and-ambient-look.md) | Biome wire format and ambient look | P2 (Built; judge in the game) |
-| [098](098-admin-biomes-page.md) | Admin: Biomes page | P1 (Built; judge in the game) |
+| [095](done/095-biome-data-model.md) | Biome data model and loader | P1 (Done) |
+| [096](done/096-biome-generation.md) | Biome map generation and blended borders | P1 (Done) |
+| [097](done/097-biome-network-and-ambient-look.md) | Biome wire format and ambient look | P2 (Done) |
+| [098](done/098-admin-biomes-page.md) | Admin: Biomes page | P1 (Done) |
 | [099](done/099-doodad-data-model.md) | Doodad data model, loader and admin page | P1 (Done) |
 | [100](done/100-doodad-generation.md) | Doodad generation | P1 (Done) |
 | [101](done/101-doodad-network.md) | Doodad wire format and fog reveal | P1 (Done) |
@@ -111,15 +111,15 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [105](done/105-doodad-removal-on-mining.md) | Doodads disappear when their anchor is removed | P1 (Done) |
 | [106](done/106-doodad-wandering-bugs.md) | Wandering doodads (bugs) | P3 (Done) |
 | [107](done/107-doodad-preview-and-sandbox.md) | Doodad admin preview and sandbox placement | P2 (Done) |
-| [108](108-mission-data-model.md) | Mission data model, objective registry and loader | P1 (Built; waiting for you to try it) |
-| [109](109-objective-tracking.md) | Objective tracking engine | P1 (Built; waiting for you to try it) |
-| [110](110-mission-map-generation.md) | Map generation guarantees the mission is achievable | P1 (Built; waiting for you to try it) |
-| [111](111-mission-offer-and-picker.md) | Mission offers and the pre-run picker | P1 (Built; waiting for you to try it) |
-| [112](112-mission-network-and-hud.md) | Mission wire format, HUD tracker and completion toast | P1 (Built; waiting for you to try it) |
-| [113](113-mission-completion-rewards-and-results.md) | Mission completion, rewards, failure and results screen | P1 (Built; waiting for you to try it) |
-| [114](114-admin-missions-page.md) | Admin: Missions page | P1 (Built; waiting for you to try it) |
+| [108](done/108-mission-data-model.md) | Mission data model, objective registry and loader | P1 (Done) |
+| [109](done/109-objective-tracking.md) | Objective tracking engine | P1 (Done) |
+| [110](done/110-mission-map-generation.md) | Map generation guarantees the mission is achievable | P1 (Done) |
+| [111](done/111-mission-offer-and-picker.md) | Mission offers and the pre-run picker | P1 (Done) |
+| [112](done/112-mission-network-and-hud.md) | Mission wire format, HUD tracker and completion toast | P1 (Done) |
+| [113](done/113-mission-completion-rewards-and-results.md) | Mission completion, rewards, failure and results screen | P1 (Done) |
+| [114](done/114-admin-missions-page.md) | Admin: Missions page | P1 (Done) |
 | [115](115-pump-fluid-objective.md) | Pump-out-a-fluid objective (future) | P3 (Open) |
-| [116](116-mission-sandbox-and-scenes.md) | Missions in sandbox mode and test scenes | P2 (Built; waiting for you to try it) |
+| [116](done/116-mission-sandbox-and-scenes.md) | Missions in sandbox mode and test scenes | P2 (Done) |
 | [117](done/117-item-weight-and-backpack-capacity.md) | Item weight and backpack carry capacity | P1 (Done; limit enforced in 118) |
 | [118](done/118-full-backpack-pickup-rules.md) | Full backpack: pickup refusal and feedback | P1 (Done; "full" marker on drops deferred) |
 | [119](done/119-extractor-data-model.md) | Extractor data model and loader | P1 (Done) |
@@ -128,28 +128,28 @@ File-based tracker (no Jira). One markdown file per ticket: `NNN-slug.md`. Open 
 | [122](done/122-conveyor-belt-build.md) | Conveyor belt: digging down and laying segments | P1 (Done) |
 | [123](done/123-conveyor-unloading-and-item-travel.md) | Conveyor unloading and item travel | P1 (Done) |
 | [124](done/124-belt-and-extractor-damage.md) | Belt damage: mobs and fire | P2 (Done) |
-| [125](125-extractor-exit-and-mission-integration.md) | Exit, death and mission integration | P1 (Built; the mission reward is paid with the loot on a safe exit) |
+| [125](done/125-extractor-exit-and-mission-integration.md) | Exit, death and mission integration | P1 (Done) |
 | [126](done/126-admin-extractors-page.md) | Admin: Extractors page and item weight field | P2 (Done) |
 | [127](done/127-extractor-sandbox-and-profiling.md) | Extractor in sandbox mode, test scenes and profiling | P2 (Done) |
 | [128](done/128-extractor-and-belt-art.md) | Extractor and conveyor belt art (owner task, Gemini) | P2 (Done) |
-| [129](129-surface-environment-data-model.md) | Surface environment data model and loader | P2 (Open) |
-| [130](130-sky-and-parallax-rendering.md) | Procedural sky and parallax scenery | P2 (Open) |
-| [131](131-cloud-rendering.md) | Clouds | P2 (Open) |
-| [132](132-weather-state-and-sync.md) | Weather state and sync | P2 (Open) |
-| [133](133-precipitation-and-wind-effects.md) | Rain, snow, fog and wind effects | P2 (Open) |
-| [134](134-lightning-thunder-and-weather-lighting.md) | Lightning, thunder and weather lighting | P2 (Open) |
-| [135](135-surface-props-as-doodads.md) | Surface props via doodads (trees, bushes, birds) | P2 (Open) |
-| [136](136-admin-environments-page.md) | Admin: Environments (and weather) page | P2 (Open) |
-| [137](137-surface-art-gemini.md) | Surface background art (owner task, Gemini) | P2 (Open) |
-| [138](138-surface-sandbox-and-profiling.md) | Surface in sandbox mode, test scenes and profiling | P3 (Open) |
+| [129](done/129-surface-environment-data-model.md) | Surface environment data model and loader | P2 (Done) |
+| [130](done/130-sky-and-parallax-rendering.md) | Procedural sky and parallax scenery | P2 (Done) |
+| [131](done/131-cloud-rendering.md) | Clouds | P2 (Done) |
+| [132](done/132-weather-state-and-sync.md) | Weather state and sync | P2 (Done) |
+| [133](done/133-precipitation-and-wind-effects.md) | Rain, snow, fog and wind effects | P2 (Done) |
+| [134](done/134-lightning-thunder-and-weather-lighting.md) | Lightning, thunder and weather lighting | P2 (Done) |
+| [135](done/135-surface-props-as-doodads.md) | Surface props via doodads (trees, bushes, birds) | P2 (Done) |
+| [136](done/136-admin-environments-page.md) | Admin: Environments (and weather) page | P2 (Done) |
+| [137](137-surface-art-gemini.md) | Surface background art (owner task, Gemini) | P2 (Open; first art set uploaded, better assets wanted; briefs in gemini_tasks) |
+| [138](done/138-surface-sandbox-and-profiling.md) | Surface in sandbox mode, test scenes and profiling | P3 (Done) |
 | [139](done/139-surface-sky-rows-in-real-mine.md) | Sky rows above the ground in the real mine | P1 (Done; exit sign waits for doodads; found in audit, blocks 120, 130, 135) |
-| [140](140-basic-terrain-blocks.md) | Basic terrain blocks: stone, clay, sandstone, gravel, ice, bedrock | P2 (Built; script applied to the dev DB 2026-10-23, waiting for you to try it) |
-| [141](141-retire-blocks.md) | Retire the Bridge, Chest, Mineral and Entrance blocks | P2 (Built in code; DB rows deleted from the dev DB) |
-| [142](142-first-biomes-and-sandbox-bands.md) | First biomes and the sandbox biome walk | P2 (Built; biomes created in the dev DB, waiting for you to try it) |
+| [140](done/140-basic-terrain-blocks.md) | Basic terrain blocks: stone, clay, sandstone, gravel, ice, bedrock | P2 (Done) |
+| [141](done/141-retire-blocks.md) | Retire the Bridge, Chest, Mineral and Entrance blocks | P2 (Done) |
+| [142](done/142-first-biomes-and-sandbox-bands.md) | First biomes and the sandbox biome walk | P2 (Done) |
 | [143](done/143-doodad-damage-and-falling.md) | Doodads can be hurt and killed; ceiling doodads fall like rocks | P2 (Done) |
 | [145](done/145-biome-dirt-oil-and-doodad-size-tuning.md) | Biome dirt, oil and doodad size tuning | P2 (Done) |
 | [146](done/146-doodad-groups.md) | Doodads that spawn in groups, clumps and meadows | P2 (Done) |
-| [144](144-singleplayer-biome-picker.md) | Choose biomes for a Single Player run | P2 (Built; waiting for you to try it) |
+| [144](done/144-singleplayer-biome-picker.md) | Choose biomes for a Single Player run | P2 (Done) |
 
 ## Suggested build order (open tickets 095-139)
 

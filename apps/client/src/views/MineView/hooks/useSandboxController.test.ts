@@ -182,4 +182,29 @@ describe('useSandboxController', () => {
     await act(() => result.current.digBelt(5));
     expect(notificationService.error).toHaveBeenCalledWith('Belt', 'Spawn the extractor first.');
   });
+
+  describe('the surface tools (ticket 138)', () => {
+    it('sends each surface command and keeps the status the server answers with', async () => {
+      const send = vi.fn().mockResolvedValue({ success: true, data: { status: { godMode: false, paused: false, speed: 1, forcedWeather: 'storm', surfaceEnvironment: 'green_valley' } } });
+      const { result } = render(send, sandboxSession());
+      await act(() => result.current.setWeather('storm', 0.7));
+      expect(send).toHaveBeenCalledWith({ type: 'sandbox_set_weather', weather: 'storm', intensity: 0.7 });
+      expect(result.current.status.forcedWeather).toBe('storm');
+      await act(() => result.current.setSurfaceEnvironment('green_valley'));
+      expect(send).toHaveBeenCalledWith({ type: 'sandbox_set_surface_environment', key: 'green_valley' });
+      expect(result.current.status.surfaceEnvironment).toBe('green_valley');
+      await act(() => result.current.loadSurfaceScene('heavy-rain'));
+      expect(send).toHaveBeenCalledWith({ type: 'sandbox_load_surface_scene', sceneId: 'heavy-rain' });
+      await act(() => result.current.triggerLightning());
+      expect(send).toHaveBeenCalledWith({ type: 'sandbox_trigger_lightning' });
+    });
+
+    it('shows a refusal to the user and keeps the old status', async () => {
+      const send = vi.fn().mockResolvedValue({ success: false, error: 'Unknown weather.' });
+      const { result } = render(send, sandboxSession());
+      await act(() => result.current.setWeather('hail', 1));
+      expect(notificationService.error).toHaveBeenCalledWith('Weather', 'Unknown weather.');
+      expect(result.current.status.forcedWeather).toBeUndefined();
+    });
+  });
 });

@@ -173,6 +173,8 @@ export interface DoodadDefinition {
   fallDamage?: number | null;
   /** ParticleEffect (by id) played where it dies. Null: none. */
   deathParticleEffectId?: string | null;
+  /** Weather ids (see `WEATHER_TYPES`) it hides in, e.g. birds in a storm. Only matters for doodads on the surface. Empty/absent: never. */
+  hiddenInWeather?: string[] | null;
   /** Sound slots as stored: library sounds by id (see `resolveDoodadSounds`). */
   soundEffects?: DoodadSoundSlotRefs | null;
   /** The same slots resolved to playable urls. Filled in when definitions load; never stored. */
@@ -207,6 +209,7 @@ export interface DoodadClientDefinition {
   particleOffsetX?: number;
   particleOffsetY?: number;
   deathParticleEffectId?: string;
+  hiddenInWeather?: string[];
   sounds?: DoodadSoundEffectsConfig;
   wander?: DoodadWander;
 }
@@ -234,6 +237,7 @@ export function toClientDoodad(doodad: DoodadDefinition, index: number): DoodadC
     if (doodad.particleOffsetY) out.particleOffsetY = doodad.particleOffsetY;
   }
   if (doodad.deathParticleEffectId) out.deathParticleEffectId = doodad.deathParticleEffectId;
+  if (doodad.hiddenInWeather?.length) out.hiddenInWeather = doodad.hiddenInWeather;
   if (doodad.sounds && Object.keys(doodad.sounds).length > 0) out.sounds = doodad.sounds;
   if (doodad.wander) out.wander = doodad.wander;
   return out;
@@ -246,6 +250,8 @@ export function doodadSizeChoices(doodad: Pick<DoodadDefinition, 'width' | 'heig
 }
 
 const DOODAD_KEY = /^[a-z][a-z0-9_]*$/;
+/** The weather kinds (mirrors `WeatherId`; kept here so the doodad type does not depend on the weather logic). */
+const WEATHER_ID_LIST: readonly string[] = ['clear', 'cloudy', 'windy', 'rain', 'storm', 'snow', 'fog'];
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isWhole = (v: unknown, min: number): v is number => isNumber(v) && Number.isInteger(v) && v >= min;
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -423,6 +429,9 @@ export function validateDoodad(doodad: Partial<DoodadDefinition>): string[] {
   if (doodad.zOffset !== undefined && !Number.isInteger(doodad.zOffset)) errors.push('zOffset must be a whole number');
   if (doodad.textureUrl !== undefined && doodad.textureUrl !== null && !isAssetUrl(doodad.textureUrl)) errors.push('textureUrl must be an /assets/... url');
   for (const name of ['particleOffsetX', 'particleOffsetY'] as const) if (doodad[name] !== undefined && !isNumber(doodad[name])) errors.push(`${name} must be a number`);
+  if (doodad.hiddenInWeather !== undefined && doodad.hiddenInWeather !== null && (!Array.isArray(doodad.hiddenInWeather) || doodad.hiddenInWeather.some((w) => !WEATHER_ID_LIST.includes(w)))) {
+    errors.push(`hiddenInWeather must be a list of weather kinds (${WEATHER_ID_LIST.join(', ')})`);
+  }
   if (doodad.health !== undefined && doodad.health !== null && !isWhole(doodad.health, 1)) errors.push('health must be a whole number of at least 1, or empty');
   if (doodad.fallDamage !== undefined && doodad.fallDamage !== null && (!isNumber(doodad.fallDamage) || doodad.fallDamage <= 0)) errors.push('fallDamage must be greater than 0, or empty');
   if (doodad.deathParticleEffectId !== undefined && doodad.deathParticleEffectId !== null && (typeof doodad.deathParticleEffectId !== 'string' || doodad.deathParticleEffectId === '')) {

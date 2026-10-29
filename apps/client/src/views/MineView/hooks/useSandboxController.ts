@@ -81,6 +81,14 @@ export function useSandboxController(sendGameEvent: SendGameEvent, session: Mini
   const startMission = useCallback((missionId: string) => run({ type: 'sandbox_start_mission', missionId }, 'Mission'), [run]);
   const missionControl = useCallback((action: 'complete' | 'reset' | 'clear') => run({ type: 'sandbox_mission_control', action }, 'Mission'), [run]);
   const loadMissionScene = useCallback((sceneId: string) => run({ type: 'sandbox_load_mission_scene', sceneId }, 'Mission scene'), [run]);
+  /** The server tells the room (a surface change in the next tick); the status answers with what is forced. */
+  const setSurfaceEnvironment = useCallback(async (key: string) => applyStatus(await run({ type: 'sandbox_set_surface_environment', key }, 'Surface')), [run, applyStatus]);
+  const setWeather = useCallback(
+    async (weather: string | null, intensity: number) => applyStatus(await run({ type: 'sandbox_set_weather', weather, intensity }, 'Weather')),
+    [run, applyStatus],
+  );
+  const triggerLightning = useCallback(() => run({ type: 'sandbox_trigger_lightning' }, 'Lightning'), [run]);
+  const loadSurfaceScene = useCallback(async (sceneId: string) => applyStatus(await run({ type: 'sandbox_load_surface_scene', sceneId }, 'Surface scene')), [run, applyStatus]);
   const clearHazards = useCallback(() => run({ type: 'sandbox_clear_hazards' }, 'Clear'), [run]);
   /** The server answers a reset with a fresh state for everyone, which the view handles. */
   const reset = useCallback(() => run({ type: 'sandbox_reset' }, 'Reset'), [run]);
@@ -114,5 +122,9 @@ export function useSandboxController(sendGameEvent: SendGameEvent, session: Mini
     startMission,
     missionControl,
     loadMissionScene,
+    setSurfaceEnvironment,
+    setWeather,
+    triggerLightning,
+    loadSurfaceScene,
   };
 }

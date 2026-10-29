@@ -2,6 +2,9 @@ import { miningProfiler } from '../utils/MiningProfiler';
 import { BLOCK_SCALE, type AutotileConfig } from '@mine-me/shared';
 import { useEffect, useRef, useState } from 'react';
 import { Application, Container, Graphics, Sprite, TilingSprite, Assets, Texture } from 'pixi.js';
+import { SurfaceSystem } from '../surface/SurfaceSystem';
+import { surfaceSettings } from '../../../../../services/surfaceSettings';
+import { soundManager as globalSoundManager } from '../../../../../services/sound';
 import { ModularCharacterSprite, FloatingTextManager, type GearLayerDescriptor } from '../../../../../components/game/sprites';
 import { MiningRemotePlayerRenderer } from '../renderers/MiningRemotePlayerRenderer';
 import { MiningMobRenderer } from '../renderers/MiningMobRenderer';
@@ -96,6 +99,8 @@ export function useMiningScene({
   /** Draws the doodads, and gives off their light and particles (tickets 102, 103). */
   const doodadRendererRef = useRef<DoodadRenderer | null>(null);
   const doodadEffectsRef = useRef<DoodadEffects | null>(null);
+  /** The sky, scenery, clouds and weather above the ground (absent when the mine has no surface to show). */
+  const surfaceSystemRef = useRef<SurfaceSystem | null>(null);
   const fireRendererRef = useRef<FireRenderer | null>(null);
   const fluidGlowRef = useRef<FluidGlow | null>(null);
   const burningBodiesRef = useRef<BurningBodies | null>(null);
@@ -159,6 +164,9 @@ export function useMiningScene({
 
     const gridContainer = new Container();
     const backgroundContainer = new Container();
+    // The sky and scenery go behind the terrain, the rain and lightning in front of everything on the surface (ticket 129)
+    const surfaceBackgroundContainer = new Container();
+    const surfaceWeatherContainer = new Container();
     const tilesContainer = new Container();
     const doodadContainer = new Container();
     const fluidsContainer = new Container();
@@ -187,9 +195,11 @@ export function useMiningScene({
     const skyHeight = 800;
     const extraMargin = 600;
 
-    // Sky above ground (nice vibrant blue)
-    bgGraphics.rect(-extraMargin, -skyHeight, bgWidth + extraMargin * 2, skyHeight + surfaceY);
-    bgGraphics.fill(0x38bdf8);
+    // Sky above ground: a plain blue unless the mine has a surface environment, which draws its own sky
+    if (!initialSessionState.surface) {
+      bgGraphics.rect(-extraMargin, -skyHeight, bgWidth + extraMargin * 2, skyHeight + surfaceY);
+      bgGraphics.fill(0x38bdf8);
+    }
 
     // Underground base earthen tone fallback (y >= 0)
     bgGraphics.rect(-extraMargin, surfaceY, bgWidth + extraMargin * 2, bgHeight - surfaceY + extraMargin * 2);
@@ -207,6 +217,7 @@ export function useMiningScene({
     debugGraphicsRef.current = debugGraphics;
 
     gridContainer.addChild(backgroundContainer);
+    gridContainer.addChild(surfaceBackgroundContainer);
     gridContainer.addChild(tilesContainer);
     // Scenery stands in the open cells in front of the back wall and behind everything that moves (and the extractor)
     gridContainer.addChild(doodadContainer);
@@ -227,6 +238,7 @@ export function useMiningScene({
     gridContainer.addChild(gasContainer);
     gridContainer.addChild(projectilesContainer);
     gridContainer.addChild(particlesContainer);
+    gridContainer.addChild(surfaceWeatherContainer);
     gridContainer.addChild(floatingTextContainer);
     gridContainer.addChild(reticleContainer);
     gridContainer.addChild(debugContainer);
@@ -352,6 +364,21 @@ export function useMiningScene({
       }
     );
     lightingEngine.addLight(entranceTorch);
+
+    // The surface above the ground: sky, scenery, clouds, weather and the light they give (tickets 129-135)
+    const surfaceSystem = initialSessionState.surface
+      ? new SurfaceSystem(initialSessionState.surface, {
+          backgroundParent: surfaceBackgroundContainer,
+          weatherParent: surfaceWeatherContainer,
+          surfaceRow,
+          mapWidthCells: gridWidth,
+          lighting: lightingEngine,
+          doodads: doodadRenderer,
+          sounds: globalSoundManager,
+          reduceFlashes: () => surfaceSettings.reduceFlashes,
+        })
+      : null;
+    surfaceSystemRef.current = surfaceSystem;
 
     // Initial sunlight calculation
     lightingEngine.updateGrid(initialSessionState.grid);
@@ -728,6 +755,8 @@ export function useMiningScene({
       doodadRendererRef.current = null;
       doodadFieldRef.current = null;
       biomeAmbientRef.current = null;
+      surfaceSystem?.destroy();
+      surfaceSystemRef.current = null;
       lightingEngine.destroy();
       lightingEngineRef.current = null;
       flashlightRef.current = null;
@@ -761,6 +790,7 @@ export function useMiningScene({
     doodadFieldRef,
     doodadRendererRef,
     doodadEffectsRef,
+    surfaceSystemRef,
     fireRendererRef,
     fluidGlowRef,
     burningBodiesRef,

@@ -51,6 +51,17 @@ describe('sampleSceneGauges', () => {
     expect(none.getStats().gauges).toEqual({});
   });
 
+  it('publishes the surface above the ground, and nothing for it underground', () => {
+    const profiler = new MiningProfiler(1000, true);
+    sampleSceneGauges(profiler, { surface: { objects: 40, clouds: 6, particles: 210, active: true } });
+    expect(profiler.getStats().gauges).toEqual({ 'Surface objects': 40, 'Clouds shown': 6, 'Weather particles': 210, 'Surface drawn': 1 });
+    sampleSceneGauges(profiler, { surface: { objects: 40, clouds: 0, particles: 0, active: false } });
+    expect(profiler.getStats().gauges).toMatchObject({ 'Clouds shown': 0, 'Weather particles': 0, 'Surface drawn': 0 });
+    const none = new MiningProfiler(1000, true);
+    sampleSceneGauges(none, { surface: null });
+    expect(none.getStats().gauges).toEqual({});
+  });
+
   it('does nothing while profiling is off', () => {
     const profiler = new MiningProfiler(1000, false);
     sampleSceneGauges(profiler, { stage: node(), gridCells: 5 });

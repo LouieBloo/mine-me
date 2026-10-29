@@ -1,0 +1,4 @@
+.surface-preview canvas {
+  image-rendering: auto;
+  touch-action: none;
+}

@@ -1,5 +1,89 @@
 [
   {
+    "id": "cmvsugi3o000387b5o1s3a7zb",
+    "key": "bird",
+    "name": "Bird",
+    "description": "A small bird that flutters about the sky and hides from storms.",
+    "anchor": "AIR",
+    "width": 1,
+    "height": 1,
+    "sizeVariants": null,
+    "textureUrl": "/assets/sprites/doodads/cmvsugi3o000387b5o1s3a7zb.png?v=1793312721000",
+    "parts": null,
+    "zOffset": 0,
+    "motion": null,
+    "reacts": null,
+    "light": null,
+    "particleEffectId": null,
+    "particleOffsetX": 0,
+    "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [
+      "rain",
+      "storm"
+    ],
+    "soundEffects": null,
+    "wander": {
+      "mode": "FLUTTER",
+      "speed": 3,
+      "radius": 10,
+      "pauseMs": 600
+    },
+    "spawn": null,
+    "createdAt": "2026-10-29T01:07:53.893Z",
+    "updatedAt": "2026-10-29T22:25:21.001Z",
+    "biomes": []
+  },
+  {
+    "id": "cmvsugi3k000287b5ivlli1x4",
+    "key": "bush",
+    "name": "Bush",
+    "description": "A low bush that rustles when someone walks past.",
+    "anchor": "FLOOR",
+    "width": 3,
+    "height": 2,
+    "sizeVariants": [
+      {
+        "width": 3,
+        "height": 2,
+        "weight": 3
+      },
+      {
+        "width": 4,
+        "height": 3,
+        "weight": 1
+      }
+    ],
+    "textureUrl": "/assets/sprites/doodads/cmvsugi3k000287b5ivlli1x4.png?v=1793312735929",
+    "parts": null,
+    "zOffset": 1,
+    "motion": {
+      "speed": 0.5,
+      "preset": "sway",
+      "amplitude": 0.05
+    },
+    "reacts": {
+      "radius": 4,
+      "strength": 0.5
+    },
+    "light": null,
+    "particleEffectId": null,
+    "particleOffsetX": 0,
+    "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
+    "soundEffects": null,
+    "wander": null,
+    "spawn": null,
+    "createdAt": "2026-10-29T01:07:53.889Z",
+    "updatedAt": "2026-10-29T22:25:35.929Z",
+    "biomes": []
+  },
+  {
     "id": "cmvmvewb100251a8qswau8lu3",
     "key": "cave_beetle",
     "name": "Cave Beetle",
@@ -20,6 +104,10 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": 10,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": {
       "mode": "CRAWL",
@@ -32,7 +120,7 @@
       "minSpacing": 15
     },
     "createdAt": "2026-10-24T20:48:01.549Z",
-    "updatedAt": "2026-10-24T21:18:38.783Z",
+    "updatedAt": "2026-10-27T00:12:21.923Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dk0000si7t7ku5jyi4",
@@ -64,8 +152,7 @@
         "weight": 0.4,
         "density": 3.6
       }
-    ],
-    "health": 10
+    ]
   },
   {
     "id": "cmvmvew8n00011a8q2y3dtrru",
@@ -101,14 +188,22 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": null,
     "spawn": {
       "minDepth": 6,
-      "minSpacing": 3
+      "minSpacing": 3,
+      "groupChance": 0.8,
+      "groupSpread": 6,
+      "groupSizeMax": 8,
+      "groupSizeMin": 3
     },
     "createdAt": "2026-10-24T20:48:01.463Z",
-    "updatedAt": "2026-10-24T21:19:13.982Z",
+    "updatedAt": "2026-10-28T02:42:13.225Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dk0000si7t7ku5jyi4",
@@ -157,6 +252,10 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": 15,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": null,
     "spawn": {
@@ -177,7 +276,7 @@
       "nearRadius": 12
     },
     "createdAt": "2026-10-24T20:48:01.508Z",
-    "updatedAt": "2026-10-26T22:57:49.129Z",
+    "updatedAt": "2026-10-27T02:54:29.327Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dq0001si7t9c46at4h",
@@ -203,8 +302,7 @@
         "weight": 0.1,
         "density": 2.4
       }
-    ],
-    "health": 15
+    ]
   },
   {
     "id": "cmvmvewau001y1a8qazhrrg3r",
@@ -239,6 +337,10 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": 1,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": {
       "mode": "FLUTTER",
@@ -251,7 +353,7 @@
       "minSpacing": 12
     },
     "createdAt": "2026-10-24T20:48:01.543Z",
-    "updatedAt": "2026-10-26T22:57:15.895Z",
+    "updatedAt": "2026-10-27T00:12:21.940Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dq0001si7t9c46at4h",
@@ -277,8 +379,7 @@
         "weight": 0.4,
         "density": 3
       }
-    ],
-    "health": 1
+    ]
   },
   {
     "id": "cmvmvewa3001c1a8qbtcqpmum",
@@ -322,14 +423,22 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": null,
     "spawn": {
       "minDepth": 12,
-      "minSpacing": 8
+      "minSpacing": 8,
+      "groupChance": 0.8,
+      "groupSpread": 6,
+      "groupSizeMax": 5,
+      "groupSizeMin": 2
     },
     "createdAt": "2026-10-24T20:48:01.516Z",
-    "updatedAt": "2026-10-24T21:20:02.575Z",
+    "updatedAt": "2026-10-28T02:42:13.257Z",
     "biomes": [
       {
         "biomeId": "cmvlss0e60005si7tlvdeq0g4",
@@ -390,14 +499,22 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": null,
     "spawn": {
       "darkOnly": true,
-      "minSpacing": 6
+      "minSpacing": 6,
+      "groupChance": 0.8,
+      "groupSpread": 6,
+      "groupSizeMax": 8,
+      "groupSizeMin": 3
     },
     "createdAt": "2026-10-24T20:48:01.479Z",
-    "updatedAt": "2026-10-26T22:57:33.962Z",
+    "updatedAt": "2026-10-28T02:42:13.234Z",
     "biomes": [
       {
         "biomeId": "cmvlss0eb0006si7twio67u66",
@@ -459,38 +576,48 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": null,
     "spawn": {
+      "maxCount": 600,
       "maxDepth": 45,
-      "minDepth": 1
+      "minDepth": 1,
+      "groupFill": 0.8,
+      "groupChance": 1,
+      "groupSpread": 12,
+      "groupSizeMax": 24,
+      "groupSizeMin": 6
     },
     "createdAt": "2026-10-24T20:48:01.486Z",
-    "updatedAt": "2026-10-26T23:32:18.988Z",
+    "updatedAt": "2026-10-28T02:42:13.239Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dk0000si7t7ku5jyi4",
         "biomeKey": "default",
         "weight": 1,
-        "density": 7.2
+        "density": 120
       },
       {
         "biomeId": "cmvlss0dq0001si7t9c46at4h",
         "biomeKey": "clay_pits",
         "weight": 1,
-        "density": 9
+        "density": 120
       },
       {
         "biomeId": "cmvlss0dy0003si7tulxzn8zp",
         "biomeKey": "gravel_banks",
         "weight": 0.4,
-        "density": 4.8
+        "density": 50
       },
       {
         "biomeId": "cmvlss0du0002si7t7m1mubvo",
         "biomeKey": "sandstone_hollows",
         "weight": 0.15,
-        "density": 3
+        "density": 12
       }
     ]
   },
@@ -523,6 +650,10 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": 5,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": null,
     "spawn": {
@@ -532,10 +663,14 @@
         "DIRT"
       ],
       "minDepth": 6,
-      "minSpacing": 2
+      "minSpacing": 2,
+      "groupChance": 0.6,
+      "groupSpread": 6,
+      "groupSizeMax": 8,
+      "groupSizeMin": 3
     },
     "createdAt": "2026-10-24T20:48:01.522Z",
-    "updatedAt": "2026-10-24T21:20:31.684Z",
+    "updatedAt": "2026-10-28T02:42:13.262Z",
     "biomes": [
       {
         "biomeId": "cmvlss0e60005si7tlvdeq0g4",
@@ -543,8 +678,7 @@
         "weight": 1.5,
         "density": 12
       }
-    ],
-    "health": 5
+    ]
   },
   {
     "id": "cmvmvewah001l1a8qgzgl8q6w",
@@ -576,6 +710,10 @@
     "particleEffectId": "cmv79i1qr0000j1drmo4qfwum",
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": null,
     "spawn": {
@@ -586,7 +724,7 @@
       "nearRadius": 9
     },
     "createdAt": "2026-10-24T20:48:01.529Z",
-    "updatedAt": "2026-10-24T21:20:39.743Z",
+    "updatedAt": "2026-10-27T02:54:29.352Z",
     "biomes": [
       {
         "biomeId": "cmvlss0ef0007si7t7cmm85tc",
@@ -595,6 +733,99 @@
         "density": 9
       }
     ]
+  },
+  {
+    "id": "cmvsugi3a000087b5wzotpscn",
+    "key": "oak_tree",
+    "name": "Oak Tree",
+    "description": "A broad tree that sways in the wind.",
+    "anchor": "FLOOR",
+    "width": 4,
+    "height": 8,
+    "sizeVariants": [
+      {
+        "width": 4,
+        "height": 8,
+        "weight": 3
+      },
+      {
+        "width": 3,
+        "height": 6,
+        "weight": 2
+      },
+      {
+        "width": 5,
+        "height": 10,
+        "weight": 1
+      }
+    ],
+    "textureUrl": "/assets/sprites/doodads/cmvsugi3a000087b5wzotpscn.png?v=1793312746271",
+    "parts": null,
+    "zOffset": 0,
+    "motion": {
+      "speed": 0.35,
+      "preset": "sway",
+      "amplitude": 0.04
+    },
+    "reacts": null,
+    "light": null,
+    "particleEffectId": null,
+    "particleOffsetX": 0,
+    "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
+    "soundEffects": null,
+    "wander": null,
+    "spawn": null,
+    "createdAt": "2026-10-29T01:07:53.879Z",
+    "updatedAt": "2026-10-29T22:25:46.271Z",
+    "biomes": []
+  },
+  {
+    "id": "cmvsugi3g000187b52zwulftm",
+    "key": "pine_tree",
+    "name": "Pine Tree",
+    "description": "A tall narrow tree for cold places.",
+    "anchor": "FLOOR",
+    "width": 3,
+    "height": 9,
+    "sizeVariants": [
+      {
+        "width": 3,
+        "height": 9,
+        "weight": 3
+      },
+      {
+        "width": 2,
+        "height": 6,
+        "weight": 2
+      }
+    ],
+    "textureUrl": "/assets/sprites/doodads/cmvsugi3g000187b52zwulftm.png?v=1793312756449",
+    "parts": null,
+    "zOffset": 0,
+    "motion": {
+      "speed": 0.3,
+      "preset": "sway",
+      "amplitude": 0.03
+    },
+    "reacts": null,
+    "light": null,
+    "particleEffectId": null,
+    "particleOffsetX": 0,
+    "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
+    "soundEffects": null,
+    "wander": null,
+    "spawn": null,
+    "createdAt": "2026-10-29T01:07:53.885Z",
+    "updatedAt": "2026-10-29T22:25:56.450Z",
+    "biomes": []
   },
   {
     "id": "cmvmvew9g000m1a8quswx4c1w",
@@ -625,6 +856,10 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": 15,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": null,
     "spawn": {
@@ -638,10 +873,14 @@
         "LAVAROCK"
       ],
       "minDepth": 6,
-      "minSpacing": 3
+      "minSpacing": 3,
+      "groupChance": 0.5,
+      "groupSpread": 6,
+      "groupSizeMax": 5,
+      "groupSizeMin": 2
     },
     "createdAt": "2026-10-24T20:48:01.493Z",
-    "updatedAt": "2026-10-26T23:32:42.917Z",
+    "updatedAt": "2026-10-28T02:42:13.252Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dk0000si7t7ku5jyi4",
@@ -685,8 +924,7 @@
         "weight": 0.6,
         "density": 4.8
       }
-    ],
-    "health": 15
+    ]
   },
   {
     "id": "cmvmvew9n000w1a8qllh84a0t",
@@ -717,6 +955,10 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": null,
     "spawn": {
@@ -730,10 +972,14 @@
         "LAVAROCK"
       ],
       "minDepth": 6,
-      "minSpacing": 3
+      "minSpacing": 3,
+      "groupChance": 0.5,
+      "groupSpread": 6,
+      "groupSizeMax": 5,
+      "groupSizeMin": 2
     },
     "createdAt": "2026-10-24T20:48:01.500Z",
-    "updatedAt": "2026-10-24T21:21:46.122Z",
+    "updatedAt": "2026-10-28T02:42:13.248Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dk0000si7t7ku5jyi4",
@@ -802,14 +1048,22 @@
     "particleEffectId": null,
     "particleOffsetX": 0,
     "particleOffsetY": 0,
+    "health": null,
+    "fallDamage": null,
+    "deathParticleEffectId": null,
+    "hiddenInWeather": [],
     "soundEffects": null,
     "wander": null,
     "spawn": {
       "minDepth": 4,
-      "minSpacing": 2
+      "minSpacing": 2,
+      "groupChance": 0.7,
+      "groupSpread": 6,
+      "groupSizeMax": 10,
+      "groupSizeMin": 3
     },
     "createdAt": "2026-10-24T20:48:01.535Z",
-    "updatedAt": "2026-10-26T23:32:54.336Z",
+    "updatedAt": "2026-10-28T02:42:13.244Z",
     "biomes": [
       {
         "biomeId": "cmvlss0dq0001si7t9c46at4h",

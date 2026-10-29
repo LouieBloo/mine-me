@@ -269,6 +269,47 @@ describe('LightingEngine', () => {
     engine.destroy();
   });
 
+  describe('the weather tinting the sky light (ticket 134)', () => {
+    it('starts at full daylight and takes a new sky light', () => {
+      const engine = new LightingEngine(mockApp, mockContainer, 10, 10, 64, 3);
+      expect(engine.getSkyLight()).toBe(0xffffff);
+      engine.setSkyLight(0x6f7d96);
+      expect(engine.getSkyLight()).toBe(0x6f7d96);
+      expect((engine as any).skyGraphics.tint).toBe(0x6f7d96);
+      engine.destroy();
+    });
+
+    it('marks the lightmap for a redraw only when the light actually changed', () => {
+      const engine = new LightingEngine(mockApp, mockContainer, 10, 10, 64, 3);
+      (engine as any).isLightmapDirty = false;
+      engine.setSkyLight(0xffffff);
+      expect((engine as any).isLightmapDirty).toBe(false);
+      engine.setSkyLight(0xaabbcc);
+      expect((engine as any).isLightmapDirty).toBe(true);
+      (engine as any).isLightmapDirty = false;
+      engine.setSkyLight(0xaabbcc);
+      expect((engine as any).isLightmapDirty).toBe(false);
+      engine.destroy();
+    });
+
+    it('only tints the sky: the underground ambient graphics are not touched', () => {
+      const engine = new LightingEngine(mockApp, mockContainer, 10, 10, 64, 3);
+      const underground = (engine as any).ambientGraphics;
+      const before = underground.tint;
+      engine.setSkyLight(0x445566);
+      expect(underground.tint).toBe(before);
+      engine.destroy();
+    });
+
+    it('keeps the tint when the ambient layers are drawn again', () => {
+      const engine = new LightingEngine(mockApp, mockContainer, 10, 10, 64, 3);
+      engine.setSkyLight(0x445566);
+      (engine as any).renderAmbient();
+      expect((engine as any).skyGraphics.tint).toBe(0x445566);
+      engine.destroy();
+    });
+  });
+
   describe('with open sky above the ground (the sandbox)', () => {
     // 3 rows of sky, then ground (dirt) with an open shaft at x = 2 going down
     const skyGrid = (): MiningClientTile[][] =>

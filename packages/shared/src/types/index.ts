@@ -385,4 +385,5 @@ export * from './biome';
 export * from './doodad';
 export * from './extractor';
 export * from './mission';
+export * from './surface';
 export * from './sound';

@@ -405,6 +405,20 @@ export function useMiningTicker({
         mobRenderer: mobRendererRef?.current,
       });
 
+      // 8.5 The surface: sky, scenery, clouds, weather and the light above the ground. Next to nothing underground.
+      const surface = world.surfaceSystemRef?.current;
+      if (surface) {
+        if (!surface.onPhase) surface.onPhase = (name) => miningProfiler.startSection(name);
+        const zoomScale = gridContainer.scale.x || 1;
+        const surfaceView = {
+          left: -gridContainer.x / zoomScale,
+          top: -gridContainer.y / zoomScale,
+          width: app.screen.width / zoomScale,
+          height: app.screen.height / zoomScale,
+        };
+        surface.update(surfaceView, surfaceView.top + surfaceView.height / 2, nowMs / 1000);
+      }
+
       // 9. Lighting Engine & Flashlight
       miningProfiler.startSection('Lighting Engine');
       const flashlight = flashlightRef.current;
@@ -482,6 +496,7 @@ export function useMiningTicker({
           lights: lightingEngineRef.current,
           particles: particleEngineRef?.current,
           doodads: world.doodadRendererRef?.current ? { drawn: world.doodadRendererRef.current.count, lights: world.doodadEffectsRef?.current?.lightCount ?? 0, emitters: world.doodadEffectsRef?.current?.emitterCount ?? 0 } : null,
+          surface: world.surfaceSystemRef?.current?.stats ?? null,
           tileSprites: world.tileSpritesMap?.current,
           tileGraphics: world.tileGraphicsMap?.current,
           renderer: app.renderer,

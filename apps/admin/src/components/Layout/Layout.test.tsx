@@ -20,6 +20,7 @@ describe('Layout navigation', () => {
     renderLayout();
     expect(screen.getByRole('link', { name: 'Biomes Editor' })).toHaveAttribute('href', '/biomes');
     expect(screen.getByRole('link', { name: 'Doodads Editor' })).toHaveAttribute('href', '/doodads');
+    expect(screen.getByRole('link', { name: 'Surface Editor' })).toHaveAttribute('href', '/surface-environments');
   });
 
   it('marks the page you are on and shows it beside the menu', () => {

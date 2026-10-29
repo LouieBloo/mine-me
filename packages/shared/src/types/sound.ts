@@ -179,6 +179,26 @@ export interface MissionSoundSlotResolved extends SoundEffectSlotConfig {
 
 export type MissionSoundEffectsConfig = Partial<Record<MissionSoundSlot, MissionSoundSlotResolved>>;
 
+export type SurfaceSoundSlot = 'rain' | 'wind' | 'thunder';
+
+/** What the admin stores for one surface-environment slot: a library sound by id (the url is resolved at load). */
+export interface SurfaceSoundSlotRef {
+  soundId?: string | null;
+  loop?: boolean;
+  /** Volume of this sound on this environment, 0 to 1 (1 when absent). */
+  volume?: number;
+}
+
+export type SurfaceSoundSlotRefs = Partial<Record<SurfaceSoundSlot, SurfaceSoundSlotRef>>;
+
+/** A surface-environment slot after its library sound has been resolved to something the client can play. */
+export interface SurfaceSoundSlotResolved extends SoundEffectSlotConfig {
+  soundId?: string | null;
+  volume?: number;
+}
+
+export type SurfaceSoundEffectsConfig = Partial<Record<SurfaceSoundSlot, SurfaceSoundSlotResolved>>;
+
 export type ExtractorSoundSlot = 'landing' | 'loop' | 'unload' | 'beltBreak';
 
 /** What the admin stores for one extractor slot: a library sound by id (the url is resolved at load). */

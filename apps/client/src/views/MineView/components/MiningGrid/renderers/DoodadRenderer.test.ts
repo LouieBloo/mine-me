@@ -6,6 +6,7 @@ import {
   DOODAD_HIT_FLASH_SECONDS,
   DOODAD_HIT_TINT,
   DOODAD_VIEW_MARGIN_CELLS,
+  DOODAD_WEATHER_FADE_SECONDS,
   DoodadRenderer,
   doodadPlaceholderColor,
   drawDoodadPlaceholder,
@@ -536,5 +537,85 @@ describe('DoodadRenderer hurt, killed and falling doodads (ticket 143)', () => {
       renderer.shatter([99, 0, 0, 10, 30]);
       expect(heard).toEqual([]);
     });
+  });
+});
+
+describe('DoodadRenderer surface props in the weather (ticket 135)', () => {
+  const tree = def(0, 'FLOOR', { key: 'tree', motion: { preset: 'sway', speed: 1, amplitude: 0.2 } });
+  const bird = def(1, 'AIR', { key: 'bird', width: 1, height: 1, hiddenInWeather: ['storm', 'rain'] });
+  const defs = [tree, bird];
+  /** The ground is row 20: a tree stands on it (rows 17-18 above), another is underground (rows 25-26), a bird is in the sky. */
+  const placements = [[0, 5, 18, 0], [0, 12, 25, 0], [1, 8, 5, 0]] as ConstructorParameters<typeof DoodadField>[1];
+  const views = (renderer: DoodadRenderer) => [...(renderer as any).active.values()] as any[];
+  const byY = (renderer: DoodadRenderer, y: number) => views(renderer).find((v) => v.entry.y === y);
+  const make2 = () => {
+    const m = make(placements, defs);
+    m.renderer.setSurfaceRow(20);
+    return m;
+  };
+
+  it('sways the doodads above the ground harder in the wind, and leaves the underground ones alone', () => {
+    const calm = make2();
+    calm.renderer.update(0.3, VIEW, 0.016);
+    const surfaceCalm = byY(calm.renderer, 18).body.rotation;
+    const underCalm = byY(calm.renderer, 25).body.rotation;
+    const windy = make2();
+    windy.renderer.setWeather('windy', 3);
+    windy.renderer.update(0.3, VIEW, 0.016);
+    expect(windy.renderer.currentWindSway).toBe(3);
+    // (the phase of a doodad depends on its place, so compare each against the calm one standing in the same place)
+    expect(Math.abs(byY(windy.renderer, 18).body.rotation)).toBeCloseTo(Math.abs(surfaceCalm) * 3);
+    expect(byY(windy.renderer, 25).body.rotation).toBeCloseTo(underCalm);
+  });
+
+  it('treats a bad wind as no wind', () => {
+    const { renderer } = make2();
+    renderer.setWeather('clear', 0);
+    expect(renderer.currentWindSway).toBe(1);
+    renderer.setWeather('clear', NaN);
+    expect(renderer.currentWindSway).toBe(1);
+  });
+
+  it('fades a bird out when the weather it hides in comes, and back in when it clears', () => {
+    const { renderer } = make2();
+    renderer.update(0, VIEW, 0.016);
+    const view = byY(renderer, 5);
+    expect(view.root.alpha).toBe(1);
+    renderer.setWeather('storm', 2);
+    renderer.update(0.1, VIEW, DOODAD_WEATHER_FADE_SECONDS / 2);
+    expect(view.root.alpha).toBeCloseTo(0.5);
+    expect(view.root.visible).toBe(true);
+    renderer.update(0.2, VIEW, DOODAD_WEATHER_FADE_SECONDS);
+    expect(view.root.alpha).toBe(0);
+    expect(view.root.visible).toBe(false);
+    renderer.setWeather('clear', 1);
+    renderer.update(0.3, VIEW, DOODAD_WEATHER_FADE_SECONDS);
+    expect(view.root.alpha).toBe(1);
+    expect(view.root.visible).toBe(true);
+  });
+
+  it('does not hide a doodad in weather that is not in its list, nor one with no list', () => {
+    const { renderer } = make2();
+    renderer.setWeather('snow', 1);
+    renderer.update(0, VIEW, 5);
+    expect(byY(renderer, 5).root.alpha).toBe(1);
+    renderer.setWeather('storm', 1);
+    renderer.update(0, VIEW, 5);
+    expect(byY(renderer, 18).root.alpha).toBe(1);
+    expect(byY(renderer, 18).root.visible).toBe(true);
+  });
+
+  it('starts a reused sprite shown again, even if its last doodad was hidden', () => {
+    const { renderer, field } = make2();
+    renderer.setWeather('storm', 1);
+    renderer.update(0, VIEW, 5);
+    expect(byY(renderer, 5).root.visible).toBe(false);
+    // Scroll away (the sprite goes back to the pool) and come back in clear weather
+    renderer.update(0, { x0: 100, y0: 100, x1: 140, y1: 140 }, 0.016);
+    renderer.setWeather('clear', 1);
+    renderer.update(0, VIEW, 0.016);
+    expect(field).toBeDefined();
+    expect(byY(renderer, 5).root.visible).toBe(true);
+    expect(byY(renderer, 5).root.alpha).toBe(1);
   });
 });

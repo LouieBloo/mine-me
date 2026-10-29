@@ -4,6 +4,7 @@ import { SettingsModal } from '../SettingsModal';
 import { SettingsButton } from '../../SettingsButton/SettingsButton';
 import { SoundProvider } from '../../../contexts/SoundContext';
 import { soundManager } from '../../../services/sound';
+import { surfaceSettings } from '../../../services/surfaceSettings';
 import '@testing-library/jest-dom';
 
 describe('Settings Integration', () => {
@@ -83,6 +84,23 @@ describe('Settings Integration', () => {
     fireEvent.click(screen.getByText(/SFX: OFF/i));
     expect(screen.getByText(/SFX: ON/i)).toBeInTheDocument();
     expect(soundManager.getSettings().sfxEnabled).toBe(true);
+  });
+
+  it('turns the reduced lightning flashes setting on and off, and the game reads it', () => {
+    surfaceSettings.setReduceFlashes(false);
+    render(
+      <SoundProvider>
+        <SettingsButton />
+        <SettingsModal />
+      </SoundProvider>
+    );
+    fireEvent.click(screen.getByLabelText(/Settings/i));
+    expect(screen.getByText(/Reduce Lightning Flashes/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Flashes: Full/i));
+    expect(screen.getByText(/Flashes: Reduced/i)).toBeInTheDocument();
+    expect(surfaceSettings.reduceFlashes).toBe(true);
+    fireEvent.click(screen.getByText(/Flashes: Reduced/i));
+    expect(surfaceSettings.reduceFlashes).toBe(false);
   });
 
   it('closes modal when clicking Done button or X button', () => {
