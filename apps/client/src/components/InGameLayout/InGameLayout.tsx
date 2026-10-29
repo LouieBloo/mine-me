@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useGame } from '../../contexts/GameContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { CharacterPanel } from '../CharacterPanel/CharacterPanel';
 import { InventoryPanel } from '../InventoryPanel/InventoryPanel';
 import { ChatPanel } from '../ChatPanel/ChatPanel';
+import { SlideDrawer } from '../SlideDrawer/SlideDrawer';
+import { ChatOverlay } from '../ChatOverlay/ChatOverlay';
 import { LoadingSpinner } from '../LoadingSpinner/LoadingSpinner';
 import type { PlayerState, GameCity } from '@mine-me/shared';
 import './InGameLayout.css';
@@ -14,6 +16,8 @@ export const InGameLayout = () => {
     const { user } = useAuth();
     const { activeCharacter, playerState, setActiveCity, displayPlayerHealth } = useGame();
     const { session, retrySession, onEvent } = useSocket();
+    // In the mine the game gets the whole screen: no sidebars, the backpack is a drawer and the chat floats over the game
+    const inMine = useLocation().pathname.startsWith('/mine');
 
     // City room join/leave and character selection are owned by the socket session (SocketContext);
     // this layout only waits for it. Once it has been ready once, later drops show a banner instead of
@@ -106,6 +110,34 @@ export const InGameLayout = () => {
         }
     };
 
+    const connectionBanner = session.status !== 'ready' && (
+        <div
+            role="status"
+            className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded bg-amber-600/90 px-3 py-1 text-xs font-black uppercase tracking-wider text-white shadow"
+        >
+            {session.status === 'error' ? (
+                <button className="cursor-pointer underline" onClick={retrySession}>Connection lost - retry</button>
+            ) : (
+                'Reconnecting...'
+            )}
+        </div>
+    );
+
+    if (inMine) {
+        return (
+            <div className="in-game-layout flex h-full w-full bg-slate-900 overflow-hidden">
+                <div className="flex-1 relative flex flex-col overflow-hidden">
+                    {connectionBanner}
+                    <Outlet />
+                    <ChatOverlay />
+                    <SlideDrawer label="Backpack" hotkey="i">
+                        <InventoryPanel inventory={player.inventory} />
+                    </SlideDrawer>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="in-game-layout flex h-full w-full bg-slate-900 overflow-hidden">
             {/* Left side: Character Sheet & Chat */}
@@ -120,18 +152,7 @@ export const InGameLayout = () => {
 
             {/* Center: Dynamic Game Content */}
             <div className="flex-1 relative flex flex-col overflow-hidden">
-                {session.status !== 'ready' && (
-                    <div
-                        role="status"
-                        className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded bg-amber-600/90 px-3 py-1 text-xs font-black uppercase tracking-wider text-white shadow"
-                    >
-                        {session.status === 'error' ? (
-                            <button className="cursor-pointer underline" onClick={retrySession}>Connection lost - retry</button>
-                        ) : (
-                            'Reconnecting...'
-                        )}
-                    </div>
-                )}
+                {connectionBanner}
                 <Outlet />
             </div>
 

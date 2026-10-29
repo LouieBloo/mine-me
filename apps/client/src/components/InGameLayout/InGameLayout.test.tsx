@@ -14,6 +14,7 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { familyName: 'T
 vi.mock('../CharacterPanel/CharacterPanel', () => ({ CharacterPanel: () => <div>character-panel</div> }));
 vi.mock('../InventoryPanel/InventoryPanel', () => ({ InventoryPanel: () => <div>inventory-panel</div> }));
 vi.mock('../ChatPanel/ChatPanel', () => ({ ChatPanel: () => <div>chat-panel</div> }));
+vi.mock('../ChatOverlay/ChatOverlay', () => ({ ChatOverlay: () => <div>chat-overlay</div> }));
 vi.mock('react-router-dom', async (orig) => ({
   ...(await orig<typeof import('react-router-dom')>()),
   Outlet: () => <div>outlet</div>,
@@ -24,8 +25,8 @@ const character = {
   combatScore: 1, defenseScore: 1, ageInDays: 1, cityId: 'city-1', status: 'ACTIVE', createdAt: '', inventory: [],
 };
 
-const tree = () => (
-  <MemoryRouter>
+const tree = (path = '/home') => (
+  <MemoryRouter initialEntries={[path]}>
     <GameProvider>
       <InGameLayout />
     </GameProvider>
@@ -63,5 +64,23 @@ describe('InGameLayout session gate', () => {
     act(() => { rerender(tree()); });
     expect(screen.getByText('outlet')).toBeTruthy();
     expect(screen.getByText('Reconnecting...')).toBeTruthy();
+  });
+
+  it('shows both sidebars outside the mine', () => {
+    mockSession = { status: 'ready', error: null };
+    render(tree('/home'));
+    expect(screen.getByText('character-panel')).toBeTruthy();
+    expect(screen.getByText('chat-panel')).toBeTruthy();
+    expect(screen.queryByText('chat-overlay')).toBeNull();
+  });
+
+  it('gives the mine the whole screen: no character sheet, a floating chat, the backpack in a drawer', () => {
+    mockSession = { status: 'ready', error: null };
+    render(tree('/mine'));
+    expect(screen.queryByText('character-panel')).toBeNull();
+    expect(screen.queryByText('chat-panel')).toBeNull();
+    expect(screen.getByText('chat-overlay')).toBeTruthy();
+    expect(screen.getByText('inventory-panel')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Backpack/ }).getAttribute('aria-expanded')).toBe('false');
   });
 });

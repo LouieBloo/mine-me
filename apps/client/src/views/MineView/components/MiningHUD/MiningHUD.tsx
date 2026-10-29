@@ -227,6 +227,11 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
               <span className={showDebug ? 'text-emerald-400 font-bold' : ''}>Hitboxes</span>
             </span>
             <span className="text-slate-700">|</span>
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">I</kbd>
+              <span>Backpack</span>
+            </span>
+            <span className="text-slate-700">|</span>
             <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">E</kbd><span className="text-emerald-400">Leave (at the EXIT sign)</span></span>
           </div>
         </div>

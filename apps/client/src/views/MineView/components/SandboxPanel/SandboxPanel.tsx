@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { SANDBOX_SIM_SPEEDS, WEATHER_IDS, WEATHER_TYPES, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
 import { LoadingSpinner } from '../../../../components/LoadingSpinner/LoadingSpinner';
+import { useDraggablePanel } from '../../hooks/useDraggablePanel';
 import { MINE_TOOL, type SandboxToolSelection } from '../../sandbox/sandboxTool';
 import './SandboxPanel.css';
 
@@ -128,6 +129,8 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   busy = false,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
+  const { position, onPointerDown, consumeClick } = useDraggablePanel('sandboxPanelPosition', panelRef);
   const [fluidKey, setFluidKey] = useState(fluids[0]?.typeKey ?? '');
   const [gasKey, setGasKey] = useState(gases[0]?.typeKey ?? '');
   const [mobId, setMobId] = useState(mobs[0]?.id ?? '');
@@ -148,10 +151,20 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   const selectedMob = mobs.some((m) => m.id === mobId) ? mobId : mobs[0]?.id ?? '';
 
   return (
-    <aside className="sandbox-panel absolute top-3 right-3 z-30 w-64 rounded-xl border border-violet-500/40 bg-slate-900/90 text-slate-200 shadow-xl shadow-black/40 backdrop-blur">
+    // Until it is dragged it sits on the right below the health panel, clear of the buttons in the top-right corner
+    <aside
+      ref={panelRef}
+      className={`sandbox-panel absolute z-30 w-64 max-h-[calc(100%-1.5rem)] overflow-y-auto rounded-xl border border-violet-500/40 bg-slate-900/90 text-slate-200 shadow-xl shadow-black/40 backdrop-blur ${position ? '' : 'top-64 right-3'}`}
+      style={position ? { left: position.left, top: position.top } : undefined}
+    >
       <button
         type="button"
-        onClick={() => setCollapsed((c) => !c)}
+        onPointerDown={onPointerDown}
+        title="Drag to move"
+        onClick={() => {
+          if (consumeClick()) return;
+          setCollapsed((c) => !c);
+        }}
         className="w-full flex items-center justify-between px-3 py-2 text-xs font-black uppercase tracking-widest text-violet-300 cursor-pointer hover:text-violet-200"
         aria-expanded={!collapsed}
       >

@@ -1,0 +1,13 @@
+.slide-drawer {
+  transform: translateX(100%);
+  transition: transform 180ms ease-out;
+}
+
+.slide-drawer--open {
+  transform: translateX(0);
+}
+
+.slide-drawer__label {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+}
