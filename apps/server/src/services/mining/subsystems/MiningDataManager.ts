@@ -6,6 +6,7 @@ import {
   isThrowableItem,
   type BiomeDefinition,
   type DoodadDefinition,
+  type MissionDefinition,
   type CharacterSoundEffectsConfig,
   type FluidDefinition,
   type ExtractorDefinition,
@@ -34,6 +35,8 @@ export interface GameDefinitions {
   biomes?: BiomeDefinition[];
   /** Doodads (mushrooms, drips...). Absent means none are defined: the mine has no decoration. */
   doodads?: DoodadDefinition[];
+  /** Missions (ticket 108). Absent means none are defined: runs have no mission. */
+  missions?: MissionDefinition[];
   /** Extractors. Absent means none are defined (the built-in default is used). */
   extractors?: ExtractorDefinition[];
   /** The particle effect library, so fluids and fire can name an effect by id. Absent means none. */
@@ -96,6 +99,8 @@ export class MiningDataManager {
   private readonly doodads: DoodadDefinition[] = [];
   private readonly doodadsByKey = new Map<string, DoodadDefinition>();
   private readonly doodadsById = new Map<string, DoodadDefinition>();
+  private readonly missions: MissionDefinition[] = [];
+  private readonly missionsById = new Map<string, MissionDefinition>();
   private readonly extractors: ExtractorDefinition[] = [];
   private readonly extractorsByKey = new Map<string, ExtractorDefinition>();
   private readonly extractorsById = new Map<string, ExtractorDefinition>();
@@ -141,6 +146,11 @@ export class MiningDataManager {
       this.biomes.push(biome);
       this.biomesByKey.set(biome.key, biome);
       MiningDataManager.putFirst(this.biomesById, biome.id, biome);
+    }
+    for (const mission of definitions.missions ?? []) {
+      if (!mission?.id || this.missionsById.has(mission.id)) continue;
+      this.missions.push(mission);
+      this.missionsById.set(mission.id, mission);
     }
     for (const doodad of definitions.doodads ?? []) {
       if (!doodad?.key || this.doodadsByKey.has(doodad.key)) continue;
@@ -267,6 +277,30 @@ export class MiningDataManager {
   /** All biome definitions, in load order (the first of any duplicated key wins). May be empty: see `BiomeField` for the default. */
   public getBiomes(): BiomeDefinition[] {
     return this.biomes;
+  }
+
+  /** All mission definitions, in load order. May be empty. */
+  public getMissions(): MissionDefinition[] {
+    return this.missions;
+  }
+
+  /** Mission definition by database id or key. */
+  public getMission(idOrKey: string): MissionDefinition | undefined {
+    return this.missionsById.get(idOrKey) ?? this.missions.find((m) => m.key === idOrKey);
+  }
+
+  /** Blocks whose drop table can give an item, with the expected quantity of it per block broken (for the mission map guarantees). */
+  public getBlocksDropping(itemId: string): { typeKey: string; tileType: MiningTileType; expectedPerBlock: number }[] {
+    const out: { typeKey: string; tileType: MiningTileType; expectedPerBlock: number }[] = [];
+    for (const [typeKey, config] of this.blocksByTypeKey) {
+      const tileType = tileTypeForBlockKey(typeKey);
+      if (tileType === undefined) continue;
+      const expected = (config.dropTable?.items ?? [])
+        .filter((entry) => entry.itemId === itemId)
+        .reduce((sum, entry) => sum + (entry.chance / 100) * ((entry.minQuantity + entry.maxQuantity) / 2), 0);
+      if (expected > 0) out.push({ typeKey, tileType, expectedPerBlock: expected });
+    }
+    return out;
   }
 
   /** All doodad definitions, in load order (the first of any duplicated key wins). May be empty. */

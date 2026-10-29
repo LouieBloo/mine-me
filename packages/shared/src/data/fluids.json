@@ -92,8 +92,8 @@
       "maxSize": 12,
       "minSize": 6,
       "maxDepth": null,
-      "minDepth": 6,
-      "percentage": 10
+      "minDepth": 30,
+      "percentage": 3
     },
     "soundEffects": null,
     "contact": null,

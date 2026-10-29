@@ -18,6 +18,7 @@ import type { MiningMobSubsystem } from './subsystems/MiningMobSubsystem';
 import type { MiningPlayerManager, MiningPlayerSession } from './subsystems/MiningPlayerManager';
 import type { MiningProjectileSubsystem } from './subsystems/MiningProjectileSubsystem';
 import type { MiningRockSubsystem } from './subsystems/MiningRockSubsystem';
+import type { MissionTracker } from './missions/MissionTracker';
 
 /** A change to one tile that clients must be told about this tick. */
 export interface PendingTileUpdate {
@@ -39,6 +40,8 @@ export interface PendingTileUpdate {
  */
 export interface MiningWorld {
   // ---- Shared state ---------------------------------------------------------------------------
+  /** Follows the run's mission (absent: the run has none). */
+  readonly missions: MissionTracker | null;
   readonly grid: ServerMiningGrid;
   readonly rigidWorld: MiningRigidWorld;
   readonly data: MiningDataManager;

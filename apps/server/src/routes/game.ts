@@ -1,5 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index';
+import { listPickableBiomes } from '@mine-me/shared';
+import { MiningDataManager } from '../services/mining/subsystems/MiningDataManager';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 export const gameRouter = Router();
@@ -100,5 +102,17 @@ gameRouter.get('/mobs', async (req: AuthRequest, res: Response): Promise<any> =>
     return res.json(mobs);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// ----------------------------------------------------------------------------
+// GET /api/game/biomes
+// The loaded biomes, for the Single Player biome picker (names only: nothing about how they generate).
+// ----------------------------------------------------------------------------
+gameRouter.get('/biomes', (_req: AuthRequest, res: Response): any => {
+  try {
+    return res.json(listPickableBiomes(MiningDataManager.getInstance().getBiomes()));
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to load the biomes' });
   }
 });

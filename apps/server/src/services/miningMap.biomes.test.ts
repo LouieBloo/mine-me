@@ -64,7 +64,7 @@ describe('biomes in map generation', () => {
   });
 
   it('a biome that wants none of a block has none of it', () => {
-    const { grid, biomeField } = make(9, [biome('barren', { weight: 3, blockPalette: { weights: { ROCK: 0 } } })], { rockPercentage: 12 });
+    const { grid, biomeField } = make(9, [biome('barren', { weight: 3, blockPalette: { weights: { ROCK: 0 } } })], { rockPercentage: 40 });
     const barren = biomeField.biomes.findIndex((b) => b.key === 'barren');
     const pure = (x: number, y: number) => biomeField.weightsAt(x, y)[barren] > 0.999;
     expect(count(grid, MiningTileType.ROCK, pure)).toBe(0);

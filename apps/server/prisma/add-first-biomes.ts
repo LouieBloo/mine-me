@@ -26,6 +26,7 @@ export const FIRST_BIOMES: readonly NewBiome[] = [
     maxDepth: null,
     weight: 1,
     noiseScale: DEFAULT_BIOME_NOISE_SCALE,
+    fluidWeights: { OIL: 0 },
   },
   {
     key: 'clay_pits',
@@ -36,7 +37,7 @@ export const FIRST_BIOMES: readonly NewBiome[] = [
     maxDepth: 15 * S,
     weight: 1.5,
     noiseScale: 14 * S,
-    blockPalette: { swaps: [{ from: 'DIRT', to: 'CLAY', chance: 0.85 }] },
+    blockPalette: { swaps: [{ from: 'DIRT', to: 'CLAY', chance: 1 }] },
     fluidWeights: { WATER: 2.5, OIL: 0.3, LAVA: 0 },
     ambient: { tint: '#8a5a3c' },
   },
@@ -51,7 +52,7 @@ export const FIRST_BIOMES: readonly NewBiome[] = [
     noiseScale: 15 * S,
     blockPalette: {
       swaps: [
-        { from: 'DIRT', to: 'SANDSTONE', chance: 0.9 },
+        { from: 'DIRT', to: 'SANDSTONE', chance: 1 },
         { from: 'ROCK', to: 'SANDSTONE', chance: 0.3 },
       ],
     },
@@ -68,7 +69,7 @@ export const FIRST_BIOMES: readonly NewBiome[] = [
     maxDepth: 30 * S,
     weight: 1.3,
     noiseScale: 13 * S,
-    blockPalette: { swaps: [{ from: 'DIRT', to: 'GRAVEL', chance: 0.7 }] },
+    blockPalette: { swaps: [{ from: 'DIRT', to: 'GRAVEL', chance: 1 }] },
     fluidWeights: { WATER: 2, LAVA: 0.2 },
     ambient: { tint: '#7d7d7d' },
   },
@@ -81,7 +82,7 @@ export const FIRST_BIOMES: readonly NewBiome[] = [
     maxDepth: 32 * S,
     weight: 1.3,
     noiseScale: 12 * S,
-    blockPalette: { swaps: [{ from: 'DIRT', to: 'CLAY', chance: 0.3 }, { from: 'ROCK', to: 'STONE', chance: 0.4 }] },
+    blockPalette: { swaps: [{ from: 'DIRT', to: 'CLAY', chance: 1 }, { from: 'ROCK', to: 'STONE', chance: 0.4 }] },
     fluidWeights: { OIL: 4, WATER: 0.4 },
     gasWeights: { HYDROGEN: 2.5 },
     ambient: { tint: '#3d3329' },
@@ -97,7 +98,7 @@ export const FIRST_BIOMES: readonly NewBiome[] = [
     noiseScale: 15 * S,
     blockPalette: {
       swaps: [
-        { from: 'DIRT', to: 'ICE', chance: 0.75 },
+        { from: 'DIRT', to: 'ICE', chance: 1 },
         { from: 'ROCK', to: 'STONE', chance: 0.5 },
       ],
     },
@@ -117,7 +118,7 @@ export const FIRST_BIOMES: readonly NewBiome[] = [
     blockPalette: {
       weights: { COPPERIUM: 1.5, SILVERIUM: 2 },
       swaps: [
-        { from: 'DIRT', to: 'STONE', chance: 0.9 },
+        { from: 'DIRT', to: 'STONE', chance: 1 },
         { from: 'ROCK', to: 'STONE', chance: 0.4 },
       ],
     },
@@ -137,7 +138,7 @@ export const FIRST_BIOMES: readonly NewBiome[] = [
     blockPalette: {
       weights: { SILVERIUM: 2.5 },
       swaps: [
-        { from: 'DIRT', to: 'STONE', chance: 0.6 },
+        { from: 'DIRT', to: 'STONE', chance: 1 },
         { from: 'ROCK', to: 'LAVAROCK', chance: 0.6 },
       ],
     },

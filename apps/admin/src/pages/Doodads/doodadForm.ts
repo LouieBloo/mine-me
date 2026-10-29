@@ -78,6 +78,16 @@ export function tidySpawn(spawn: DoodadSpawnRules): DoodadSpawnRules | null {
   if ((fluids || gases) && isNumber(spawn.nearRadius)) out.nearRadius = spawn.nearRadius;
   if (spawn.darkOnly) out.darkOnly = true;
   if (isNumber(spawn.minSpacing) && spawn.minSpacing > 0) out.minSpacing = spawn.minSpacing;
+  // Group settings only mean something with a group share, so they are dropped without one
+  if (isNumber(spawn.groupChance) && spawn.groupChance > 0) {
+    out.groupChance = spawn.groupChance;
+    if (isNumber(spawn.groupSizeMin)) out.groupSizeMin = spawn.groupSizeMin;
+    if (isNumber(spawn.groupSizeMax)) out.groupSizeMax = spawn.groupSizeMax;
+    if (isNumber(spawn.groupSpread)) out.groupSpread = spawn.groupSpread;
+    if (isNumber(spawn.groupFill)) out.groupFill = spawn.groupFill;
+    if (isNumber(spawn.memberSpacing) && spawn.memberSpacing > 0) out.memberSpacing = spawn.memberSpacing;
+  }
+  if (isNumber(spawn.maxCount) && spawn.maxCount >= 0) out.maxCount = spawn.maxCount;
   return Object.keys(out).length > 0 ? out : null;
 }
 

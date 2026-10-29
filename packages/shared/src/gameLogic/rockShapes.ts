@@ -11,9 +11,11 @@ export interface RockShape extends TileFootprint {
   weight: number;
 }
 
-/** The rock sizes the generator picks from: small rocks are common, a 3x3 boulder is rare. */
+/**
+ * The rock sizes the generator picks from: small rocks are common, a 3x3 boulder is rare. There is no 1x1 for now (it looked
+ * odd as a lone block); add `{ id: '1x1', width: 1, height: 1, weight: 45 }` back to bring it back.
+ */
 export const ROCK_SHAPES: readonly RockShape[] = [
-  { id: '1x1', width: 1, height: 1, weight: 45 },
   { id: '2x1', width: 2, height: 1, weight: 20 },
   { id: '3x1', width: 3, height: 1, weight: 12 },
   { id: '2x2', width: 2, height: 2, weight: 15 },

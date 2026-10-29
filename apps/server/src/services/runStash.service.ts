@@ -66,10 +66,13 @@ export class RunStashService {
   /**
    * Banks the stash and `extra` (the backpack, when the run ends at the exit) into the inventory in one
    * transaction, then empties the stash. Everything commits or nothing does, and calling it again banks nothing twice.
+   * A `bonus` (a mission's reward, ticket 113) is written in the same transaction: Sol with the items, experience right after
+   * it commits (like the experience items carry), so a failed payout leaves the stash, the backpack and the reward all unpaid.
    */
   public static bank(
     characterId: string,
-    extra: readonly StashItem[] = []
+    extra: readonly StashItem[] = [],
+    bonus: { sol?: number; experience?: number } = {}
   ): Promise<{ banked: StashItem[]; stash: StashItem[]; skipped: { itemId: string; quantity: number; reason: string }[] }> {
     return RunStashService.enqueue(characterId, async () => {
       const skipped: { itemId: string; quantity: number; reason: string }[] = [];
@@ -77,10 +80,12 @@ export class RunStashService {
         const rows = await tx.runStash.findMany({ where: { characterId } });
         const stash = rows.filter((r) => r.quantity > 0).map((r) => ({ itemId: r.itemId, quantity: r.quantity }));
         const applied = await InventoryService.applyGrantsInTransaction(tx, characterId, merge(stash, [...extra]), skipped);
+        if ((bonus.sol ?? 0) > 0) await tx.character.update({ where: { id: characterId }, data: { sol: { increment: bonus.sol } } });
         await tx.runStash.deleteMany({ where: { characterId } });
         return { ...applied, stash };
       });
-      if (result.experienceGranted > 0) await CharacterService.addExperience(characterId, result.experienceGranted);
+      const experience = result.experienceGranted + Math.max(0, bonus.experience ?? 0);
+      if (experience > 0) await CharacterService.addExperience(characterId, experience);
       return { banked: result.granted, stash: result.stash, skipped };
     });
   }

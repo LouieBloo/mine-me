@@ -20,6 +20,8 @@ import * as GasSoundController from '../controllers/admin/gasSound.controller';
 import * as BiomeController from '../controllers/admin/biome.controller';
 import * as DoodadController from '../controllers/admin/doodad.controller';
 import * as DoodadSoundController from '../controllers/admin/doodadSound.controller';
+import * as MissionController from '../controllers/admin/mission.controller';
+import * as MissionSoundController from '../controllers/admin/missionSound.controller';
 import * as ExtractorController from '../controllers/admin/extractor.controller';
 import * as ExtractorSoundController from '../controllers/admin/extractorSound.controller';
 import * as MiningConfigController from '../controllers/admin/miningConfig.controller';
@@ -136,6 +138,16 @@ adminRouter.delete('/doodads/:id', DoodadController.deleteDoodad);
 adminRouter.post('/doodads/:id/texture', DoodadController.doodadTextureUpload, DoodadController.uploadDoodadTexture);
 adminRouter.post('/doodads/:id/images/:name', DoodadController.requireImageName, DoodadController.doodadTextureUpload, DoodadController.uploadDoodadImage);
 adminRouter.patch('/doodads/:id/sound-effects/:slot', DoodadSoundController.requireDoodadSoundSlot, DoodadSoundController.setDoodadSoundSlot);
+
+adminRouter.get('/missions', MissionController.getMissions);
+adminRouter.post('/missions/preview', MissionController.previewMission);
+adminRouter.post('/missions/simulate-offers', MissionController.simulateMissionOffers);
+adminRouter.get('/missions/:id', MissionController.getMission);
+adminRouter.post('/missions', MissionController.createMission);
+adminRouter.put('/missions/:id', MissionController.updateMission);
+adminRouter.patch('/missions/:id', MissionController.updateMission);
+adminRouter.delete('/missions/:id', MissionController.deleteMission);
+adminRouter.patch('/missions/:id/sound-effects/:slot', MissionSoundController.requireMissionSoundSlot, MissionSoundController.setMissionSoundSlot);
 
 // EXTRACTORS
 adminRouter.get('/extractors', ExtractorController.getExtractors);

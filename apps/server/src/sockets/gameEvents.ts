@@ -4,6 +4,7 @@ import { broadcastStatUpdate } from '../services/characterBroadcast';
 import { handleTrainingAction } from './trainingEvents';
 import {
   handleMiningStart,
+  handleMiningMissionOffers,
   handleMiningInput,
   handleMiningInteract,
   handleMiningPlaceLadder,
@@ -36,6 +37,9 @@ import {
   handleSandboxClearDoodads,
   handleSandboxSetDoodadGeneration,
   handleSandboxLoadDoodadScene,
+  handleSandboxStartMission,
+  handleSandboxMissionControl,
+  handleSandboxLoadMissionScene,
 } from './miningEvents';
 import { miningSessionManager } from '../services/mining/MiningSessionManager';
 import { InventoryService } from '../services/inventory.service';
@@ -574,6 +578,7 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   rest: handleRest,
   training_action: handleTrainingAction,
   mining_start: handleMiningStart,
+  mining_mission_offers: handleMiningMissionOffers,
   mining_input: handleMiningInput,
   mining_interact: handleMiningInteract,
   mining_place_ladder: handleMiningPlaceLadder,
@@ -606,6 +611,9 @@ export const gameEventHandlers: Record<string, GameEventHandler<any>> = {
   sandbox_clear_doodads: handleSandboxClearDoodads,
   sandbox_set_doodad_generation: handleSandboxSetDoodadGeneration,
   sandbox_load_doodad_scene: handleSandboxLoadDoodadScene,
+  sandbox_start_mission: handleSandboxStartMission,
+  sandbox_mission_control: handleSandboxMissionControl,
+  sandbox_load_mission_scene: handleSandboxLoadMissionScene,
   equip_item: handleEquipItem,
   unequip_item: handleUnequipItem,
   consume_item: handleConsumeItem,

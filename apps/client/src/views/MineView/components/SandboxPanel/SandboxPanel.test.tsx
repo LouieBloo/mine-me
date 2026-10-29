@@ -225,6 +225,54 @@ describe('SandboxPanel extractor tools', () => {
     expect(screen.getByText('Spawn extractor')).toBeDisabled();
     expect(screen.getByText('Dig belt +10')).toBeDisabled();
   });
+  describe('missions (ticket 116)', () => {
+    const missionTools = (over: Partial<NonNullable<SandboxPanelProps['missions']>> = {}) => ({
+      options: [{ id: 'm1', name: 'Copper Run (tier 1)' }],
+      scenes: [{ id: 'reach-depth', name: 'Reach a depth' }],
+      active: false,
+      onStart: vi.fn(),
+      onControl: vi.fn(),
+      onLoadScene: vi.fn(),
+      ...over,
+    });
+
+    it('hides the mission tools when there are no missions and no scenes', () => {
+      render(<SandboxPanel {...props({ missions: missionTools({ options: [], scenes: [] }) })} />);
+      expect(screen.queryByLabelText('Missions')).toBeNull();
+    });
+
+    it('starts the chosen mission, and cannot start before one is chosen', () => {
+      const missions = missionTools();
+      render(<SandboxPanel {...props({ missions })} />);
+      const start = screen.getByRole('button', { name: 'Start' });
+      expect(start).toBeDisabled();
+      fireEvent.change(screen.getByLabelText('Mission to start'), { target: { value: 'm1' } });
+      fireEvent.click(start);
+      expect(missions.onStart).toHaveBeenCalledWith('m1');
+    });
+
+    it('finishes, restarts and drops a running mission, and disables them when none runs', () => {
+      const idle = missionTools();
+      const { rerender } = render(<SandboxPanel {...props({ missions: idle })} />);
+      for (const name of ['Finish', 'Restart', 'Drop']) expect(screen.getByRole('button', { name })).toBeDisabled();
+      const onControl = vi.fn();
+      const running = missionTools({ active: true, onControl });
+      rerender(<SandboxPanel {...props({ missions: running })} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restart' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Drop' }));
+      expect(onControl.mock.calls.map((c) => c[0])).toEqual(['complete', 'reset', 'clear']);
+    });
+
+    it('loads a test scene', () => {
+      const missions = missionTools();
+      render(<SandboxPanel {...props({ missions })} />);
+      fireEvent.change(screen.getByLabelText('Mission scene'), { target: { value: 'reach-depth' } });
+      fireEvent.click(screen.getAllByRole('button', { name: 'Load' }).pop()!);
+      expect(missions.onLoadScene).toHaveBeenCalledWith('reach-depth');
+    });
+  });
+
   describe('doodads', () => {
     const doodadTools = (over: Partial<NonNullable<SandboxPanelProps['doodads']>> = {}) => ({
       options: [{ id: 'd1', name: 'Mushroom', anchor: 'FLOOR' }, { id: 'd2', name: 'Drip', anchor: 'CEILING' }],

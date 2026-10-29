@@ -104,8 +104,24 @@ export interface DoodadSpawnRules {
   nearRadius?: number | null;
   /** Only where the cell is dark. */
   darkOnly?: boolean;
-  /** No other doodad of the same kind this close, in small blocks. */
+  /** No other doodad of the same kind this close, in small blocks. With groups it only separates one group from another. */
   minSpacing?: number | null;
+  /**
+   * Groups (ticket 146). The share (0-1) of this kind's placements that stand in a group instead of alone; 0 or absent is
+   * the plain scatter, which places exactly what it did before groups existed.
+   */
+  groupChance?: number | null;
+  /** How many a group holds at least / at most (a surface that runs out gives fewer). */
+  groupSizeMin?: number | null;
+  groupSizeMax?: number | null;
+  /** How far along the surface a group reaches from its centre, in small blocks. */
+  groupSpread?: number | null;
+  /** The share (0-1) of the free spots inside the spread that get one at the centre of a group in a biome of density 1. High is a meadow. */
+  groupFill?: number | null;
+  /** No other member of the same group this close, in small blocks (default 0: they may touch). */
+  memberSpacing?: number | null;
+  /** The most of this kind in the whole mine (absent: only the map's overall cap applies), so a plentiful kind cannot use up the budget. */
+  maxCount?: number | null;
 }
 
 /** The default `nearRadius`: two original blocks. */
@@ -336,6 +352,18 @@ export function validateDoodadSpawnRules(value: unknown): string[] {
   optionalNumber('minDepth', 0);
   optionalNumber('maxDepth', 0);
   optionalNumber('minSpacing', 0);
+  optionalNumber('memberSpacing', 0);
+  optionalNumber('maxCount', 0);
+  optionalNumber('groupSpread', 0);
+  for (const name of ['groupChance', 'groupFill'] as const) {
+    const v = value[name];
+    if (v !== undefined && v !== null && (!isNumber(v) || v < 0 || v > 1)) errors.push(`spawn.${name} must be between 0 and 1`);
+  }
+  for (const name of ['groupSizeMin', 'groupSizeMax'] as const) {
+    const v = value[name];
+    if (v !== undefined && v !== null && (!isNumber(v) || !Number.isInteger(v) || v < 1)) errors.push(`spawn.${name} must be a whole number of 1 or more`);
+  }
+  if (isNumber(value.groupSizeMin) && isNumber(value.groupSizeMax) && value.groupSizeMin > value.groupSizeMax) errors.push('spawn.groupSizeMin cannot be greater than groupSizeMax');
   if (value.nearRadius !== undefined && value.nearRadius !== null && (!isNumber(value.nearRadius) || value.nearRadius <= 0)) {
     errors.push('spawn.nearRadius must be greater than 0');
   }

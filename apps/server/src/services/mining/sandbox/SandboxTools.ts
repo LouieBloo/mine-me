@@ -1,9 +1,11 @@
-import { doodadFalls, doodadRect, isTileSolid, type DoodadPlacement, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
+import { doodadFalls, doodadRect, isTileSolid, validateMission, type ObjectiveDefinition, type DoodadPlacement, type SandboxDoodadOption, type SandboxMobOption, type SandboxStatus } from '@mine-me/shared';
 import type { MiningGameEngine } from '../MiningGameEngine';
 import { WorldSimClock } from './WorldSimClock';
 import { findDoodadScene } from './doodadScenes';
 import { findExtractorScene, heaviestItemId } from './extractorScenes';
 import { doodadPlacementProblem } from './sandboxDoodads';
+import { adHocMission, findMissionScene } from './missionScenes';
+import { missionLookups } from '../missions/missionContext';
 
 export type SandboxResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -272,6 +274,53 @@ export class SandboxTools {
   /** Puts the room into one of the named doodad test scenes. */
   public loadDoodadScene(characterId: string, sceneId: unknown): SandboxResult<{ placed: number }> {
     const scene = findDoodadScene(sceneId);
+    if (!scene) return fail('Unknown scene.');
+    if (!this.engine.getPlayer(characterId)) return fail('You are not in the room.');
+    return scene.apply(this.engine, characterId);
+  }
+
+  /** The loaded missions that can be started, for the tool panel (undefined when none are defined). */
+  public missionOptions(): SandboxMobOption[] | undefined {
+    const missions = this.engine.dataManager.getMissions();
+    return missions.length > 0 ? missions.map((m) => ({ id: m.id, name: `${m.name} (tier ${m.tier})` })) : undefined;
+  }
+
+  /**
+   * Starts a mission on the hand-built map: one of the loaded ones, or a one-off list of objectives (checked like a saved
+   * mission, since it comes from a client). The fluid and gas baselines are taken now.
+   */
+  public startMission(missionId: unknown, objectives: unknown): SandboxResult {
+    const data = this.engine.dataManager;
+    if (typeof missionId === 'string' && missionId !== '') {
+      const mission = data.getMission(missionId);
+      if (!mission) return fail('Unknown mission.');
+      this.engine.setMission(mission);
+      return { ok: true };
+    }
+    if (!Array.isArray(objectives) || objectives.length === 0) return fail('Pick a mission or give it at least one objective.');
+    const draft = adHocMission('custom', 'Custom mission', objectives as ObjectiveDefinition[]);
+    const errors = validateMission(draft, missionLookups(data, this.engine.grid.length - this.engine.surfaceRow - 3));
+    if (errors.length > 0) return fail(errors[0]);
+    this.engine.setMission(draft);
+    return { ok: true };
+  }
+
+  /** Completes the mission now, starts it over from its baselines, or drops it. */
+  public missionControl(action: unknown): SandboxResult {
+    if (action === 'clear') {
+      this.engine.setMission(null);
+      return { ok: true };
+    }
+    if (!this.engine.mission || !this.engine.missionTracker) return fail('There is no mission running.');
+    if (action === 'complete') this.engine.missionTracker.forceComplete();
+    else if (action === 'reset') this.engine.startMissionTracker();
+    else return fail('Unknown mission action.');
+    return { ok: true };
+  }
+
+  /** Puts the room into one of the named mission test scenes. */
+  public loadMissionScene(characterId: string, sceneId: unknown): SandboxResult {
+    const scene = findMissionScene(sceneId);
     if (!scene) return fail('Unknown scene.');
     if (!this.engine.getPlayer(characterId)) return fail('You are not in the room.');
     return scene.apply(this.engine, characterId);

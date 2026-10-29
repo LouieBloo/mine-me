@@ -8,6 +8,7 @@ import type { DoodadClientDefinition } from './doodad';
 import type { DoodadPlacementWire, DoodadRemovalWire, FallingDoodadWire, DoodadShatterWire } from '../gameLogic/doodad/doodadPlacement';
 import type { GasClientDefinition, GasEvent, GasExplosionCell, GasWireCell } from '../gameLogic/gas/gasWire';
 import type { SkeletonManifest } from './modularRig';
+import type { MissionClientState, MissionProgressDelta, MissionResultView } from './mission';
 
 // ============================================================================
 // Mining Mini-Game Types & Constants
@@ -133,7 +134,7 @@ export const MINING_CONFIG = {
   PLAYER_HIT_KNOCKBACK_SECONDS: 0.2, // movement input is ignored this long after being hit
 
   /** Approximate percentage of tiles that are rocks */
-  ROCK_PERCENTAGE: 6,
+  ROCK_PERCENTAGE: 2,
 
   /** Continuous physics parameters */
   PLAYER_RADIUS: 12, // pixels: the character sprite's foot offset below the body centre
@@ -580,6 +581,10 @@ export interface SandboxClientInfo {
   doodads?: SandboxDoodadOption[];
   /** The named doodad test scenes that can be loaded. */
   doodadScenes?: SandboxMobOption[];
+  /** The loaded missions that can be started (absent: none are defined). */
+  missions?: SandboxMobOption[];
+  /** The named mission test scenes that can be loaded. */
+  missionScenes?: SandboxMobOption[];
   status: SandboxStatus;
 }
 
@@ -784,6 +789,8 @@ export interface MiningRemotePlayer {
  * Sent on session start and after each state-changing action.
  */
 export interface MiningSessionClientState {
+  /** The run's mission with its progress so far (absent: a run without one). */
+  mission?: MissionClientState;
   /** The visible grid (fog of war applied). */
   grid: MiningClientTile[][];
   /** How to draw each fluid in the mine, sent once. Missing means the mine has no fluids. */
@@ -922,6 +929,8 @@ export interface MiningSessionEndedEvent {
   reason: 'death';
   title: string;
   message: string;
+  /** How the run's mission ended (it failed), when the run had one. */
+  mission?: MissionResultView;
 }
 
 /** Authoritative block hit event emitted when a block takes mining damage. */
@@ -1081,6 +1090,8 @@ export interface MiningStateTickPayload {
    */
   fluidCells?: [x: number, y: number, fluidId: number, level: number, falling?: number][];
   /** Doodads that came into view this tick (their cells were revealed), as compact placements. Hidden doodads are never sent. */
+  /** Mission objectives that moved this tick (only the ones that changed). */
+  missionProgress?: MissionProgressDelta;
   doodadsAdded?: DoodadPlacementWire[];
   /** Doodads that went this tick (the block they hung from or stood on was mined or blown up), by the top-left cell of their footprint. */
   doodadsRemoved?: DoodadRemovalWire[];
@@ -1300,7 +1311,7 @@ export interface MiningMapConfigData {
 
 /** Sky above the ground in the generated mine: about one screen, 8 of the original blocks. */
 /** The most doodads a generated mine holds unless the map says otherwise. */
-export const DEFAULT_DOODAD_MAX_COUNT = 400;
+export const DEFAULT_DOODAD_MAX_COUNT = 1500;
 /** The most lights doodads keep alive at once unless the map says otherwise (lights are the costly part of the scene). */
 export const DEFAULT_DOODAD_MAX_LIGHTS = 12;
 

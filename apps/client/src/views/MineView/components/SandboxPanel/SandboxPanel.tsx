@@ -38,6 +38,19 @@ export interface SandboxDoodadTools {
   onLoadScene: (sceneId: string) => void;
 }
 
+/** What the sandbox can do with missions (ticket 116). */
+export interface SandboxMissionTools {
+  /** The loaded missions that can be started (empty: only the test scenes). */
+  options: SandboxMobOption[];
+  /** Named test scenes. */
+  scenes: SandboxMobOption[];
+  /** The room has a mission running (the complete, restart and drop buttons need one). */
+  active: boolean;
+  onStart: (missionId: string) => void;
+  onControl: (action: 'complete' | 'reset' | 'clear') => void;
+  onLoadScene: (sceneId: string) => void;
+}
+
 export interface SandboxPanelProps {
   fluids: SandboxFluidOption[];
   /** The gases that can be released (absent or empty hides the gas tool). */
@@ -57,6 +70,8 @@ export interface SandboxPanelProps {
   extractor?: SandboxExtractorTools;
   /** The doodad tools (absent or no kinds hides the section and the two mouse tools). */
   doodads?: SandboxDoodadTools;
+  /** The mission tools (absent hides the section). */
+  missions?: SandboxMissionTools;
   onReset: () => void;
   onLeave: () => void;
   /** A command is in flight: the shared spinner shows and the buttons wait. */
@@ -87,6 +102,7 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   onClearHazards,
   extractor,
   doodads,
+  missions,
   onReset,
   onLeave,
   busy = false,
@@ -98,6 +114,8 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
   const [sceneId, setSceneId] = useState('');
   const [doodadId, setDoodadId] = useState(doodads?.options[0]?.id ?? '');
   const [doodadSceneId, setDoodadSceneId] = useState('');
+  const [missionId, setMissionId] = useState('');
+  const [missionSceneId, setMissionSceneId] = useState('');
   const [capacity, setCapacityText] = useState('100');
 
   const selectedFluid = fluids.some((f) => f.typeKey === fluidKey) ? fluidKey : fluids[0]?.typeKey ?? '';
@@ -288,6 +306,53 @@ export const SandboxPanel: React.FC<SandboxPanelProps> = ({
                     ))}
                   </select>
                   <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => doodads.onLoadScene(doodadSceneId)} disabled={busy || doodadSceneId === ''}>
+                    Load
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+
+          {missions && (missions.options.length > 0 || missions.scenes.length > 0) && (
+            <section aria-label="Missions" className="flex flex-col gap-1.5">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Missions</h3>
+              {missions.options.length > 0 && (
+                <div className="flex gap-1.5">
+                  <select aria-label="Mission to start" className={SELECT} value={missionId} onChange={(e) => setMissionId(e.target.value)}>
+                    <option value="">Mission...</option>
+                    {missions.options.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => missions.onStart(missionId)} disabled={busy || missionId === ''}>
+                    Start
+                  </button>
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-1.5">
+                <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => missions.onControl('complete')} disabled={busy || !missions.active}>
+                  Finish
+                </button>
+                <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => missions.onControl('reset')} disabled={busy || !missions.active}>
+                  Restart
+                </button>
+                <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => missions.onControl('clear')} disabled={busy || !missions.active}>
+                  Drop
+                </button>
+              </div>
+              {missions.scenes.length > 0 && (
+                <div className="flex gap-1.5">
+                  <select aria-label="Mission scene" className={SELECT} value={missionSceneId} onChange={(e) => setMissionSceneId(e.target.value)}>
+                    <option value="">Test scene...</option>
+                    {missions.scenes.map((scene) => (
+                      <option key={scene.id} value={scene.id}>
+                        {scene.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" className={`${BUTTON} ${IDLE}`} onClick={() => missions.onLoadScene(missionSceneId)} disabled={busy || missionSceneId === ''}>
                     Load
                   </button>
                 </div>

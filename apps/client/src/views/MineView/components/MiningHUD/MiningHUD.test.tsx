@@ -102,4 +102,17 @@ describe('MiningHUD', () => {
     rerender(<MiningHUD {...props} zoom={1.55} />);
     expect(screen.getByTestId('zoom-control').getAttribute('data-visible')).toBe('true');
   });
+
+  it('shows the mission tracker only when the run has a mission', () => {
+    const props = { playerState: mockPlayerState, onExit: vi.fn(), onAbandon: vi.fn(), onRestart: vi.fn() };
+    const { rerender } = render(<MiningHUD sessionState={mockSessionState} {...props} />);
+    expect(screen.queryByTestId('mission-tracker')).toBeNull();
+    const withMission: MiningSessionClientState = {
+      ...mockSessionState,
+      mission: { id: 'm1', name: 'Copper Run', tier: 1, completed: false, reward: { coins: 1, xp: 1, items: [] }, objectives: [{ type: 'KILL_MOB', label: 'Kill 3 mobs', target: 3, progress: 1, done: false, unit: 'count' }] },
+    };
+    rerender(<MiningHUD sessionState={withMission} {...props} />);
+    expect(screen.getByTestId('mission-tracker')).toBeDefined();
+    expect(screen.getByText('Kill 3 mobs')).toBeDefined();
+  });
 });

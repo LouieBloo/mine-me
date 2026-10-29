@@ -26,6 +26,7 @@ import {
   ROCK_SHAPES,
   type PieceOffset,
   type RockShape,
+  type MissionRequirements,
 } from '@mine-me/shared';
 import { MiningDataManager, blockKeyForTileType, tileTypeForBlockKey } from './mining/subsystems/MiningDataManager';
 import { DOODAD_SEED_SALT, generateDoodadPlacements } from './mining/doodads/DoodadGenerator';
@@ -110,6 +111,11 @@ export interface MapGeneratorOptions {
   biomes?: readonly BiomeDefinition[];
   /** Doodads (scenery) to scatter through the mine (ticket 100). None: none are placed and nothing else changes. */
   doodads?: readonly DoodadDefinition[];
+  /**
+   * What the run's mission needs from the map (ticket 110). The generator tops up whatever the usual recipe left short (blocks,
+   * fluid and gas pockets) so the mission can be done; a map with no mission is generated exactly as before.
+   */
+  mission?: MissionRequirements;
 }
 
 /** One cell of fluid the generator placed: a full cell of `typeKey` at (x, y). */
@@ -146,6 +152,19 @@ const FLUID_SEED_SALT = 0x0f1d51ed;
 /** Salt for the random stream that swaps base blocks per biome, so swaps never change anything else. */
 const SWAP_SEED_SALT = 0x5a9b10c5;
 
+/** Salt for the random stream that tops up what a mission needs, so a mission never changes the rest of the map. */
+const MISSION_SEED_SALT = 0x31551011;
+
+/** Blocks a mission's extra ore may replace: plain ground, never ore, rock, bedrock or lava rock. */
+const MISSION_REPLACEABLE: ReadonlySet<MiningTileType> = new Set<MiningTileType>([
+  MiningTileType.DIRT,
+  MiningTileType.CLAY,
+  MiningTileType.SANDSTONE,
+  MiningTileType.GRAVEL,
+  MiningTileType.ICE,
+  MiningTileType.STONE,
+]);
+
 /** Salt for the weighted ordering of ore and rock spots in biomes that change block weights. */
 const BIOME_ORDER_SEED_SALT = 0x0e0a5ed1;
 
@@ -163,6 +182,8 @@ export class MiningMapGenerator {
   private readonly orderRng: () => number;
   private readonly doodadRng: () => number;
   private readonly doodads: readonly DoodadDefinition[];
+  private readonly missionRequirements: MissionRequirements | undefined;
+  private readonly missionRng: () => number;
   /** Which biome each cell is in (tickets 095-096). */
   public readonly biomeField: BiomeField;
   /** Fluid cells placed by the last `generate()`. */
@@ -184,6 +205,8 @@ export class MiningMapGenerator {
     this.orderRng = createSeededRng(options.seed ^ BIOME_ORDER_SEED_SALT);
     this.doodadRng = createSeededRng(options.seed ^ DOODAD_SEED_SALT);
     this.doodads = options.doodads ?? [];
+    this.missionRequirements = options.mission;
+    this.missionRng = createSeededRng(options.seed ^ MISSION_SEED_SALT);
     this.config = {
       ...DEFAULT_MINING_MAP_CONFIG,
       ...options.config,
@@ -206,11 +229,106 @@ export class MiningMapGenerator {
     this.protectSurfaceAndSpawn();
     this.placeFluidPockets();
     this.placeGasPockets();
+    this.guaranteeMissionPockets();
     this.placeOreVeins();
     this.placeRocks();
     this.swapBaseBlocks();
+    this.guaranteeMissionBlocks();
     this.placeDoodads();
     return this.grid;
+  }
+
+  /**
+   * Mission guarantee, part one (ticket 110): a mission that asks to clear a fluid or gas gets at least one sealed pocket of it
+   * (3x3 cells), whatever the usual recipe left. Draws only from the mission's own random stream, and nothing at all when the
+   * map already holds enough or the run has no mission.
+   */
+  private guaranteeMissionPockets(): void {
+    const req = this.missionRequirements;
+    if (!req) return;
+    const countOf = (cells: ReadonlyArray<{ typeKey: string }>, typeKey: string) => cells.filter((c) => c.typeKey === typeKey).length;
+    for (const need of req.fluids) {
+      let have = countOf(this.fluidCells, need.typeKey);
+      while (have < need.minCells && this.forcePocket((x, y) => this.fluidCells.push({ x, y, typeKey: need.typeKey, level: 1 }))) have += 9;
+    }
+    for (const need of req.gases) {
+      const gas = this.gases.find((g) => g.typeKey === need.typeKey);
+      if (!gas) continue;
+      const concentration = gas.generation?.concentration ?? 1;
+      let have = countOf(this.gasCells, need.typeKey);
+      while (have < need.minCells && this.forcePocket((x, y) => this.gasCells.push({ x, y, typeKey: need.typeKey, concentration }))) have += 9;
+    }
+  }
+
+  /** Carves one sealed 3x3 pocket somewhere in the ground and reports its cells. False when nowhere fits. */
+  private forcePocket(onCell: (x: number, y: number) => void): boolean {
+    const size = 3;
+    const first = Math.max(1, 2 * BLOCK_SCALE);
+    const last = this.height - 2 - size;
+    if (last < first || this.width < size + 4) return false;
+    for (let attempt = 0; attempt < 600; attempt++) {
+      const x = 2 + Math.floor(this.missionRng() * (this.width - size - 3));
+      const y = first + Math.floor(this.missionRng() * (last - first + 1));
+      const cells: { x: number; y: number }[] = [];
+      for (let dy = 0; dy < size; dy++) for (let dx = 0; dx < size; dx++) cells.push({ x: x + dx, y: y + dy });
+      if (!this.canHoldPocket(cells)) continue;
+      for (const c of cells) {
+        this.grid[c.y][c.x] = { type: MiningTileType.EMPTY, revealed: false };
+        onCell(c.x, c.y);
+        this.pocketCellKeys.add(c.y * this.width + c.x);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Mission guarantee, part two: a mission that asks for an item gets at least the blocks that drop it (twice what the goal
+   * needs), added as small clusters of ordinary ground turned into that block after everything else is placed. Nothing
+   * happens when the map already holds enough or the run has no mission.
+   */
+  private guaranteeMissionBlocks(): void {
+    const req = this.missionRequirements;
+    if (!req) return;
+    for (const need of req.blocks) {
+      const tileType = tileTypeForBlockKey(need.typeKey);
+      if (tileType === undefined) continue;
+      let have = 0;
+      const eligible: MiningPosition[] = [];
+      for (let y = 1; y < this.height; y++) {
+        for (let x = 0; x < this.width; x++) {
+          const tile = this.grid[y][x];
+          if (tile.type === tileType) have++;
+          else if (MISSION_REPLACEABLE.has(tile.type) && !tile.piece && y >= Math.min(2 * BLOCK_SCALE, this.height - 1) && !(y <= 2 * BLOCK_SCALE && Math.abs(x - MINING_CONFIG.ENTRANCE_X) <= ENTRANCE_CLEAR_RADIUS)) eligible.push({ x, y });
+        }
+      }
+      let missing = need.minCount - have;
+      if (missing <= 0 || eligible.length === 0) continue;
+      for (let i = eligible.length - 1; i > 0; i--) {
+        const j = Math.floor(this.missionRng() * (i + 1));
+        [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+      }
+      for (const seed of eligible) {
+        if (missing <= 0) break;
+        if (!MISSION_REPLACEABLE.has(this.grid[seed.y][seed.x].type)) continue;
+        // A small cluster around the seed, like a vein
+        const cluster = 1 + Math.floor(this.missionRng() * 4);
+        const queue: MiningPosition[] = [seed];
+        let placed = 0;
+        while (queue.length > 0 && placed < cluster && missing > 0) {
+          const at = queue.shift()!;
+          if (!MISSION_REPLACEABLE.has(this.grid[at.y][at.x].type)) continue;
+          this.grid[at.y][at.x] = { type: tileType, revealed: false };
+          placed++;
+          missing--;
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nx = at.x + dx;
+            const ny = at.y + dy;
+            if (nx >= 0 && nx < this.width && ny >= 1 && ny < this.height && !this.pocketCellKeys.has(ny * this.width + nx) && this.grid[ny][nx].type !== MiningTileType.EMPTY) queue.push({ x: nx, y: ny });
+          }
+        }
+      }
+    }
   }
 
   /** Scatters the scenery over the finished mine (see `generateDoodadPlacements`). Reads the map, never changes it. */

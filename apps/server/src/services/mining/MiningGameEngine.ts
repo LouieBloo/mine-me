@@ -27,6 +27,12 @@ import {
   type DamageResult,
   type DamageTarget,
   type TileDamageResult,
+  pickRunBiomes,
+  sanitizeBiomeKeys,
+  type MissionDefinition,
+  type MissionRequirements,
+  type ObjectiveDefinition,
+  type MissionResultView,
 } from '@mine-me/shared';
 import * as planck from 'planck';
 import {
@@ -75,6 +81,8 @@ import { MiningDoodadSubsystem } from './subsystems/MiningDoodadSubsystem';
 import { MiningTickProfiler } from './MiningTickProfiler';
 import { MiningBurningSubsystem } from './subsystems/MiningBurningSubsystem';
 import { MiningMobSubsystem, type MiningActiveMobSession } from './subsystems/MiningMobSubsystem';
+import { MissionTracker } from './missions/MissionTracker';
+import { missionLookups, requirementsFor, rewardView } from './missions/missionContext';
 
 export type { MiningPlayerSession, MiningActiveMobSession };
 
@@ -103,6 +111,10 @@ export interface MiningEngineOptions extends Partial<MiningCombatStats & CarrySt
   /** Called when the room is shut down after too many consecutive failing ticks. */
   onFatalError?: (roomId: string) => void;
   mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>;
+  /** Single Player only: biomes the player chose to see (keys, untrusted). Only those appear, at any depth. Absent or empty: a normal map. */
+  biomeKeys?: string[];
+  /** The mission this run plays (tickets 108-113): the map is made to hold what it needs. Absent: a run without a mission. */
+  mission?: MissionDefinition;
 }
 
 /**
@@ -128,6 +140,14 @@ export class MiningGameEngine {
   public grid!: ServerMiningGrid;
   public rigidWorld!: MiningRigidWorld;
   public mapConfig?: Partial<import('@mine-me/shared').MiningMapConfigData>;
+  /** The run's mission (null: none). The sandbox sets and clears it with its tools. */
+  public mission: MissionDefinition | null = null;
+  /** Follows the mission through the run (null without one). Rebuilt when the world is. */
+  public missionTracker: MissionTracker | null = null;
+  /** The mission step polls fluid and gas totals this often (ticks). */
+  private static readonly MISSION_POLL_TICKS = 10;
+  /** The biomes this run was started with (Single Player), as asked; empty for a normal map. Never stored. */
+  public readonly runBiomeKeys: string[];
 
   public maxDurationSeconds = MINING_CONFIG.MAX_SESSION_DURATION_SECONDS;
   public elapsedTimeSeconds = 0;
@@ -203,6 +223,8 @@ export class MiningGameEngine {
     this.writeStash = options.writeStash;
     this.onPlayerDeath = options.onPlayerDeath;
     this.mapConfig = options.mapConfig;
+    this.mission = options.mission ?? null;
+    this.runBiomeKeys = options.gameMode === 'singleplayer' || options.gameMode === undefined ? sanitizeBiomeKeys(options.biomeKeys) : [];
 
     // Initialize subsystems. Each one is given the same world (its view of this room) and reaches
     // its collaborators through it, so none of them needs the engine or each other's constructors.
@@ -237,14 +259,20 @@ export class MiningGameEngine {
    */
   private rebuildWorld(): void {
     const mapConfig = this.mapConfig;
+    // A run that picked biomes uses only those (any depth), so the map's own biome weights do not apply
+    const allBiomes = MiningDataManager.getInstance().getBiomes();
+    const picking = this.runBiomeKeys.some((key) => allBiomes.some((b) => b.key === key));
+    const pickedBiomes = picking ? pickRunBiomes(allBiomes, this.runBiomeKeys) : allBiomes;
+    const generatorConfig = picking ? { ...mapConfig, biomeWeights: null } : mapConfig;
     const built = buildMapForMode(this.gameMode, {
       seed: this.seed,
-      mapConfig,
+      mapConfig: generatorConfig,
       fluids: MiningDataManager.getInstance().getFluids(),
       gases: MiningDataManager.getInstance().getGases(),
-      biomes: MiningDataManager.getInstance().getBiomes(),
+      biomes: pickedBiomes,
       doodads: MiningDataManager.getInstance().getDoodads(),
       sandboxDoodads: this.sandboxDoodadsRequested,
+      mission: this.mission && this.gameMode !== 'sandbox' ? requirementsFor(this.mission, this.dataManager) : undefined,
     });
     this.grid = built.grid;
     this.surfaceRow = built.surfaceRow ?? 0;
@@ -293,8 +321,64 @@ export class MiningGameEngine {
       for (const mob of built.mobs) this.spawnSurfaceTargetDummy({ x: mob.x, y: mob.y });
     } else {
       this.populateCavernMobs();
+      // Mission guarantee: enough mobs in the caves for a kill goal (before the target dummy, which is not one)
+      if (this.mission && this.gameMode !== 'sandbox') this.mobSubsystem.ensureMissionMobs(requirementsFor(this.mission, this.dataManager).mobs);
       this.spawnSurfaceTargetDummy();
     }
+    this.startMissionTracker();
+  }
+
+  /** (Re)starts the tracker for the run's mission against the world as it is now (the baselines for fluid and gas are taken here). */
+  public startMissionTracker(): void {
+    if (!this.mission) {
+      this.missionTracker = null;
+      this.sendMissionState();
+      return;
+    }
+    const data = this.dataManager;
+    const fluidId = (typeKey: string) => this.fluidSubsystem.registry.idOf(typeKey);
+    const gasId = (typeKey: string) => this.gasSubsystem.registry.idOf(typeKey);
+    this.missionTracker = new MissionTracker(this.mission, {
+      lookups: missionLookups(data),
+      fluidTypeKey: (id) => data.getFluid(id)?.typeKey,
+      gasTypeKey: (id) => data.getGas(id)?.typeKey,
+      fluidTotal: (typeKey) => (fluidId(typeKey) === undefined ? 0 : this.fluidSubsystem.grid.totalVolume(fluidId(typeKey))),
+      gasTotal: (typeKey) => (gasId(typeKey) === undefined ? 0 : this.gasSubsystem.grid.totalVolume(gasId(typeKey))),
+      mapDepth: this.grid.length - this.surfaceRow,
+      playerName: (characterId) => this.players.get(characterId)?.characterName ?? this.missionNames.get(characterId) ?? 'Miner',
+      reward: rewardView(this.mission, data),
+    });
+    this.sendMissionState();
+  }
+
+  /** Tells every player the mission as it stands now (a new, restarted or dropped mission), in full. */
+  private sendMissionState(): void {
+    for (const session of this.players.values()) {
+      if (session.socket?.connected) session.socket.emit('mining_mission_state', { mission: this.missionTracker?.clientState() ?? null });
+    }
+  }
+
+  /** Names of players who left, so a result can still say who did what. */
+  private readonly missionNames = new Map<string, string>();
+
+  /** Gives the room a mission (the sandbox's tool) and starts following it. */
+  public setMission(mission: MissionDefinition | null): void {
+    this.mission = mission;
+    this.startMissionTracker();
+  }
+
+  /** Adds an objective to the run's mission as it goes (any source). False when the run has no mission. */
+  public addMissionObjective(def: ObjectiveDefinition): boolean {
+    if (!this.missionTracker) return false;
+    this.missionTracker.addObjective(def);
+    return true;
+  }
+
+  /** How the run's mission stands for a player ending their run, or undefined when the run had none. */
+  public missionResultFor(characterId: string, outcome: MissionResultView['outcome'], reason?: string): MissionResultView | undefined {
+    const tracker = this.missionTracker;
+    if (!tracker) return undefined;
+    return tracker.result([...this.players.keys(), characterId], outcome, reason);
   }
 
   // ============================================================================
@@ -647,8 +731,22 @@ export class MiningGameEngine {
     // 9.5 Who just waded into or out of a fluid (for splash sounds)
     this.runStep('fluidSplashes', () => this.fluidSubsystem.trackSplashes());
 
+    // 9.6 Mission progress: how deep everyone is, and (a few times a second) how much fluid and gas is left
+    this.runStep('missions', () => this.updateMission());
+
     // 10. Broadcast 30 Hz State Tick
     this.runStep('broadcast', () => this.broadcastStateTick());
+  }
+
+  private updateMission(): void {
+    const tracker = this.missionTracker;
+    if (!tracker) return;
+    for (const session of this.players.values()) {
+      const depth = Math.floor(session.playerBody.position.y - this.surfaceRow);
+      if (depth > 0) tracker.onDepth(session.characterId, depth);
+      this.missionNames.set(session.characterId, session.characterName ?? 'Miner');
+    }
+    if (this.tickCount % MiningGameEngine.MISSION_POLL_TICKS === 0) tracker.poll();
   }
 
   /** Ends the run of every player who died this tick (after the simulation steps, so it is safe). */
@@ -670,6 +768,7 @@ export class MiningGameEngine {
           reason: 'death',
           title: 'You Were Knocked Out',
           message: 'You were knocked out in the mine. You have been returned to the surface and the contents of your backpack were lost.',
+          mission: this.missionResultFor(characterId, 'failed', 'You were knocked out before you reached the exit.'),
         };
         session.socket.emit('mining_session_ended', ended);
       }
@@ -807,6 +906,9 @@ export class MiningGameEngine {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const engine = this;
     return {
+      get missions() {
+        return engine.missionTracker;
+      },
       get grid() {
         return engine.grid;
       },
@@ -981,6 +1083,7 @@ export class MiningGameEngine {
     const beltItemChanges = this.beltSubsystem?.takeItemChanges();
     const doodadChanges = this.doodadSubsystem.takeChanges();
     const doodadsShattered = this.doodadSubsystem.falling.takeShattered();
+    const missionDelta = this.missionTracker?.takeDelta() ?? undefined;
 
     // About once a second every player is also told what the server is spending on this room
     const sendPerf = this.tickCount % MiningGameEngine.PERF_REPORT_TICKS === 0;
@@ -1061,6 +1164,7 @@ export class MiningGameEngine {
         miningTarget: session.miningTarget ?? undefined,
         revealedTiles: this.pendingRevealedTiles.length > 0 ? this.pendingRevealedTiles : undefined,
         fluidCells: fluidChanges.length > 0 ? fluidChanges : undefined,
+        ...(missionDelta ? { missionProgress: missionDelta } : {}),
         doodadsAdded: doodadChanges.added.length > 0 ? doodadChanges.added : undefined,
         doodadsRemoved: doodadChanges.removed.length > 0 ? doodadChanges.removed : undefined,
         doodadsHit: doodadChanges.hit.length > 0 ? doodadChanges.hit : undefined,
@@ -1149,6 +1253,7 @@ export class MiningGameEngine {
       if (session.socket && session.socket.connected) {
         session.socket.emit('mining_session_timeout', {
           message: 'Your mining session has reached the 15-minute time limit. You have been returned to the surface and the contents of your backpack were lost.',
+          mission: this.missionResultFor(session.characterId, 'failed', 'The time limit ran out before you reached the exit.'),
         });
       }
     }

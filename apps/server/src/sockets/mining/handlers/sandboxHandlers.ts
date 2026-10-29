@@ -190,3 +190,26 @@ export const handleSandboxLoadDoodadScene = async (_io: Server, socket: Socket, 
   if (res.ok) miningSessionManager.sendSandboxState(ctx.engine, { title: 'Scene loaded', message: `${res.placed} doodads placed.` });
   return toResult(res, res.ok ? { placed: res.placed } : undefined);
 };
+
+/** Starts a mission on the sandbox map: a loaded one by id, or a one-off list of objectives. */
+export const handleSandboxStartMission = async (_io: Server, socket: Socket, payload: { missionId?: unknown; objectives?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.startMission(payload?.missionId, payload?.objectives));
+};
+
+/** Completes the sandbox mission now, restarts it, or drops it. */
+export const handleSandboxMissionControl = async (_io: Server, socket: Socket, payload: { action?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  return toResult(ctx.tools.missionControl(payload?.action));
+};
+
+/** Loads a named mission test scene; the view is rebuilt so the player is where the scene put them. */
+export const handleSandboxLoadMissionScene = async (_io: Server, socket: Socket, payload: { sceneId?: unknown }): Promise<GameEventResult> => {
+  const ctx = sandboxFor(socket);
+  if (!isContext(ctx)) return ctx;
+  const res = ctx.tools.loadMissionScene(ctx.characterId, payload?.sceneId);
+  if (res.ok) miningSessionManager.sendSandboxState(ctx.engine, { title: 'Scene loaded', message: 'The mission has started.' });
+  return toResult(res);
+};

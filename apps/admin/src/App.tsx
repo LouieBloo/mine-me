@@ -30,6 +30,8 @@ import Biomes from './pages/Biomes/Biomes';
 import BiomeDetail from './pages/Biomes/BiomeDetail/BiomeDetail';
 import Doodads from './pages/Doodads/Doodads';
 import DoodadDetail from './pages/Doodads/DoodadDetail/DoodadDetail';
+import Missions from './pages/Missions/Missions';
+import MissionDetail from './pages/Missions/MissionDetail/MissionDetail';
 import Extractors from './pages/Extractors/Extractors';
 import ExtractorDetail from './pages/Extractors/ExtractorDetail/ExtractorDetail';
 import ItemWeights from './pages/ItemWeights/ItemWeights';
@@ -124,6 +126,14 @@ const router = createBrowserRouter([
       {
         path: "doodads/:id",
         element: <DoodadDetail />
+      },
+      {
+        path: "missions",
+        element: <Missions />
+      },
+      {
+        path: "missions/:id",
+        element: <MissionDetail />
       },
       {
         path: "extractors",

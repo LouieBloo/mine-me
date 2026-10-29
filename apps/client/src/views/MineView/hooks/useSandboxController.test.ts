@@ -84,6 +84,20 @@ describe('useSandboxController', () => {
     expect(notificationService.error).toHaveBeenCalledWith('Doodad scene', 'There are no doodads defined to show.');
   });
 
+  it('sends the mission commands, and shows why one was refused', async () => {
+    const send = vi.fn().mockResolvedValue({ success: true });
+    const { result } = render(send, sandboxSession());
+    await act(() => result.current.startMission('m1'));
+    expect(send).toHaveBeenCalledWith({ type: 'sandbox_start_mission', missionId: 'm1' });
+    await act(() => result.current.missionControl('complete'));
+    expect(send).toHaveBeenCalledWith({ type: 'sandbox_mission_control', action: 'complete' });
+    await act(() => result.current.loadMissionScene('reach-depth'));
+    expect(send).toHaveBeenCalledWith({ type: 'sandbox_load_mission_scene', sceneId: 'reach-depth' });
+    send.mockResolvedValue({ success: false, error: 'There is no mission running.' });
+    await act(() => result.current.missionControl('reset'));
+    expect(notificationService.error).toHaveBeenCalledWith('Mission', 'There is no mission running.');
+  });
+
   it('does not send a speed the sandbox does not offer', async () => {
     const send = vi.fn().mockResolvedValue({ success: true });
     const { result } = render(send, sandboxSession());

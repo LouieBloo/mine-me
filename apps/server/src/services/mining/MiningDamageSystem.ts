@@ -15,6 +15,16 @@ import { getDamageStage, isInBounds } from '../miningMap.service';
 import type { MiningPlayerSession } from './subsystems/MiningPlayerManager';
 import type { MiningWorld } from './MiningWorld';
 
+/** How long after a player's hit a death caused by the environment (fire, a fall, a rock) still counts as their kill. */
+export const MISSION_KILL_CREDIT_SECONDS = 15;
+
+/** The player a damage source traces to: their own hit, or the owner of the bullet or blast. Absent for mobs and the environment. */
+export function playerBehind(source: DamageEvent['source']): string | undefined {
+  if (source.kind === 'player') return source.id;
+  if (source.kind === 'projectile' || source.kind === 'explosion') return source.ownerId;
+  return undefined;
+}
+
 /**
  * The one place hits are applied. Every source of damage (melee, bullets, explosions, mob
  * attacks, mining) builds a `DamageEvent` and goes through `applyDamage` / `damageTile`, so rules
@@ -63,6 +73,12 @@ export class MiningDamageSystem {
     if (!mob || mob.health <= 0) return NO_DAMAGE;
 
     const healthBefore = mob.health;
+    // Remember which player this hurt it, so fire, a fall or a blast that finishes it soon after still counts for them
+    const attacker = playerBehind(event.source);
+    if (attacker) {
+      mob.lastPlayerHitBy = attacker;
+      mob.lastPlayerHitAt = this.world.simTime;
+    }
     this.world.mobs.damageMob(mobId, amount, { stun: !event.noStun });
 
     // Knockback only moves mobs that can move at all (not target dummies / stationary mobs)
@@ -72,7 +88,22 @@ export class MiningDamageSystem {
       mob.mobBody.isGrounded = false;
     }
 
-    return { applied: true, dealt: healthBefore - mob.health, killed: mob.health <= 0 };
+    const killed = mob.health <= 0;
+    if (killed) this.creditMissionKill(mob, attacker);
+    return { applied: true, dealt: healthBefore - mob.health, killed };
+  }
+
+  /**
+   * A mob died: a mission counts every kill (co-op: fire, falls, rocks and gas count too), but only the surface target dummy
+   * never does. The contribution on the results screen goes to the player the damage traces to (their own hit, their bullet
+   * or their blast), or, when the environment finished it, to the player who hurt it last within MISSION_KILL_CREDIT_SECONDS;
+   * a death the environment caused alone counts for the run and for nobody's contribution.
+   */
+  private creditMissionKill(mob: { mobId: string; lastPlayerHitBy?: string; lastPlayerHitAt?: number }, attacker: string | undefined): void {
+    const tracker = this.world.missions;
+    if (!tracker || mob.mobId === this.world.mapConfig?.surfaceDummyMobId) return;
+    const recent = mob.lastPlayerHitBy !== undefined && mob.lastPlayerHitAt !== undefined && this.world.simTime - mob.lastPlayerHitAt <= MISSION_KILL_CREDIT_SECONDS;
+    tracker.onMobKilled(attacker ?? (recent ? mob.lastPlayerHitBy ?? null : null), mob.mobId);
   }
 
   private damagePlayer(characterId: string, amount: number, event: DamageEvent): DamageResult {

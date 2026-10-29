@@ -55,6 +55,13 @@ describe('doodadForm', () => {
     it('ignores a number still being typed', () => {
       expect(tidySpawn({ minDepth: NaN, maxDepth: 30 })).toEqual({ maxDepth: 30 });
     });
+    it('keeps the group settings only with a group share, and the kind\'s own limit always', () => {
+      const all = { groupSizeMin: 3, groupSizeMax: 8, groupSpread: 6, groupFill: 0.5, memberSpacing: 1, maxCount: 80 };
+      expect(tidySpawn({ ...all, groupChance: 0.8 })).toEqual({ ...all, groupChance: 0.8 });
+      expect(tidySpawn({ ...all, groupChance: 0 })).toEqual({ maxCount: 80 });
+      expect(tidySpawn({ ...all, groupChance: null, maxCount: NaN })).toBeNull();
+      expect(tidySpawn({ groupChance: 0.5, groupSizeMin: NaN, memberSpacing: 0 })).toEqual({ groupChance: 0.5 });
+    });
   });
 
   describe('previewDoodad', () => {

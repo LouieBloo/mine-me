@@ -27,6 +27,9 @@ import {
   handleSandboxClearDoodads,
   handleSandboxSetDoodadGeneration,
   handleSandboxLoadDoodadScene,
+  handleSandboxStartMission,
+  handleSandboxMissionControl,
+  handleSandboxLoadMissionScene,
 } from './sandboxHandlers';
 
 const socketFor = (characterId: string | undefined) => ({ data: { characterId }, connected: true, emit: vi.fn() }) as any;
@@ -58,6 +61,9 @@ describe('sandbox handlers', () => {
         handleSandboxSpawnExtractor(io, socket),
         handleSandboxDigBelt(io, socket, { rows: 3 }),
         handleSandboxSetCapacity(io, socket, { capacity: 10 }),
+        handleSandboxStartMission(io, socket, { objectives: [{ type: 'KILL_MOB', amount: 1 }] }),
+        handleSandboxMissionControl(io, socket, { action: 'complete' }),
+        handleSandboxLoadMissionScene(io, socket, { sceneId: 'reach-depth' }),
         handleSandboxFillBackpack(io, socket, { quantity: 3 }),
         handleSandboxLoadExtractorScene(io, socket, { sceneId: 'full-pack-at-belt' }),
         handleSandboxPlaceDoodad(io, socket, { doodadId: 'x', x: 1, y: 1 }),
@@ -198,6 +204,40 @@ describe('sandbox handlers', () => {
       expect(socket.emit.mock.calls.some((c: any[]) => c[0] === 'mining_sandbox_reset')).toBe(true);
       const again = await handleSandboxSetDoodadGeneration(io, socket, { enabled: false });
       expect(again).toMatchObject({ success: true, data: { status: { doodadsGenerated: false } } });
+    });
+  });
+  describe('the mission tools in a sandbox (ticket 116)', () => {
+    it('starts a one-off mission, tells the room, completes it, restarts it and drops it', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      socket.emit.mockClear();
+      expect(await handleSandboxStartMission(io, socket, { objectives: [{ type: 'REACH_DEPTH', amount: 20 }] })).toEqual({ success: true });
+      expect(socket.emit).toHaveBeenCalledWith('mining_mission_state', { mission: expect.objectContaining({ completed: false }) });
+      const engine = miningSessionManager.getSession('hs-a')!;
+      expect(await handleSandboxMissionControl(io, socket, { action: 'complete' })).toEqual({ success: true });
+      expect(engine.missionTracker!.completed).toBe(true);
+      expect(await handleSandboxMissionControl(io, socket, { action: 'reset' })).toEqual({ success: true });
+      expect(engine.missionTracker!.completed).toBe(false);
+      expect(await handleSandboxMissionControl(io, socket, { action: 'clear' })).toEqual({ success: true });
+      expect(engine.missionTracker).toBeNull();
+    });
+
+    it('refuses bad input with a reason', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      expect(await handleSandboxStartMission(io, socket, {})).toMatchObject({ success: false });
+      expect(await handleSandboxStartMission(io, socket, { missionId: 'nope' })).toEqual({ success: false, error: 'Unknown mission.' });
+      expect(await handleSandboxMissionControl(io, socket, { action: 'complete' })).toEqual({ success: false, error: 'There is no mission running.' });
+      expect(await handleSandboxLoadMissionScene(io, socket, { sceneId: 'nope' })).toEqual({ success: false, error: 'Unknown scene.' });
+    });
+
+    it('loads a scene and rebuilds everyone\'s view', async () => {
+      const socket = socketFor('hs-a');
+      join('hs-a', 'sandbox', socket);
+      socket.emit.mockClear();
+      expect(await handleSandboxLoadMissionScene(io, socket, { sceneId: 'reach-depth' })).toEqual({ success: true });
+      expect(socket.emit.mock.calls.some((c: any[]) => c[0] === 'mining_sandbox_reset')).toBe(true);
+      expect(miningSessionManager.getSession('hs-a')!.missionTracker).not.toBeNull();
     });
   });
 });

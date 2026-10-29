@@ -1,5 +1,5 @@
 import { prisma } from '../index';
-import { DEFAULT_MINING_MAP_CONFIG, type MiningMapConfigData } from '@mine-me/shared';
+import { DEFAULT_DOODAD_MAX_COUNT, DEFAULT_MINING_MAP_CONFIG, type MiningMapConfigData } from '@mine-me/shared';
 import { Prisma } from '@prisma/client';
 import { syncJson } from './admin.service';
 
@@ -123,7 +123,7 @@ export async function updateMiningConfig(data: Partial<MiningMapConfigData>): Pr
     biomeBlendWidth: data.biomeBlendWidth ?? (existing as any)?.biomeBlendWidth ?? DEFAULT_MINING_MAP_CONFIG.biomeBlendWidth ?? 0.15,
     // null is meaningful here ("every biome"), so only fall back when the field was not supplied at all
     biomeWeights: data.biomeWeights !== undefined ? data.biomeWeights : ((existing as any)?.biomeWeights ?? null),
-    doodadMaxCount: data.doodadMaxCount ?? (existing as any)?.doodadMaxCount ?? DEFAULT_MINING_MAP_CONFIG.doodadMaxCount ?? 400,
+    doodadMaxCount: data.doodadMaxCount ?? (existing as any)?.doodadMaxCount ?? DEFAULT_MINING_MAP_CONFIG.doodadMaxCount ?? DEFAULT_DOODAD_MAX_COUNT,
     doodadMaxLights: data.doodadMaxLights ?? (existing as any)?.doodadMaxLights ?? DEFAULT_MINING_MAP_CONFIG.doodadMaxLights ?? 12,
     mobSpawnCount: data.mobSpawnCount ?? (existing as any)?.mobSpawnCount ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnCount ?? 3,
     mobSpawnMinDepth: data.mobSpawnMinDepth ?? (existing as any)?.mobSpawnMinDepth ?? DEFAULT_MINING_MAP_CONFIG.mobSpawnMinDepth ?? 5,

@@ -20,12 +20,13 @@ describe('generated rocks come in several sizes', () => {
   const grid = generateMiningMap({ seed: 2024, config: { rockPercentage: 12 } });
   const rocks = rocksIn(grid);
 
-  it('places rocks of more than one size, with small ones the most common', () => {
+  it('places rocks of more than one size, with small ones the most common, and never a single cell', () => {
     const sizes = new Set(rocks.map((r) => `${r.width}x${r.height}`));
     expect(sizes.size).toBeGreaterThanOrEqual(3);
     expect([...sizes].every((s) => ROCK_SHAPES.some((shape) => shape.id === s))).toBe(true);
     const count = (id: string) => rocks.filter((r) => `${r.width}x${r.height}` === id).length;
-    expect(count('1x1')).toBeGreaterThan(count('3x3'));
+    expect(count('2x1')).toBeGreaterThan(count('3x3'));
+    expect(count('1x1')).toBe(0);
   });
 
   it('a rock bigger than one cell is a whole piece: every cell is rock and knows its place and the rock size', () => {

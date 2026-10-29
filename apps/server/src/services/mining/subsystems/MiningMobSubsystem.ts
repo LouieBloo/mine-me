@@ -41,6 +41,9 @@ export interface MiningActiveMobSession extends SwingState {
   id: string;
   /** On fire (set by the burning system each tick). */
   burning?: boolean;
+  /** The last player whose attack hurt it, and when (sim seconds): a death by fire, a fall or a rock soon after still counts for them. */
+  lastPlayerHitBy?: string;
+  lastPlayerHitAt?: number;
   mobId: string;
   name: string;
   mobBody: MiningMobBody;
@@ -285,6 +288,34 @@ export class MiningMobSubsystem {
       if (!mobDef) continue;
 
       this.spawnMob(mobDef, spawnPos);
+    }
+  }
+
+  /**
+   * Mission guarantee, part three (ticket 110): tops up the cave's mobs so a kill objective can be done. For each need, spawns
+   * the mobs it is short of at valid cave spots: the named mob, or (for "any mob") the map's own mobs taking turns. Spawns
+   * nothing when the caves already hold enough, so a run with no mission is untouched.
+   */
+  public ensureMissionMobs(needs: ReadonlyArray<{ mobId: string | null; minSpawns: number }>): void {
+    if (needs.length === 0) return;
+    const minDepth = this.world.mapConfig?.mobSpawnMinDepth ?? 5;
+    const alive = (mobId?: string) => Array.from(this.activeMobs.values()).filter((m) => m.health > 0 && (mobId === undefined || m.mobId === mobId)).length;
+    const dummyId = this.world.mapConfig?.surfaceDummyMobId;
+    for (const need of needs) {
+      if (need.mobId !== null) {
+        const def = this.world.data.getMobData(need.mobId);
+        if (!def) continue;
+        for (let missing = need.minSpawns - alive(need.mobId); missing > 0; missing--) this.spawnMob(def, this.findValidCavernSpawnPosition(minDepth));
+        continue;
+      }
+      const fromMap = this.world.mapConfig?.allowedMobIds ?? [];
+      const pool = (fromMap.length > 0 ? fromMap : this.world.data.getMobs().map((m) => m.id)).filter((id) => id !== dummyId && this.world.data.getMobData(id));
+      if (pool.length === 0) continue;
+      let turn = 0;
+      for (let missing = need.minSpawns - alive(); missing > 0; missing--) {
+        const def = this.world.data.getMobData(pool[turn++ % pool.length]);
+        if (def) this.spawnMob(def, this.findValidCavernSpawnPosition(minDepth));
+      }
     }
   }
 

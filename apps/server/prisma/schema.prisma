@@ -478,7 +478,7 @@ model MiningMapConfig {
   // Which biomes this map has and their weight on it (biome key -> weight); null = every biome at its own weight
   biomeWeights        Json?
   // The most doodads (scenery) the generated mine holds; 0 = none (ticket 100)
-  doodadMaxCount      Int      @default(400)
+  doodadMaxCount      Int      @default(1500)
   // The most doodad lights alive at once on screen (ticket 103)
   doodadMaxLights     Int      @default(12)
   // Hostile NPC / Mob Spawning Settings
@@ -648,4 +648,31 @@ model DoodadBiome {
   density   Float  @default(1)
 
   @@unique([doodadId, biomeId])
+}
+
+/// A mission: a goal for a mine run (ticket 108). Objectives are typed rows in JSON (see the shared OBJECTIVE_TYPES registry);
+/// the reward items have the shape of drop table entries.
+model Mission {
+  id          String   @id @default(cuid())
+  // Open key, e.g. copper_run
+  key         String   @unique
+  name        String
+  description String?
+  // Character levels it may be offered to (inclusive)
+  minLevel    Int      @default(1)
+  maxLevel    Int      @default(100)
+  // Difficulty tier, 1 = easiest
+  tier        Int      @default(1)
+  // Chance weight against the other missions on offer
+  weight      Float    @default(1)
+  // [{ type, targetId?, amount }]
+  objectives  Json
+  rewardCoins Int      @default(0)
+  rewardXp    Int      @default(0)
+  // [{ itemId, chance, minQuantity, maxQuantity }]
+  rewardItems Json?
+  // Sound slots (objective, complete, failed): library sounds by id, each with its own volume
+  soundEffects Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

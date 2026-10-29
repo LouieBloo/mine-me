@@ -2,11 +2,11 @@ import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds, attachFluidSounds, attachGasSounds, attachExtractorSounds, attachDoodadSounds, toDoodadDefinition } from './definitionLoaders';
+import { attachMissionSounds, toMissionDefinition, loadDefinitionsFromDatabase, loadDefinitionsFromFiles, installDefinitionsFromDatabase, attachMobSounds, attachFluidSounds, attachGasSounds, attachExtractorSounds, attachDoodadSounds, toDoodadDefinition } from './definitionLoaders';
 import { validateExtractor } from '@mine-me/shared';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 
-const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; biomes?: any[]; doodads?: any[]; extractors?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
+const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?: any[]; gases?: any[]; biomes?: any[]; doodads?: any[]; missions?: any[]; extractors?: any[]; particleEffects?: any[]; sounds?: any[]; characterSounds?: any }) =>
   ({
     item: { findMany: vi.fn().mockResolvedValue(data.items ?? [{ id: 'i1', name: 'Thing' }]) },
     mob: { findMany: vi.fn().mockResolvedValue(data.mobs ?? [{ id: 'm1', name: 'Mole' }]) },
@@ -15,6 +15,7 @@ const fakePrisma = (data: { items?: any[]; mobs?: any[]; blocks?: any[]; fluids?
     gas: { findMany: vi.fn().mockResolvedValue(data.gases ?? []) },
     biome: { findMany: vi.fn().mockResolvedValue(data.biomes ?? []) },
     doodad: { findMany: vi.fn().mockResolvedValue(data.doodads ?? []) },
+    mission: { findMany: vi.fn().mockResolvedValue(data.missions ?? []) },
     extractor: { findMany: vi.fn().mockResolvedValue(data.extractors ?? []) },
     particleEffect: { findMany: vi.fn().mockResolvedValue(data.particleEffects ?? []) },
     sound: { findMany: vi.fn().mockResolvedValue(data.sounds ?? []) },
@@ -255,7 +256,7 @@ describe('loadDefinitionsFromFiles', () => {
     write('items.json', [{ id: 'a' }]);
     write('mobs.json', []);
     write('blocks.json', [{ typeKey: 'DIRT' }]);
-    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], biomes: [], doodads: [], extractors: [], particleEffects: [], characterSounds: {} });
+    expect(loadDefinitionsFromFiles(tmp)).toEqual({ items: [{ id: 'a' }], mobs: [], blocks: [{ typeKey: 'DIRT' }], fluids: [], gases: [], biomes: [], doodads: [], missions: [], extractors: [], particleEffects: [], characterSounds: {} });
   });
 
   it('reads fluids.json when it exists', () => {
@@ -460,5 +461,34 @@ describe('doodads (ticket 099)', () => {
     expect(data.getDoodad('d1')?.key).toBe('glow_mushroom');
     expect(data.getDoodad('nope')).toBeUndefined();
     MiningDataManager.reset();
+  });
+});
+
+describe('missions (ticket 108)', () => {
+  const row = { id: 'm1', key: 'copper_run', name: 'Copper Run', minLevel: 1, maxLevel: 5, tier: 1, weight: 1, objectives: [{ type: 'KILL_MOB', amount: 2 }], rewardCoins: 5, rewardXp: 5, rewardItems: null, soundEffects: { complete: { soundId: 's1', volume: 0.5 } } };
+
+  it('loads the missions, oldest first, with their sounds resolved from the library', async () => {
+    const prisma = fakePrisma({ missions: [row], sounds: [{ id: 's1', url: '/assets/sounds/chime.mp3', volume: 1, isActive: true }] });
+    const defs = await loadDefinitionsFromDatabase(prisma);
+    expect(prisma.mission.findMany).toHaveBeenCalledWith({ orderBy: { createdAt: 'asc' } });
+    expect(defs.missions).toHaveLength(1);
+    expect(defs.missions![0]).toMatchObject({ key: 'copper_run', objectives: [{ type: 'KILL_MOB', amount: 2 }], rewardItems: [] });
+    expect(defs.missions![0].sounds?.complete).toMatchObject({ url: '/assets/sounds/chime.mp3', volume: 0.5 });
+  });
+
+  it('has no missions when none are defined or the table does not exist yet', async () => {
+    expect((await loadDefinitionsFromDatabase(fakePrisma({}))).missions).toEqual([]);
+    const prisma = fakePrisma({});
+    delete prisma.mission;
+    expect((await loadDefinitionsFromDatabase(prisma)).missions).toEqual([]);
+  });
+
+  it('turns a row whose JSON columns are empty into a usable mission', () => {
+    expect(toMissionDefinition({ ...row, objectives: null, rewardItems: null })).toMatchObject({ objectives: [], rewardItems: [] });
+  });
+
+  it('keeps sounds a mission already carries when it has no references', () => {
+    const mission = { ...toMissionDefinition(row), soundEffects: null, sounds: { complete: { url: '/a.mp3' } } } as any;
+    expect(attachMissionSounds([mission], [])[0].sounds).toEqual({ complete: { url: '/a.mp3' } });
   });
 });

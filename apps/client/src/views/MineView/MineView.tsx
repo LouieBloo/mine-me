@@ -9,12 +9,15 @@ import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
 import { LOADING_SCREEN_EXIT_MS, MiningLoadingScreen } from './components/MiningLoadingScreen/MiningLoadingScreen';
 import { notificationService } from '../../services/notificationService';
-import { type BeltBlockedReason, type MiningBackpackItem, type MiningGameMode, isOnEntrance } from '@mine-me/shared';
+import { type BeltBlockedReason, type MiningBackpackItem, type MiningGameMode, type MissionOffersResponse, type MissionResultView, isOnEntrance } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
 import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
+import { miningStartEvent } from './miningStartEvent';
 import { ExpeditionModeModal } from './components/ExpeditionModeModal/ExpeditionModeModal';
 import { SandboxPanel } from './components/SandboxPanel/SandboxPanel';
 import { useSandboxController } from './hooks/useSandboxController';
+import { useMissionSync, playMissionSound } from './hooks/useMissionSync';
+import { MissionResults } from './components/MissionResults/MissionResults';
 import './MineView.css';
 
 export const MineView: React.FC = () => {
@@ -63,6 +66,10 @@ export const MineView: React.FC = () => {
   const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const [summaryLoot, setSummaryLoot] = useState<MiningBackpackItem[]>([]);
+  // How the run's mission went, shown when the run ends (before the loot on a safe exit, instead of it when the run is lost)
+  const [missionResult, setMissionResult] = useState<MissionResultView | null>(null);
+  const [missionResultOpen, setMissionResultOpen] = useState<boolean>(false);
+  const afterMissionResultRef = useRef<'summary' | 'home'>('home');
 
   // Debug hitboxes & reach mode state
   const [showDebug, setShowDebug] = useState<boolean>(false);
@@ -136,31 +143,44 @@ export const MineView: React.FC = () => {
   // Track whether session has already been extracted/cleaned up so unmount doesn't double-cancel
   const isCleanedUpRef = useRef<boolean>(false);
 
+  // (kept in a ref so a run that ends can still play the mission's own "failed" sound after the session is cleared)
+  const lostMissionRef = useRef(miningSession?.mission);
+  lostMissionRef.current = miningSession?.mission ?? lostMissionRef.current;
+
   // The server can end a run on its own: the 15 minute limit, or the player dying
   useEffect(() => {
-    const endRun = (title: string, message: string, severity: 'info' | 'error') => {
+    const endRun = (title: string, message: string, severity: 'info' | 'error', mission?: MissionResultView) => {
       isCleanedUpRef.current = true;
       setMiningSession(null);
       notificationService[severity](title, message);
+      if (mission) {
+        // The lost mission is shown before going home, with its own sound
+        if (lostMissionRef.current) playMissionSound(lostMissionRef.current, 'failed', (url, options) => soundManager.playSfx?.(url, options as never));
+        afterMissionResultRef.current = 'home';
+        setMissionResult(mission);
+        setMissionResultOpen(true);
+        return;
+      }
       navigate('/home');
     };
 
-    const cleanupTimeout = onEvent('mining_session_timeout', (payload: { message?: string }) => {
+    const cleanupTimeout = onEvent('mining_session_timeout', (payload: { message?: string; mission?: MissionResultView }) => {
       endRun(
         'Time Limit Reached',
         payload?.message || 'Your mining expedition has reached its 15-minute time limit and ended.',
-        'info'
+        'info',
+        payload?.mission
       );
     });
     const cleanupEnded = onEvent('mining_session_ended', (payload) => {
-      endRun(payload?.title || 'Expedition Over', payload?.message || 'Your expedition has ended.', 'error');
+      endRun(payload?.title || 'Expedition Over', payload?.message || 'Your expedition has ended.', 'error', payload?.mission);
     });
 
     return () => {
       cleanupTimeout();
       cleanupEnded();
     };
-  }, [onEvent, setMiningSession, navigate]);
+  }, [onEvent, setMiningSession, navigate, soundManager]);
 
   // Tool feedback from the server, e.g. "Your tool isn't strong enough to break Silverium."
   useEffect(() => {
@@ -190,14 +210,28 @@ export const MineView: React.FC = () => {
     });
   }, [onEvent, setMiningSession]);
 
+  // The HUD's mission follows the server (progress in the tick, whole state when it is started over)
+  const playSfx = useCallback((url: string, options?: unknown) => soundManager.playSfx?.(url, options as never), [soundManager]);
+  useMissionSync(onEvent as never, setMiningSession as never, playSfx);
+
+  // Asks what missions a new run of this mode offers (the modal shows them before the map is made)
+  const loadMissionOffers = useCallback(
+    async (mode: MiningGameMode): Promise<MissionOffersResponse> => {
+      const result = await sendGameEvent({ type: 'mining_mission_offers', mode });
+      if (!result.success) throw new Error(result.error || 'Could not load the missions');
+      return result.data as MissionOffersResponse;
+    },
+    [sendGameEvent]
+  );
+
   // Start Expedition Session with chosen mode
   const handleStartExpedition = useCallback(
-    async (mode: MiningGameMode, forceNew = false) => {
+    async (mode: MiningGameMode, forceNew = false, biomeKeys?: string[], missionId?: string) => {
       setShowModeModal(false);
       try {
         setLoading(true);
         setIsAssetsLoaded(false);
-        const result = await sendGameEvent({ type: 'mining_start', mode, forceNew });
+        const result = await sendGameEvent(miningStartEvent(mode, forceNew, biomeKeys, missionId));
 
         if (result.success && result.data?.sessionState) {
           isCleanedUpRef.current = false;
@@ -230,11 +264,12 @@ export const MineView: React.FC = () => {
       navigate('/home');
       return;
     }
-    if (!miningSession) {
+    // (while the run's results or spoils are on screen the mode picker waits: closing them goes home)
+    if (!miningSession && !missionResultOpen && !showSummaryModal) {
       setLoading(false);
       setShowModeModal(true);
     }
-  }, [activeCharacter?.id, navigate, miningSession]);
+  }, [activeCharacter?.id, navigate, miningSession, missionResultOpen, showSummaryModal]);
 
   // Track if player has moved off the entrance and then landed back on it to trigger modal
   useEffect(() => {
@@ -263,8 +298,15 @@ export const MineView: React.FC = () => {
         }
         const items = result.data?.extractedItems || [];
         setSummaryLoot(items);
-        setShowSummaryModal(true);
         setMiningSession(null);
+        if (result.data?.mission) {
+          // The mission's results come first, then the loot
+          afterMissionResultRef.current = 'summary';
+          setMissionResult(result.data.mission as MissionResultView);
+          setMissionResultOpen(true);
+        } else {
+          setShowSummaryModal(true);
+        }
       } else {
         notificationService.error('Extraction Failed', result.error || 'Cannot extract');
       }
@@ -429,6 +471,14 @@ export const MineView: React.FC = () => {
                 }
               : undefined
           }
+          missions={{
+            options: sandbox.info.missions ?? [],
+            scenes: sandbox.info.missionScenes ?? [],
+            active: Boolean(miningSession.mission),
+            onStart: sandbox.startMission,
+            onControl: sandbox.missionControl,
+            onLoadScene: sandbox.loadMissionScene,
+          }}
           onReset={sandbox.reset}
           onLeave={handleExit}
           busy={sandbox.busy}
@@ -490,10 +540,23 @@ export const MineView: React.FC = () => {
         acceptButtonText="Accept Spoils"
       />
 
+      {/* How the run's mission went (a safe exit pays; a lost run shows what was missed) */}
+      <MissionResults
+        isOpen={missionResultOpen}
+        result={missionResult}
+        onClose={() => {
+          setMissionResultOpen(false);
+          setMissionResult(null);
+          if (afterMissionResultRef.current === 'summary') setShowSummaryModal(true);
+          else navigate('/home');
+        }}
+      />
+
       {/* Choose Expedition Mode Modal (Solo vs Multiplayer) */}
       <ExpeditionModeModal
         isOpen={showModeModal}
-        onSelectMode={(mode) => handleStartExpedition(mode, mode === 'singleplayer')}
+        loadMissionOffers={loadMissionOffers}
+        onSelectMode={(mode, options) => handleStartExpedition(mode, mode === 'singleplayer', options?.biomeKeys, options?.missionId)}
         onCancel={() => {
           setShowModeModal(false);
           navigate('/home');

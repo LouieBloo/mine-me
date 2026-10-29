@@ -2,7 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import { installDefinitionsFromDatabase } from './definitionLoaders';
 
 type DefinitionDb = Pick<PrismaClient, 'item' | 'mob' | 'miningBlock' | 'fluid' | 'gas' | 'particleEffect' | 'sound' | 'characterSoundConfig'> &
-  Partial<Pick<PrismaClient, 'extractor'>>;
+  Partial<Pick<PrismaClient, 'extractor' | 'biome' | 'doodad' | 'mission'>>;
 
 export type ReloadResult = { ok: true } | { ok: false; error: string };
 

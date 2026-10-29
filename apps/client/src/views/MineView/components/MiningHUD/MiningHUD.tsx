@@ -3,6 +3,7 @@ import { type MiningSessionClientState, type PlayerState, MINING_CONFIG } from '
 import { ZoomControl } from '../ZoomControl/ZoomControl';
 import { QuickAccessBar } from '../../../../components/QuickAccessBar/QuickAccessBar';
 import { BeltStatus } from '../BeltStatus/BeltStatus';
+import { MissionTracker } from '../MissionTracker/MissionTracker';
 import { TemporaryBackpack } from '../TemporaryBackpack/TemporaryBackpack';
 import { PerformanceOverlay } from '../PerformanceOverlay/PerformanceOverlay';
 import { BiomeDebugOverlay } from '../BiomeDebugOverlay/BiomeDebugOverlay';
@@ -95,6 +96,12 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
               stash={sessionState.stash}
             />
           </div>
+
+          {sessionState.mission && (
+            <div className="pointer-events-auto">
+              <MissionTracker mission={sessionState.mission} />
+            </div>
+          )}
 
           {sessionState.belt && sessionState.belt.rows + (sessionState.belt.blockedBy ? 1 : 0) > 0 && (
             <div className="pointer-events-auto">

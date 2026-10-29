@@ -1,3 +1,4 @@
+import type { ObjectiveDefinition } from './mission';
 import type { MiningPosition, MiningDirection, MiningGameMode, MiningInputState, Vector2D } from './mining';
 
 // ============================================================================
@@ -63,6 +64,10 @@ export interface MiningStartPayload extends GameEventBase {
   type: 'mining_start';
   forceNew?: boolean;
   mode?: MiningGameMode;
+  /** Single Player only: the biomes the player chose to see (keys). Absent or empty: a normal map. */
+  biomeKeys?: string[];
+  /** The mission picked from the offers (Single Player and a new multiplayer lobby). Absent: a run with no mission. */
+  missionId?: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -311,6 +316,31 @@ export interface SandboxLoadDoodadScenePayload extends GameEventBase {
   sceneId: string;
 }
 
+/** Asks what missions a new run of this mode would offer (rolled once per player and kept until they start). */
+export interface MiningMissionOffersPayload extends GameEventBase {
+  type: 'mining_mission_offers';
+  mode?: MiningGameMode;
+}
+
+/** Sandbox: starts a mission from the loaded ones (by id), or a one-off list of objectives, on the hand-built map. */
+export interface SandboxStartMissionPayload extends GameEventBase {
+  type: 'sandbox_start_mission';
+  missionId?: string;
+  objectives?: ObjectiveDefinition[];
+}
+
+/** Sandbox: complete every objective now, start the mission over, or drop it. */
+export interface SandboxMissionControlPayload extends GameEventBase {
+  type: 'sandbox_mission_control';
+  action: 'complete' | 'reset' | 'clear';
+}
+
+/** Sandbox: sets up a named mission test scene (see missionScenes.ts). */
+export interface SandboxLoadMissionScenePayload extends GameEventBase {
+  type: 'sandbox_load_mission_scene';
+  sceneId: string;
+}
+
 export interface SandboxIgnitePayload extends GameEventBase {
   type: 'sandbox_ignite';
   x: number;
@@ -357,6 +387,10 @@ export type GameEventPayload =
   | SandboxClearDoodadsPayload
   | SandboxSetDoodadGenerationPayload
   | SandboxLoadDoodadScenePayload
+  | MiningMissionOffersPayload
+  | SandboxStartMissionPayload
+  | SandboxMissionControlPayload
+  | SandboxLoadMissionScenePayload
   | SandboxSpawnExtractorPayload
   | SandboxDigBeltPayload
   | SandboxSetCapacityPayload

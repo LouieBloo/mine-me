@@ -73,17 +73,17 @@
     "name": "Cave Mushroom",
     "description": "A pale mushroom that leans away when something brushes past.",
     "anchor": "FLOOR",
-    "width": 2,
-    "height": 2,
+    "width": 1,
+    "height": 1,
     "sizeVariants": [
+      {
+        "width": 1,
+        "height": 1,
+        "weight": 4
+      },
       {
         "width": 2,
         "height": 2,
-        "weight": 3
-      },
-      {
-        "width": 3,
-        "height": 3,
         "weight": 1
       }
     ],
@@ -142,8 +142,8 @@
     "name": "Dripping Stalactite",
     "description": "A wet stalactite that drips into the water below. It only grows near water.",
     "anchor": "CEILING",
-    "width": 2,
-    "height": 3,
+    "width": 1,
+    "height": 2,
     "sizeVariants": null,
     "textureUrl": "/assets/sprites/doodads/cmvmvew9w00151a8qgf3tfpe1.png",
     "parts": null,
@@ -286,17 +286,17 @@
     "name": "Glow Crystal",
     "description": "A cluster of cold blue crystals that pulse with light.",
     "anchor": "FLOOR",
-    "width": 2,
-    "height": 3,
+    "width": 1,
+    "height": 2,
     "sizeVariants": [
       {
-        "width": 2,
-        "height": 3,
+        "width": 1,
+        "height": 2,
         "weight": 3
       },
       {
-        "width": 3,
-        "height": 4,
+        "width": 2,
+        "height": 3,
         "weight": 1
       }
     ],
@@ -351,17 +351,17 @@
     "name": "Glow Mushroom",
     "description": "A mushroom that glows a soft green in the dark. Only in the dark.",
     "anchor": "FLOOR",
-    "width": 2,
-    "height": 2,
+    "width": 1,
+    "height": 1,
     "sizeVariants": [
+      {
+        "width": 1,
+        "height": 1,
+        "weight": 4
+      },
       {
         "width": 2,
         "height": 2,
-        "weight": 3
-      },
-      {
-        "width": 3,
-        "height": 3,
         "weight": 1
       }
     ],
@@ -437,7 +437,7 @@
       {
         "width": 1,
         "height": 1,
-        "weight": 3
+        "weight": 5
       },
       {
         "width": 2,
@@ -501,16 +501,16 @@
     "description": "A long icicle hanging from frozen ground.",
     "anchor": "CEILING",
     "width": 1,
-    "height": 3,
+    "height": 2,
     "sizeVariants": [
       {
         "width": 1,
-        "height": 3,
+        "height": 2,
         "weight": 3
       },
       {
-        "width": 2,
-        "height": 4,
+        "width": 1,
+        "height": 3,
         "weight": 1
       }
     ],
@@ -552,8 +552,8 @@
     "name": "Lava Vent",
     "description": "A crack in the floor glowing orange, with embers rising. Only beside lava.",
     "anchor": "FLOOR",
-    "width": 3,
-    "height": 2,
+    "width": 2,
+    "height": 1,
     "sizeVariants": null,
     "textureUrl": "/assets/sprites/doodads/cmvmvewah001l1a8qgzgl8q6w.png",
     "parts": null,
@@ -602,17 +602,17 @@
     "name": "Stalactite",
     "description": "Rock hanging from a cave ceiling.",
     "anchor": "CEILING",
-    "width": 2,
-    "height": 3,
+    "width": 1,
+    "height": 2,
     "sizeVariants": [
+      {
+        "width": 1,
+        "height": 2,
+        "weight": 4
+      },
       {
         "width": 2,
         "height": 3,
-        "weight": 3
-      },
-      {
-        "width": 3,
-        "height": 4,
         "weight": 1
       }
     ],
@@ -694,17 +694,17 @@
     "name": "Stalagmite",
     "description": "Rock rising from a cave floor.",
     "anchor": "FLOOR",
-    "width": 2,
-    "height": 3,
+    "width": 1,
+    "height": 2,
     "sizeVariants": [
+      {
+        "width": 1,
+        "height": 2,
+        "weight": 4
+      },
       {
         "width": 2,
         "height": 3,
-        "weight": 3
-      },
-      {
-        "width": 3,
-        "height": 4,
         "weight": 1
       }
     ],
@@ -780,16 +780,16 @@
     "description": "Damp moss clinging to a cave wall.",
     "anchor": "WALL",
     "width": 1,
-    "height": 3,
+    "height": 2,
     "sizeVariants": [
       {
         "width": 1,
-        "height": 3,
+        "height": 2,
         "weight": 2
       },
       {
         "width": 1,
-        "height": 2,
+        "height": 1,
         "weight": 1
       }
     ],

@@ -2,14 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { ROCK_SHAPES, pickRockShape, rockMass } from './rockShapes';
 
 describe('rock shapes', () => {
-  it('offers a 1x1, a 2x1, a 3x1, a 2x2 and a 3x3', () => {
-    expect(ROCK_SHAPES.map((s) => s.id)).toEqual(['1x1', '2x1', '3x1', '2x2', '3x3']);
+  it('offers a 2x1, a 3x1, a 2x2 and a 3x3, and no lone 1x1 block', () => {
+    expect(ROCK_SHAPES.map((s) => s.id)).toEqual(['2x1', '3x1', '2x2', '3x3']);
     for (const s of ROCK_SHAPES) expect(s.id).toBe(`${s.width}x${s.height}`);
   });
 
   it('small rocks are the most likely and a 3x3 the least', () => {
     const weight = (id: string) => ROCK_SHAPES.find((s) => s.id === id)!.weight;
-    expect(weight('1x1')).toBeGreaterThan(weight('2x1'));
+    expect(weight('2x1')).toBeGreaterThan(weight('3x1'));
     expect(weight('3x3')).toBeLessThan(weight('2x2'));
   });
 
@@ -21,7 +21,7 @@ describe('rock shapes', () => {
 
   describe('pickRockShape', () => {
     it('follows the weights across the roll', () => {
-      expect(pickRockShape(0)!.id).toBe('1x1');
+      expect(pickRockShape(0)!.id).toBe('2x1');
       expect(pickRockShape(0.999)!.id).toBe('3x3');
       const counts: Record<string, number> = {};
       for (let i = 0; i < 1000; i++) {

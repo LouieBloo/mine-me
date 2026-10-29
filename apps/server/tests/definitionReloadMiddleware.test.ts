@@ -33,6 +33,9 @@ describe('affectsDefinitions', () => {
     expect(affectsDefinitions('PATCH', '/doodads/d1/sound-effects/ambient')).toBe(true);
     expect(affectsDefinitions('POST', '/doodads/d1/texture')).toBe(true);
     expect(affectsDefinitions('GET', '/doodads')).toBe(false);
+    expect(affectsDefinitions('POST', '/missions')).toBe(true);
+    expect(affectsDefinitions('PATCH', '/missions/m1/sound-effects/complete')).toBe(true);
+    expect(affectsDefinitions('GET', '/missions')).toBe(false);
     expect(affectsDefinitions('GET', '/items')).toBe(false);
     expect(affectsDefinitions('POST', '/users')).toBe(false);
     expect(affectsDefinitions('POST', '/items-other')).toBe(false);

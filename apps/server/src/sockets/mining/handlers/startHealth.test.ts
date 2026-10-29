@@ -46,3 +46,29 @@ describe('handleMiningStart health', () => {
     expect(broadcastStatUpdate).toHaveBeenCalledWith(cid, { health: 80, maxHealth: 130 });
   });
 });
+
+describe('handleMiningStart biome picks (ticket 144)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (prisma.character.findUnique as any).mockResolvedValue(character());
+  });
+  afterEach(() => miningSessionManager.cancelSession(cid, { persistHealth: false }));
+
+  it('hands a Single Player run its picked biomes (well formed keys only)', async () => {
+    await handleMiningStart({} as any, socket, { forceNew: true, mode: 'singleplayer', biomeKeys: ['deep_stone', 5, 'Not A Key'] });
+    expect(miningSessionManager.getSession(cid)!.runBiomeKeys).toEqual(['deep_stone']);
+  });
+
+  it('starts a normal map with no picks', async () => {
+    await handleMiningStart({} as any, socket, { forceNew: true, mode: 'singleplayer' });
+    expect(miningSessionManager.getSession(cid)!.runBiomeKeys).toEqual([]);
+  });
+
+  it('does not let a multiplayer or sandbox start choose biomes', async () => {
+    await handleMiningStart({} as any, socket, { forceNew: true, mode: 'multiplayer', biomeKeys: ['deep_stone'] });
+    expect(miningSessionManager.getSession(cid)!.runBiomeKeys).toEqual([]);
+    miningSessionManager.cancelSession(cid, { persistHealth: false });
+    await handleMiningStart({} as any, socket, { forceNew: true, mode: 'sandbox', biomeKeys: ['deep_stone'] });
+    expect(miningSessionManager.getSession(cid)!.runBiomeKeys).toEqual([]);
+  });
+});

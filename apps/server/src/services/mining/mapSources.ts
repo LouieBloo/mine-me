@@ -1,11 +1,15 @@
-import { DEFAULT_SKY_ROWS, MiningTileType, type BiomeDefinition, type BiomeField, type DoodadDefinition, type DoodadPlacement, type FluidDefinition, GasDefinition, MiningGameMode, MiningMapConfigData } from '@mine-me/shared';
+import { DEFAULT_SKY_ROWS, MiningTileType, type BiomeDefinition, type BiomeField, type DoodadDefinition, type DoodadPlacement, type FluidDefinition, GasDefinition, MiningGameMode, MiningMapConfigData, type MissionRequirements, hasRequirements } from '@mine-me/shared';
 import { generateMiningMapWithFluids, type GeneratedFluidCell, type GeneratedGasCell, type ServerMiningGrid } from '../miningMap.service';
 import { BLOCK_TILE_TYPES } from './subsystems/MiningDataManager';
 import { createDefaultSandboxLayout, type SandboxMobSpawn } from './sandbox/SandboxLayout';
 import { buildSandboxMap } from './sandbox/SandboxMapBuilder';
+import { mapShortfall } from './missions/missionCensus';
 import { generateSandboxDoodads } from './sandbox/sandboxDoodads';
 
 /** A room's starting map. */
+/** How many other seeds a map is regenerated with when it still lacks what the mission needs. */
+export const MISSION_MAP_RETRIES = 5;
+
 export interface BuiltMap {
   grid: ServerMiningGrid;
   fluidCells: GeneratedFluidCell[];
@@ -31,6 +35,8 @@ export interface MapSourceOptions {
   gases?: readonly GasDefinition[];
   biomes?: readonly BiomeDefinition[];
   doodads?: readonly DoodadDefinition[];
+  /** What the run's mission needs from the map (ticket 110). Absent: a map with no mission, generated exactly as before. */
+  mission?: MissionRequirements;
   /** Sandbox only: run the generator's doodad pass on the hand-built map (off by default, ticket 107). */
   sandboxDoodads?: boolean;
 }
@@ -42,7 +48,12 @@ export function buildMapForMode(mode: MiningGameMode, options: MapSourceOptions)
     if (!options.sandboxDoodads || !options.doodads?.length) return map;
     return { ...map, doodads: generateSandboxDoodads(map, { seed: options.seed, doodads: options.doodads, biomes: options.biomes, maxCount: options.mapConfig?.doodadMaxCount }) };
   }
-  const generated = generateMiningMapWithFluids({ seed: options.seed, config: options.mapConfig, fluids: options.fluids, gases: options.gases, biomes: options.biomes, doodads: options.doodads });
+  const mission = options.mission && hasRequirements(options.mission) ? options.mission : undefined;
+  const generate = (seed: number) =>
+    generateMiningMapWithFluids({ seed, config: options.mapConfig, fluids: options.fluids, gases: options.gases, biomes: options.biomes, doodads: options.doodads, mission });
+  let generated = generate(options.seed);
+  // The generator tops up what the mission needs; if a crowded map still falls short, the next derived seed is tried
+  for (let attempt = 1; mission && attempt <= MISSION_MAP_RETRIES && mapShortfall(mission, generated).length > 0; attempt++) generated = generate(options.seed + attempt * 7919);
   return addSkyRows(generated, options.mapConfig?.skyRows ?? DEFAULT_SKY_ROWS);
 }
 

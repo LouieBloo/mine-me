@@ -1,0 +1,6 @@
+/* BiomePicker Scoped CSS */
+.biome-picker .biome-option:focus-within,
+.biome-picker .biome-option:focus-visible {
+  outline: 2px solid rgb(245 158 11);
+  outline-offset: 2px;
+}

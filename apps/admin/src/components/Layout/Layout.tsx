@@ -40,6 +40,7 @@ export default function Layout() {
           <NavLink to="/gases" className={navLinkClass}>Gases Editor</NavLink>
           <NavLink to="/biomes" className={navLinkClass}>Biomes Editor</NavLink>
           <NavLink to="/doodads" className={navLinkClass}>Doodads Editor</NavLink>
+          <NavLink to="/missions" className={navLinkClass}>Missions Editor</NavLink>
           <NavLink to="/extractors" className={navLinkClass}>Extractors Editor</NavLink>
           <NavLink to="/item-weights" className={navLinkClass}>Item Weights</NavLink>
           <NavLink to="/effects" className={navLinkClass}>Effects Editor</NavLink>

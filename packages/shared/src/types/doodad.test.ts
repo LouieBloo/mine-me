@@ -117,6 +117,15 @@ describe('motion, reactions, wander, light and spawn rules', () => {
     expect(validateDoodadSpawnRules({ darkOnly: 'yes' })).toEqual(['spawn.darkOnly must be true or false']);
     expect(validateDoodadSpawnRules({ nearRadius: 0 })).toEqual(['spawn.nearRadius must be greater than 0']);
   });
+  it('group settings are shares between 0 and 1, whole sizes from 1 up, and a min that does not pass the max', () => {
+    expect(validateDoodadSpawnRules({ groupChance: 0.8, groupSizeMin: 3, groupSizeMax: 8, groupSpread: 6, groupFill: 0.5, memberSpacing: 0, maxCount: 100 })).toEqual([]);
+    expect(validateDoodadSpawnRules({ groupChance: 1.5 })).toEqual(['spawn.groupChance must be between 0 and 1']);
+    expect(validateDoodadSpawnRules({ groupFill: -0.1 })).toEqual(['spawn.groupFill must be between 0 and 1']);
+    expect(validateDoodadSpawnRules({ groupSizeMin: 0 })).toEqual(['spawn.groupSizeMin must be a whole number of 1 or more']);
+    expect(validateDoodadSpawnRules({ groupSizeMax: 2.5 })).toEqual(['spawn.groupSizeMax must be a whole number of 1 or more']);
+    expect(validateDoodadSpawnRules({ groupSizeMin: 9, groupSizeMax: 4 })).toEqual(['spawn.groupSizeMin cannot be greater than groupSizeMax']);
+    expect(validateDoodadSpawnRules({ groupSpread: -1, maxCount: -1, memberSpacing: -1 })).toHaveLength(3);
+  });
 });
 
 describe('biome links', () => {

@@ -1,0 +1,218 @@
+[
+  {
+    "id": "cmvrl61cr0006cdhtwha7mslh",
+    "key": "burn_the_oil",
+    "name": "Burn the Oil",
+    "description": "Oil seeps through the lower tunnels and one spark would be a disaster. Get rid of a good part of it, on purpose.",
+    "minLevel": 2,
+    "maxLevel": 4,
+    "tier": 2,
+    "weight": 1,
+    "objectives": [
+      {
+        "type": "CLEAR_FLUID",
+        "amount": 40,
+        "targetId": "fluid_oil"
+      }
+    ],
+    "rewardCoins": 110,
+    "rewardXp": 75,
+    "rewardItems": [],
+    "soundEffects": null,
+    "createdAt": "2026-10-28T04:00:02.908Z",
+    "updatedAt": "2026-10-28T04:00:02.908Z"
+  },
+  {
+    "id": "cmvrl61cc0002cdhtwr1w74aw",
+    "key": "clear_the_air",
+    "name": "Clear the Air",
+    "description": "A pocket of hydrogen is building up deep down. Vent it, burn it or blow it, but get rid of it.",
+    "minLevel": 1,
+    "maxLevel": 4,
+    "tier": 1,
+    "weight": 2,
+    "objectives": [
+      {
+        "type": "CLEAR_GAS",
+        "amount": 10,
+        "targetId": "gas_hydrogen"
+      }
+    ],
+    "rewardCoins": 50,
+    "rewardXp": 40,
+    "rewardItems": [
+      {
+        "chance": 50,
+        "itemId": "cmp6aexa30004idpx29gsz12l",
+        "maxQuantity": 3,
+        "minQuantity": 1
+      }
+    ],
+    "soundEffects": null,
+    "createdAt": "2026-10-28T04:00:02.892Z",
+    "updatedAt": "2026-10-29T00:02:07.297Z"
+  },
+  {
+    "id": "cmvrl61cv0007cdhtnnrh7maq",
+    "key": "deep_silver",
+    "name": "Deep Silver",
+    "description": "The richest silverium lies far down, and the moles guard it. Go deep, dig it out and deal with them.",
+    "minLevel": 3,
+    "maxLevel": 4,
+    "tier": 3,
+    "weight": 1,
+    "objectives": [
+      {
+        "type": "MINE_ITEM",
+        "amount": 15,
+        "targetId": "cmp6ammsn0006idpxgnpsnyk1"
+      },
+      {
+        "type": "KILL_MOB",
+        "amount": 5,
+        "targetId": "cmn_mole_person_001"
+      },
+      {
+        "type": "REACH_DEPTH",
+        "amount": 90
+      }
+    ],
+    "rewardCoins": 300,
+    "rewardXp": 200,
+    "rewardItems": [
+      {
+        "chance": 100,
+        "itemId": "cmp6ammsn0006idpxgnpsnyk1",
+        "maxQuantity": 4,
+        "minQuantity": 2
+      }
+    ],
+    "soundEffects": null,
+    "createdAt": "2026-10-28T04:00:02.912Z",
+    "updatedAt": "2026-10-28T04:00:02.912Z"
+  },
+  {
+    "id": "cmvrl61c20000cdhtlu3vcmfm",
+    "key": "first_copper",
+    "name": "Copper Run",
+    "description": "The forge is hungry. Dig out some copperium and bring it home.",
+    "minLevel": 1,
+    "maxLevel": 3,
+    "tier": 1,
+    "weight": 3,
+    "objectives": [
+      {
+        "type": "MINE_ITEM",
+        "amount": 10,
+        "targetId": "cmp6aexa30004idpx29gsz12l"
+      }
+    ],
+    "rewardCoins": 30,
+    "rewardXp": 20,
+    "rewardItems": [],
+    "soundEffects": null,
+    "createdAt": "2026-10-28T04:00:02.883Z",
+    "updatedAt": "2026-10-28T04:00:02.883Z"
+  },
+  {
+    "id": "cmvrl61cf0003cdht4fitnmms",
+    "key": "first_descent",
+    "name": "First Descent",
+    "description": "Nobody has measured the mine in years. Go down and see how far it goes.",
+    "minLevel": 1,
+    "maxLevel": 3,
+    "tier": 1,
+    "weight": 2,
+    "objectives": [
+      {
+        "type": "REACH_DEPTH",
+        "amount": 45
+      }
+    ],
+    "rewardCoins": 35,
+    "rewardXp": 25,
+    "rewardItems": [],
+    "soundEffects": null,
+    "createdAt": "2026-10-28T04:00:02.896Z",
+    "updatedAt": "2026-10-28T04:00:02.896Z"
+  },
+  {
+    "id": "cmvrl61c80001cdhte0ctxsto",
+    "key": "mole_trouble",
+    "name": "Mole Trouble",
+    "description": "Mole people have been undermining the tunnels. Thin them out.",
+    "minLevel": 1,
+    "maxLevel": 3,
+    "tier": 1,
+    "weight": 2,
+    "objectives": [
+      {
+        "type": "KILL_MOB",
+        "amount": 3,
+        "targetId": "cmn_mole_person_001"
+      }
+    ],
+    "rewardCoins": 40,
+    "rewardXp": 30,
+    "rewardItems": [],
+    "soundEffects": null,
+    "createdAt": "2026-10-28T04:00:02.888Z",
+    "updatedAt": "2026-10-28T04:00:02.888Z"
+  },
+  {
+    "id": "cmvrl61cn0005cdhtbfanc5gg",
+    "key": "pest_control",
+    "name": "Pest Control",
+    "description": "Anything that moves down there is a problem. Clear out eight of them.",
+    "minLevel": 2,
+    "maxLevel": 4,
+    "tier": 2,
+    "weight": 2,
+    "objectives": [
+      {
+        "type": "KILL_MOB",
+        "amount": 8
+      }
+    ],
+    "rewardCoins": 100,
+    "rewardXp": 70,
+    "rewardItems": [],
+    "soundEffects": null,
+    "createdAt": "2026-10-28T04:00:02.903Z",
+    "updatedAt": "2026-10-28T04:00:02.903Z"
+  },
+  {
+    "id": "cmvrl61cj0004cdhtoe1pohrf",
+    "key": "silver_vein",
+    "name": "The Silver Vein",
+    "description": "Rumour has silverium below the copper. Find it, and get down to it.",
+    "minLevel": 2,
+    "maxLevel": 4,
+    "tier": 2,
+    "weight": 2,
+    "objectives": [
+      {
+        "type": "MINE_ITEM",
+        "amount": 8,
+        "targetId": "cmp6ammsn0006idpxgnpsnyk1"
+      },
+      {
+        "type": "REACH_DEPTH",
+        "amount": 60
+      }
+    ],
+    "rewardCoins": 120,
+    "rewardXp": 80,
+    "rewardItems": [
+      {
+        "chance": 100,
+        "itemId": "cmp6aexa30004idpx29gsz12l",
+        "maxQuantity": 6,
+        "minQuantity": 3
+      }
+    ],
+    "soundEffects": null,
+    "createdAt": "2026-10-28T04:00:02.900Z",
+    "updatedAt": "2026-10-28T04:00:02.900Z"
+  }
+]

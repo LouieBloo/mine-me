@@ -15,6 +15,7 @@ import DoodadMotionPanel from './DoodadMotionPanel/DoodadMotionPanel';
 import DoodadBehaviourPanel from './DoodadBehaviourPanel/DoodadBehaviourPanel';
 import DoodadEffectsPanel from './DoodadEffectsPanel/DoodadEffectsPanel';
 import DoodadSpawnPanel from './DoodadSpawnPanel/DoodadSpawnPanel';
+import DoodadGroupsPanel from './DoodadGroupsPanel/DoodadGroupsPanel';
 import DoodadBiomeLinks, { type BiomeOption } from './DoodadBiomeLinks/DoodadBiomeLinks';
 import DoodadSoundEffects from './DoodadSoundEffects/DoodadSoundEffects';
 import { hintClass, inputClass, labelClass, readNumber, show } from './panelStyles';
@@ -312,6 +313,7 @@ export default function DoodadDetail() {
               onDeathEffectChange={(v) => set('deathParticleEffectId', v)}
             />
             <DoodadSpawnPanel value={form.spawn} onChange={(v) => set('spawn', v)} blocks={blocks} fluids={fluids} gases={gases} />
+            <DoodadGroupsPanel value={form.spawn} onChange={(v) => set('spawn', v)} />
             <DoodadBiomeLinks value={form.biomes} biomes={biomes} onChange={(v) => set('biomes', v)} />
 
             {problems.length > 0 && (

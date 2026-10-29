@@ -16,9 +16,13 @@ import {
   MINING_CONFIG,
   type MiningGameMode,
   DEFAULT_DOODAD_MAX_LIGHTS,
+  rollDropTable,
+  type MissionDefinition,
+  type MissionResultView,
 } from '@mine-me/shared';
 import { DOODAD_SCENE_OPTIONS } from './sandbox/doodadScenes';
 import { EXTRACTOR_SCENE_OPTIONS } from './sandbox/extractorScenes';
+import { MISSION_SCENE_OPTIONS } from './sandbox/missionScenes';
 import { MiningDataManager } from './subsystems/MiningDataManager';
 import { toClientGrid } from '../miningMap.service';
 import { getGameModeRules, roomIdFor } from './gameModeRules';
@@ -32,6 +36,15 @@ export interface ExitResult {
   extractedItems: MiningBackpackItem[];
   backpackItems: MiningBackpackItem[];
   stashItems: MiningBackpackItem[];
+  /** How the run's mission went and what it paid (absent: the run had no mission). */
+  mission?: MissionResultView;
+}
+
+/** What a safe exit pays for a completed mission, rolled once at claim time (ticket 113). */
+export interface MissionPayout {
+  coins: number;
+  xp: number;
+  items: { itemId: string; quantity: number }[];
 }
 
 const EMPTY_EXIT: ExitResult = { extractedItems: [], backpackItems: [], stashItems: [] };
@@ -87,6 +100,8 @@ export class MiningSessionManager {
     combat: Partial<MiningCombatStats & CarryStats> = {},
     equippedWeaponId: string | null = null,
     maxHealth?: number,
+    biomeKeys?: string[],
+    mission?: MissionDefinition,
   ): MiningGameEngine {
     const rules = getGameModeRules(mode);
     const targetRoomId = roomIdFor(mode, characterId);
@@ -113,6 +128,8 @@ export class MiningSessionManager {
         gameMode: mode,
         cityId,
         mapConfig,
+        biomeKeys,
+        mission,
         onTimeout: (roomId) => {
           this.cleanupRoom(roomId);
         },
@@ -159,6 +176,14 @@ export class MiningSessionManager {
     return engine;
   }
 
+  /** The room a new run of this mode would join if it already exists with players in it (the shared lobby), else undefined. */
+  public peekJoinableRoom(mode: MiningGameMode, characterId: string): MiningGameEngine | undefined {
+    const rules = getGameModeRules(mode);
+    if (rules.restartsOnEntry) return undefined;
+    const engine = this.activeRooms.get(roomIdFor(mode, characterId));
+    return engine && engine.playerCount > 0 ? engine : undefined;
+  }
+
   /**
    * Get an active mining engine by character ID.
    */
@@ -191,6 +216,7 @@ export class MiningSessionManager {
     const activeMobs = engine.getActiveMobs();
 
     return {
+      ...(engine.missionTracker ? { mission: engine.missionTracker.clientState() } : {}),
       grid: toClientGrid(engine.grid, engine.biomeGrid),
       biomes: engine.clientBiomes(),
       doodads: engine.doodadSubsystem.clientDefinitions(),
@@ -229,6 +255,8 @@ export class MiningSessionManager {
             extractorScenes: [...EXTRACTOR_SCENE_OPTIONS],
             doodads: engine.sandbox.doodadOptions(),
             doodadScenes: engine.sandbox.doodadOptions() ? [...DOODAD_SCENE_OPTIONS] : undefined,
+            missions: engine.sandbox.missionOptions(),
+            missionScenes: [...MISSION_SCENE_OPTIONS],
             status: engine.sandbox.status(characterId),
           }
         : undefined,
@@ -320,6 +348,8 @@ export class MiningSessionManager {
     }
 
     const finalHealth = MiningSessionManager.finalHealth(engine.getPlayer(characterId));
+    // The mission pays on a safe exit only, and once per player: claimed here, undone if the payout cannot be written
+    const missionOutcome = engine.rules.persistsCharacter ? this.settleMission(engine, characterId) : null;
     const removeResult = engine.removePlayer(characterId);
     this.playerToRoom.delete(characterId);
 
@@ -337,15 +367,48 @@ export class MiningSessionManager {
     await this.persistHealth(characterId, finalHealth);
 
     // The backpack and the extractor's stash are banked together, in one transaction (matched by item ID only)
-    const { stash, skipped } = await RunStashService.bank(
-      characterId,
-      backpackItems.map((i) => ({ itemId: i.itemId, quantity: i.quantity }))
-    );
+    const payout = missionOutcome?.payout ?? null;
+    let banked: Awaited<ReturnType<typeof RunStashService.bank>>;
+    try {
+      const loot = [...backpackItems.map((i) => ({ itemId: i.itemId, quantity: i.quantity })), ...(payout?.items ?? [])];
+      banked = payout ? await RunStashService.bank(characterId, loot, { sol: payout.coins, experience: payout.xp }) : await RunStashService.bank(characterId, loot);
+    } catch (err) {
+      // Nothing was written, so the reward is still owed (and the backpack stays with the caller to retry)
+      if (payout) engine.missionTracker?.unclaim(characterId);
+      throw err;
+    }
+    const { stash, skipped } = banked;
     for (const s of skipped) {
       console.warn(`[Mining] Could not save extracted item ${s.itemId} x${s.quantity} for ${characterId}: ${s.reason}`);
     }
+    const rewardedItems = payout ? payout.items.filter((i) => !skipped.some((k) => k.itemId === i.itemId)) : [];
+    const mission = missionOutcome?.result
+      ? {
+          ...missionOutcome.result,
+          ...(payout
+            ? { reward: { coins: payout.coins, xp: payout.xp, items: rewardedItems.map((i) => ({ itemId: i.itemId, itemName: engine.dataManager.getItemData(i.itemId)?.name ?? i.itemId, iconUrl: engine.dataManager.getItemData(i.itemId)?.iconUrl ?? null, quantity: i.quantity })) } }
+            : {}),
+        }
+      : undefined;
 
-    return { extractedItems: combineLoot(backpackItems, stash, engine), backpackItems, stashItems: describeStash(stash, engine) };
+    return { extractedItems: combineLoot(backpackItems, stash, engine), backpackItems, stashItems: describeStash(stash, engine), ...(mission ? { mission } : {}) };
+  }
+
+  /**
+   * Decides what a player's mission is worth as they leave safely (ticket 113): a completed mission is claimed (once per player)
+   * and its reward rolled; an unfinished one pays nothing. Returns the result for the results screen and the payout, or null
+   * for a run without a mission. The caller undoes the claim if the payout cannot be written.
+   */
+  private settleMission(engine: MiningGameEngine, characterId: string): { result: MissionResultView; payout: MissionPayout | null } | null {
+    const tracker = engine.missionTracker;
+    if (!tracker) return null;
+    if (!tracker.claim(characterId)) {
+      const finished = tracker.completed;
+      return { result: engine.missionResultFor(characterId, finished ? 'completed' : 'unfinished', finished ? 'The reward was already paid.' : 'You left before the mission was complete, so nothing was paid.')!, payout: null };
+    }
+    const mission = tracker.mission;
+    const items = rollDropTable({ items: mission.rewardItems ?? [] }).map((d) => ({ itemId: d.itemId, quantity: d.quantity }));
+    return { result: engine.missionResultFor(characterId, 'paid')!, payout: { coins: mission.rewardCoins, xp: mission.rewardXp, items } };
   }
 
   /**

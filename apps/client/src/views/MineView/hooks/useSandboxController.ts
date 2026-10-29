@@ -77,6 +77,10 @@ export function useSandboxController(sendGameEvent: SendGameEvent, session: Mini
   const clearDoodads = useCallback(() => run({ type: 'sandbox_clear_doodads' }, 'Doodads'), [run]);
   /** The server rebuilds the map and answers with a fresh state for everyone, which the view handles. */
   const setDoodadGeneration = useCallback(async (enabled: boolean) => applyStatus(await run({ type: 'sandbox_set_doodad_generation', enabled }, 'Doodads')), [run, applyStatus]);
+  /** Starting, finishing, restarting or dropping a mission is answered with the mission's state for everyone, which the view handles. */
+  const startMission = useCallback((missionId: string) => run({ type: 'sandbox_start_mission', missionId }, 'Mission'), [run]);
+  const missionControl = useCallback((action: 'complete' | 'reset' | 'clear') => run({ type: 'sandbox_mission_control', action }, 'Mission'), [run]);
+  const loadMissionScene = useCallback((sceneId: string) => run({ type: 'sandbox_load_mission_scene', sceneId }, 'Mission scene'), [run]);
   const clearHazards = useCallback(() => run({ type: 'sandbox_clear_hazards' }, 'Clear'), [run]);
   /** The server answers a reset with a fresh state for everyone, which the view handles. */
   const reset = useCallback(() => run({ type: 'sandbox_reset' }, 'Reset'), [run]);
@@ -107,5 +111,8 @@ export function useSandboxController(sendGameEvent: SendGameEvent, session: Mini
     loadDoodadScene,
     clearDoodads,
     setDoodadGeneration,
+    startMission,
+    missionControl,
+    loadMissionScene,
   };
 }

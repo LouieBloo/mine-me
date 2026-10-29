@@ -227,6 +227,8 @@ export class MiningDropSubsystem {
     }
     session.backpackDirty = true;
     this.droppedItemsDirty = true;
+    // Only what really went into the backpack counts toward a mission
+    this.world.missions?.onItemCollected(session.characterId, item.itemId, quantity);
   }
 
   /** An item did not fit: tell the player, at most once every few seconds while they stand on it. */

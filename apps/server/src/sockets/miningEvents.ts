@@ -3,7 +3,7 @@
  * Aggregator module delegating to specialized handler domain modules.
  */
 
-export { handleMiningStart } from './mining/handlers/startMiningSession';
+export { handleMiningStart, handleMiningMissionOffers } from './mining/handlers/startMiningSession';
 export {
   handleMiningInput,
   handleMiningInteract,
@@ -46,4 +46,7 @@ export {
   handleSandboxClearDoodads,
   handleSandboxSetDoodadGeneration,
   handleSandboxLoadDoodadScene,
+  handleSandboxStartMission,
+  handleSandboxMissionControl,
+  handleSandboxLoadMissionScene,
 } from './mining/handlers/sandboxHandlers';

@@ -159,6 +159,26 @@ export interface DoodadSoundSlotResolved extends SoundEffectSlotConfig {
 
 export type DoodadSoundEffectsConfig = Partial<Record<DoodadSoundSlot, DoodadSoundSlotResolved>>;
 
+export type MissionSoundSlot = 'objective' | 'complete' | 'failed';
+
+/** What the admin stores for one mission slot: a library sound by id (the url is resolved at load). */
+export interface MissionSoundSlotRef {
+  soundId?: string | null;
+  loop?: boolean;
+  /** Volume of this sound on this mission, 0 to 1 (1 when absent). */
+  volume?: number;
+}
+
+export type MissionSoundSlotRefs = Partial<Record<MissionSoundSlot, MissionSoundSlotRef>>;
+
+/** A mission slot after its library sound has been resolved to something the client can play. */
+export interface MissionSoundSlotResolved extends SoundEffectSlotConfig {
+  soundId?: string | null;
+  volume?: number;
+}
+
+export type MissionSoundEffectsConfig = Partial<Record<MissionSoundSlot, MissionSoundSlotResolved>>;
+
 export type ExtractorSoundSlot = 'landing' | 'loop' | 'unload' | 'beltBreak';
 
 /** What the admin stores for one extractor slot: a library sound by id (the url is resolved at load). */
