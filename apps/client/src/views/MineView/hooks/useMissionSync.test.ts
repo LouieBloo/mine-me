@@ -7,7 +7,7 @@ vi.mock('../../../services/notificationService', () => ({ notificationService: {
 import { notificationService } from '../../../services/notificationService';
 
 const mission = (over: Partial<MissionClientState> = {}): MissionClientState => ({
-  id: 'm1', name: 'Copper Run', tier: 1, completed: false, reward: { coins: 1, xp: 1, items: [] },
+  id: 'm1', name: 'Copper Run', tier: 1, completed: false, reward: { sol: 1, xp: 1, items: [] },
   sounds: { objective: { url: '/o.mp3', volume: 0.5 } as any, complete: { url: '/c.mp3' } as any },
   objectives: [
     { type: 'MINE_ITEM', label: 'Collect 5 Copperium', target: 5, progress: 0, done: false, unit: 'count' },

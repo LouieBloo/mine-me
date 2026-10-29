@@ -26,5 +26,11 @@ Missions (108-116) are not built, so only the extractor side is done:
 - **Waiting for 113:** the mission reward paid together with the stash and pack, the results screen showing stash and pack separately (the data is returned, no screen yet), and the map requirement leaving room for the pad and shaft (110).
 
 ## Built (2026-10-27, with the missions epic)
-- The mission reward (coins, XP, rolled items) is banked in the same transaction as the backpack and the stash (`RunStashService.bank` with a bonus), once per player, only on a safe exit; see 113.
+- The mission reward (Sol, XP, rolled items) is banked in the same transaction as the backpack and the stash (`RunStashService.bank` with a bonus), once per player, only on a safe exit; see 113.
 - Still open: the exit screen shows backpack and stash as one list (the response still carries them separately); the forced mission blocks do not avoid the belt shaft (the belt digs through them).
+
+## Decisions (2026-10-28, from the owner): leaving only at the extraction point
+- The always-visible bottom-right "Extract & Leave" / "Abandon Mine" button is removed. A normal run can only be left by standing on the extraction point on the surface (the exit entrance) and confirming "Leave Mine?"; dying or running out of time still end the run on their own.
+- **The server enforces it:** `mining_exit` is rejected ("You can only leave the mine at the extraction point on the surface.") unless the player's live position is on the exit (`MiningSessionManager.canExit`, the same `isOnEntrance` rule as `canExtract`). The sandbox, which saves nothing, keeps its Leave button and can leave from anywhere. Closing the page or leaving the view still cancels the run as before.
+- **How the player finds it (2026-10-28):** the point is drawn as an EXIT sign standing on the ground at the entrance (placeholder Graphics, behind every body, not drawn in the sandbox). While the player stands on it, a "Press E to leave the mine" prompt (key E, free in the input handling, plus a clickable button) opens the existing "Leave Mine?" confirmation. **Decided:** the old auto-popup when walking back onto the spawn is removed (it never worked with the sky rows and would be intrusive); the question only opens from the key or the button.
+

@@ -35,6 +35,7 @@ import { LOADING_SCREEN_EXIT_MS } from '../../MiningLoadingScreen/MiningLoadingS
 import { DoodadRenderer } from '../renderers/DoodadRenderer';
 import { DoodadEffects } from '../systems/DoodadEffects';
 import { ExtractorRenderer } from '../renderers/ExtractorRenderer';
+import { ExitMarkerRenderer } from '../renderers/ExitMarkerRenderer';
 import { BeltRenderer } from '../renderers/BeltRenderer';
 import { BeltItemRenderer } from '../renderers/BeltItemRenderer';
 import { FireRenderer } from '../renderers/FireRenderer';
@@ -171,6 +172,7 @@ export function useMiningScene({
     const playerContainer = new Container();
     const beltContainer = new Container();
     const extractorContainer = new Container();
+    const exitMarkerContainer = new Container();
     const particlesContainer = new Container();
     const floatingTextContainer = new Container();
     const debugContainer = new Container();
@@ -211,6 +213,8 @@ export function useMiningScene({
     // The extractor stands on the ground in front of the tiles, behind every body
     gridContainer.addChild(beltContainer);
     gridContainer.addChild(extractorContainer);
+    // The extraction point's sign, behind every body (the sandbox has no extraction point: it has a Leave button)
+    if (initialSessionState.gameMode !== 'sandbox') gridContainer.addChild(exitMarkerContainer);
     // Fluid sits on the tiles and behind every entity, so characters and items stay visible in it
     gridContainer.addChild(fluidsContainer);
     gridContainer.addChild(fallingRocksContainer);
@@ -260,6 +264,7 @@ export function useMiningScene({
       beltItemRendererRef.current = new BeltItemRenderer(beltContainer, initialSessionState.belt);
       beltItemRendererRef.current.add(initialSessionState.beltItems ?? []);
     }
+    if (initialSessionState.gameMode !== 'sandbox') new ExitMarkerRenderer(exitMarkerContainer, surfaceRow);
     if (initialSessionState.extractor) {
       extractorRendererRef.current = new ExtractorRenderer(extractorContainer, initialSessionState.extractor, { startPaused: true });
     }

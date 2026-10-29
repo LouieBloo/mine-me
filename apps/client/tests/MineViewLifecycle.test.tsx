@@ -1,7 +1,7 @@
 import { MINING_CONFIG } from '@mine-me/shared';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React, { useState } from 'react';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { notificationService } from '../src/services/notificationService';
 import { soundManager } from '../src/services/sound';
@@ -9,17 +9,17 @@ import { MineView } from '../src/views/MineView/MineView';
 import { GameProvider, useGame } from '../src/contexts/GameContext';
 
 // Mock sub-components that use Pixi or complex DOM
+// (the mine reports the player standing at the extraction point through a prop; tests drive it from here)
+const gridProps = vi.hoisted(() => ({ current: {} as { onAtExitChange?: (atExit: boolean) => void } }));
 vi.mock('../src/views/MineView/components/MiningGrid/MiningGrid', () => ({
-  MiningGrid: () => <div data-testid="mining-grid">Mining Grid</div>,
+  MiningGrid: (props: { onAtExitChange?: (atExit: boolean) => void }) => {
+    gridProps.current = props;
+    return <div data-testid="mining-grid">Mining Grid</div>;
+  },
 }));
 
 vi.mock('../src/views/MineView/components/MiningHUD/MiningHUD', () => ({
-  MiningHUD: ({ onExit }: any) => (
-    <div data-testid="mining-hud">
-      Mining HUD
-      <button onClick={onExit}>exit-now</button>
-    </div>
-  ),
+  MiningHUD: () => <div data-testid="mining-hud">Mining HUD</div>,
 }));
 
 vi.mock('../src/views/MineView/components/MiningLoadingScreen/MiningLoadingScreen', () => ({
@@ -288,13 +288,13 @@ describe('MineView Navigation & Session Lifecycle', () => {
 
   describe('missions (tickets 111-113)', () => {
     const missionState = {
-      id: 'm1', name: 'Copper Run', tier: 1, completed: false, reward: { coins: 30, xp: 20, items: [] },
+      id: 'm1', name: 'Copper Run', tier: 1, completed: false, reward: { sol: 30, xp: 20, items: [] },
       objectives: [{ type: 'KILL_MOB', label: 'Kill 3 mobs', target: 3, progress: 0, done: false, unit: 'count' }],
     };
     const runState = (over: Record<string, unknown> = {}) => ({
       grid: [], position: { x: 15, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3, canExtract: true, isMining: false, ...over,
     });
-    const offers = [{ id: 'm1', name: 'Copper Run', description: null, tier: 1, objectives: [{ type: 'KILL_MOB', label: 'Kill 3 mobs', target: 3, unit: 'count' }], reward: { coins: 30, xp: 20, items: [] } }];
+    const offers = [{ id: 'm1', name: 'Copper Run', description: null, tier: 1, objectives: [{ type: 'KILL_MOB', label: 'Kill 3 mobs', target: 3, unit: 'count' }], reward: { sol: 30, xp: 20, items: [] } }];
 
     const mount = (handlers: Record<string, (p: any) => void>) => {
       mockOnEvent.mockImplementation((name: string, handler: (p: any) => void) => {
@@ -303,8 +303,10 @@ describe('MineView Navigation & Session Lifecycle', () => {
       });
       let session: any = 'uninitialized';
       let path = '';
+      let setSession: (fn: (prev: any) => any) => void = () => {};
       const Probe = () => {
         session = useGame().miningSession;
+        setSession = useGame().setMiningSession as any;
         path = useLocation().pathname;
         return null;
       };
@@ -316,7 +318,14 @@ describe('MineView Navigation & Session Lifecycle', () => {
           </GameProvider>
         </MemoryRouter>
       );
-      return { getSession: () => session, getPath: () => path };
+      // Stands at the extraction point and asks to leave from the prompt (the only way out of a normal mine)
+      const walkBackToTheExit = async () => {
+        await act(async () => gridProps.current.onAtExitChange?.(true));
+        await act(async () => {
+          screen.getByRole('button', { name: /leave the mine/i }).click();
+        });
+      };
+      return { getSession: () => session, getPath: () => path, walkBackToTheExit };
     };
 
     it('offers the missions before the run starts and sends the picked one with the start', async () => {
@@ -361,45 +370,49 @@ describe('MineView Navigation & Session Lifecycle', () => {
       expect(getSession().mission).toBeUndefined();
     });
 
-    it('shows the paid mission first on a safe exit, then the spoils', async () => {
+    it('shows a paid mission inside the one Expedition Summary, with its Sol and XP in the totals', async () => {
       const handlers: Record<string, (p: any) => void> = {};
       mockSendGameEvent.mockImplementation(async (event: { type: string }) => {
         if (event.type === 'mining_mission_offers') return { success: true, data: { offers: [] } };
-        if (event.type === 'mining_start') return { success: true, data: { sessionState: runState({ mission: missionState }) } };
+        if (event.type === 'mining_start') return { success: true, data: { sessionState: runState({ mission: missionState, position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 } }) } };
         if (event.type === 'mining_exit') {
           return {
             success: true,
             data: {
               extractedItems: [{ itemId: 'i1', itemName: 'Copperium', iconUrl: null, quantity: 4 }],
-              mission: { name: 'Copper Run', tier: 1, outcome: 'paid', objectives: missionState.objectives.map((o) => ({ ...o, done: true, progress: 3 })), contributions: [], reward: { coins: 30, xp: 20, items: [] } },
+              mission: { name: 'Copper Run', tier: 1, outcome: 'paid', objectives: missionState.objectives.map((o) => ({ ...o, done: true, progress: 3 })), contributions: [], reward: { sol: 30, xp: 20, items: [] } },
             },
           };
         }
         return { success: true };
       });
-      const { getPath } = mount(handlers);
+      const { getPath, walkBackToTheExit } = mount(handlers);
       await act(async () => {
         screen.getByText(/Single Player/i).click();
       });
       await act(async () => {
         screen.getByRole('button', { name: 'Start Expedition' }).click();
       });
+      await walkBackToTheExit();
       await act(async () => {
-        screen.getByText('exit-now').click();
+        screen.getByRole('button', { name: 'Extract & Leave' }).click();
       });
-      expect(screen.getByTestId('mission-reward').textContent).toContain('30 coins, 20 XP');
-      expect(screen.queryByText(/Expedition Summary/)).toBeNull();
-      await act(async () => {
-        screen.getByRole('button', { name: 'Continue' }).click();
-      });
-      expect(screen.getByText(/Expedition Summary/)).toBeDefined();
+      expect(screen.getAllByText(/Expedition Summary/)).toHaveLength(1);
+      expect(screen.getByTestId('mission-reward').textContent).toContain('30 Sol, 20 XP');
+      expect(screen.getByText('+30')).toBeDefined(); // the Sol card
+      expect(screen.getByText('+40 XP')).toBeDefined(); // 4 items x 5 + the mission's 20
       expect(getPath()).toBe('/mine');
+      await act(async () => {
+        screen.getByRole('button', { name: 'Accept Spoils' }).click();
+      });
+      expect(getPath()).toBe('/home');
     });
 
-    it('shows the lost mission before going home when the run ends in death, with the mission\'s own failed sound', async () => {
+    it('ends a lost run on the same summary with the mission marked failed, and plays its own failed sound', async () => {
       const playSfx = vi.spyOn(soundManager, 'playSfx').mockImplementation(() => null);
       const handlers: Record<string, (p: any) => void> = {};
       answerStart(runState({ mission: { ...missionState, sounds: { failed: { url: '/assets/sounds/fail.mp3', volume: 0.4 } } } }));
+      const infoSpy = vi.spyOn(notificationService, 'error').mockImplementation(() => undefined as any);
       const { getPath } = mount(handlers);
       await act(async () => {
         screen.getByText(/Single Player/i).click();
@@ -413,13 +426,35 @@ describe('MineView Navigation & Session Lifecycle', () => {
           mission: { name: 'Copper Run', tier: 1, outcome: 'failed', objectives: missionState.objectives, contributions: [], reason: 'You were knocked out before you reached the exit.' },
         });
       });
+      expect(screen.getByText(/You Were Knocked Out/)).toBeDefined();
+      expect(screen.getByText('Backpack lost.')).toBeDefined();
       expect(screen.getByText(/Mission Failed/)).toBeDefined();
       expect(screen.getByText(/knocked out before you reached the exit/)).toBeDefined();
+      expect(screen.queryByText(/Expedition Summary/)).toBeNull();
+      expect(infoSpy).not.toHaveBeenCalled(); // the summary is the one end screen: no toast on top of it
       expect(playSfx).toHaveBeenCalledWith('/assets/sounds/fail.mp3', expect.objectContaining({ volumeScale: 0.4 }));
       expect(getPath()).toBe('/mine');
       await act(async () => {
-        screen.getByRole('button', { name: 'Continue' }).click();
+        screen.getByRole('button', { name: 'Return Home' }).click();
       });
+      expect(getPath()).toBe('/home');
+    });
+
+    it('still just shows a message and goes home when a run without a mission ends', async () => {
+      const handlers: Record<string, (p: any) => void> = {};
+      answerStart(runState());
+      const errSpy = vi.spyOn(notificationService, 'error').mockImplementation(() => undefined as any);
+      const { getPath } = mount(handlers);
+      await act(async () => {
+        screen.getByText(/Single Player/i).click();
+      });
+      await act(async () => {
+        screen.getByRole('button', { name: 'Start Expedition' }).click();
+      });
+      await act(async () => {
+        handlers['mining_session_ended']({ reason: 'death', title: 'You Were Knocked Out', message: 'Backpack lost.' });
+      });
+      expect(errSpy).toHaveBeenCalledWith('You Were Knocked Out', 'Backpack lost.');
       expect(getPath()).toBe('/home');
     });
   });
@@ -514,59 +549,71 @@ describe('MineView Navigation & Session Lifecycle', () => {
       expect(screen.queryByText(/Expedition Summary/i)).toBeNull();
     });
 
-    it('never asks "Leave Mine?" when the player walks back to the spawn', async () => {
-      let setSession: (fn: (prev: any) => any) => void = () => {};
-      const Mover = () => {
-        setSession = useGame().setMiningSession as any;
-        return null;
-      };
+    const mountSession = async (sessionState: Record<string, unknown>, button: string | RegExp) => {
       mockOnEvent.mockReturnValue(() => {});
       render(
         <MemoryRouter initialEntries={['/mine']}>
           <GameProvider>
-            <Mover />
             <MineView />
           </GameProvider>
         </MemoryRouter>
       );
-      mockSendGameEvent.mockResolvedValueOnce({ success: true, data: { sessionState: sandboxState() } });
+      answerStart(sessionState);
       await act(async () => {
-        screen.getByText('Sandbox').click();
+        screen.getByText(button as any).click();
       });
-      // Off the entrance, then back on it: a normal mine would offer to extract here
-      await act(async () => setSession((prev) => ({ ...prev, position: { x: 30, y: 8 } })));
-      await act(async () => setSession((prev) => ({ ...prev, position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 } })));
+    };
+
+    it('shows no prompt in the sandbox (it has a Leave button), even if the mine reports the exit', async () => {
+      await mountSession(sandboxState(), 'Sandbox');
+      await act(async () => gridProps.current.onAtExitChange?.(true));
+      expect(screen.queryByRole('button', { name: /leave the mine/i })).toBeNull();
       expect(screen.queryByText(/Leave Mine\?/)).toBeNull();
     });
 
-    it('does ask in a normal mine (control for the test above)', async () => {
-      let setSession: (fn: (prev: any) => any) => void = () => {};
-      const Mover = () => {
-        setSession = useGame().setMiningSession as any;
-        return null;
+    describe('the extraction point in a normal mine', () => {
+      const normal = { grid: [], position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3, canExtract: true, isMining: false, gameMode: 'singleplayer' };
+      const start = async () => {
+        await mountSession(normal, /Single Player/i);
+        await act(async () => {
+          screen.getByRole('button', { name: 'Start Expedition' }).click();
+        });
       };
-      mockOnEvent.mockReturnValue(() => {});
-      render(
-        <MemoryRouter initialEntries={['/mine']}>
-          <GameProvider>
-            <Mover />
-            <MineView />
-          </GameProvider>
-        </MemoryRouter>
-      );
-      mockSendGameEvent.mockResolvedValueOnce({
-        success: true,
-        data: { sessionState: { grid: [], position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 }, droppedItems: [], temporaryBackpack: [], visionRange: 3, canExtract: true, isMining: false, gameMode: 'singleplayer' } },
+
+      it('shows the prompt only while standing at the point, and never pops the question up by itself', async () => {
+        await start();
+        expect(screen.queryByRole('button', { name: /leave the mine/i })).toBeNull();
+        await act(async () => gridProps.current.onAtExitChange?.(true));
+        expect(screen.getByRole('button', { name: /leave the mine/i })).toBeDefined();
+        expect(screen.queryByText(/Leave Mine\?/)).toBeNull();
+        await act(async () => gridProps.current.onAtExitChange?.(false));
+        expect(screen.queryByRole('button', { name: /leave the mine/i })).toBeNull();
       });
-      await act(async () => {
-        screen.getByText(/Single Player/i).click();
+
+      it('opens "Leave Mine?" from the prompt button and from the E key', async () => {
+        await start();
+        await act(async () => gridProps.current.onAtExitChange?.(true));
+        await act(async () => {
+          screen.getByRole('button', { name: /leave the mine/i }).click();
+        });
+        expect(screen.getByText(/Leave Mine\?/)).toBeDefined();
+        await act(async () => {
+          screen.getByRole('button', { name: 'Keep Exploring' }).click();
+        });
+        await waitFor(() => expect(screen.queryByText(/Leave Mine\?/)).toBeNull());
+        await act(async () => {
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e' }));
+        });
+        expect(screen.getByText(/Leave Mine\?/)).toBeDefined();
       });
-      await act(async () => {
-        screen.getByRole('button', { name: 'Start Expedition' }).click();
+
+      it('ignores the E key away from the point', async () => {
+        await start();
+        await act(async () => {
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e' }));
+        });
+        expect(screen.queryByText(/Leave Mine\?/)).toBeNull();
       });
-      await act(async () => setSession((prev) => ({ ...prev, position: { x: 30, y: 8 } })));
-      await act(async () => setSession((prev) => ({ ...prev, position: { x: MINING_CONFIG.ENTRANCE_X, y: 0 } })));
-      expect(screen.getByText(/Leave Mine\?/)).toBeDefined();
     });
 
     it('rebuilds the session and tells the user when the sandbox is reset', async () => {

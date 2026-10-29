@@ -20,7 +20,7 @@ describe('mission test scenes (ticket 116)', () => {
   });
 
   it('builds a one-off mission with no reward and an open level range', () => {
-    expect(adHocMission('x', 'X', [{ type: 'KILL_MOB', amount: 1 }])).toMatchObject({ rewardCoins: 0, rewardXp: 0, minLevel: 1, objectives: [{ type: 'KILL_MOB', amount: 1 }] });
+    expect(adHocMission('x', 'X', [{ type: 'KILL_MOB', amount: 1 }])).toMatchObject({ rewardSol: 0, rewardXp: 0, minLevel: 1, objectives: [{ type: 'KILL_MOB', amount: 1 }] });
   });
 
   it('clear-gas: starts with a cloud of gas and completes once half of it is gone', () => {

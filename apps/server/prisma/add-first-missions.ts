@@ -30,7 +30,7 @@ export interface FirstMission {
   tier: number;
   weight: number;
   objectives: FirstObjective[];
-  rewardCoins: number;
+  rewardSol: number;
   rewardXp: number;
   /** Reward items by item name. */
   rewardItems: { item: string; chance: number; minQuantity: number; maxQuantity: number }[];
@@ -38,14 +38,14 @@ export interface FirstMission {
 
 /** Depths are in small blocks: the original value x 3. */
 export const FIRST_MISSIONS: readonly FirstMission[] = [
-  { key: 'first_copper', name: 'Copper Run', description: 'The forge is hungry. Dig out some copperium and bring it home.', minLevel: 1, maxLevel: 3, tier: 1, weight: 3, objectives: [{ type: 'MINE_ITEM', target: 'Copperium', amount: 10 }], rewardCoins: 30, rewardXp: 20, rewardItems: [] },
-  { key: 'mole_trouble', name: 'Mole Trouble', description: 'Mole people have been undermining the tunnels. Thin them out.', minLevel: 1, maxLevel: 3, tier: 1, weight: 2, objectives: [{ type: 'KILL_MOB', target: 'Mole Person', amount: 3 }], rewardCoins: 40, rewardXp: 30, rewardItems: [] },
-  { key: 'clear_the_air', name: 'Clear the Air', description: 'A pocket of hydrogen is building up deep down. Vent it, burn it or blow it, but get rid of it.', minLevel: 1, maxLevel: 4, tier: 1, weight: 2, objectives: [{ type: 'CLEAR_GAS', target: 'HYDROGEN', amount: 10 }], rewardCoins: 50, rewardXp: 40, rewardItems: [{ item: 'Copperium', chance: 50, minQuantity: 1, maxQuantity: 3 }] },
-  { key: 'first_descent', name: 'First Descent', description: 'Nobody has measured the mine in years. Go down and see how far it goes.', minLevel: 1, maxLevel: 3, tier: 1, weight: 2, objectives: [{ type: 'REACH_DEPTH', amount: 45 }], rewardCoins: 35, rewardXp: 25, rewardItems: [] },
-  { key: 'silver_vein', name: 'The Silver Vein', description: 'Rumour has silverium below the copper. Find it, and get down to it.', minLevel: 2, maxLevel: 4, tier: 2, weight: 2, objectives: [{ type: 'MINE_ITEM', target: 'Silverium', amount: 8 }, { type: 'REACH_DEPTH', amount: 60 }], rewardCoins: 120, rewardXp: 80, rewardItems: [{ item: 'Copperium', chance: 100, minQuantity: 3, maxQuantity: 6 }] },
-  { key: 'pest_control', name: 'Pest Control', description: 'Anything that moves down there is a problem. Clear out eight of them.', minLevel: 2, maxLevel: 4, tier: 2, weight: 2, objectives: [{ type: 'KILL_MOB', amount: 8 }], rewardCoins: 100, rewardXp: 70, rewardItems: [] },
-  { key: 'burn_the_oil', name: 'Burn the Oil', description: 'Oil seeps through the lower tunnels and one spark would be a disaster. Get rid of a good part of it, on purpose.', minLevel: 2, maxLevel: 4, tier: 2, weight: 1, objectives: [{ type: 'CLEAR_FLUID', target: 'OIL', amount: 40 }], rewardCoins: 110, rewardXp: 75, rewardItems: [] },
-  { key: 'deep_silver', name: 'Deep Silver', description: 'The richest silverium lies far down, and the moles guard it. Go deep, dig it out and deal with them.', minLevel: 3, maxLevel: 4, tier: 3, weight: 1, objectives: [{ type: 'MINE_ITEM', target: 'Silverium', amount: 15 }, { type: 'KILL_MOB', target: 'Mole Person', amount: 5 }, { type: 'REACH_DEPTH', amount: 90 }], rewardCoins: 300, rewardXp: 200, rewardItems: [{ item: 'Silverium', chance: 100, minQuantity: 2, maxQuantity: 4 }] },
+  { key: 'first_copper', name: 'Copper Run', description: 'The forge is hungry. Dig out some copperium and bring it home.', minLevel: 1, maxLevel: 3, tier: 1, weight: 3, objectives: [{ type: 'MINE_ITEM', target: 'Copperium', amount: 10 }], rewardSol: 30, rewardXp: 20, rewardItems: [] },
+  { key: 'mole_trouble', name: 'Mole Trouble', description: 'Mole people have been undermining the tunnels. Thin them out.', minLevel: 1, maxLevel: 3, tier: 1, weight: 2, objectives: [{ type: 'KILL_MOB', target: 'Mole Person', amount: 3 }], rewardSol: 40, rewardXp: 30, rewardItems: [] },
+  { key: 'clear_the_air', name: 'Clear the Air', description: 'A pocket of hydrogen is building up deep down. Vent it, burn it or blow it, but get rid of it.', minLevel: 1, maxLevel: 4, tier: 1, weight: 2, objectives: [{ type: 'CLEAR_GAS', target: 'HYDROGEN', amount: 10 }], rewardSol: 50, rewardXp: 40, rewardItems: [{ item: 'Copperium', chance: 50, minQuantity: 1, maxQuantity: 3 }] },
+  { key: 'first_descent', name: 'First Descent', description: 'Nobody has measured the mine in years. Go down and see how far it goes.', minLevel: 1, maxLevel: 3, tier: 1, weight: 2, objectives: [{ type: 'REACH_DEPTH', amount: 45 }], rewardSol: 35, rewardXp: 25, rewardItems: [] },
+  { key: 'silver_vein', name: 'The Silver Vein', description: 'Rumour has silverium below the copper. Find it, and get down to it.', minLevel: 2, maxLevel: 4, tier: 2, weight: 2, objectives: [{ type: 'MINE_ITEM', target: 'Silverium', amount: 8 }, { type: 'REACH_DEPTH', amount: 60 }], rewardSol: 120, rewardXp: 80, rewardItems: [{ item: 'Copperium', chance: 100, minQuantity: 3, maxQuantity: 6 }] },
+  { key: 'pest_control', name: 'Pest Control', description: 'Anything that moves down there is a problem. Clear out eight of them.', minLevel: 2, maxLevel: 4, tier: 2, weight: 2, objectives: [{ type: 'KILL_MOB', amount: 8 }], rewardSol: 100, rewardXp: 70, rewardItems: [] },
+  { key: 'burn_the_oil', name: 'Burn the Oil', description: 'Oil seeps through the lower tunnels and one spark would be a disaster. Get rid of a good part of it, on purpose.', minLevel: 2, maxLevel: 4, tier: 2, weight: 1, objectives: [{ type: 'CLEAR_FLUID', target: 'OIL', amount: 40 }], rewardSol: 110, rewardXp: 75, rewardItems: [] },
+  { key: 'deep_silver', name: 'Deep Silver', description: 'The richest silverium lies far down, and the moles guard it. Go deep, dig it out and deal with them.', minLevel: 3, maxLevel: 4, tier: 3, weight: 1, objectives: [{ type: 'MINE_ITEM', target: 'Silverium', amount: 15 }, { type: 'KILL_MOB', target: 'Mole Person', amount: 5 }, { type: 'REACH_DEPTH', amount: 90 }], rewardSol: 300, rewardXp: 200, rewardItems: [{ item: 'Silverium', chance: 100, minQuantity: 2, maxQuantity: 4 }] },
 ];
 
 /** What the database has, by the names the templates use. */
@@ -65,7 +65,7 @@ export interface MissionRow {
   tier: number;
   weight: number;
   objectives: ObjectiveDefinition[];
-  rewardCoins: number;
+  rewardSol: number;
   rewardXp: number;
   rewardItems: { itemId: string; chance: number; minQuantity: number; maxQuantity: number }[];
 }
@@ -92,7 +92,7 @@ export function resolveMission(m: FirstMission, c: Catalog): { row: MissionRow }
     return [{ itemId, chance: r.chance, minQuantity: r.minQuantity, maxQuantity: r.maxQuantity }];
   });
   if (problems.length > 0) return { problems };
-  return { row: { key: m.key, name: m.name, description: m.description, minLevel: m.minLevel, maxLevel: m.maxLevel, tier: m.tier, weight: m.weight, objectives, rewardCoins: m.rewardCoins, rewardXp: m.rewardXp, rewardItems } };
+  return { row: { key: m.key, name: m.name, description: m.description, minLevel: m.minLevel, maxLevel: m.maxLevel, tier: m.tier, weight: m.weight, objectives, rewardSol: m.rewardSol, rewardXp: m.rewardXp, rewardItems } };
 }
 
 export interface PlanRow { mission: FirstMission; action: 'create' | 'skip' | 'problem'; row?: MissionRow; notes: string[] }
@@ -149,7 +149,7 @@ async function main() {
       await prisma.mission.create({
         data: {
           key: p.row.key, name: p.row.name, description: p.row.description, minLevel: p.row.minLevel, maxLevel: p.row.maxLevel, tier: p.row.tier, weight: p.row.weight,
-          objectives: p.row.objectives as unknown as Prisma.InputJsonValue, rewardCoins: p.row.rewardCoins, rewardXp: p.row.rewardXp,
+          objectives: p.row.objectives as unknown as Prisma.InputJsonValue, rewardSol: p.row.rewardSol, rewardXp: p.row.rewardXp,
           rewardItems: p.row.rewardItems.length > 0 ? (p.row.rewardItems as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
         },
       });

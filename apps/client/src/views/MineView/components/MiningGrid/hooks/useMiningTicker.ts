@@ -33,6 +33,7 @@ import { MiningLocalSimulationSystem } from '../systems/MiningLocalSimulationSys
 import { MiningReticleRenderer } from '../systems/MiningReticleRenderer';
 import { MiningDebugRenderer } from '../systems/MiningDebugRenderer';
 import { collectBodySamples, gridWanderTerrain } from '../systems/DoodadBodies';
+import { ExitPointTracker } from '../systems/ExitPointTracker';
 
 export interface UseMiningTickerOptions {
   app: Application | null;
@@ -42,6 +43,8 @@ export interface UseMiningTickerOptions {
   soundManager?: SoundManager | null;
   /** Swings per second used to pace the swing animation and its sound. */
   miningSwingSpeed?: number;
+  /** Tells the page when the player steps onto or off the extraction point. Absent (the sandbox): not watched. */
+  exitPoint?: { surfaceRow: number; onChange: (atExit: boolean) => void } | null;
 }
 
 export function useMiningTicker({
@@ -50,6 +53,7 @@ export function useMiningTicker({
   sessionState,
   soundManager,
   miningSwingSpeed,
+  exitPoint,
 }: UseMiningTickerOptions) {
   const {
     playerContainerRef,
@@ -102,6 +106,8 @@ export function useMiningTicker({
   // The ticker callback is created once per `app`, so read the live swing speed through a ref
   const miningSwingSpeedRef = useRef(miningSwingSpeed);
   miningSwingSpeedRef.current = miningSwingSpeed;
+  const exitPointRef = useRef(exitPoint);
+  exitPointRef.current = exitPoint;
 
   useEffect(() => {
     if (!app) return;
@@ -126,6 +132,7 @@ export function useMiningTicker({
 
     let sceneSampleFrames = 0;
     const cullView = new Rectangle();
+    const exitTracker = new ExitPointTracker(exitPointRef.current?.surfaceRow ?? 0, (atExit) => exitPointRef.current?.onChange(atExit));
     const tickerCallback = () => {
       miningProfiler.beginFrame();
       const playerContainer = playerContainerRef.current;
@@ -168,6 +175,9 @@ export function useMiningTicker({
         },
         app.ticker.deltaMS / 1000
       );
+
+      // 1b. The extraction point: the page shows its leave prompt while the player stands on it
+      if (exitPointRef.current) exitTracker.update(currentPos.x, currentPos.y);
 
       // 2. Camera Tracking
       miningProfiler.startSection('Camera');
@@ -492,6 +502,7 @@ export function useMiningTicker({
     return () => {
       app.ticker.remove(tickerCallback);
       unsubscribeProfiler();
+      exitTracker.reset();
       restoreRender?.();
       restoreRender = null;
       lightingEngineRef.current?.removeLight('torch_preview');

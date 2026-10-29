@@ -48,7 +48,7 @@ const RewardItemsEditor: React.FC<RewardItemsEditorProps> = ({ value, items, onC
           </div>
         </div>
       ))}
-      {value.length === 0 && <p className="text-xs text-slate-400 font-semibold italic">No reward items: the mission pays coins and XP only.</p>}
+      {value.length === 0 && <p className="text-xs text-slate-400 font-semibold italic">No reward items: the mission pays Sol and XP only.</p>}
       <button type="button" onClick={() => onChange([...value, newRewardItem(items[0]?.id ?? '')])} className={buttonClass}>+ Add Reward Item</button>
     </section>
   );

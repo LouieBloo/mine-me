@@ -22,7 +22,7 @@ const character = (over: any = {}) => ({ id: cid, userId: 'u1', name: 'Hero', st
 
 const mission = (id: string, over: Partial<MissionDefinition> = {}): MissionDefinition => ({
   id, key: id, name: `Mission ${id}`, minLevel: 1, maxLevel: 5, tier: 1, weight: 1,
-  objectives: [{ type: 'KILL_MOB', amount: 2 }], rewardCoins: 10, rewardXp: 5, rewardItems: [], ...over,
+  objectives: [{ type: 'KILL_MOB', amount: 2 }], rewardSol: 10, rewardXp: 5, rewardItems: [], ...over,
 });
 const pool = ['a', 'b', 'c', 'd', 'e'].map((id) => mission(id));
 
@@ -45,7 +45,7 @@ describe('picking a mission before the run (ticket 111)', () => {
     const first = await handleMiningMissionOffers({} as any, socket, { mode: 'singleplayer' });
     expect(first.success).toBe(true);
     expect(first.data!.offers.length).toBeGreaterThanOrEqual(2);
-    expect(first.data!.offers[0]).toMatchObject({ tier: 1, reward: { coins: 10, xp: 5 } });
+    expect(first.data!.offers[0]).toMatchObject({ tier: 1, reward: { sol: 10, xp: 5 } });
     const again = await handleMiningMissionOffers({} as any, socket, { mode: 'singleplayer' });
     expect(again.data!.offers.map((o: any) => o.id)).toEqual(first.data!.offers.map((o: any) => o.id));
   });

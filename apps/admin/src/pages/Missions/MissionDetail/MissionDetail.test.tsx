@@ -20,7 +20,7 @@ vi.mock('./MissionSoundEffects/MissionSoundEffects', () => ({
 
 const MISSION = {
   id: 'm1', key: 'copper_run', name: 'Copper Run', description: 'Dig.', minLevel: 1, maxLevel: 5, tier: 2, weight: 2,
-  objectives: [{ type: 'MINE_ITEM', targetId: 'i1', amount: 10 }], rewardCoins: 20, rewardXp: 10, rewardItems: [],
+  objectives: [{ type: 'MINE_ITEM', targetId: 'i1', amount: 10 }], rewardSol: 20, rewardXp: 10, rewardItems: [],
 };
 const ok = (body: unknown, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => body });
 
@@ -63,7 +63,7 @@ describe('MissionDetail', () => {
     expect(screen.getByLabelText('Key')).toHaveValue('copper_run');
     expect(screen.getByLabelText('Key')).toBeDisabled();
     expect(screen.getByLabelText('Tier')).toHaveValue('2');
-    expect(screen.getByLabelText('Reward Coins')).toHaveValue(20);
+    expect(screen.getByLabelText('Reward Sol')).toHaveValue(20);
     expect(await screen.findByLabelText('Objective 1 target')).toHaveValue('i1');
     expect(screen.getByTestId('sounds')).toHaveTextContent('sounds for m1');
     expect(screen.getByTestId('requirements')).toHaveTextContent('1 objectives');
@@ -72,14 +72,14 @@ describe('MissionDetail', () => {
   it('saves the changes with a PUT and shows them as saved', async () => {
     serve();
     renderAt('/missions/m1');
-    fireEvent.change(await screen.findByLabelText('Reward Coins'), { target: { value: '75' } });
+    fireEvent.change(await screen.findByLabelText('Reward Sol'), { target: { value: '75' } });
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Big Copper Run' } });
     await screen.findByLabelText('Objective 1 target');
     fireEvent.click(screen.getByText('Save Mission'));
     await waitFor(() => expect(lastCall('PUT')).toBeTruthy());
     const [url, opts] = lastCall('PUT')!;
     expect(url).toBe('/api/admin/missions/m1');
-    expect(JSON.parse(opts.body)).toMatchObject({ name: 'Big Copper Run', rewardCoins: 75, objectives: [{ type: 'MINE_ITEM', targetId: 'i1', amount: 10 }] });
+    expect(JSON.parse(opts.body)).toMatchObject({ name: 'Big Copper Run', rewardSol: 75, objectives: [{ type: 'MINE_ITEM', targetId: 'i1', amount: 10 }] });
     expect(await screen.findByText('Mission saved!')).toBeInTheDocument();
   });
 

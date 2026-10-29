@@ -13,7 +13,7 @@ const lookups: MissionLookups = {
 
 const mission = (over: Partial<MissionDefinition> = {}): MissionDefinition => ({
   id: 'm1', key: 'copper_run', name: 'Copper Run', minLevel: 1, maxLevel: 5, tier: 1, weight: 1,
-  objectives: [{ type: 'MINE_ITEM', targetId: 'copper', amount: 10 }], rewardCoins: 10, rewardXp: 5, rewardItems: [], ...over,
+  objectives: [{ type: 'MINE_ITEM', targetId: 'copper', amount: 10 }], rewardSol: 10, rewardXp: 5, rewardItems: [], ...over,
 });
 
 describe('validateMission', () => {
@@ -34,7 +34,7 @@ describe('validateMission', () => {
   });
 
   it('rejects negative rewards and bad reward items', () => {
-    expect(validateMission(mission({ rewardCoins: -1, rewardXp: 1.5 }), lookups).join()).toMatch(/coins.*XP/);
+    expect(validateMission(mission({ rewardSol: -1, rewardXp: 1.5 }), lookups).join()).toMatch(/Sol.*XP/);
     expect(validateMission(mission({ rewardItems: [{ itemId: 'nope', chance: 150, minQuantity: 0, maxQuantity: 0 }] }), lookups).join()).toMatch(/unknown item/);
   });
 });

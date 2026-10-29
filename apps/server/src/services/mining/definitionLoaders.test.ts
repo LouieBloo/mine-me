@@ -465,7 +465,7 @@ describe('doodads (ticket 099)', () => {
 });
 
 describe('missions (ticket 108)', () => {
-  const row = { id: 'm1', key: 'copper_run', name: 'Copper Run', minLevel: 1, maxLevel: 5, tier: 1, weight: 1, objectives: [{ type: 'KILL_MOB', amount: 2 }], rewardCoins: 5, rewardXp: 5, rewardItems: null, soundEffects: { complete: { soundId: 's1', volume: 0.5 } } };
+  const row = { id: 'm1', key: 'copper_run', name: 'Copper Run', minLevel: 1, maxLevel: 5, tier: 1, weight: 1, objectives: [{ type: 'KILL_MOB', amount: 2 }], rewardSol: 5, rewardXp: 5, rewardItems: null, soundEffects: { complete: { soundId: 's1', volume: 0.5 } } };
 
   it('loads the missions, oldest first, with their sounds resolved from the library', async () => {
     const prisma = fakePrisma({ missions: [row], sounds: [{ id: 's1', url: '/assets/sounds/chime.mp3', volume: 1, isActive: true }] });

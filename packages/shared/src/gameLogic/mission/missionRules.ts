@@ -26,7 +26,7 @@ export function validateMission(mission: Partial<MissionDefinition>, lookups: Mi
   else if (isWhole(mission.minLevel, 1) && mission.minLevel > mission.maxLevel) errors.push('minimum level cannot be above the maximum level');
   if (!isWhole(mission.tier, 1)) errors.push('tier must be a whole number of at least 1');
   if (typeof mission.weight !== 'number' || !Number.isFinite(mission.weight) || mission.weight <= 0) errors.push('weight must be greater than 0');
-  if (!isWhole(mission.rewardCoins ?? 0, 0)) errors.push('coins must be a whole number, 0 or more');
+  if (!isWhole(mission.rewardSol ?? 0, 0)) errors.push('Sol must be a whole number, 0 or more');
   if (!isWhole(mission.rewardXp ?? 0, 0)) errors.push('XP must be a whole number, 0 or more');
   const objectives = mission.objectives;
   if (!Array.isArray(objectives) || objectives.length === 0) errors.push('a mission needs at least one objective');

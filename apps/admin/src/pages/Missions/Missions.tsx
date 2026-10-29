@@ -80,7 +80,7 @@ export default function Missions() {
                     <td className="py-4 px-6 text-slate-600 font-semibold">{mission.minLevel}-{mission.maxLevel}</td>
                     <td className="py-4 px-6 text-slate-600 font-semibold">{objectiveSummary(mission)}</td>
                     <td className="py-4 px-6 text-slate-600 font-semibold">
-                      {mission.rewardCoins} coins, {mission.rewardXp} XP{mission.rewardItems?.length ? `, ${mission.rewardItems.length} item${mission.rewardItems.length === 1 ? '' : 's'}` : ''}
+                      {mission.rewardSol} Sol, {mission.rewardXp} XP{mission.rewardItems?.length ? `, ${mission.rewardItems.length} item${mission.rewardItems.length === 1 ? '' : 's'}` : ''}
                     </td>
                     <td className="py-4 px-6 text-right">
                       <button

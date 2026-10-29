@@ -29,9 +29,9 @@ export function requirementsFor(mission: Pick<MissionDefinition, 'objectives'>, 
 }
 
 /** The reward as a player reads it: item names and icons resolved. */
-export function rewardView(mission: Pick<MissionDefinition, 'rewardCoins' | 'rewardXp' | 'rewardItems'>, data: MiningDataManager): MissionRewardView {
+export function rewardView(mission: Pick<MissionDefinition, 'rewardSol' | 'rewardXp' | 'rewardItems'>, data: MiningDataManager): MissionRewardView {
   return {
-    coins: mission.rewardCoins,
+    sol: mission.rewardSol,
     xp: mission.rewardXp,
     items: (mission.rewardItems ?? []).map((r) => {
       const item = data.getItemData(r.itemId);

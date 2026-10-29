@@ -63,7 +63,7 @@ const gas = data.getGases()[0];
 
 const GOOD = {
   key: 'copper_run', name: 'Copper Run', description: 'Dig for copper.', minLevel: 1, maxLevel: 5, tier: 1, weight: 2,
-  objectives: [{ type: 'MINE_ITEM', targetId: copperItem.id, amount: 10 }], rewardCoins: 20, rewardXp: 10,
+  objectives: [{ type: 'MINE_ITEM', targetId: copperItem.id, amount: 10 }], rewardSol: 20, rewardXp: 10,
   rewardItems: [{ itemId: copperItem.id, chance: 50, minQuantity: 1, maxQuantity: 2 }],
 };
 
@@ -76,7 +76,7 @@ describe('admin missions', () => {
   it('creates a mission, stores its objectives and reward, and mirrors the table to the dev seed', async () => {
     const res = await request(app).post('/admin/missions').send(GOOD);
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ key: 'copper_run', tier: 1, weight: 2, rewardCoins: 20, objectives: GOOD.objectives, rewardItems: GOOD.rewardItems });
+    expect(res.body).toMatchObject({ key: 'copper_run', tier: 1, weight: 2, rewardSol: 20, objectives: GOOD.objectives, rewardItems: GOOD.rewardItems });
     expect(syncJson).toHaveBeenCalledWith('missions.json', expect.any(Array));
     expect((await request(app).get('/admin/missions')).body).toHaveLength(1);
     expect((await request(app).get('/admin/missions/copper_run')).body.name).toBe('Copper Run');
@@ -120,9 +120,9 @@ describe('admin missions', () => {
 
   it('updates fields, keeps the key, and rechecks the whole mission', async () => {
     await request(app).post('/admin/missions').send(GOOD);
-    const ok = await request(app).patch('/admin/missions/copper_run').send({ tier: 3, rewardCoins: '75', key: 'ignored' });
+    const ok = await request(app).patch('/admin/missions/copper_run').send({ tier: 3, rewardSol: '75', key: 'ignored' });
     expect(ok.status).toBe(200);
-    expect(ok.body).toMatchObject({ key: 'copper_run', tier: 3, rewardCoins: 75 });
+    expect(ok.body).toMatchObject({ key: 'copper_run', tier: 3, rewardSol: 75 });
     const bad = await request(app).patch('/admin/missions/copper_run').send({ minLevel: 50 });
     expect(bad.status).toBe(400);
     expect(rows[0].minLevel).toBe(1);

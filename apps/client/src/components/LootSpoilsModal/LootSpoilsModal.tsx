@@ -28,6 +28,8 @@ interface LootSpoilsModalProps {
   experience: number;
   items: LootItemDescriptor[];
   acceptButtonText?: string;
+  /** Anything else the summary should show under the description (e.g. how the run's mission went). */
+  extra?: React.ReactNode;
 }
 
 const getRarityColorClass = (rarity?: string) => {
@@ -73,6 +75,7 @@ export const LootSpoilsModal: React.FC<LootSpoilsModalProps> = ({
   experience,
   items,
   acceptButtonText = 'Accept Loot',
+  extra,
 }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidthClass="max-w-lg">
@@ -80,6 +83,8 @@ export const LootSpoilsModal: React.FC<LootSpoilsModalProps> = ({
         <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">
           {description}
         </p>
+
+        {extra}
 
         <div className="grid grid-cols-2 gap-3">
           {/* Sol Gained */}

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { MissionDefinition, MissionRewardView } from '@mine-me/shared';
 import { MissionTracker, type MissionTrackerDeps } from './MissionTracker';
 
-const reward: MissionRewardView = { coins: 10, xp: 5, items: [] };
+const reward: MissionRewardView = { sol: 10, xp: 5, items: [] };
 
 function setup(objectives: MissionDefinition['objectives'], totals: { fluid?: number; gas?: number } = {}) {
   const state = { fluid: totals.fluid ?? 160, gas: totals.gas ?? 40 };
@@ -16,7 +16,7 @@ function setup(objectives: MissionDefinition['objectives'], totals: { fluid?: nu
     playerName: (id) => id.toUpperCase(),
     reward,
   };
-  const mission: MissionDefinition = { id: 'm', key: 'm', name: 'Test', minLevel: 1, maxLevel: 9, tier: 1, weight: 1, objectives, rewardCoins: 10, rewardXp: 5, rewardItems: [] };
+  const mission: MissionDefinition = { id: 'm', key: 'm', name: 'Test', minLevel: 1, maxLevel: 9, tier: 1, weight: 1, objectives, rewardSol: 10, rewardXp: 5, rewardItems: [] };
   return { tracker: new MissionTracker(mission, deps), state };
 }
 

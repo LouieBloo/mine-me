@@ -44,7 +44,7 @@ export interface MissionDefinition {
   /** Chance weight against the other missions on offer for a level. */
   weight: number;
   objectives: ObjectiveDefinition[];
-  rewardCoins: number;
+  rewardSol: number;
   rewardXp: number;
   rewardItems: MissionRewardItem[];
   /** Sound slots as stored: library sounds by id (see `resolveMissionSounds`). */
@@ -76,7 +76,7 @@ export interface MissionObjectiveView {
 
 /** What a reward is, as shown before and after a run (items by id with names resolved by the server). */
 export interface MissionRewardView {
-  coins: number;
+  sol: number;
   xp: number;
   items: { itemId: string; itemName: string; iconUrl?: string | null; chance: number; minQuantity: number; maxQuantity: number }[];
 }
@@ -125,7 +125,7 @@ export interface MissionResultView {
   outcome: 'paid' | 'completed' | 'failed' | 'unfinished';
   objectives: MissionObjectiveView[];
   /** What was paid on a safe exit (absent when nothing was). */
-  reward?: { coins: number; xp: number; items: { itemId: string; itemName: string; iconUrl?: string | null; quantity: number }[] } | null;
+  reward?: { sol: number; xp: number; items: { itemId: string; itemName: string; iconUrl?: string | null; quantity: number }[] } | null;
   /** Who did how much of each objective (co-op). */
   contributions: { characterId: string; characterName: string; amounts: number[] }[];
   /** Why nothing was paid, when it was not. */

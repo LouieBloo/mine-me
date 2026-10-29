@@ -18,8 +18,8 @@ import { toMissionDefinition } from '../../services/mining/definitionLoaders';
 import { missionLookups, requirementContext } from '../../services/mining/missions/missionContext';
 
 /** The columns an admin may set. `key` is only set when a mission is created; sounds have their own route. */
-const EDITABLE_FIELDS = ['name', 'description', 'minLevel', 'maxLevel', 'tier', 'weight', 'objectives', 'rewardCoins', 'rewardXp', 'rewardItems'] as const;
-const NUMERIC_FIELDS = ['minLevel', 'maxLevel', 'tier', 'weight', 'rewardCoins', 'rewardXp'] as const;
+const EDITABLE_FIELDS = ['name', 'description', 'minLevel', 'maxLevel', 'tier', 'weight', 'objectives', 'rewardSol', 'rewardXp', 'rewardItems'] as const;
+const NUMERIC_FIELDS = ['minLevel', 'maxLevel', 'tier', 'weight', 'rewardSol', 'rewardXp'] as const;
 
 export const asMissionDefinition = (row: unknown): MissionDefinition => toMissionDefinition(row);
 
@@ -79,7 +79,7 @@ const jsonOrNull = (value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonN
 export const createMission = async (req: Request, res: Response) => {
   try {
     const input = readBody(req.body ?? {});
-    const draft = { minLevel: 1, maxLevel: 100, tier: 1, weight: 1, rewardCoins: 0, rewardXp: 0, rewardItems: [], ...input } as Partial<MissionDefinition>;
+    const draft = { minLevel: 1, maxLevel: 100, tier: 1, weight: 1, rewardSol: 0, rewardXp: 0, rewardItems: [], ...input } as Partial<MissionDefinition>;
     const errors = validateMission(draft, missionLookups(MiningDataManager.getInstance(), await mapMaxDepth()));
     if (errors.length > 0) {
       res.status(400).json({ error: errors.join('; '), errors });
@@ -99,7 +99,7 @@ export const createMission = async (req: Request, res: Response) => {
         tier: draft.tier!,
         weight: draft.weight!,
         objectives: draft.objectives as unknown as Prisma.InputJsonValue,
-        rewardCoins: draft.rewardCoins ?? 0,
+        rewardSol: draft.rewardSol ?? 0,
         rewardXp: draft.rewardXp ?? 0,
         rewardItems: jsonOrNull(draft.rewardItems && draft.rewardItems.length > 0 ? draft.rewardItems : null),
       },

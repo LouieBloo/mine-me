@@ -10,7 +10,7 @@ export interface MissionForm {
   tier: number;
   weight: number;
   objectives: ObjectiveDefinition[];
-  rewardCoins: number;
+  rewardSol: number;
   rewardXp: number;
   rewardItems: MissionRewardItem[];
 }
@@ -25,7 +25,7 @@ export const NEW_MISSION: MissionForm = {
   tier: 1,
   weight: 1,
   objectives: [{ type: 'MINE_ITEM', targetId: null, amount: 10 }],
-  rewardCoins: 0,
+  rewardSol: 0,
   rewardXp: 0,
   rewardItems: [],
 };
@@ -39,7 +39,7 @@ export const missionToForm = (m: MissionDefinition): MissionForm => ({
   tier: m.tier,
   weight: m.weight,
   objectives: (m.objectives ?? []).map((o) => ({ ...o })),
-  rewardCoins: m.rewardCoins,
+  rewardSol: m.rewardSol,
   rewardXp: m.rewardXp,
   rewardItems: (m.rewardItems ?? []).map((r) => ({ ...r })),
 });
@@ -54,7 +54,7 @@ export const formToMission = (f: MissionForm): Partial<MissionDefinition> => ({
   tier: f.tier,
   weight: f.weight,
   objectives: f.objectives.map((o) => (o.targetId ? { type: o.type, targetId: o.targetId, amount: o.amount } : { type: o.type, amount: o.amount })),
-  rewardCoins: Number.isFinite(f.rewardCoins) ? f.rewardCoins : 0,
+  rewardSol: Number.isFinite(f.rewardSol) ? f.rewardSol : 0,
   rewardXp: Number.isFinite(f.rewardXp) ? f.rewardXp : 0,
   rewardItems: f.rewardItems,
 });

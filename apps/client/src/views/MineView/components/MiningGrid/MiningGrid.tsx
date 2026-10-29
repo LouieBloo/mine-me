@@ -73,6 +73,8 @@ interface MiningGridProps {
   onBackpackFull?: () => void;
   onStashChange?: (newStash: MiningBackpackItem[]) => void;
   onBeltChange?: (update: NonNullable<MiningStateTickPayload['belt']>) => void;
+  /** The player stepped onto (true) or off (false) the extraction point. */
+  onAtExitChange?: (atExit: boolean) => void;
   /** Sandbox tool and camera settings (only in a sandbox). */
   sandbox?: SandboxViewState;
 }
@@ -100,6 +102,7 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
   onBackpackFull,
   onStashChange,
   onBeltChange,
+  onAtExitChange,
   sandbox,
 }) => {
   const { app } = usePixiStage();
@@ -606,6 +609,8 @@ export const MiningGrid: React.FC<MiningGridProps> = ({
     world,
     soundManager,
     miningSwingSpeed: effectiveMiningSwingSpeed,
+    // (the sandbox has a Leave button instead of an extraction point)
+    exitPoint: onAtExitChange && initialSessionState.gameMode !== 'sandbox' ? { surfaceRow: initialSessionState.surfaceRow ?? 0, onChange: onAtExitChange } : null,
   });
 
   return (

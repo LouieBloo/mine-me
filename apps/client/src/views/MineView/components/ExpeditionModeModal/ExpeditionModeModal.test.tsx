@@ -108,7 +108,7 @@ describe('ExpeditionModeModal', () => {
 });
 
 describe('ExpeditionModeModal mission step (ticket 111)', () => {
-  const offer = (id: string, name: string) => ({ id, name, description: null, tier: 1, objectives: [{ type: 'KILL_MOB' as const, label: `Kill 3 ${name}`, target: 3, unit: 'count' as const }], reward: { coins: 10, xp: 5, items: [] } });
+  const offer = (id: string, name: string) => ({ id, name, description: null, tier: 1, objectives: [{ type: 'KILL_MOB' as const, label: `Kill 3 ${name}`, target: 3, unit: 'count' as const }], reward: { sol: 10, xp: 5, items: [] } });
 
   it('asks for missions after the biome step, shows the offers, and starts with the one picked', async () => {
     const onSelectMode = vi.fn();

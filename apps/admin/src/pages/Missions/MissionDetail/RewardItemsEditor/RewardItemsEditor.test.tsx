@@ -29,8 +29,8 @@ describe('RewardItemsEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith([]);
   });
 
-  it('says the mission pays coins and XP only when there are no rows', () => {
+  it('says the mission pays Sol and XP only when there are no rows', () => {
     render(<RewardItemsEditor value={[]} items={items} onChange={vi.fn()} />);
-    expect(screen.getByText(/coins and XP only/)).toBeInTheDocument();
+    expect(screen.getByText(/Sol and XP only/)).toBeInTheDocument();
   });
 });

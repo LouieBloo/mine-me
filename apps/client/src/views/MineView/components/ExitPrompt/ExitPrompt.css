@@ -1,0 +1,4 @@
+/* Layout and colour come from Tailwind in the component; this keeps the prompt above the HUD's bottom row on small screens. */
+.exit-prompt {
+  max-width: calc(100% - 2rem);
+}

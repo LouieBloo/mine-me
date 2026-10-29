@@ -15,10 +15,10 @@ const TIER_STYLE: Record<number, string> = {
   3: 'bg-rose-950/80 border-rose-500/40 text-rose-300',
 };
 
-/** "30 coins, 20 XP, Copperium x1-3 (50%)": a reward as one line. */
+/** "30 Sol, 20 XP, Copperium x1-3 (50%)": a reward as one line. */
 export const rewardText = (reward: MissionRewardView): string => {
   const parts: string[] = [];
-  if (reward.coins > 0) parts.push(`${reward.coins} coins`);
+  if (reward.sol > 0) parts.push(`${reward.sol} Sol`);
   if (reward.xp > 0) parts.push(`${reward.xp} XP`);
   for (const item of reward.items) {
     const qty = item.minQuantity === item.maxQuantity ? `${item.minQuantity}` : `${item.minQuantity}-${item.maxQuantity}`;

@@ -45,8 +45,6 @@ describe('MiningHUD', () => {
       <MiningHUD
         sessionState={mockSessionState}
         playerState={mockPlayerState}
-        onExit={vi.fn()}
-        onAbandon={vi.fn()}
         onRestart={vi.fn()}
       />
     );
@@ -59,8 +57,6 @@ describe('MiningHUD', () => {
       <MiningHUD
         sessionState={{ ...mockSessionState, gameMode: 'multiplayer', isMining: true }}
         playerState={mockPlayerState}
-        onExit={vi.fn()}
-        onAbandon={vi.fn()}
         onRestart={vi.fn()}
         showDebug
       />
@@ -77,8 +73,6 @@ describe('MiningHUD', () => {
       <MiningHUD
         sessionState={mockSessionState}
         playerState={mockPlayerState}
-        onExit={vi.fn()}
-        onAbandon={vi.fn()}
         onRestart={vi.fn()}
       />
     );
@@ -91,8 +85,6 @@ describe('MiningHUD', () => {
     const props = {
       sessionState: mockSessionState,
       playerState: mockPlayerState,
-      onExit: vi.fn(),
-      onAbandon: vi.fn(),
       onRestart: vi.fn(),
       onZoomChange: vi.fn(),
     };
@@ -104,15 +96,20 @@ describe('MiningHUD', () => {
   });
 
   it('shows the mission tracker only when the run has a mission', () => {
-    const props = { playerState: mockPlayerState, onExit: vi.fn(), onAbandon: vi.fn(), onRestart: vi.fn() };
+    const props = { playerState: mockPlayerState, onRestart: vi.fn() };
     const { rerender } = render(<MiningHUD sessionState={mockSessionState} {...props} />);
     expect(screen.queryByTestId('mission-tracker')).toBeNull();
     const withMission: MiningSessionClientState = {
       ...mockSessionState,
-      mission: { id: 'm1', name: 'Copper Run', tier: 1, completed: false, reward: { coins: 1, xp: 1, items: [] }, objectives: [{ type: 'KILL_MOB', label: 'Kill 3 mobs', target: 3, progress: 1, done: false, unit: 'count' }] },
+      mission: { id: 'm1', name: 'Copper Run', tier: 1, completed: false, reward: { sol: 1, xp: 1, items: [] }, objectives: [{ type: 'KILL_MOB', label: 'Kill 3 mobs', target: 3, progress: 1, done: false, unit: 'count' }] },
     };
     rerender(<MiningHUD sessionState={withMission} {...props} />);
     expect(screen.getByTestId('mission-tracker')).toBeDefined();
     expect(screen.getByText('Kill 3 mobs')).toBeDefined();
+  });
+
+  it('has no button to leave or abandon the mine: leaving is only at the extraction point', () => {
+    render(<MiningHUD sessionState={mockSessionState} playerState={mockPlayerState} onRestart={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /extract|abandon|leave/i })).toBeNull();
   });
 });

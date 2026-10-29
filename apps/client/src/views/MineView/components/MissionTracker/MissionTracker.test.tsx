@@ -5,7 +5,7 @@ import type { MissionClientState } from '@mine-me/shared';
 import { MissionTracker } from './MissionTracker';
 
 const mission = (over: Partial<MissionClientState> = {}): MissionClientState => ({
-  id: 'm1', name: 'Deep Silver', tier: 3, completed: false, reward: { coins: 1, xp: 1, items: [] },
+  id: 'm1', name: 'Deep Silver', tier: 3, completed: false, reward: { sol: 1, xp: 1, items: [] },
   objectives: [
     { type: 'MINE_ITEM', label: 'Collect 15 Silverium', target: 15, progress: 6, done: false, unit: 'count' },
     { type: 'CLEAR_GAS', label: 'Clear 50% of the Hydrogen', target: 50, progress: 22.4, done: false, unit: 'percent' },

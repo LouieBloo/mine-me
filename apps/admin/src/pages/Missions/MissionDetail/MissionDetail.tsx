@@ -237,8 +237,8 @@ export default function MissionDetail() {
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label htmlFor="rewardCoins" className={labelClass}>Reward Coins</label>
-              <input id="rewardCoins" type="number" min={0} step={1} value={show(form.rewardCoins)} onChange={(e) => set('rewardCoins', readNumber(e.target.value))} className={inputClass} />
+              <label htmlFor="rewardSol" className={labelClass}>Reward Sol</label>
+              <input id="rewardSol" type="number" min={0} step={1} value={show(form.rewardSol)} onChange={(e) => set('rewardSol', readNumber(e.target.value))} className={inputClass} />
             </div>
             <div className="space-y-2">
               <label htmlFor="rewardXp" className={labelClass}>Reward XP</label>

@@ -3,7 +3,7 @@ import type { MissionClientState } from '@mine-me/shared';
 import { applyMissionDelta } from './missionProgress';
 
 const mission = (over: Partial<MissionClientState> = {}): MissionClientState => ({
-  id: 'm1', name: 'Test', tier: 1, completed: false, reward: { coins: 1, xp: 1, items: [] },
+  id: 'm1', name: 'Test', tier: 1, completed: false, reward: { sol: 1, xp: 1, items: [] },
   objectives: [
     { type: 'MINE_ITEM', label: 'Collect 5 Copperium', target: 5, progress: 1, done: false, unit: 'count' },
     { type: 'KILL_MOB', label: 'Kill 2 mobs', target: 2, progress: 0, done: false, unit: 'count' },

@@ -5,7 +5,7 @@ import { MiningDataManager, type GameDefinitions } from './mining/subsystems/Min
 
 const mission = (id: string, over: Partial<MissionDefinition> = {}): MissionDefinition => ({
   id, key: id, name: id, minLevel: 1, maxLevel: 5, tier: 1, weight: 1,
-  objectives: [{ type: 'KILL_MOB', amount: 2 }], rewardCoins: 10, rewardXp: 5, rewardItems: [], ...over,
+  objectives: [{ type: 'KILL_MOB', amount: 2 }], rewardSol: 10, rewardXp: 5, rewardItems: [], ...over,
 });
 
 function dataWith(missions: MissionDefinition[]): MiningDataManager {
@@ -77,10 +77,10 @@ describe('MissionOfferService', () => {
   });
 
   it('describes a mission for the picker: written objectives and the reward', () => {
-    const data = dataWith([mission('only', { objectives: [{ type: 'REACH_DEPTH', amount: 40 }, { type: 'KILL_MOB', amount: 3 }], rewardCoins: 99, rewardXp: 7 })]);
+    const data = dataWith([mission('only', { objectives: [{ type: 'REACH_DEPTH', amount: 40 }, { type: 'KILL_MOB', amount: 3 }], rewardSol: 99, rewardXp: 7 })]);
     const view = toOfferView(data.getMissions()[0], data);
     expect(view.objectives.map((o) => o.label)).toEqual(['Reach depth 40', 'Kill 3 mobs']);
-    expect(view.reward).toMatchObject({ coins: 99, xp: 7 });
+    expect(view.reward).toMatchObject({ sol: 99, xp: 7 });
     expect(view.tier).toBe(1);
   });
 });

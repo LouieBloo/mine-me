@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { type MiningSessionClientState, type PlayerState, MINING_CONFIG } from '@mine-me/shared';
+import { type MiningSessionClientState, type PlayerState } from '@mine-me/shared';
 import { ZoomControl } from '../ZoomControl/ZoomControl';
 import { QuickAccessBar } from '../../../../components/QuickAccessBar/QuickAccessBar';
 import { BeltStatus } from '../BeltStatus/BeltStatus';
@@ -12,8 +12,6 @@ import './MiningHUD.css';
 interface MiningHUDProps {
   sessionState: MiningSessionClientState;
   playerState: PlayerState;
-  onExit: () => void;
-  onAbandon: () => void;
   onRestart: () => void;
   isRestarting?: boolean;
   zoom?: number;
@@ -25,8 +23,6 @@ interface MiningHUDProps {
 export const MiningHUD: React.FC<MiningHUDProps> = ({
   sessionState,
   playerState,
-  onExit,
-  onAbandon,
   onRestart,
   isRestarting = false,
   zoom = 1.0,
@@ -66,16 +62,6 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
     update();
     return () => cancelAnimationFrame(frameId);
   }, [sessionState.isMining, sessionState.miningTotal, sessionState.miningStartedAt]);
-
-  const handleExitClick = () => {
-    if (sessionState.canExtract) {
-      onExit();
-    } else {
-      if (confirm('Are you sure you want to abandon the mine? All items in your temporary backpack will be lost!')) {
-        onAbandon();
-      }
-    }
-  };
 
   return (
     <div className="mining-hud-overlay absolute inset-0 flex flex-col justify-between p-6 pointer-events-none select-none">
@@ -241,20 +227,8 @@ export const MiningHUD: React.FC<MiningHUDProps> = ({
               <span className={showDebug ? 'text-emerald-400 font-bold' : ''}>Hitboxes</span>
             </span>
             <span className="text-slate-700">|</span>
-            <span>Exit at ({MINING_CONFIG.ENTRANCE_X}, {MINING_CONFIG.ENTRANCE_Y})</span>
+            <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-slate-200">E</kbd><span className="text-emerald-400">Leave (at the EXIT sign)</span></span>
           </div>
-
-          {/* Leave/Extract Button */}
-          <button
-            onClick={handleExitClick}
-            className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest border transition-all active:scale-95 cursor-pointer shadow-2xl pointer-events-auto ${
-              sessionState.canExtract
-                ? 'bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-400 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)] animate-pulse'
-                : 'bg-red-950/40 hover:bg-red-900/60 text-red-400 border-red-900/50 hover:border-red-500/50'
-            }`}
-          >
-            {sessionState.canExtract ? 'Extract & Leave' : 'Abandon Mine'}
-          </button>
         </div>
       </div>
       <PerformanceOverlay />

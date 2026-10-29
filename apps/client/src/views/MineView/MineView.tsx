@@ -9,15 +9,18 @@ import { MiningGrid } from './components/MiningGrid/MiningGrid';
 import { MiningHUD } from './components/MiningHUD/MiningHUD';
 import { LOADING_SCREEN_EXIT_MS, MiningLoadingScreen } from './components/MiningLoadingScreen/MiningLoadingScreen';
 import { notificationService } from '../../services/notificationService';
-import { type BeltBlockedReason, type MiningBackpackItem, type MiningGameMode, type MissionOffersResponse, type MissionResultView, isOnEntrance } from '@mine-me/shared';
+import { type BeltBlockedReason, type MiningBackpackItem, type MiningGameMode, type MissionOffersResponse, type MissionResultView } from '@mine-me/shared';
 import { Modal } from '../../components/Modal/Modal';
 import { LootSpoilsModal } from '../../components/LootSpoilsModal/LootSpoilsModal';
 import { miningStartEvent } from './miningStartEvent';
 import { ExpeditionModeModal } from './components/ExpeditionModeModal/ExpeditionModeModal';
+import { ExitPrompt } from './components/ExitPrompt/ExitPrompt';
+import { useExitKey } from './components/ExitPrompt/useExitKey';
 import { SandboxPanel } from './components/SandboxPanel/SandboxPanel';
 import { useSandboxController } from './hooks/useSandboxController';
 import { useMissionSync, playMissionSound } from './hooks/useMissionSync';
-import { MissionResults } from './components/MissionResults/MissionResults';
+import { MissionSummary } from './components/MissionSummary/MissionSummary';
+import { buildRunSummary } from './runSummary';
 import './MineView.css';
 
 export const MineView: React.FC = () => {
@@ -62,14 +65,15 @@ export const MineView: React.FC = () => {
 
   // Modal & Summary States
   const [showModeModal, setShowModeModal] = useState<boolean>(!miningSession);
-  const [hasMovedOffEntrance, setHasMovedOffEntrance] = useState<boolean>(false);
+  // Whether the player stands at the extraction point (reported by the mine's frame loop)
+  const [atExit, setAtExit] = useState<boolean>(false);
   const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const [summaryLoot, setSummaryLoot] = useState<MiningBackpackItem[]>([]);
-  // How the run's mission went, shown when the run ends (before the loot on a safe exit, instead of it when the run is lost)
-  const [missionResult, setMissionResult] = useState<MissionResultView | null>(null);
-  const [missionResultOpen, setMissionResultOpen] = useState<boolean>(false);
-  const afterMissionResultRef = useRef<'summary' | 'home'>('home');
+  // How the run's mission went: a section of the one Expedition Summary (safe exit, or a run the server ended)
+  const [summaryMission, setSummaryMission] = useState<MissionResultView | null>(null);
+  // Set when the server ended the run (death, time limit): the summary says why, in place of the usual safe-exit text
+  const [summaryEnded, setSummaryEnded] = useState<{ title: string; message: string } | null>(null);
 
   // Debug hitboxes & reach mode state
   const [showDebug, setShowDebug] = useState<boolean>(false);
@@ -152,15 +156,16 @@ export const MineView: React.FC = () => {
     const endRun = (title: string, message: string, severity: 'info' | 'error', mission?: MissionResultView) => {
       isCleanedUpRef.current = true;
       setMiningSession(null);
-      notificationService[severity](title, message);
       if (mission) {
-        // The lost mission is shown before going home, with its own sound
+        // A run with a mission ends on the Expedition Summary (the one end screen), which says why and shows the failed mission
         if (lostMissionRef.current) playMissionSound(lostMissionRef.current, 'failed', (url, options) => soundManager.playSfx?.(url, options as never));
-        afterMissionResultRef.current = 'home';
-        setMissionResult(mission);
-        setMissionResultOpen(true);
+        setSummaryLoot([]);
+        setSummaryMission(mission);
+        setSummaryEnded({ title, message });
+        setShowSummaryModal(true);
         return;
       }
+      notificationService[severity](title, message);
       navigate('/home');
     };
 
@@ -237,7 +242,7 @@ export const MineView: React.FC = () => {
           isCleanedUpRef.current = false;
           setMiningSession(result.data.sessionState);
           setSessionKey((prev) => prev + 1);
-          setHasMovedOffEntrance(false);
+          setAtExit(false);
           setShowExitConfirmation(false);
           selectSlot(0).catch(() => {});
           soundManager.startSessionBgm();
@@ -265,23 +270,16 @@ export const MineView: React.FC = () => {
       return;
     }
     // (while the run's results or spoils are on screen the mode picker waits: closing them goes home)
-    if (!miningSession && !missionResultOpen && !showSummaryModal) {
+    if (!miningSession && !showSummaryModal) {
       setLoading(false);
       setShowModeModal(true);
     }
-  }, [activeCharacter?.id, navigate, miningSession, missionResultOpen, showSummaryModal]);
+  }, [activeCharacter?.id, navigate, miningSession, showSummaryModal]);
 
-  // Track if player has moved off the entrance and then landed back on it to trigger modal
-  useEffect(() => {
-    // (the sandbox has no exit ladder to confirm: it has a Leave button)
-    if (!miningSession || miningSession.gameMode === 'sandbox') return;
-    const isAtEntrance = isOnEntrance(miningSession.position.x, miningSession.position.y);
-    if (!isAtEntrance) {
-      setHasMovedOffEntrance(true);
-    } else if (hasMovedOffEntrance && isAtEntrance) {
-      setShowExitConfirmation(true);
-    }
-  }, [miningSession?.position?.x, miningSession?.position?.y, hasMovedOffEntrance]);
+  // Pressing E (or clicking the prompt) at the extraction point asks to leave; nothing pops up on its own
+  const canAskToLeave = atExit && !showExitConfirmation && !showSummaryModal && !showModeModal;
+  const askToLeave = useCallback(() => setShowExitConfirmation(true), []);
+  useExitKey(canAskToLeave, askToLeave);
 
   // Safe Extraction Handler
   const handleExit = useCallback(async () => {
@@ -299,14 +297,9 @@ export const MineView: React.FC = () => {
         const items = result.data?.extractedItems || [];
         setSummaryLoot(items);
         setMiningSession(null);
-        if (result.data?.mission) {
-          // The mission's results come first, then the loot
-          afterMissionResultRef.current = 'summary';
-          setMissionResult(result.data.mission as MissionResultView);
-          setMissionResultOpen(true);
-        } else {
-          setShowSummaryModal(true);
-        }
+        setSummaryMission((result.data?.mission as MissionResultView | undefined) ?? null);
+        setSummaryEnded(null);
+        setShowSummaryModal(true);
       } else {
         notificationService.error('Extraction Failed', result.error || 'Cannot extract');
       }
@@ -318,47 +311,13 @@ export const MineView: React.FC = () => {
     }
   }, [sendGameEvent, setMiningSession, miningSession?.gameMode, navigate]);
 
-  // Abandon Session Handler (without extraction)
-  const handleAbandon = useCallback(() => {
-    isCleanedUpRef.current = true;
-    sendGameEvent({ type: 'mining_cancel' }).catch(() => {});
-    setMiningSession(null);
-    notificationService.info('Mine Abandoned', 'You abandoned the mine and lost your temporary loot.');
-    navigate('/home');
-  }, [sendGameEvent, setMiningSession, navigate]);
-
   // Restart / New Game Handler
   const handleRestart = useCallback(() => {
     setShowExitConfirmation(false);
     setShowModeModal(true);
   }, []);
 
-  const xpGained = summaryLoot.reduce((sum, item) => sum + item.quantity * 5, 0);
-  const mappedLootItems = (() => {
-    const groupedMap: Record<string, typeof summaryLoot[number]> = {};
-    for (const item of summaryLoot) {
-      if (groupedMap[item.itemId]) {
-        groupedMap[item.itemId] = {
-          ...groupedMap[item.itemId],
-          quantity: groupedMap[item.itemId].quantity + item.quantity,
-        };
-      } else {
-        groupedMap[item.itemId] = { ...item };
-      }
-    }
-    return Object.values(groupedMap).map((item) => ({
-      itemId: item.itemId,
-      quantity: item.quantity,
-      itemDetails: {
-        id: item.itemId,
-        name: item.itemName,
-        description: 'A resource extracted from the dungeon mine.',
-        iconUrl: item.iconUrl,
-        type: 'MATERIAL',
-        rarity: 'LOW',
-      },
-    }));
-  })();
+  const runSummary = buildRunSummary(summaryLoot, summaryMission);
 
   if (!activeCharacter || !playerState) {
     return null;
@@ -414,6 +373,7 @@ export const MineView: React.FC = () => {
             onBackpackFull={handleBackpackFull}
             onStashChange={handleStashChange}
             onBeltChange={handleBeltChange}
+            onAtExitChange={setAtExit}
             sandbox={sandbox.view}
           />
         </PixiStageProvider>
@@ -424,8 +384,6 @@ export const MineView: React.FC = () => {
         <MiningHUD
           sessionState={miningSession}
           playerState={playerState}
-          onExit={handleExit}
-          onAbandon={handleAbandon}
           onRestart={handleRestart}
           isRestarting={loading}
           zoom={zoom}
@@ -433,6 +391,11 @@ export const MineView: React.FC = () => {
           showDebug={showDebug}
           onToggleDebug={handleToggleDebug}
         />
+      )}
+
+      {/* "Press E to leave the mine", only while standing at the extraction point */}
+      {miningSession && miningSession.gameMode !== 'sandbox' && !showExitConfirmation && (
+        <ExitPrompt visible={atExit} onLeave={askToLeave} />
       )}
 
       {/* Sandbox tool panel */}
@@ -498,7 +461,7 @@ export const MineView: React.FC = () => {
       >
         <div className="flex flex-col gap-4">
           <p className="text-sm text-slate-300">
-            You have returned to the exit ladder. Would you like to safely extract all items in your temporary loot sack and leave the mine?
+            You are at the extraction point. Would you like to safely extract all items in your temporary loot sack and leave the mine?
           </p>
           <div className="flex justify-end gap-3 mt-2">
             <button
@@ -520,36 +483,27 @@ export const MineView: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Summary Loot spoils modal */}
+      {/* The Expedition Summary: the run's only end screen (loot, Sol and XP, and how the mission went) */}
       <LootSpoilsModal
         isOpen={showSummaryModal}
         onClose={() => {
           setShowSummaryModal(false);
           setSummaryLoot([]);
+          setSummaryMission(null);
+          setSummaryEnded(null);
           navigate('/home');
         }}
         title={
-          <span className="flex items-center gap-2 text-amber-400">
-            ⛏️ Expedition Summary
+          <span className={`flex items-center gap-2 ${summaryEnded ? 'text-rose-400' : 'text-amber-400'}`}>
+            {summaryEnded ? `⚠️ ${summaryEnded.title}` : '⛏️ Expedition Summary'}
           </span>
         }
-        description="You successfully extracted from the mine! Here are the spoils gathered:"
-        sol={0}
-        experience={xpGained}
-        items={mappedLootItems}
-        acceptButtonText="Accept Spoils"
-      />
-
-      {/* How the run's mission went (a safe exit pays; a lost run shows what was missed) */}
-      <MissionResults
-        isOpen={missionResultOpen}
-        result={missionResult}
-        onClose={() => {
-          setMissionResultOpen(false);
-          setMissionResult(null);
-          if (afterMissionResultRef.current === 'summary') setShowSummaryModal(true);
-          else navigate('/home');
-        }}
+        description={summaryEnded ? summaryEnded.message : 'You successfully extracted from the mine! Here are the spoils gathered:'}
+        sol={runSummary.sol}
+        experience={runSummary.experience}
+        items={runSummary.items}
+        acceptButtonText={summaryEnded ? 'Return Home' : 'Accept Spoils'}
+        extra={<MissionSummary result={summaryMission} />}
       />
 
       {/* Choose Expedition Mode Modal (Solo vs Multiplayer) */}

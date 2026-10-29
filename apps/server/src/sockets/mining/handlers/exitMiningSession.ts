@@ -7,7 +7,8 @@ import { miningSessionManager } from '../../../services/mining/MiningSessionMana
 
 /**
  * Handler: mining_exit
- * Extracts from the mine. Saves temporary loot to PostgreSQL inventory.
+ * Extracts from the mine. Saves temporary loot to PostgreSQL inventory. Only allowed at the extraction point on the surface
+ * (the sandbox, which saves nothing, may leave from anywhere).
  */
 export const handleMiningExit = async (
   io: Server,
@@ -15,6 +16,9 @@ export const handleMiningExit = async (
 ): Promise<GameEventResult> => {
   const characterId = socket.data.characterId;
   if (!characterId) return { success: false, error: 'No character selected.' };
+
+  const mayLeave = miningSessionManager.canExit(characterId);
+  if (!mayLeave.ok) return { success: false, error: mayLeave.error };
 
   try {
     const { extractedItems, backpackItems, stashItems, mission } = await miningSessionManager.endSession(characterId);

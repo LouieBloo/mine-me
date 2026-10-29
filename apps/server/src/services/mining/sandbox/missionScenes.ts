@@ -18,7 +18,7 @@ const S = SANDBOX_BLOCK_SCALE;
 
 /** A mission made on the spot (no reward, level range open) from a list of objectives. */
 export function adHocMission(id: string, name: string, objectives: ObjectiveDefinition[]): MissionDefinition {
-  return { id: `sandbox_${id}`, key: `sandbox_${id}`, name, description: 'A test mission started from the sandbox.', minLevel: 1, maxLevel: 999, tier: 1, weight: 1, objectives, rewardCoins: 0, rewardXp: 0, rewardItems: [] };
+  return { id: `sandbox_${id}`, key: `sandbox_${id}`, name, description: 'A test mission started from the sandbox.', minLevel: 1, maxLevel: 999, tier: 1, weight: 1, objectives, rewardSol: 0, rewardXp: 0, rewardItems: [] };
 }
 
 /** The hall in cells of the whole map: its open columns and the row of its floor. */

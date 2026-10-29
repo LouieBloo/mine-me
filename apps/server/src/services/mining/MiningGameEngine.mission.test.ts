@@ -7,7 +7,7 @@ import { hitMob } from './testHelpers';
 const cid = 'mission-char';
 
 const mission = (objectives: ObjectiveDefinition[], over: Partial<MissionDefinition> = {}): MissionDefinition => ({
-  id: 'mx', key: 'mx', name: 'Test mission', minLevel: 1, maxLevel: 99, tier: 1, weight: 1, objectives, rewardCoins: 5, rewardXp: 5, rewardItems: [], ...over,
+  id: 'mx', key: 'mx', name: 'Test mission', minLevel: 1, maxLevel: 99, tier: 1, weight: 1, objectives, rewardSol: 5, rewardXp: 5, rewardItems: [], ...over,
 });
 
 function start(m: MissionDefinition | undefined, mapConfig: object = { mobSpawnCount: 0 }) {
@@ -152,7 +152,7 @@ describe('depth and the wire', () => {
     engine.missionTracker!.onMobKilled(cid, 'x');
     const { miningSessionManager } = await import('./MiningSessionManager');
     const state = miningSessionManager.buildClientState(engine, cid);
-    expect(state.mission).toMatchObject({ name: 'Test mission', completed: false, reward: { coins: 5, xp: 5 } });
+    expect(state.mission).toMatchObject({ name: 'Test mission', completed: false, reward: { sol: 5, xp: 5 } });
     expect(state.mission?.objectives[0]).toMatchObject({ progress: 1, target: 2, done: false });
   });
 });

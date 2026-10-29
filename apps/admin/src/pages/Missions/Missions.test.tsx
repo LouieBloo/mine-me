@@ -9,8 +9,8 @@ const mockFetchWithAuth = vi.fn();
 vi.mock('../../hooks/useApi', () => ({ useApi: () => ({ fetchWithAuth: mockFetchWithAuth }) }));
 vi.mock('./MissionSimulator/MissionSimulator', () => ({ default: () => <div>SIMULATOR</div> }));
 
-const COPPER = { id: 'm1', key: 'copper_run', name: 'Copper Run', tier: 1, minLevel: 1, maxLevel: 3, weight: 1, objectives: [{ type: 'MINE_ITEM', targetId: 'i1', amount: 10 }], rewardCoins: 30, rewardXp: 20, rewardItems: [] };
-const DEEP = { id: 'm2', key: 'deep', name: 'Deep Silver', tier: 3, minLevel: 3, maxLevel: 4, weight: 1, objectives: [{ type: 'MINE_ITEM', targetId: 'i2', amount: 15 }, { type: 'REACH_DEPTH', amount: 90 }], rewardCoins: 300, rewardXp: 200, rewardItems: [{ itemId: 'i2', chance: 100, minQuantity: 1, maxQuantity: 2 }] };
+const COPPER = { id: 'm1', key: 'copper_run', name: 'Copper Run', tier: 1, minLevel: 1, maxLevel: 3, weight: 1, objectives: [{ type: 'MINE_ITEM', targetId: 'i1', amount: 10 }], rewardSol: 30, rewardXp: 20, rewardItems: [] };
+const DEEP = { id: 'm2', key: 'deep', name: 'Deep Silver', tier: 3, minLevel: 3, maxLevel: 4, weight: 1, objectives: [{ type: 'MINE_ITEM', targetId: 'i2', amount: 15 }, { type: 'REACH_DEPTH', amount: 90 }], rewardSol: 300, rewardXp: 200, rewardItems: [{ itemId: 'i2', chance: 100, minQuantity: 1, maxQuantity: 2 }] };
 
 const renderPage = () =>
   render(
@@ -42,8 +42,8 @@ describe('Missions list page', () => {
     expect(screen.getByText('Tier 1 (easy)')).toBeInTheDocument();
     expect(screen.getByText('Tier 3 (hard)')).toBeInTheDocument();
     expect(screen.getByText('3-4')).toBeInTheDocument();
-    expect(screen.getByText('30 coins, 20 XP')).toBeInTheDocument();
-    expect(screen.getByText('300 coins, 200 XP, 1 item')).toBeInTheDocument();
+    expect(screen.getByText('30 Sol, 20 XP')).toBeInTheDocument();
+    expect(screen.getByText('300 Sol, 200 XP, 1 item')).toBeInTheDocument();
     expect(screen.getByText('SIMULATOR')).toBeInTheDocument();
   });
 

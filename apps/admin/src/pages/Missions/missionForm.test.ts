@@ -4,7 +4,7 @@ import { NEW_MISSION, formToMission, missionToForm, newObjective, newRewardItem,
 
 const mission: MissionDefinition = {
   id: 'm1', key: 'copper_run', name: 'Copper Run', description: null, minLevel: 1, maxLevel: 5, tier: 2, weight: 3,
-  objectives: [{ type: 'KILL_MOB', amount: 3 }], rewardCoins: 10, rewardXp: 20, rewardItems: [{ itemId: 'i1', chance: 50, minQuantity: 1, maxQuantity: 2 }],
+  objectives: [{ type: 'KILL_MOB', amount: 3 }], rewardSol: 10, rewardXp: 20, rewardItems: [{ itemId: 'i1', chance: 50, minQuantity: 1, maxQuantity: 2 }],
 };
 
 describe('missionForm', () => {
@@ -22,7 +22,7 @@ describe('missionForm', () => {
   });
 
   it('sends 0 for an empty reward number', () => {
-    expect(formToMission({ ...NEW_MISSION, rewardCoins: Number.NaN, rewardXp: Number.NaN })).toMatchObject({ rewardCoins: 0, rewardXp: 0 });
+    expect(formToMission({ ...NEW_MISSION, rewardSol: Number.NaN, rewardXp: Number.NaN })).toMatchObject({ rewardSol: 0, rewardXp: 0 });
   });
 
   it('gives a new objective the defaults of its type, with an empty target where one applies', () => {

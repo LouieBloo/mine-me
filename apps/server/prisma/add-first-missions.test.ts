@@ -37,8 +37,8 @@ describe('add-first-missions', () => {
     const byTier = (t: number) => FIRST_MISSIONS.filter((m) => m.tier === t);
     const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
     expect(avg(byTier(3).map((m) => m.objectives.length))).toBeGreaterThan(avg(byTier(1).map((m) => m.objectives.length)));
-    expect(avg(byTier(3).map((m) => m.rewardCoins))).toBeGreaterThan(avg(byTier(2).map((m) => m.rewardCoins)));
-    expect(avg(byTier(2).map((m) => m.rewardCoins))).toBeGreaterThan(avg(byTier(1).map((m) => m.rewardCoins)));
+    expect(avg(byTier(3).map((m) => m.rewardSol))).toBeGreaterThan(avg(byTier(2).map((m) => m.rewardSol)));
+    expect(avg(byTier(2).map((m) => m.rewardSol))).toBeGreaterThan(avg(byTier(1).map((m) => m.rewardSol)));
   });
 
   it('skips missions that exist and reports what the database lacks', () => {

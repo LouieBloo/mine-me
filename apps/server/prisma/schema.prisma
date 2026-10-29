@@ -667,7 +667,8 @@ model Mission {
   weight      Float    @default(1)
   // [{ type, targetId?, amount }]
   objectives  Json
-  rewardCoins Int      @default(0)
+  // (the column keeps its first name, rewardCoins, so no data moves)
+  rewardSol   Int      @map("rewardCoins") @default(0)
   rewardXp    Int      @default(0)
   // [{ itemId, chance, minQuantity, maxQuantity }]
   rewardItems Json?

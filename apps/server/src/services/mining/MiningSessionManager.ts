@@ -42,7 +42,7 @@ export interface ExitResult {
 
 /** What a safe exit pays for a completed mission, rolled once at claim time (ticket 113). */
 export interface MissionPayout {
-  coins: number;
+  sol: number;
   xp: number;
   items: { itemId: string; quantity: number }[];
 }
@@ -335,6 +335,21 @@ export class MiningSessionManager {
   /**
    * End session and persist temporary loot to character inventory via Prisma.
    */
+  /**
+   * Whether the player may leave the mine safely right now: only standing at the extraction point (the exit on the surface).
+   * A room that saves nothing (the sandbox) has its own Leave button and lets anyone go. Someone with no run is let through,
+   * so a repeated exit still just returns an empty result.
+   */
+  public canExit(characterId: string): { ok: true } | { ok: false; error: string } {
+    const roomId = this.playerToRoom.get(characterId);
+    const engine = roomId ? this.activeRooms.get(roomId) : undefined;
+    const player = engine?.getPlayer(characterId);
+    if (!engine || !player || !engine.rules.persistsCharacter) return { ok: true };
+    const { x, y } = player.playerBody.position;
+    if (isOnEntrance(x, y, engine.surfaceRow)) return { ok: true };
+    return { ok: false, error: 'You can only leave the mine at the extraction point on the surface.' };
+  }
+
   public async endSession(characterId: string): Promise<ExitResult> {
     const roomId = this.playerToRoom.get(characterId);
     if (!roomId) {
@@ -371,7 +386,7 @@ export class MiningSessionManager {
     let banked: Awaited<ReturnType<typeof RunStashService.bank>>;
     try {
       const loot = [...backpackItems.map((i) => ({ itemId: i.itemId, quantity: i.quantity })), ...(payout?.items ?? [])];
-      banked = payout ? await RunStashService.bank(characterId, loot, { sol: payout.coins, experience: payout.xp }) : await RunStashService.bank(characterId, loot);
+      banked = payout ? await RunStashService.bank(characterId, loot, { sol: payout.sol, experience: payout.xp }) : await RunStashService.bank(characterId, loot);
     } catch (err) {
       // Nothing was written, so the reward is still owed (and the backpack stays with the caller to retry)
       if (payout) engine.missionTracker?.unclaim(characterId);
@@ -386,7 +401,7 @@ export class MiningSessionManager {
       ? {
           ...missionOutcome.result,
           ...(payout
-            ? { reward: { coins: payout.coins, xp: payout.xp, items: rewardedItems.map((i) => ({ itemId: i.itemId, itemName: engine.dataManager.getItemData(i.itemId)?.name ?? i.itemId, iconUrl: engine.dataManager.getItemData(i.itemId)?.iconUrl ?? null, quantity: i.quantity })) } }
+            ? { reward: { sol: payout.sol, xp: payout.xp, items: rewardedItems.map((i) => ({ itemId: i.itemId, itemName: engine.dataManager.getItemData(i.itemId)?.name ?? i.itemId, iconUrl: engine.dataManager.getItemData(i.itemId)?.iconUrl ?? null, quantity: i.quantity })) } }
             : {}),
         }
       : undefined;
@@ -408,7 +423,7 @@ export class MiningSessionManager {
     }
     const mission = tracker.mission;
     const items = rollDropTable({ items: mission.rewardItems ?? [] }).map((d) => ({ itemId: d.itemId, quantity: d.quantity }));
-    return { result: engine.missionResultFor(characterId, 'paid')!, payout: { coins: mission.rewardCoins, xp: mission.rewardXp, items } };
+    return { result: engine.missionResultFor(characterId, 'paid')!, payout: { sol: mission.rewardSol, xp: mission.rewardXp, items } };
   }
 
   /**

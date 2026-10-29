@@ -14,9 +14,9 @@ Work them through one at a time with the pick-from-a-list prompt. Each has the d
 6. **The offers are kept in server memory for 30 minutes** [111], so a restart re-rolls them. Fine for now; say if it must survive restarts.
 7. ~~answered~~ **Who picks in the shared lobby** [111]. Built: whoever enters an empty lobby; later joiners inherit its mission and progress and see no picker. A lobby that empties starts fresh.
    **Answer (owner, 2026-10-28): Keep: the first player in the lobby picks.**
-8. ~~answered~~ **An unfinished mission shows the results screen on every safe exit** [113], to say why nothing was paid. Keep, or only show it when the mission was completed or lost?
-   **Answer (owner, 2026-10-28): Keep: always show the results screen.**
-9. **Starter numbers** [108]: eight missions, tiers 1-3, coins 30-300, XP 20-200, depths 45-90 small blocks (15-30 original blocks), levels 1-4. All are a first guess for the Missions page.
+8. ~~answered~~ **An unfinished mission shows the end-of-run summary on every safe exit** [113], to say why nothing was paid. Keep, or only show it when the mission was completed or lost?
+   **Answer (owner, 2026-10-28): Keep: always show it. Later the same day: there must be only ONE end screen, so the mission results are now a section of the Expedition Summary (ticket 113).**
+9. **Starter numbers** [108]: eight missions, tiers 1-3, Sol 30-300, XP 20-200, depths 45-90 small blocks (15-30 original blocks), levels 1-4. All are a first guess for the Missions page.
 10. ~~answered~~ **The optional map `requirements` column (biome needs) from ticket 108 was not built** [108, 110]. Nothing needs it yet; say if a mission should be able to ask for a biome.
    **Answer (owner, 2026-10-28): Not yet.**
 11. **Pumping a fluid out (115)** stays registered but cannot be saved until pumps exist.

@@ -15,7 +15,7 @@
         "targetId": "fluid_oil"
       }
     ],
-    "rewardCoins": 110,
+    "rewardSol": 110,
     "rewardXp": 75,
     "rewardItems": [],
     "soundEffects": null,
@@ -38,7 +38,7 @@
         "targetId": "gas_hydrogen"
       }
     ],
-    "rewardCoins": 50,
+    "rewardSol": 50,
     "rewardXp": 40,
     "rewardItems": [
       {
@@ -77,7 +77,7 @@
         "amount": 90
       }
     ],
-    "rewardCoins": 300,
+    "rewardSol": 300,
     "rewardXp": 200,
     "rewardItems": [
       {
@@ -107,7 +107,7 @@
         "targetId": "cmp6aexa30004idpx29gsz12l"
       }
     ],
-    "rewardCoins": 30,
+    "rewardSol": 30,
     "rewardXp": 20,
     "rewardItems": [],
     "soundEffects": null,
@@ -129,7 +129,7 @@
         "amount": 45
       }
     ],
-    "rewardCoins": 35,
+    "rewardSol": 35,
     "rewardXp": 25,
     "rewardItems": [],
     "soundEffects": null,
@@ -152,7 +152,7 @@
         "targetId": "cmn_mole_person_001"
       }
     ],
-    "rewardCoins": 40,
+    "rewardSol": 40,
     "rewardXp": 30,
     "rewardItems": [],
     "soundEffects": null,
@@ -174,7 +174,7 @@
         "amount": 8
       }
     ],
-    "rewardCoins": 100,
+    "rewardSol": 100,
     "rewardXp": 70,
     "rewardItems": [],
     "soundEffects": null,
@@ -201,7 +201,7 @@
         "amount": 60
       }
     ],
-    "rewardCoins": 120,
+    "rewardSol": 120,
     "rewardXp": 80,
     "rewardItems": [
       {

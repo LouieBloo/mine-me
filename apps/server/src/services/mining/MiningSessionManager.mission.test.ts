@@ -14,7 +14,7 @@ const makeSocket = () => ({ connected: true, emit: vi.fn() }) as any;
 
 const mission = (over: Partial<MissionDefinition> = {}): MissionDefinition => ({
   id: 'm1', key: 'm1', name: 'Reach the deep', minLevel: 1, maxLevel: 9, tier: 1, weight: 1,
-  objectives: [{ type: 'KILL_MOB', amount: 1 }], rewardCoins: 25, rewardXp: 40,
+  objectives: [{ type: 'KILL_MOB', amount: 1 }], rewardSol: 25, rewardXp: 40,
   rewardItems: [{ itemId: 'reward-item', chance: 100, minQuantity: 2, maxQuantity: 2 }], ...over,
 });
 
@@ -37,13 +37,13 @@ describe('a mission pays on a safe exit only (ticket 113)', () => {
 
   const complete = (id: string) => miningSessionManager.getSession(id)!.missionTracker!.onMobKilled(id, 'any-mob');
 
-  it('banks the coins, XP and rolled items with the loot in the same banking call', async () => {
+  it('banks the Sol, XP and rolled items with the loot in the same banking call', async () => {
     start('mc-a', mission());
     complete('mc-a');
     const res = await miningSessionManager.endSession('mc-a');
     expect(exitCalls()).toHaveLength(1);
     expect(RunStashService.bank).toHaveBeenCalledWith('mc-a', [{ itemId: 'reward-item', quantity: 2 }], { sol: 25, experience: 40 });
-    expect(res.mission).toMatchObject({ outcome: 'paid', reward: { coins: 25, xp: 40 } });
+    expect(res.mission).toMatchObject({ outcome: 'paid', reward: { sol: 25, xp: 40 } });
     expect(res.mission?.reward?.items).toEqual([expect.objectContaining({ itemId: 'reward-item', quantity: 2 })]);
   });
 
